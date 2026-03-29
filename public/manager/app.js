@@ -5,8 +5,8 @@ function load(key) { try { return JSON.parse(localStorage.getItem(key)) || []; }
 function save(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
   updateStatus();
-  // products 변경 시 Supabase 백그라운드 동기화
-  if (key === KEYS.products && typeof syncProductsToSupabase === 'function') {
+  // products 변경 시 Supabase 동기화 (2초 디바운스로 중복 방지)
+  if (key === KEYS.products) {
     syncProductsToSupabase();
   }
 }
@@ -15,16 +15,22 @@ function loadObj(key, def) { try { return JSON.parse(localStorage.getItem(key)) 
 // Supabase에서 밀워키 제품 로드
 async function loadProductsFromSupabase() {
   try {
+    console.log('[Supabase] 제품 로드 시작...');
     var resp = await fetch('/api/products');
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    if (!resp.ok) {
+      var errText = await resp.text().catch(function() { return ''; });
+      throw new Error('HTTP ' + resp.status + ' ' + errText.substring(0, 200));
+    }
     var data = await resp.json();
     if (data.products && data.products.length > 0) {
       DB.products = data.products;
-      save(KEYS.products, DB.products); // localStorage 백업
-      console.log('[Supabase] 밀워키 제품 로드: ' + data.products.length + '건');
+      // localStorage에만 저장 (Supabase 재업로드 방지)
+      localStorage.setItem(KEYS.products, JSON.stringify(DB.products));
+      updateStatus();
+      console.log('[Supabase] 밀워키 제품 로드 완료: ' + data.products.length + '건');
       return true;
     } else {
-      console.log('[Supabase] 제품 데이터 없음 — localStorage 폴백');
+      console.log('[Supabase] 제품 데이터 없음 — localStorage 폴백 (' + DB.products.length + '건)');
       return false;
     }
   } catch (err) {
@@ -33,22 +39,37 @@ async function loadProductsFromSupabase() {
   }
 }
 
-// Supabase에 밀워키 제품 전체 동기화 (localStorage 저장 후 백그라운드 업로드)
+// Supabase에 밀워키 제품 전체 동기화 (디바운스 적용)
+var _syncTimer = null;
+var _syncing = false;
 function syncProductsToSupabase() {
   var products = DB.products;
-  if (!products.length) return;
-  fetch('/api/products/bulk', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ products: products, mode: 'replace' })
-  }).then(function(resp) {
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return resp.json();
-  }).then(function(data) {
-    console.log('[Supabase] 제품 동기화 완료:', data.result);
-  }).catch(function(err) {
-    console.warn('[Supabase] 제품 동기화 실패:', err.message);
-  });
+  if (!products.length) { console.log('[Supabase] 동기화 스킵: 제품 0건'); return; }
+  if (_syncing) { console.log('[Supabase] 동기화 스킵: 이미 진행 중'); return; }
+
+  // 2초 디바운스 — save()가 여러 번 연속 호출돼도 마지막 1번만 실행
+  if (_syncTimer) clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(function() {
+    _syncing = true;
+    console.log('[Supabase] 동기화 시작: ' + products.length + '건');
+
+    fetch('/api/products/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: products, mode: 'replace' })
+    }).then(function(resp) {
+      if (!resp.ok) {
+        return resp.text().then(function(t) { throw new Error('HTTP ' + resp.status + ' ' + t.substring(0, 200)); });
+      }
+      return resp.json();
+    }).then(function(data) {
+      console.log('[Supabase] 동기화 완료:', JSON.stringify(data.result));
+    }).catch(function(err) {
+      console.error('[Supabase] 동기화 실패:', err.message);
+    }).finally(function() {
+      _syncing = false;
+    });
+  }, 2000);
 }
 
 let DB = {

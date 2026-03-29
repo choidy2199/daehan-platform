@@ -52,26 +52,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '제품 데이터가 없습니다' }, { status: 400 });
     }
 
-    const dbRows = products.map(toDb);
-    let result = { inserted: 0, updated: 0 };
+    console.log(`[Products Bulk] 요청: ${products.length}건, mode=${mode}, 첫번째 code=${products[0]?.code || 'N/A'}`);
 
-    // replace/merge 모두 delete+insert 방식 (유니크 인덱스 불필요)
-    // merge 시에도 app.js에서 이미 기존 데이터와 병합 후 전체를 보내므로 replace와 동일
-    const { error: delError } = await supabase
+    const dbRows = products.map(toDb);
+    let result = { inserted: 0, deleted: 0 };
+
+    // 기존 milwaukee 제품 삭제
+    const { data: delData, error: delError } = await supabase
       .from('products')
       .delete()
-      .eq('product_type', 'milwaukee');
-    if (delError) throw delError;
+      .eq('product_type', 'milwaukee')
+      .select('id');
+
+    if (delError) {
+      console.error('[Products Bulk] 삭제 실패:', delError);
+      throw delError;
+    }
+    result.deleted = delData ? delData.length : 0;
+    console.log(`[Products Bulk] 기존 삭제: ${result.deleted}건`);
 
     // 500개씩 배치 insert
     for (let i = 0; i < dbRows.length; i += 500) {
       const batch = dbRows.slice(i, i + 500);
       const { error } = await supabase.from('products').insert(batch);
-      if (error) throw error;
+      if (error) {
+        console.error(`[Products Bulk] insert 배치 ${i/500+1} 실패:`, error);
+        throw error;
+      }
       result.inserted += batch.length;
+      console.log(`[Products Bulk] insert 배치 ${i/500+1}: ${batch.length}건 성공`);
     }
 
-    console.log('[Products Bulk] 완료:', mode, result);
+    console.log('[Products Bulk] 완료:', JSON.stringify(result));
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('[Products Bulk]', err);
