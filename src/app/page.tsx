@@ -62,6 +62,34 @@ const menuCards = [
 export default function Home() {
   return (
     <>
+      {/* 기존 버전 관리시스템 바로가기 */}
+      <a
+        href="/manager/index.html"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "linear-gradient(135deg, #185FA5 0%, #0C447C 100%)",
+          color: "#fff",
+          borderRadius: 10,
+          padding: "16px 20px",
+          marginBottom: 20,
+          textDecoration: "none",
+          transition: "opacity 0.2s",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 22 }}>🖥</span>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>관리시스템 (기존 버전)</div>
+            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>
+              기존 단일파일 관리시스템 전체 기능 — 단가표, 발주, 세트분해, 견적, 판매, 설정
+            </div>
+          </div>
+        </div>
+        <span style={{ fontSize: 20, opacity: 0.7 }}>→</span>
+      </a>
+
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--tl-text)" }}>
           관리 메뉴

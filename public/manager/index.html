@@ -1,0 +1,1661 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>(주)대한종합상사 관리</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="top-nav">
+  <div class="nav-logo">(주)대한종합상사</div>
+  <div class="nav-tabs">
+    <div class="nav-sector nav-sector-milwaukee">
+      <span class="nav-sector-label label-milwaukee">밀워키</span>
+      <button class="nav-tab active" onclick="switchTab('catalog')">단가표</button>
+      <button class="nav-tab" onclick="switchTab('order')">발주</button>
+      <button class="nav-tab" onclick="switchTab('setbun')">세트및분해</button>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-sector nav-sector-general">
+      <span class="nav-sector-label label-general">일반</span>
+      <button class="nav-tab" onclick="switchTab('general')">일반제품 단가표</button>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-sector nav-sector-estimate">
+      <span class="nav-sector-label label-estimate">견적</span>
+      <button class="nav-tab" onclick="switchTab('estimate')">검색 및 견적</button>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-sector nav-sector-sales">
+      <span class="nav-sector-label label-sales">판매</span>
+      <button class="nav-tab" onclick="switchTab('sales')">온라인판매 관리</button>
+    </div>
+    <div class="nav-divider"></div>
+    <div class="nav-sector nav-sector-manage">
+      <button class="nav-tab" onclick="switchTab('manage')">설정</button>
+    </div>
+  </div>
+  <button class="btn-ghost" onclick="syncInventory()" style="padding:5px 12px;font-size:11px;font-weight:600">📦 재고</button>
+</nav>
+
+<div class="content">
+
+<!-- =============== TAB 1: 밀워키 단가표 =============== -->
+<div id="tab-catalog" class="tab-content active">
+  <div class="kpi-row" id="catalog-kpi" style="display:none"></div>
+  <div class="sub-tabs" id="catalog-filter-tabs" style="flex-shrink:0;margin-bottom:8px">
+    <button class="sub-tab active" onclick="setCatalogFilter('all')">전체제품</button>
+    <button class="sub-tab" onclick="setCatalogFilter('instock')">재고있음</button>
+    <button class="sub-tab" onclick="setCatalogFilter('outstock')">재고없음</button>
+    <button class="sub-tab" onclick="setCatalogFilter('discontinued')">단종</button>
+    <button class="sub-tab" onclick="setCatalogFilter('nocode')">관리코드없음</button>
+    <button class="sub-tab" onclick="setCatalogFilter('nosku')">코드없음</button>
+  </div>
+  <div class="section" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:visible">
+    <div class="section-header" style="flex-shrink:0">
+      <span>밀워키 전체 가격표</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:12px;font-weight:400;opacity:0.7" id="catalog-count">0건</span>
+        <button class="btn-danger btn-sm" onclick="deleteSelectedProducts()" id="btn-delete-selected" style="display:none">선택 삭제</button>
+        <button class="btn-setting" onclick="showSettingsModal()">⚙ 설정</button>
+        <button class="btn-action" onclick="showProductModal()">+ 제품 추가</button>
+        <button class="btn-action-sub" onclick="showImportModal()">📥 가져오기</button>
+        <button class="btn-export" onclick="exportAll()">📤 내보내기</button>
+      </div>
+    </div>
+    <div class="section-body" style="padding:12px;flex:1;display:flex;flex-direction:column;min-height:0">
+      <div class="search-bar" style="flex-shrink:0">
+        <input class="input" id="catalog-search" placeholder="코드, 모델명, 제품설명 검색..." oninput="renderCatalog()">
+        <select class="select" id="catalog-cat" onchange="renderCatalog()">
+          <option value="">전체 대분류</option>
+        </select>
+        <select class="select" id="catalog-sub" onchange="renderCatalog()">
+          <option value="">전체 중분류</option>
+        </select>
+      </div>
+      <div class="table-scroll" style="flex:1;overflow-y:auto;overflow-x:auto;min-height:0">
+        <table class="data-table" id="catalog-table">
+          <thead>
+            <tr>
+              <th>코드</th><th>관리코드</th><th>대분류</th><th>중분류</th><th>소분류</th><th class="center">순번</th><th>TTI#</th>
+              <th>모델명</th><th>제품설명</th><th class="num">공급가</th><th class="center">제품DC</th><th class="num">원가</th><th class="num" style="background:#FCEBEB;color:#CC2222">원가P</th>
+              <th class="num">A(도매)</th><th class="num">소매</th>
+              <th class="num" style="background:#E6F1FB;color:#0C447C">스토어팜</th>
+              <th class="num" style="background:#FAEEDA;color:#412402">오픈마켓</th>
+              <th class="center">재고</th>
+              <th class="center">본사</th>
+              <th class="center" style="min-width:120px">입고날짜</th>
+              <th class="center" style="width:90px"></th>
+            </tr>
+          </thead>
+          <tbody id="catalog-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============== TAB 2: 주문하기 =============== -->
+<div id="tab-order" class="tab-content">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px;flex-wrap:wrap">
+    <div class="sub-tabs" id="order-main-tabs" style="margin-bottom:0;flex-shrink:0">
+      <button class="sub-tab active" onclick="switchOrderMain('normal')">일반주문</button>
+      <button class="sub-tab" onclick="switchOrderMain('promo')">프로모션</button>
+    </div>
+    <div id="order-kpi-bar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;align-items:center;background:#1A1D23;border-radius:6px;padding:8px 20px">
+        <span style="font-size:12px;color:rgba(255,255,255,0.6)">전동공구</span>
+        <span style="font-size:18px;font-weight:700;color:#FFF" id="order-elec-total">0</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;background:#F4F6FA;border-radius:6px;padding:8px 20px;border:1px solid #DDE1EB">
+        <span style="font-size:12px;color:#5A6070">수공구</span>
+        <span style="font-size:18px;font-weight:700;color:#1A1D23" id="order-hand-total">-</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;background:#F4F6FA;border-radius:6px;padding:8px 20px;border:1px solid #DDE1EB">
+        <span style="font-size:12px;color:#5A6070">팩아웃</span>
+        <span style="font-size:18px;font-weight:700;color:#1A1D23" id="order-pack-total">-</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;background:#CC2222;border-radius:6px;padding:8px 20px">
+        <span style="font-size:12px;color:rgba(255,255,255,0.7)">발주 합계</span>
+        <span style="font-size:18px;font-weight:700;color:#FFF" id="order-grand-total">0</span>
+      </div>
+    </div>
+    <button class="btn-action" onclick="showOrderSettingsModal()" style="padding:6px 14px;flex-shrink:0">⚙ 커머셜 프로모션 설정</button>
+  </div>
+
+  <!-- 일반주문 2단 서브탭 -->
+  <div id="order-normal-wrap">
+    <div style="display:flex;gap:4px;padding:4px 12px;background:#F4F6FA;border-bottom:1px solid var(--tl-border)">
+      <button class="btn-action" id="order-sub-elec" onclick="switchOrderSub('elec')">전동공구</button>
+      <button class="btn-sub-inactive" id="order-sub-hand" onclick="switchOrderSub('hand')">수공구</button>
+      <button class="btn-sub-inactive" id="order-sub-pack" onclick="switchOrderSub('pack')">팩아웃</button>
+      <button class="btn-header-accent" id="order-sub-sheet" onclick="switchOrderSub('sheet')">★ 발주서 ★</button>
+    </div>
+  </div>
+
+  <!-- 프로모션 2단 서브탭 -->
+  <div id="order-promo-wrap" style="display:none">
+    <div style="display:flex;gap:4px;padding:4px 12px;background:#F4F6FA;border-bottom:1px solid var(--tl-border)">
+      <button class="btn-action" id="order-sub-po" onclick="switchPromoSub('po')">프로모션 발주</button>
+      <button class="btn-sub-inactive" id="order-sub-spot" onclick="switchPromoSub('spot')">스팟발주</button>
+      <button class="btn-header-accent" id="order-sub-po-sheet" onclick="switchPromoSub('po-sheet')">★ 발주서 ★</button>
+    </div>
+  </div>
+
+  <!-- 전동공구 -->
+  <div id="order-elec" class="order-tab-content">
+    <div class="section">
+      <div class="section-header">
+        <span>전동공구 발주</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn-action-sub" onclick="showProductPicker('elec')">📋 제품 불러오기</button>
+          <button class="btn-action" onclick="showProductPicker('elec')">+ 추가</button>
+          <button class="btn-warning" onclick="resetOrderQty('elec')">수량 초기화</button>
+          <button class="btn-danger btn-sm" onclick="clearOrderTab('elec')">전체 초기화</button>
+        </div>
+      </div>
+      <div class="section-body" style="padding:8px">
+        <div style="padding:0 0 6px;display:flex;gap:6px;align-items:center;position:relative">
+          <input class="input" id="order-search-elec" type="text" placeholder="코드, 순번, 모델명 검색 → 발주 추가" style="flex:1;height:34px;font-size:13px" oninput="showOrderSearchAC(this,'elec')" onkeydown="if(event.key==='Enter')addOrderSearchItem('elec')">
+          <button class="btn-action" onclick="addOrderSearchItem('elec')" style="height:34px;padding:0 12px;font-size:12px">발주 추가</button>
+          <div id="order-ac-elec" style="display:none;position:absolute;left:0;top:100%;width:100%;max-height:250px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:20;font-size:12px"></div>
+        </div>
+        <div class="table-scroll" style="max-height:500px;overflow-y:auto;overflow-x:auto">
+          <table class="data-table" id="order-elec-table">
+            <thead><tr><th style="width:50px"></th><th>코드</th><th>모델명</th><th>제품설명</th><th>재고</th><th style="min-width:100px">입고날짜</th><th>발주수량</th><th>공급가</th><th>공급합계</th><th>원가</th><th>원가합계</th><th>적요</th></tr></thead>
+            <tbody id="order-elec-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 수공구 -->
+  <div id="order-hand" class="order-tab-content" style="display:none">
+    <div class="section">
+      <div class="section-header">
+        <span>수공구 발주</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn-action-sub" onclick="showProductPicker('hand')">📋 제품 불러오기</button>
+          <button class="btn-action" onclick="showProductPicker('hand')">+ 추가</button>
+          <button class="btn-warning" onclick="resetOrderQty('hand')">수량 초기화</button>
+          <button class="btn-danger btn-sm" onclick="clearOrderTab('hand')">전체 초기화</button>
+        </div>
+      </div>
+      <div class="section-body" style="padding:8px">
+        <div style="padding:0 0 6px;display:flex;gap:6px;align-items:center;position:relative">
+          <input class="input" id="order-search-hand" type="text" placeholder="코드, 순번, 모델명 검색 → 발주 추가" style="flex:1;height:34px;font-size:13px" oninput="showOrderSearchAC(this,'hand')" onkeydown="if(event.key==='Enter')addOrderSearchItem('hand')">
+          <button class="btn-action" onclick="addOrderSearchItem('hand')" style="height:34px;padding:0 12px;font-size:12px">발주 추가</button>
+          <div id="order-ac-hand" style="display:none;position:absolute;left:0;top:100%;width:100%;max-height:250px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:20;font-size:12px"></div>
+        </div>
+        <div class="table-scroll" style="max-height:500px;overflow-y:auto;overflow-x:auto">
+          <table class="data-table" id="order-hand-table">
+            <thead><tr><th style="width:50px"></th><th>코드</th><th>모델명</th><th>제품설명</th><th>재고</th><th style="min-width:100px">입고날짜</th><th>발주수량</th><th>공급가</th><th>공급합계</th><th>원가</th><th>원가합계</th><th>적요</th></tr></thead>
+            <tbody id="order-hand-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 팩아웃 -->
+  <div id="order-pack" class="order-tab-content" style="display:none">
+    <div class="section">
+      <div class="section-header">
+        <span>팩아웃 발주</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn-action-sub" onclick="showProductPicker('pack')">📋 제품 불러오기</button>
+          <button class="btn-action" onclick="showProductPicker('pack')">+ 추가</button>
+          <button class="btn-warning" onclick="resetOrderQty('pack')">수량 초기화</button>
+          <button class="btn-danger btn-sm" onclick="clearOrderTab('pack')">전체 초기화</button>
+        </div>
+      </div>
+      <div class="section-body" style="padding:8px">
+        <div style="padding:0 0 6px;display:flex;gap:6px;align-items:center;position:relative">
+          <input class="input" id="order-search-pack" type="text" placeholder="코드, 순번, 모델명 검색 → 발주 추가" style="flex:1;height:34px;font-size:13px" oninput="showOrderSearchAC(this,'pack')" onkeydown="if(event.key==='Enter')addOrderSearchItem('pack')">
+          <button class="btn-action" onclick="addOrderSearchItem('pack')" style="height:34px;padding:0 12px;font-size:12px">발주 추가</button>
+          <div id="order-ac-pack" style="display:none;position:absolute;left:0;top:100%;width:100%;max-height:250px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:20;font-size:12px"></div>
+        </div>
+        <div class="table-scroll" style="max-height:500px;overflow-y:auto;overflow-x:auto">
+          <table class="data-table" id="order-pack-table">
+            <thead><tr><th style="width:50px"></th><th>코드</th><th>모델명</th><th>제품설명</th><th>재고</th><th style="min-width:100px">입고날짜</th><th>발주수량</th><th>공급가</th><th>공급합계</th><th>원가</th><th>원가합계</th><th>적요</th></tr></thead>
+            <tbody id="order-pack-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 프로모션 발주 (통합) -->
+  <div id="order-po" class="order-tab-content" style="display:none">
+    <div class="section">
+      <div class="section-header">
+        <span>프로모션 발주 <span id="po-order-count" style="font-size:12px;font-weight:400;opacity:0.7">0건</span></span>
+        <div style="display:flex;gap:8px">
+          <button class="btn-action-sub" onclick="downloadPoTemplate()">📥 엑셀 양식 다운</button>
+          <button class="btn-action-sub" onclick="document.getElementById('po-upload-input').click()">📤 엑셀 업로드</button>
+          <input type="file" id="po-upload-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadPoExcel(this)">
+          <button class="btn-action" onclick="addPoRow()">+ 추가</button>
+          <button class="btn-warning" onclick="resetPoQty()">수량 초기화</button>
+          <button class="btn-danger btn-sm" onclick="clearPoAll()">전체 초기화</button>
+        </div>
+      </div>
+      <div class="section-body" style="padding:8px">
+        <div class="table-scroll" style="max-height:500px;overflow-y:auto;overflow-x:auto">
+          <table class="data-table" id="order-po-table">
+            <thead><tr>
+              <th style="width:40px"></th>
+              <th>코드</th>
+              <th>프로모션번호</th>
+              <th>프로모션명</th>
+              <th>할인율</th>
+              <th>순번</th>
+              <th>모델명</th>
+              <th>제품설명</th>
+              <th>기본수량</th>
+              <th>발주수량</th>
+              <th style="width:80px">비고</th>
+              <th>기본단가</th>
+              <th>프로모션단가</th>
+              <th class="num" style="width:90px;color:#1D9E75">매입원가</th>
+              <th style="width:90px" class="num">합계</th>
+              <th>적요</th>
+            </tr></thead>
+            <tbody id="po-order-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 스팟발주 -->
+  <div id="order-spot" class="order-tab-content" style="display:none">
+    <div class="section">
+      <div class="section-header">
+        <span>스팟 발주 <span id="spot-order-count" style="font-size:12px;font-weight:400;opacity:0.7">0건</span></span>
+        <div style="display:flex;gap:8px">
+          <button class="btn-action" onclick="addSpotRow()">+ 추가</button>
+          <button class="btn-warning" onclick="resetSpotQty()">수량 초기화</button>
+          <button class="btn-danger btn-sm" onclick="clearSpotAll()">전체 초기화</button>
+        </div>
+      </div>
+      <div class="section-body" style="padding:8px">
+        <div class="table-scroll" style="max-height:500px;overflow-y:auto;overflow-x:auto">
+          <table class="data-table" id="order-spot-table">
+            <thead><tr>
+              <th style="width:40px"></th>
+              <th>코드</th>
+              <th>프로모션번호</th>
+              <th>프로모션명</th>
+              <th>할인율</th>
+              <th>순번</th>
+              <th>모델명</th>
+              <th>제품설명</th>
+              <th>기본수량</th>
+              <th>발주수량</th>
+              <th>기본단가</th>
+              <th>프로모션단가</th>
+              <th>적요</th>
+            </tr></thead>
+            <tbody id="spot-order-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 프로모션 발주서 -->
+  <div id="order-po-sheet" class="order-tab-content" style="display:none">
+    <div class="section" style="border:2px solid #EF9F27">
+      <div class="section-header" style="background:#1A1D23">
+        <span>★ 프로모션 발주서 ★</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;font-weight:400;opacity:0.7" id="po-sheet-date"></span>
+        </div>
+      </div>
+      <div class="section-body" style="padding:0">
+        <div class="table-scroll" style="overflow-x:auto">
+          <table class="data-table" style="font-size:12px">
+            <thead><tr>
+              <th>코드</th><th>프로모션번호</th><th>프로모션명</th><th>모델명</th><th>제품설명</th><th>발주수량</th><th>프로모션단가</th><th class="num" style="color:#1D9E75">매입원가</th><th class="num" style="font-weight:700;color:#1D9E75">합계</th><th>적요</th>
+            </tr></thead>
+            <tbody id="po-sheet-body"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:24px;padding:16px 20px;background:#185FA5;color:white">
+          <div>
+            <span style="font-size:13px;opacity:0.8">프로모션</span>
+            <span style="font-size:15px;font-weight:600;margin-left:6px" id="po-sheet-promo-cost-total">0</span>
+          </div>
+          <span style="opacity:0.4">+</span>
+          <div>
+            <span style="font-size:13px;opacity:0.8">스팟</span>
+            <span style="font-size:15px;font-weight:600;margin-left:6px" id="po-sheet-spot-cost-total">0</span>
+          </div>
+          <span style="opacity:0.4">=</span>
+          <div>
+            <span style="font-size:13px;opacity:0.8">매입합계</span>
+            <span style="font-size:22px;font-weight:700;margin-left:8px" id="po-sheet-grand-cost-total">0</span>
+          </div>
+        </div>
+        <!-- 공급합계 hidden refs (JS 호환용) -->
+        <span id="po-sheet-promo-total" style="display:none">0</span>
+        <span id="po-sheet-spot-total" style="display:none">0</span>
+        <span id="po-sheet-grand-total" style="display:none">0</span>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center" id="po-sheet-actions">
+      <button class="btn-action" id="po-confirm-btn" onclick="confirmPromoOrder()">✅ 발주 확정</button>
+      <button class="btn-export" id="po-export-btn" onclick="exportPromoOrder()">📤 엑셀 다운로드</button>
+      <button class="btn-action-sub" id="po-history-btn" onclick="showPromoOrderHistory()">📋 발주 이력</button>
+      <button class="btn-action" onclick="resetAllPromoQty()" style="background:#EF9F27">수량 초기화</button>
+    </div>
+  </div>
+
+  <div id="order-sheet" class="order-tab-content" style="display:none">
+    <div class="section" style="border:2px solid #EF9F27">
+      <div class="section-header" style="background:#1A1D23">
+        <span>★ 발주서 ★</span>
+        <span style="font-size:12px;font-weight:400;opacity:0.7" id="order-sheet-date"></span>
+      </div>
+      <div class="section-body" style="padding:0">
+        <!-- 3-column layout like Excel -->
+        <div class="sheet-grid">
+          <!-- 전동공구 컬럼 -->
+          <div style="border-right:1px solid var(--tl-border)">
+            <div style="background:#FAEEDA;padding:10px 12px;font-weight:700;font-size:14px;text-align:center;border-bottom:1px solid var(--tl-border)">전동공구 <span id="sheet-elec-count" style="font-weight:400;font-size:12px;color:#5A6070"></span></div>
+            <div style="max-height:400px;overflow-y:auto">
+              <table class="data-table" style="font-size:12px">
+                <thead><tr><th>코드</th><th>모델명</th><th class="num">수량</th><th class="num" style="min-width:90px">공급합계</th><th class="num" style="min-width:90px;color:#1D9E75">원가합계</th></tr></thead>
+                <tbody id="sheet-elec-body"></tbody>
+              </table>
+            </div>
+            <div style="padding:6px 8px;border-top:1px solid var(--tl-border);background:#F4F6FA;display:flex;gap:4px;align-items:center;position:relative">
+              <input class="input" id="sheet-add-elec-ordernum" type="text" placeholder="순번 입력" style="width:90px;height:32px;font-size:13px" oninput="showSheetAC(this,'elec')" onkeydown="if(event.key==='Enter')addSheetItem('elec')">
+              <input class="input" id="sheet-add-elec-qty" type="number" placeholder="수량" min="1" style="width:70px;height:32px;font-size:13px;text-align:center" onkeydown="if(event.key==='Enter')addSheetItem('elec')">
+              <button class="btn-action" onclick="addSheetItem('elec')" style="padding:4px 10px;font-size:12px;height:32px">추가</button>
+              <div id="sheet-ac-elec" style="display:none;position:absolute;left:0;top:100%;width:320px;max-height:200px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:20;font-size:11px"></div>
+            </div>
+            <div style="background:#FAEEDA;padding:8px 12px;font-weight:700;text-align:right;font-size:14px;border-top:1px solid var(--tl-border);display:none" id="sheet-elec-sum">0</div>
+          </div>
+          <!-- 수공구 컬럼 -->
+          <div style="border-right:1px solid var(--tl-border)">
+            <div style="background:#FAEEDA;padding:10px 12px;font-weight:700;font-size:14px;text-align:center;border-bottom:1px solid var(--tl-border)">수공구 <span id="sheet-hand-count" style="font-weight:400;font-size:12px;color:#5A6070"></span></div>
+            <div style="max-height:400px;overflow-y:auto">
+              <table class="data-table" style="font-size:12px">
+                <thead><tr><th>코드</th><th>모델명</th><th class="num">수량</th><th class="num" style="min-width:90px">공급합계</th><th class="num" style="min-width:90px;color:#1D9E75">원가합계</th></tr></thead>
+                <tbody id="sheet-hand-body"></tbody>
+              </table>
+            </div>
+            <div style="padding:6px 8px;border-top:1px solid var(--tl-border);background:#F4F6FA;display:flex;gap:4px;align-items:center;position:relative">
+              <input class="input" id="sheet-add-hand-ordernum" type="text" placeholder="순번 입력" style="width:90px;height:32px;font-size:13px" oninput="showSheetAC(this,'hand')" onkeydown="if(event.key==='Enter')addSheetItem('hand')">
+              <input class="input" id="sheet-add-hand-qty" type="number" placeholder="수량" min="1" style="width:70px;height:32px;font-size:13px;text-align:center" onkeydown="if(event.key==='Enter')addSheetItem('hand')">
+              <button class="btn-action" onclick="addSheetItem('hand')" style="padding:4px 10px;font-size:12px;height:32px">추가</button>
+              <div id="sheet-ac-hand" style="display:none;position:absolute;left:0;top:100%;width:320px;max-height:200px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:20;font-size:11px"></div>
+            </div>
+            <div style="background:#FAEEDA;padding:8px 12px;font-weight:700;text-align:right;font-size:14px;border-top:1px solid var(--tl-border);display:none" id="sheet-hand-sum">0</div>
+          </div>
+          <!-- 팩아웃 컬럼 -->
+          <div>
+            <div style="background:#FAEEDA;padding:10px 12px;font-weight:700;font-size:14px;text-align:center;border-bottom:1px solid var(--tl-border)">팩아웃 <span id="sheet-pack-count" style="font-weight:400;font-size:12px;color:#5A6070"></span></div>
+            <div style="max-height:400px;overflow-y:auto">
+              <table class="data-table" style="font-size:12px">
+                <thead><tr><th>코드</th><th>모델명</th><th class="num">수량</th><th class="num" style="min-width:90px">공급합계</th><th class="num" style="min-width:90px;color:#1D9E75">원가합계</th></tr></thead>
+                <tbody id="sheet-pack-body"></tbody>
+              </table>
+            </div>
+            <div style="padding:6px 8px;border-top:1px solid var(--tl-border);background:#F4F6FA;display:flex;gap:4px;align-items:center;position:relative">
+              <input class="input" id="sheet-add-pack-ordernum" type="text" placeholder="순번 입력" style="width:90px;height:32px;font-size:13px" oninput="showSheetAC(this,'pack')" onkeydown="if(event.key==='Enter')addSheetItem('pack')">
+              <input class="input" id="sheet-add-pack-qty" type="number" placeholder="수량" min="1" style="width:70px;height:32px;font-size:13px;text-align:center" onkeydown="if(event.key==='Enter')addSheetItem('pack')">
+              <button class="btn-action" onclick="addSheetItem('pack')" style="padding:4px 10px;font-size:12px;height:32px">추가</button>
+              <div id="sheet-ac-pack" style="display:none;position:absolute;left:0;top:100%;width:320px;max-height:200px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:20;font-size:11px"></div>
+            </div>
+            <div style="background:#FAEEDA;padding:8px 12px;font-weight:700;text-align:right;font-size:14px;border-top:1px solid var(--tl-border);display:none" id="sheet-pack-sum">0</div>
+          </div>
+        </div>
+        <!-- Grand total bar -->
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:24px;padding:16px 20px;background:#185FA5;color:white">
+          <div>
+            <span style="font-size:13px;opacity:0.8">전동</span>
+            <span style="font-size:15px;font-weight:600;margin-left:6px" id="sheet-gt-elec">0</span>
+          </div>
+          <span style="opacity:0.4">+</span>
+          <div>
+            <span style="font-size:13px;opacity:0.8">수공구</span>
+            <span style="font-size:15px;font-weight:600;margin-left:6px" id="sheet-gt-hand">0</span>
+          </div>
+          <span style="opacity:0.4">+</span>
+          <div>
+            <span style="font-size:13px;opacity:0.8">팩아웃</span>
+            <span style="font-size:15px;font-weight:600;margin-left:6px" id="sheet-gt-pack">0</span>
+          </div>
+          <span style="opacity:0.4">=</span>
+          <div>
+            <span style="font-size:13px;opacity:0.8">합계금액</span>
+            <span style="font-size:22px;font-weight:700;margin-left:8px" id="sheet-gt-total">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center" id="order-sheet-actions">
+      <button class="btn-action" id="order-confirm-btn" onclick="confirmOrder()">✅ 발주 확정</button>
+      <button class="btn-export" id="order-export-btn" onclick="exportOrder()">📤 엑셀 다운로드</button>
+      <button class="btn-action-sub" id="order-history-btn" onclick="showOrderHistory()">📋 발주 이력</button>
+      <button class="btn-action" onclick="resetAllOrderQty()" style="background:#EF9F27">수량 초기화</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- =============== TAB 3: 온라인 판매 =============== -->
+<div id="tab-sales" class="tab-content">
+  <div class="sub-tabs" id="sales-sub-tabs" style="margin-bottom:8px">
+    <button class="sub-tab active" onclick="switchSalesSub('manage')">온라인판매관리</button>
+    <button class="sub-tab" onclick="switchSalesSub('calc')">수수료계산기</button>
+  </div>
+  <div id="sales-sub-manage">
+  <div class="section">
+    <div class="section-header">
+      <span>온라인판매관리</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn-primary" onclick="importOnlineSalesCumul()" style="padding:5px 12px;font-size:12px">밀워키 누적P 불러오기</button>
+        <button class="btn-primary" onclick="addOnlineSalesRow()" style="padding:5px 12px;font-size:12px">+ 행 추가</button>
+        <button class="btn-action-sub" onclick="exportOnlineSalesExcel()" style="padding:5px 12px;font-size:12px">엑셀 내보내기</button>
+        <button class="btn-setting" onclick="archiveOnlineSales()" style="padding:5px 12px;font-size:12px;background:#1D9E75;color:#FFF;border:none;border-radius:6px;cursor:pointer">월 마감</button>
+      </div>
+    </div>
+    <div class="section-body" style="padding:0">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #F0F2F7;flex-wrap:wrap">
+        <select id="os-month-select" class="input" style="width:180px;height:30px;font-size:12px;font-weight:600" onchange="loadOnlineSalesMonth(this.value)"></select>
+        <div style="width:1px;height:20px;background:#DDE1EB"></div>
+        <div id="os-promo-filters" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+        <div style="width:1px;height:20px;background:#DDE1EB"></div>
+        <span id="os-archive-hint" style="font-size:10px;color:#9BA3B2"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="os-table" style="width:100%">
+          <thead>
+            <tr>
+              <th style="width:70px">날짜</th>
+              <th style="width:60px">코드</th>
+              <th style="min-width:160px">모델</th>
+              <th style="width:60px" class="center">재고</th>
+              <th style="width:80px">업체명</th>
+              <th style="width:90px" class="num">판매가</th>
+              <th style="width:90px" class="num">원가P</th>
+              <th style="width:90px;background:rgba(29,158,117,0.08);color:#0F6E56" class="num">스토어팜</th>
+              <th style="width:80px;background:rgba(29,158,117,0.08);color:#0F6E56" class="center">이익</th>
+              <th style="width:90px;background:rgba(24,95,165,0.08);color:#0C447C" class="num">오픈마켓</th>
+              <th style="width:80px;background:rgba(24,95,165,0.08);color:#0C447C" class="center">이익</th>
+              <th style="min-width:140px">프로모션</th>
+              <th style="width:60px" class="center"></th>
+            </tr>
+          </thead>
+          <tbody id="os-body"></tbody>
+        </table>
+      </div>
+      <div id="os-summary" style="display:flex;gap:8px;padding:8px 12px;border-top:1px solid #DDE1EB"></div>
+    </div>
+  </div>
+  <!-- 기존 호환용 hidden -->
+  <div style="display:none"><table><tbody id="sales-body"></tbody></table></div>
+  </div><!-- /sales-sub-manage -->
+
+  <div id="sales-sub-calc" style="display:none">
+    <div class="section-header">
+      <span>수수료 계산기</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn-primary" onclick="addFeeCalcRow()" style="padding:5px 12px;font-size:12px">+ 행 추가</button>
+        <button class="btn-danger" onclick="clearFeeCalc()" style="padding:5px 12px;font-size:12px">초기화</button>
+      </div>
+    </div>
+    <div class="section-body" style="padding:0">
+      <div style="padding:10px 12px 6px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <span class="fee-calc-badge" id="fc-badge-naver"></span>
+        <span class="fee-calc-badge" id="fc-badge-coupang-mp"></span>
+        <span class="fee-calc-badge" id="fc-badge-coupang-rg"></span>
+        <span style="font-size:10px;color:#9BA3B2">※ 수수료는 설정 > 수수료 설정에서 변경</span>
+      </div>
+      <div style="padding:0 12px">
+        <table class="data-table" id="fee-calc-table" style="width:100%">
+          <thead>
+            <tr>
+              <th style="min-width:200px">제품 및 품명</th>
+              <th class="num" style="width:110px">매입가격</th>
+              <th class="num" style="width:110px">판매가격</th>
+              <th class="center" style="width:140px;background:rgba(29,158,117,0.08);color:#0F6E56">스토어팜</th>
+              <th class="center" style="width:140px;background:rgba(24,95,165,0.08);color:#0C447C">쿠팡(마켓)</th>
+              <th class="center" style="width:140px;background:rgba(127,119,221,0.08);color:#3C3489">쿠팡(로켓그로스)</th>
+              <th class="center" style="width:40px"></th>
+            </tr>
+          </thead>
+          <tbody id="fee-calc-body"></tbody>
+        </table>
+      </div>
+      <div style="padding:10px 12px;border-top:1px solid #F0F2F7;margin-top:4px">
+        <div style="display:flex;gap:8px;font-size:11px;color:#5A6070;flex-wrap:wrap">
+          <span>계산 공식:</span>
+          <span style="background:#E6F1FB;padding:2px 8px;border-radius:3px;color:#0C447C">이익 = 판매가 − (판매가÷11) − (판매가 × 수수료율) − 매입가</span>
+          <span style="background:#E6F1FB;padding:2px 8px;border-radius:3px;color:#0C447C">이익률 = 이익 ÷ 판매가 × 100</span>
+        </div>
+      </div>
+    </div>
+  </div><!-- /sales-sub-calc -->
+
+</div>
+
+<!-- TAB 4: 프로모션 UI 삭제됨 (DB.promotions 데이터/함수는 유지) -->
+<!-- Legacy hidden placeholders for JS compatibility -->
+<div style="display:none">
+  <input type="hidden" id="promo-search">
+  <span id="promo-count"></span>
+  <span id="promo-month-label"></span>
+  <table><tbody id="promo-body"></tbody></table>
+  <select id="promo-month-select"></select>
+  <span id="promo-newprod-count"></span><tbody id="promo-newprod-tbody"></tbody>
+  <span id="promo-package-count"></span><tbody id="promo-package-tbody"></tbody>
+  <span id="promo-monthly-count"></span><tbody id="promo-monthly-tbody"></tbody>
+  <span id="promo-cumul-count"></span><div id="promo-cumul-cards"></div>
+  <span id="promo-quarter-count"></span><div id="promo-quarter-cards"></div>
+  <span id="promo-spot-count"></span><tbody id="promo-spot-tbody"></tbody>
+  <input id="rebate-amount"><div id="rebate-result"></div><tbody id="rebate-body"></tbody>
+</div>
+
+<!-- =============== TAB 5: 세트및분해 =============== -->
+<div id="tab-setbun" class="tab-content">
+  <!-- 배터리/충전기 시세 설정 -->
+  <div class="section">
+    <div class="section-header">
+      <span>배터리 / 충전기 시세 설정</span>
+      <button class="btn-action" onclick="savePartsPrices()">시세 저장</button>
+    </div>
+    <div class="section-body" style="padding:12px">
+      <div style="display:flex;gap:12px">
+        <!-- 좌측: 일반 시세 -->
+        <div style="flex:1;min-width:0;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden">
+          <div style="background:#1A1D23;color:white;padding:0 12px;height:30px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600">
+            <span>일반 시세</span><span style="font-size:9px;opacity:0.7">세트분해(일반)에 적용</span>
+          </div>
+          <div style="padding:8px">
+            <div style="border:1px solid var(--tl-border);border-radius:6px;overflow:hidden;margin-bottom:8px">
+              <div style="background:#E6F1FB;padding:6px 10px;font-weight:700;font-size:12px;color:#0C447C">M12</div>
+              <div style="padding:8px 10px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+                <div><label class="label" style="font-size:11px">M12 B2 (2.0Ah)</label><input class="input" id="pp-M12B2" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M12 HB2.5 (2.5Ah)</label><input class="input" id="pp-M12HB25" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M12 B4 (4.0Ah)</label><input class="input" id="pp-M12B4" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M12 HB5 (5.0Ah)</label><input class="input" id="pp-M12HB5" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px;color:#185FA5;font-weight:600">C12C (충전기)</label><input class="input" id="pp-C12C" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+              </div>
+            </div>
+            <div style="border:1px solid var(--tl-border);border-radius:6px;overflow:hidden">
+              <div style="background:#FCEBEB;padding:6px 10px;font-weight:700;font-size:12px;color:#CC2222">M18</div>
+              <div style="padding:8px 10px;display:grid;grid-template-columns:repeat(8,1fr);gap:6px">
+                <div><label class="label" style="font-size:11px">M18 B2 (2.0Ah)</label><input class="input" id="pp-M18B2" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 HB3 (3.0Ah)</label><input class="input" id="pp-M18HB3" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 B5 (5.0Ah)</label><input class="input" id="pp-M18B5" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 FB6 (FORGE)</label><input class="input" id="pp-M18FB6" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 FB8 (FORGE)</label><input class="input" id="pp-M18FB8" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 FB12 (FORGE)</label><input class="input" id="pp-M18FB12" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px;color:#185FA5;font-weight:600">M12-18C</label><input class="input" id="pp-M1218C" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px;color:#185FA5;font-weight:600">M12-18FC</label><input class="input" id="pp-M1218FC" type="text" placeholder="원가" style="font-size:11px;text-align:right;height:26px" oninput="formatPartsInput(this)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 우측: 프로모션 시세 -->
+        <div style="flex:1;min-width:0;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden">
+          <div style="background:#185FA5;color:white;padding:0 12px;height:30px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600">
+            <span>프로모션 시세</span><span style="font-size:9px;opacity:0.8">세트분해(프로모션)에 적용</span>
+          </div>
+          <div style="padding:8px">
+            <div style="border:1px solid var(--tl-border);border-radius:6px;overflow:hidden;margin-bottom:8px">
+              <div style="background:#E6F1FB;padding:6px 10px;font-weight:700;font-size:12px;color:#0C447C">M12</div>
+              <div style="padding:8px 10px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+                <div><label class="label" style="font-size:11px">M12 B2 (2.0Ah)</label><input class="input" id="ppp-M12B2" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M12 HB2.5 (2.5Ah)</label><input class="input" id="ppp-M12HB25" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M12 B4 (4.0Ah)</label><input class="input" id="ppp-M12B4" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M12 HB5 (5.0Ah)</label><input class="input" id="ppp-M12HB5" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px;color:#185FA5;font-weight:600">C12C (충전기)</label><input class="input" id="ppp-C12C" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+              </div>
+            </div>
+            <div style="border:1px solid var(--tl-border);border-radius:6px;overflow:hidden">
+              <div style="background:#FCEBEB;padding:6px 10px;font-weight:700;font-size:12px;color:#CC2222">M18</div>
+              <div style="padding:8px 10px;display:grid;grid-template-columns:repeat(8,1fr);gap:6px">
+                <div><label class="label" style="font-size:11px">M18 B2 (2.0Ah)</label><input class="input" id="ppp-M18B2" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 HB3 (3.0Ah)</label><input class="input" id="ppp-M18HB3" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 B5 (5.0Ah)</label><input class="input" id="ppp-M18B5" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 FB6 (FORGE)</label><input class="input" id="ppp-M18FB6" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 FB8 (FORGE)</label><input class="input" id="ppp-M18FB8" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px">M18 FB12 (FORGE)</label><input class="input" id="ppp-M18FB12" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px;color:#185FA5;font-weight:600">M12-18C</label><input class="input" id="ppp-M1218C" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+                <div><label class="label" style="font-size:11px;color:#185FA5;font-weight:600">M12-18FC</label><input class="input" id="ppp-M1218FC" type="text" placeholder="빈칸=일반가" style="font-size:11px;text-align:right;height:26px;border-color:#B5D4F4;background:#FAFCFF" oninput="formatPartsInput(this)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 분석 목록 -->
+  <div class="section">
+    <div class="section-header">
+      <span>세트 분해 분석</span>
+      <span style="font-size:12px;font-weight:400;opacity:0.7" id="setbun-count">0건</span>
+    </div>
+    <div class="section-body" style="padding:12px">
+      <div style="display:flex;gap:12px">
+        <div style="flex:1;min-width:0;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden">
+          <div style="background:#1A1D23;color:white;padding:0 12px;height:32px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span>일반</span>
+              <span style="font-size:9px;font-weight:500;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.8)">기본 원가 기준</span>
+            </div>
+            <button class="btn-primary" onclick="addSetbunItem('normal')" style="padding:3px 10px;font-size:10px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3)">+ 분석 추가</button>
+          </div>
+          <div class="table-scroll" style="overflow-x:auto">
+            <table class="data-table" id="setbun-table-normal" style="font-size:11px">
+              <thead><tr>
+                <th style="width:40px"></th>
+                <th>세트 코드</th><th>세트 모델명</th><th>세트 원가</th>
+                <th>베어툴 코드</th><th>베어툴 모델명</th><th>베어툴 원가</th>
+                <th>배터리+충전기</th><th>분해원가</th><th>차액</th><th>판정</th>
+              </tr></thead>
+              <tbody id="setbun-body-normal"></tbody>
+            </table>
+          </div>
+        </div>
+        <div style="flex:1;min-width:0;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden">
+          <div style="background:#185FA5;color:white;padding:0 12px;height:32px;display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span>프로모션</span>
+              <span style="font-size:9px;font-weight:500;padding:2px 8px;border-radius:3px;background:rgba(255,255,255,0.2);color:#FFF">프로모션 원가 기준</span>
+            </div>
+            <button class="btn-primary" onclick="addSetbunItem('promo')" style="padding:3px 10px;font-size:10px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3)">+ 분석 추가</button>
+          </div>
+          <div class="table-scroll" style="overflow-x:auto">
+            <table class="data-table" id="setbun-table-promo" style="font-size:11px">
+              <thead><tr>
+                <th>세트 코드</th><th>세트 모델명</th><th>세트 원가</th>
+                <th>베어툴 코드</th><th>베어툴 모델명</th><th>베어툴 원가</th>
+                <th>배터리+충전기</th><th>분해원가</th><th>차액</th><th>판정</th>
+              </tr></thead>
+              <tbody id="setbun-body-promo"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============== TAB 7: 일반제품 단가표 =============== -->
+<div id="tab-general" class="tab-content">
+  <div class="section">
+    <div class="section-header">
+      <span>일반제품 단가표</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:12px;font-weight:400;opacity:0.7" id="gen-count">0건</span>
+        <button class="btn-action-sub" onclick="downloadGenTemplate()">📥 양식 다운로드</button>
+        <button class="btn-action-sub" onclick="document.getElementById('gen-upload').click()">📤 업로드</button>
+        <input type="file" id="gen-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadGenProducts(this)">
+        <button class="btn-action" onclick="addGenProduct()">+ 제품 추가</button>
+      </div>
+    </div>
+    <div class="section-body" style="padding:12px">
+      <input class="input" id="gen-search" placeholder="코드, 모델명, 제품설명 검색..." style="max-width:400px;margin-bottom:12px" oninput="renderGenProducts()">
+      <div class="table-scroll" style="max-height:500px;overflow-y:auto">
+        <table class="data-table" id="gen-table">
+          <thead><tr><th class="center" style="width:40px"></th><th>코드</th><th>관리코드</th><th>대분류</th><th>모델 및 규격</th><th>제품설명 및 품명</th><th class="num">원가</th><th class="num">도매(A)</th><th class="num">스토어팜</th><th class="num">오픈마켓</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">IN</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">OUT</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">파레트</th><th>비고</th><th style="min-width:120px">입고날짜</th></tr></thead>
+          <tbody id="gen-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============== TAB 6: 견적서 =============== -->
+<div id="tab-estimate" class="tab-content">
+  <!-- 1번째 큰 메뉴: 제품 검색 추가 -->
+  <div class="section">
+    <div class="section-header">
+      <span>제품검색</span>
+    </div>
+    <div class="section-body" style="padding:12px">
+      <input class="input" id="est-search" placeholder="코드, 모델명, 제품설명 검색..." style="max-width:500px;margin-bottom:12px"
+        oninput="searchEstProducts(this.value)">
+      <div id="est-search-results" style="max-height:300px;overflow-y:auto">
+        <table class="data-table" id="est-search-table" style="font-size:12px">
+          <thead><tr>
+            <th style="width:90px"></th>
+            <th>코드</th>
+            <th>제품설명</th>
+            <th>모델 및 품명</th>
+            <th>도매(A)</th>
+            <th>스토어팜</th>
+            <th>오픈마켓</th>
+            <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">IN</th>
+            <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">OUT</th>
+            <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">파레트</th>
+            <th>매입원가</th>
+            <th>마진금액/마진율</th>
+            <th>비고</th>
+            <th style="min-width:120px">입고날짜</th>
+          </tr></thead>
+          <tbody id="est-search-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2번째 큰 메뉴: 견적서 작성 -->
+  <div class="section" id="est-editor">
+    <div class="section-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="btn-action" onclick="newEstimate()">+ 새견적서</button>
+        <span>견적서 작성 — <span id="est-current-no" style="color:#EF9F27">-</span></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-action-sub" onclick="showEstimateList()">📋 견적서목록 <span style="font-size:11px" id="est-list-count">0건</span></button>
+        <button class="btn-action" onclick="saveEstimate()">저장</button>
+        <button class="btn-export" onclick="previewEstimatePdf()">📄 PDF 미리보기</button>
+      </div>
+    </div>
+    <div class="section-body" style="padding:12px">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="form-field">
+          <label class="label">공급받는자 (거래처)</label>
+          <div style="position:relative" id="client-ac-wrap">
+            <input class="input" id="est-client" placeholder="거래처명 또는 사업자번호 검색..." autocomplete="off"
+              oninput="searchClientAC(this.value)"
+              onfocus="if(this.value) searchClientAC(this.value)">
+            <div id="client-ac-list" style="display:none;position:absolute;top:100%;left:0;width:100%;max-height:220px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:300;font-size:12px"></div>
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="label">견적 날짜</label>
+          <input class="input" id="est-date" type="date">
+        </div>
+      </div>
+      <div id="est-client-info" style="display:none;background:#F4F6FA;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;gap:16px;flex-wrap:wrap"></div>
+
+      <div class="table-scroll" style="overflow-x:auto">
+        <table class="data-table" id="est-table">
+          <thead><tr>
+            <th style="width:40px"></th>
+            <th>코드</th>
+            <th>모델 및 품명</th>
+            <th>제품설명 및 규격</th>
+            <th>수량</th>
+            <th>단가</th>
+            <th>합계금액</th>
+            <th>부가세</th>
+            <th>비고</th>
+            <th>택배회사</th>
+            <th>택배비</th>
+            <th style="color:#CC2222">재고</th>
+          </tr></thead>
+          <tbody id="est-body"></tbody>
+        </table>
+      </div>
+      <div style="text-align:right;padding:12px 0;font-size:16px;font-weight:700">
+        합계: <span id="est-total" style="color:#185FA5">0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =============== TAB 8: 관리 =============== -->
+<div id="tab-manage" class="tab-content">
+  <div class="sub-tabs" id="settings-main-tabs" style="margin-bottom:8px">
+    <button class="sub-tab active" onclick="switchSettingsMain('fee')">온라인 판매채널 수수료</button>
+    <button class="sub-tab" onclick="switchSettingsMain('client')">거래처 등록</button>
+  </div>
+  <div id="settings-sub-fee">
+  <div class="section">
+    <div class="section-header">
+      <span>온라인 판매채널 수수료 설정</span>
+      <button class="btn-action" onclick="saveFeeSettings()">저장</button>
+    </div>
+    <div class="section-body" style="padding:20px">
+
+      <div style="background:#E6F1FB;border-radius:6px;padding:10px 14px;font-size:12px;color:#0C447C;margin-bottom:20px">
+        여기서 설정한 수수료율은 밀워키 단가표, 일반제품 단가표, 온라인판매 관리, 검색및견적 등 모든 메뉴에서 공통 적용됩니다.<br>
+        모든 판매가는 <strong>부가세 포함</strong> 기준입니다. (매출VAT = 판매가 ÷ 11)
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+        <!-- 네이버 스토어팜 -->
+        <div style="background:#fff;border:1px solid #E2E5EA;border-radius:8px;padding:16px 20px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:#00C73C;display:inline-block"></span> 네이버 스토어팜
+            <span style="margin-left:auto;font-size:13px;font-weight:700;color:#00C73C" id="fee-naver-total">6.63%</span>
+          </div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">판매수수료 (%)</label><input class="input" id="fee-naver-sale" type="number" step="0.01" value="3.0" oninput="updateNaverTotal()"></div>
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">결제수수료 (%)</label><input class="input" id="fee-naver-pay" type="number" step="0.01" value="3.63" oninput="updateNaverTotal()"></div>
+          </div>
+        </div>
+
+        <!-- 쿠팡 마켓플레이스 -->
+        <div style="background:#fff;border:1px solid #E2E5EA;border-radius:8px;padding:16px 20px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:#E62341;display:inline-block"></span> 쿠팡 마켓플레이스
+            <span style="font-size:11px;font-weight:400;color:#5A6070">직접배송 · 결제수수료 포함</span>
+          </div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">판매수수료 (%)</label><input class="input" id="fee-coupang-mp" type="number" step="0.1" value="10.8"></div>
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">카테고리 프리셋</label><select class="select" onchange="applyCoupangPreset('mp',this.value)"><option value="">— 직접 입력 —</option><option value="10.8">공구 / 산업용품 — 10.8%</option><option value="10.0">자동차용품 — 10%</option><option value="7.8">가전 / 디지털 — 7.8%</option></select></div>
+          </div>
+        </div>
+
+        <!-- 쿠팡 로켓그로스 -->
+        <div style="background:#fff;border:1px solid #E2E5EA;border-radius:8px;padding:16px 20px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:#E62341;display:inline-block"></span> 쿠팡 로켓그로스
+            <span style="font-size:11px;font-weight:400;color:#5A6070">풀필먼트 · 물류비 별도</span>
+          </div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">판매수수료 (%)</label><input class="input" id="fee-coupang-rg" type="number" step="0.1" value="10.8"></div>
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">물류비 (원)</label><input class="input" id="fee-coupang-logi" type="number" step="100" value="2800"></div>
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">카테고리 프리셋</label><select class="select" onchange="applyCoupangPreset('rg',this.value)"><option value="">— 직접 입력 —</option><option value="10.8">공구 / 산업용품 — 10.8%</option><option value="10.0">자동차용품 — 10%</option><option value="7.8">가전 / 디지털 — 7.8%</option></select></div>
+          </div>
+        </div>
+
+        <!-- 오픈마켓 (전동+수공구 1카드) -->
+        <div style="background:#fff;border:1px solid #E2E5EA;border-radius:8px;padding:16px 20px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:#185FA5;display:inline-block"></span> 오픈마켓
+          </div>
+          <div style="display:flex;gap:12px">
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">전동공구 (%)<span style="font-size:10px;color:#9BA3B2"> 파워툴</span></label><input class="input" id="fee-open-elec" type="number" step="0.1" value="13.0"></div>
+            <div style="flex:1"><label style="font-size:11px;color:#5A6070;display:block;margin-bottom:3px">수공구 (%)<span style="font-size:10px;color:#9BA3B2"> 수공구,액세서리,팩아웃</span></label><input class="input" id="fee-open-hand" type="number" step="0.1" value="17.6"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+  </div><!-- /settings-sub-fee -->
+
+  <div id="settings-sub-client" style="display:none">
+    <div class="section">
+      <div class="section-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span>거래처 등록</span>
+          <span style="font-size:12px;font-weight:400;opacity:0.7" id="client-count">0건</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-action-sub" onclick="downloadClientTemplate()">📥 엑셀 양식 다운</button>
+          <button class="btn-action-sub" onclick="document.getElementById('client-upload-input').click()">📤 엑셀 일괄등록</button>
+          <input type="file" id="client-upload-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadClients(this)">
+          <button class="btn-action" onclick="addClient()">+ 개별 등록</button>
+        </div>
+      </div>
+      <div class="section-body" style="padding:0">
+        <div style="padding:10px 12px 8px">
+          <input class="input" id="client-search" placeholder="상호명, 사업자번호, 대표자명, 코드 검색..." style="max-width:400px" oninput="renderClients()">
+        </div>
+        <div class="table-scroll" style="overflow-x:auto">
+          <table class="data-table" id="client-table">
+            <thead><tr>
+              <th style="width:36px"></th>
+              <th>코드</th>
+              <th>상호명</th>
+              <th>사업자등록증</th>
+              <th>대표자명</th>
+              <th>전화</th>
+              <th>핸드폰</th>
+              <th>팩스</th>
+              <th>관리코드</th>
+              <th>우편</th>
+              <th>주소</th>
+              <th>업태</th>
+              <th>종목</th>
+              <th>이메일</th>
+              <th>은행계좌</th>
+              <th style="width:50px">수정</th>
+            </tr></thead>
+            <tbody id="client-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div><!-- /settings-sub-client -->
+
+</div>
+
+</div><!-- /content -->
+
+<!-- Import Modal -->
+<div class="modal-bg" id="import-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3>📥 엑셀 데이터 가져오기</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <!-- Step 1: 양식 다운로드 -->
+      <div style="background:#E6F1FB;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:14px;font-weight:600;color:#0C447C;margin-bottom:6px">STEP 1. 양식 다운로드</div>
+        <p style="font-size:12px;color:#5A6070;margin-bottom:10px">아래 양식을 다운받아 데이터를 입력한 후 업로드하세요. 시트별 컬럼 구조가 맞아야 정상 인식됩니다.</p>
+        <button class="btn-primary" onclick="downloadTemplate()" style="width:100%">📄 밀워키 입력 양식 다운로드 (.xlsx)</button>
+      </div>
+      <!-- Step 2: 업로드 -->
+      <div style="background:#F4F6FA;border-radius:8px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:600;color:#1A1D23;margin-bottom:6px">STEP 2. 엑셀 파일 업로드</div>
+        <p style="font-size:12px;color:#5A6070;margin-bottom:10px">양식에 데이터를 채운 파일 또는 기존 밀워키 엑셀 파일을 선택하세요.</p>
+        <input type="file" id="excel-file" accept=".xlsx,.xls" style="font-size:13px">
+      </div>
+      <div style="margin:12px 0;padding:12px;background:#F4F6FA;border-radius:6px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#1A1D23">업로드 모드</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;font-size:13px">
+          <input type="radio" name="import-mode" value="replace" checked style="accent-color:#185FA5"> 전체 교체 — 기존 데이터 삭제 후 새로 등록 (최초 업로드)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="radio" name="import-mode" value="merge"> 코드 매칭 업데이트 — 기존 제품은 덮어쓰기, 신규는 추가 (부분 수정용)
+        </label>
+      </div>
+      <div id="import-status" style="font-size:13px;color:#5A6070"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal()">취소</button>
+      <button class="btn-primary" onclick="importExcel()">가져오기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-bg" id="settings-modal">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h3>⚙ 할인율·수수료 설정</h3>
+      <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+    </div>
+    <div style="display:flex;gap:0;border-bottom:2px solid #DDE1EB;margin:0 20px">
+      <button id="stab-settings" class="settings-tab active" onclick="switchSettingsTab('settings')">설정</button>
+      <button id="stab-datamgmt" class="settings-tab" onclick="switchSettingsTab('datamgmt')">데이터 관리</button>
+    </div>
+    <div class="modal-body" id="settings-tab-settings" style="padding:16px 20px;max-height:calc(100vh - 200px);overflow-y:auto">
+
+      <!-- 섹션1: 밀워키 리베이트 -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#1A1D23">① 밀워키 리베이트</div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="form-field">
+            <label class="label">분기 리베이트 (%)</label>
+            <input class="input" id="set-quarter" type="number" step="0.1">
+          </div>
+          <div class="form-field">
+            <label class="label">년간 리베이트 (%)</label>
+            <input class="input" id="set-year" type="number" step="0.1">
+          </div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:#E2E5EA;margin:18px 0"></div>
+
+      <!-- 섹션2: 채널별 목표 이익률 -->
+      <div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#1A1D23">채널별 목표 이익률</div>
+        <div style="background:#E6F1FB;border-radius:6px;padding:8px 12px;font-size:11px;color:#0C447C;margin-bottom:14px;line-height:1.5">
+          목표 이익률을 입력하면, 각 채널의 수수료와 부가세(10%)를 고려하여 판매가를 자동 역산합니다.<br>
+          수수료는 설정 > 수수료 설정에서 관리됩니다. 판매가는 백원 단위 반올림 (소매는 천원 단위).
+        </div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="form-field">
+            <label class="label">A(도매) 이익률 (%)</label>
+            <input class="input" id="set-mk-domae" type="number" step="0.1">
+            <span style="font-size:10px;color:#9BA3B2">단순 마크업 · 백원 반올림</span>
+          </div>
+          <div class="form-field">
+            <label class="label">소매 이익률 (%)</label>
+            <input class="input" id="set-mk-retail" type="number" step="0.1">
+            <span style="font-size:10px;color:#9BA3B2">단순 마크업 · 천원 반올림</span>
+          </div>
+        </div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:8px">
+          <div class="form-field">
+            <label class="label">스토어팜 이익률 (%)</label>
+            <input class="input" id="set-mk-naver" type="number" step="0.1">
+            <span style="font-size:10px;color:#9BA3B2">수수료+VAT 역산 · 백원</span>
+          </div>
+          <div class="form-field">
+            <label class="label">오픈마켓 전동 이익률 (%)</label>
+            <input class="input" id="set-mk-open-elec" type="number" step="0.1">
+            <span style="font-size:10px;color:#9BA3B2">수수료+VAT 역산 · 백원</span>
+          </div>
+          <div class="form-field">
+            <label class="label">오픈마켓 수공구 이익률 (%)</label>
+            <input class="input" id="set-mk-open-hand" type="number" step="0.1">
+            <span style="font-size:10px;color:#9BA3B2">수수료+VAT 역산 · 백원</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 수수료 안내 -->
+      <div style="background:#F4F6FA;border-radius:6px;padding:10px 14px;font-size:12px;color:#5A6070;margin-top:18px">
+        온라인 판매채널 수수료는 <strong>설정 > 수수료 설정</strong>에서 통합 관리합니다.
+      </div>
+
+    </div>
+    <div class="modal-body" id="settings-tab-datamgmt" style="display:none;padding:16px 20px;max-height:calc(100vh - 200px);overflow-y:auto">
+      <div style="background:#FAEEDA;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#412402">
+        ⚠️ 초기화하면 해당 데이터가 영구 삭제됩니다. 엑셀 백업 후 진행하세요.
+      </div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;color:#1A1D23">항목별 초기화</div>
+      <div id="data-mgmt-items" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+        <label class="dm-row"><input type="checkbox" value="products"><span class="dm-label">밀워키 제품 데이터</span><span class="dm-badge" id="dm-cnt-products"></span></label>
+        <label class="dm-row"><input type="checkbox" value="inventory"><span class="dm-label">재고 데이터</span><span class="dm-badge" id="dm-cnt-inventory"></span></label>
+        <label class="dm-row"><input type="checkbox" value="promotions"><span class="dm-label">프로모션 데이터</span><span class="dm-badge" id="dm-cnt-promotions"></span></label>
+        <label class="dm-row"><input type="checkbox" value="orders"><span class="dm-label">발주 데이터</span><span class="dm-badge" id="dm-cnt-orders"></span></label>
+        <label class="dm-row"><input type="checkbox" value="orderHistory"><span class="dm-label">발주 이력 (원가P)</span><span class="dm-badge" id="dm-cnt-orderHistory"></span></label>
+        <label class="dm-row"><input type="checkbox" value="general"><span class="dm-label">일반제품</span><span class="dm-badge" id="dm-cnt-general"></span></label>
+        <label class="dm-row"><input type="checkbox" value="sales"><span class="dm-label">온라인판매 항목</span><span class="dm-badge" id="dm-cnt-sales"></span></label>
+        <label class="dm-row"><input type="checkbox" value="estimates"><span class="dm-label">견적서</span><span class="dm-badge" id="dm-cnt-estimates"></span></label>
+        <label class="dm-row"><input type="checkbox" value="setbun"><span class="dm-label">세트분해 / 배터리 시세</span><span class="dm-badge" id="dm-cnt-setbun"></span></label>
+        <label class="dm-row"><input type="checkbox" value="settings"><span class="dm-label">설정값 (리베이트·수수료·마크업)</span><span class="dm-badge" id="dm-cnt-settings"></span></label>
+        <label class="dm-row"><input type="checkbox" value="ui"><span class="dm-label">UI 설정 (컬럼 너비)</span><span class="dm-badge" id="dm-cnt-ui"></span></label>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="btn-danger" onclick="executeDataReset()">선택 항목 초기화</button>
+        <span style="font-size:12px;color:#5A6070">체크한 항목만 삭제됩니다</span>
+      </div>
+      <hr style="margin:20px 0;border:none;border-top:1px solid #DDE1EB">
+      <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#CC2222">전체 초기화</div>
+      <div style="font-size:12px;color:#5A6070;margin-bottom:12px">모든 데이터를 삭제하고 앱을 초기 상태로 되돌립니다.</div>
+      <button class="btn-danger" onclick="executeFullReset()" style="background:#791F1F">🗑 전체 초기화 (복구 불가)</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeSettingsModal()">취소</button>
+      <button class="btn-primary" onclick="applySettings()">적용 (전체 재계산)</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="order-settings-modal">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h3>⚙ 커머셜 프로모션 설정</h3>
+      <button class="modal-close" onclick="closeOrderSettingsModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;max-height:calc(100vh - 160px);overflow-y:auto">
+
+      <div style="background:#E6F1FB;border-radius:6px;padding:8px 12px;font-size:12px;color:#0C447C;margin-bottom:16px">
+        일반발주·프로모션발주 모두에 적용되는 커머셜 할인율입니다.<br>
+        단가표 원가(분기+년간)와 별도로, 발주 시 추가 적용됩니다.<br>
+        AR차감: 공급가(또는 프로모션단가)에서 직접 차감 · 물량지원: 추가 수량으로 개당 단가 인하
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <!-- AR차감 방식 -->
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#5A6070;margin-bottom:6px;padding:4px 8px;background:#EAECF2;border-radius:4px">AR차감 방식</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-ar-name-0" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-ar-rate-0" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+            <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-ar-name-1" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-ar-rate-1" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+            <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-ar-name-2" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-ar-rate-2" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+            <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-ar-name-3" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-ar-rate-3" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+          </div>
+        </div>
+        <!-- 물량지원 방식 -->
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#5A6070;margin-bottom:6px;padding:4px 8px;background:#EAECF2;border-radius:4px">물량지원 방식</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-vol-name-0" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-vol-rate-0" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+            <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-vol-name-1" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-vol-rate-1" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+            <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-vol-name-2" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-vol-rate-2" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+            <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-vol-name-3" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-vol-rate-3" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeOrderSettingsModal()">취소</button>
+      <button class="btn-primary" onclick="applyOrderSettings()">적용</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="order-history-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h3>📋 일반 발주 이력 (최근 1주일)</h3>
+      <button class="modal-close" onclick="closeOrderHistoryModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;max-height:calc(100vh - 160px);overflow-y:auto">
+      <div id="order-history-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeOrderHistoryModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="po-history-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h3>📋 프로모션 발주 이력 (최근 1주일)</h3>
+      <button class="modal-close" onclick="closePoHistoryModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;max-height:calc(100vh - 160px);overflow-y:auto">
+      <div id="po-history-list"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closePoHistoryModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Promo Edit Modal -->
+<div class="modal-bg" id="promo-edit-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h3 id="promo-edit-title">프로모션 추가</h3>
+      <button class="modal-close" onclick="closePromoModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="promo-edit-idx" value="-1">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="form-field" style="grid-column:span 2">
+          <label class="label">프로모션명 (큰제목)</label>
+          <input class="input" id="pe-promoName" placeholder="예: M12 IR-202B 7% DC 프로모션">
+        </div>
+        <div class="form-field">
+          <label class="label">프로모션번호</label>
+          <input class="input" id="pe-promoCode" placeholder="예: T6, T7, M202">
+        </div>
+        <div class="form-field">
+          <label class="label">모델명</label>
+          <input class="input" id="pe-model" placeholder="예: M12 IR-202B">
+        </div>
+        <div class="form-field">
+          <label class="label">순번</label>
+          <input class="input" id="pe-orderNum" placeholder="예: 1026">
+        </div>
+        <div class="form-field">
+          <label class="label">수량</label>
+          <input class="input" id="pe-qty" type="number" placeholder="예: 1" value="1">
+        </div>
+        <div class="form-field">
+          <label class="label">대리점가격 (단품)</label>
+          <input class="input" id="pe-dealerPrice" type="number" placeholder="예: 189000">
+        </div>
+        <div class="form-field">
+          <label class="label">프로모션금액 (무상=0)</label>
+          <input class="input" id="pe-promoPrice" type="number" placeholder="예: 175000, 무상제공=0">
+        </div>
+        <div class="form-field">
+          <label class="label">할인율 (예: 7%, 7+1, 10+1)</label>
+          <input class="input" id="pe-discountRate" placeholder="예: 7% 또는 7+1">
+        </div>
+        <div class="form-field">
+          <label class="label">기간</label>
+          <input class="input" id="pe-period" placeholder="예: 일반주문 오픈후~3월30일">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closePromoModal()">취소</button>
+      <button class="btn-primary" onclick="savePromo()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Add/Edit Modal -->
+<div class="modal-bg" id="product-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <h3 id="product-modal-title">제품 추가</h3>
+      <button class="modal-close" onclick="closeProductModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px">
+      <input type="hidden" id="prod-edit-idx" value="-1">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="form-field">
+          <label class="label">코드 *</label>
+          <input class="input" id="prod-code" placeholder="예: 21815">
+        </div>
+        <div class="form-field">
+          <label class="label">관리코드</label>
+          <input class="input" id="prod-manageCode" placeholder="바코드">
+        </div>
+        <div class="form-field">
+          <label class="label">대분류</label>
+          <input class="input" id="prod-category" placeholder="예: 파워툴">
+        </div>
+        <div class="form-field">
+          <label class="label">중분류</label>
+          <input class="input" id="prod-subcategory" placeholder="예: 12V FUEL">
+        </div>
+        <div class="form-field">
+          <label class="label">소분류</label>
+          <input class="input" id="prod-detail" placeholder="예: 드릴 드라이버">
+        </div>
+        <div class="form-field">
+          <label class="label">순번</label>
+          <input class="input" id="prod-orderNum" placeholder="예: 1093">
+        </div>
+        <div class="form-field">
+          <label class="label">TTI#</label>
+          <input class="input" id="prod-ttiNum" placeholder="예: 18621019">
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
+        <div class="form-field">
+          <label class="label">모델명 *</label>
+          <input class="input" id="prod-model" placeholder="예: M12 FDD2-0X">
+        </div>
+        <div class="form-field">
+          <label class="label">공급가 *</label>
+          <input class="input" id="prod-supplyPrice" type="number" placeholder="예: 139000">
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr;margin-top:8px">
+        <div class="form-field">
+          <label class="label">제품설명</label>
+          <input class="input" id="prod-description" placeholder="예: 12V FUEL 드릴 드라이버(GEN3) 베어툴">
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:8px">
+        <div class="form-field">
+          <label class="label">제품DC (소수, 예: 0.13)</label>
+          <input class="input" id="prod-productDC" type="number" step="0.001" placeholder="예: 0.13">
+        </div>
+        <div class="form-field">
+          <label class="label">단종 여부</label>
+          <select class="select" id="prod-discontinued">
+            <option value="">정상</option>
+            <option value="단종">단종</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label class="label">입고날짜 메모</label>
+          <input class="input" id="prod-inDate" placeholder="예: 4월 중순 입고예정">
+        </div>
+        <div class="form-field">
+          <label class="label">&nbsp;</label>
+          <div style="font-size:12px;color:#5A6070;padding-top:6px">원가·판매가는 저장 시 자동 계산됩니다</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeProductModal()">취소</button>
+      <button class="btn-primary" onclick="saveProduct()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF/Image Upload Modal -->
+<div class="modal-bg" id="promo-pdf-modal">
+  <div class="modal" style="max-width:900px;max-height:90vh">
+    <div class="modal-header">
+      <h3>📄 프로모션 PDF / 이미지 업로드</h3>
+      <button class="modal-close" onclick="closePromoPdfModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:calc(90vh - 130px)">
+      <div style="background:#FAEEDA;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:14px;font-weight:600;color:#412402;margin-bottom:6px">밀워키 월별 프로모션 파일을 업로드하세요</div>
+        <p style="font-size:12px;color:#5A6070">PDF 또는 이미지(JPG, PNG)에서 프로모션 정보를 자동 추출합니다. 추출 후 가격을 직접 확인/수정한 뒤 추가하세요.</p>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+        <input type="file" id="promo-pdf-file" accept=".pdf,.jpg,.jpeg,.png,.webp" style="font-size:13px;flex:1">
+      </div>
+      <div id="pdf-status" style="font-size:13px;color:#5A6070;margin-bottom:12px"></div>
+      <div id="pdf-preview" style="display:none">
+        <div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#1A1D23">추출된 프로모션 (<span id="pdf-extract-count">0</span>건) — <span style="color:#CC2222;font-size:12px">가격을 반드시 확인하세요!</span></div>
+        <div style="max-height:400px;overflow-y:auto;border:1px solid var(--tl-border);border-radius:6px">
+          <table class="data-table" style="font-size:12px">
+            <thead><tr><th>선택</th><th>프로모션명</th><th>번호</th><th>모델명</th><th>순번</th><th>수량</th><th style="background:#FCEBEB">대리점가격</th><th style="background:#FCEBEB">프로모션금액</th><th>할인율</th><th>기간</th></tr></thead>
+            <tbody id="pdf-extract-body"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:#5A6070">
+          <label style="cursor:pointer"><input type="checkbox" id="pdf-select-all" onchange="togglePdfSelectAll(this.checked)" checked> 전체 선택</label>
+          <span style="margin-left:16px;color:#CC2222">* 빨간 배경 칸은 직접 수정 가능합니다</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closePromoPdfModal()">취소</button>
+      <button class="btn-primary" id="btn-pdf-parse" onclick="parsePdf()">파일 읽기</button>
+      <button class="btn-primary" id="btn-pdf-import" onclick="importPdfPromos()" style="display:none;background:var(--tl-success)">확인 후 추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cumul Promo Edit Modal -->
+<div class="modal-bg" id="cumul-edit-modal">
+  <div class="modal" style="max-width:700px;max-height:90vh">
+    <div class="modal-header">
+      <h3 id="cumul-edit-title">누적 프로모션 추가</h3>
+      <button class="modal-close" onclick="document.getElementById('cumul-edit-modal').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:calc(90vh - 130px)">
+      <input type="hidden" id="cumul-edit-idx" value="-1">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="form-field">
+          <label class="label">프로모션 품목군</label>
+          <input class="input" id="cumul-group" placeholder="예: M12 렌치&라쳇">
+        </div>
+        <div class="form-field">
+          <label class="label">기간</label>
+          <input class="input" id="cumul-period" placeholder="예: 2026년 3월">
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px">
+        <div class="form-field">
+          <label class="label">기준 금액</label>
+          <input class="input" id="cumul-threshold" placeholder="예: 200만원 당">
+        </div>
+        <div class="form-field">
+          <label class="label">FOC 혜택</label>
+          <input class="input" id="cumul-foc" placeholder="예: FOC 쿠폰 16만원">
+        </div>
+        <div class="form-field">
+          <label class="label">비고</label>
+          <input class="input" id="cumul-note" placeholder="예: 제한없음">
+        </div>
+      </div>
+      <div style="font-weight:600;margin-bottom:6px">적용 제품 리스트</div>
+      <div style="margin-bottom:8px;display:flex;gap:8px">
+        <input class="input" id="cumul-item-search" placeholder="모델명/코드 검색" style="max-width:300px"
+          oninput="showAC(this, c => cumulAddItem(c))">
+        <button class="btn-action" onclick="cumulAddEmpty()">빈 행 추가</button>
+      </div>
+      <div class="table-scroll" style="max-height:250px;overflow-y:auto">
+        <table class="data-table" style="font-size:12px">
+          <thead><tr><th style="width:30px"></th><th>구분</th><th>TTI#</th><th>순번</th><th>모델명</th><th>제품설명</th><th>대리점공급가</th></tr></thead>
+          <tbody id="cumul-items-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary btn-sm" onclick="document.getElementById('cumul-edit-modal').classList.remove('show')">취소</button>
+      <button class="btn-primary" onclick="saveCumulPromo()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quarter Promo Edit Modal -->
+<div class="modal-bg" id="quarter-edit-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h3 id="quarter-edit-title">분기/월별 프로모션 추가</h3>
+      <button class="modal-close" onclick="document.getElementById('quarter-edit-modal').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="quarter-edit-idx" value="-1">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="form-field">
+          <label class="label">제품군</label>
+          <input class="input" id="quarter-group" placeholder="예: 수공구 & 액세서리류">
+        </div>
+        <div class="form-field">
+          <label class="label">대상 품목 구분</label>
+          <input class="input" id="quarter-target" placeholder="예: 대분류: 수공구 / 액세서리">
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+        <div class="form-field">
+          <label class="label">단위 (월별/분기)</label>
+          <select class="select" id="quarter-unit">
+            <option value="월별">월별</option>
+            <option value="분기">분기</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label class="label">기간</label>
+          <input class="input" id="quarter-period" placeholder="예: 2026년 1월~3월">
+        </div>
+      </div>
+      <div style="font-weight:600;margin-bottom:6px">구간별 지원율</div>
+      <div id="quarter-tiers">
+        <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+          <input class="input" placeholder="금액 (예: 100만원)" style="flex:1" id="qt-amt-0">
+          <input class="input" placeholder="지원율 (예: 8%)" style="width:100px" id="qt-rate-0">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+          <input class="input" placeholder="금액" style="flex:1" id="qt-amt-1">
+          <input class="input" placeholder="지원율" style="width:100px" id="qt-rate-1">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+          <input class="input" placeholder="금액" style="flex:1" id="qt-amt-2">
+          <input class="input" placeholder="지원율" style="width:100px" id="qt-rate-2">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+          <input class="input" placeholder="금액" style="flex:1" id="qt-amt-3">
+          <input class="input" placeholder="지원율" style="width:100px" id="qt-rate-3">
+        </div>
+      </div>
+      <div class="form-field" style="margin-top:8px">
+        <label class="label">비고</label>
+        <input class="input" id="quarter-note" placeholder="비고">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary btn-sm" onclick="document.getElementById('quarter-edit-modal').classList.remove('show')">취소</button>
+      <button class="btn-primary" onclick="saveQuarterPromo()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Promo V2 Edit Modal -->
+<div class="modal-bg" id="promo-v2-edit-modal">
+  <div class="modal" style="max-width:750px;max-height:90vh">
+    <div class="modal-header">
+      <h3 id="pv2-edit-title">프로모션 추가</h3>
+      <button class="modal-close" onclick="document.getElementById('promo-v2-edit-modal').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:calc(90vh - 130px)">
+      <input type="hidden" id="pv2-category" value="">
+      <input type="hidden" id="pv2-edit-idx" value="-1">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px">
+        <div class="form-field">
+          <label class="label">프로모션 번호</label>
+          <input class="input" id="pv2-no" placeholder="예: M101, M201, T5">
+        </div>
+        <div class="form-field">
+          <label class="label">할인율/방식</label>
+          <input class="input" id="pv2-discount" placeholder="예: 20%, 7+1, 무상">
+        </div>
+        <div class="form-field">
+          <label class="label">기간</label>
+          <input class="input" id="pv2-period" placeholder="예: 3/3~3/30">
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:2fr 1fr;margin-bottom:12px">
+        <div class="form-field">
+          <label class="label">프로모션 제목</label>
+          <input class="input" id="pv2-title" placeholder="예: M18 BLCV2 신제품 패키지 프로모션 - 20% 할인">
+        </div>
+        <div class="form-field">
+          <label class="label">제한사항</label>
+          <input class="input" id="pv2-restriction" placeholder="예: 업체당 1세트 제한">
+        </div>
+      </div>
+
+      <div style="font-weight:600;margin-bottom:6px">제품 리스트</div>
+      <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
+        <input class="input" id="pv2-item-search" placeholder="모델명/코드 검색으로 추가" style="max-width:300px"
+          oninput="showAC(this, c => pv2AddItemByCode(c))">
+        <button class="btn-action" onclick="pv2AddEmptyItem()">빈 행 추가</button>
+      </div>
+      <div class="table-scroll" style="overflow-x:auto;max-height:300px;overflow-y:auto">
+        <table class="data-table" style="font-size:12px">
+          <thead><tr>
+            <th style="width:30px"></th>
+            <th>순번</th>
+            <th>TTI#</th>
+            <th>모델명</th>
+            <th>제품설명</th>
+            <th>수량</th>
+            <th>단가</th>
+            <th>프로모션금액</th>
+            <th>총액</th>
+          </tr></thead>
+          <tbody id="pv2-items-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary btn-sm" onclick="document.getElementById('promo-v2-edit-modal').classList.remove('show')">취소</button>
+      <button class="btn-primary" onclick="savePromoV2()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Estimate List Modal -->
+<div class="modal-bg" id="est-list-modal">
+  <div class="modal" style="max-width:700px;max-height:80vh">
+    <div class="modal-header">
+      <h3>📋 견적서 목록</h3>
+      <button class="modal-close" onclick="document.getElementById('est-list-modal').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:calc(80vh - 100px);padding:12px">
+      <table class="data-table">
+        <thead><tr><th>견적번호</th><th>거래처</th><th>견적금액</th><th>날짜</th><th style="width:120px"></th></tr></thead>
+        <tbody id="est-list-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Estimate PDF Preview Modal -->
+<div class="modal-bg" id="est-pdf-modal">
+  <div class="modal" style="max-width:850px;max-height:95vh">
+    <div class="modal-header">
+      <h3>📄 견적서 미리보기</h3>
+      <button class="modal-close" onclick="document.getElementById('est-pdf-modal').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:calc(95vh - 130px);padding:0">
+      <div id="est-pdf-content" style="background:white;padding:40px;font-size:13px;color:#222;font-family:Pretendard,sans-serif"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="document.getElementById('est-pdf-modal').classList.remove('show')">닫기</button>
+      <button class="btn-primary" onclick="downloadEstimatePdf()">📥 PDF 다운로드</button>
+    </div>
+  </div>
+</div>
+
+<!-- Setbun Edit Modal -->
+<div class="modal-bg" id="setbun-edit-modal">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h3 id="setbun-edit-title">세트 분해 분석 추가</h3>
+      <button class="modal-close" onclick="closeSetbunModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="sb-edit-idx" value="-1">
+      <input type="hidden" id="sb-search-mode" value="normal">
+      <input type="hidden" id="sb-set-code" value="">
+      <input type="hidden" id="sb-bare-code" value="">
+
+      <div style="font-weight:600;margin-bottom:6px">세트 제품</div>
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
+        <div style="flex:1">
+          <label class="label">모델명 검색</label>
+          <input class="input" id="sb-set-model-input" placeholder="모델명 검색 (예: FID2)"
+            oninput="showSetbunAC(this, c => sbSelectSet(c))"
+            onfocus="if(this.value) showSetbunAC(this, c => sbSelectSet(c))">
+        </div>
+        <div id="sb-set-info" style="flex:2;font-size:13px;color:#5A6070;padding:20px 0 0">-</div>
+      </div>
+
+      <div style="font-weight:600;margin-bottom:6px">베어툴 제품</div>
+      <div style="margin-bottom:12px">
+        <div id="sb-bare-candidates" style="display:none;margin-bottom:8px">
+          <label class="label">추천 베어툴 (선택)</label>
+          <div id="sb-bare-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+        </div>
+        <div id="sb-bare-info" style="font-size:13px;color:#5A6070;padding:4px 0">베어툴: 세트 제품을 먼저 선택하세요</div>
+      </div>
+
+      <div style="font-weight:600;margin-bottom:6px">세트 구성 (배터리/충전기)</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:8px">
+        <div class="form-field">
+          <label class="label">배터리 1</label>
+          <select class="select" id="sb-bat1"></select>
+        </div>
+        <div class="form-field">
+          <label class="label">배터리 2</label>
+          <select class="select" id="sb-bat2"></select>
+        </div>
+        <div class="form-field">
+          <label class="label">충전기</label>
+          <select class="select" id="sb-charger"></select>
+        </div>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:8px">
+        <div class="form-field">
+          <label class="label">프로모션 적용 (있는 경우)</label>
+          <input class="input" id="sb-promo" placeholder="예: M201 7% DC">
+        </div>
+        <div class="form-field">
+          <label class="label">프로모션 매입원가 (수동입력)</label>
+          <input class="input" id="sb-promo-cost" type="number" placeholder="프로모션 적용 시 세트 매입원가">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeSetbunModal()">취소</button>
+      <button class="btn-primary" onclick="saveSetbunItem()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Picker Modal for Orders -->
+<div class="modal-bg" id="product-picker-modal">
+  <div class="modal" style="max-width:900px;max-height:90vh">
+    <div class="modal-header">
+      <h3>📋 제품 불러오기</h3>
+      <button class="modal-close" onclick="closeProductPicker()">&times;</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:calc(90vh - 130px)">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <input class="input" id="picker-search" placeholder="코드, 모델명, 제품설명 검색..." oninput="renderPickerList()" style="flex:1">
+        <select class="select" id="picker-cat" onchange="renderPickerList()" style="width:140px">
+          <option value="">전체 대분류</option>
+        </select>
+        <select class="select" id="picker-sub" onchange="renderPickerList()" style="width:140px">
+          <option value="">전체 중분류</option>
+        </select>
+      </div>
+      <div style="font-size:12px;color:#5A6070;margin-bottom:8px">
+        <label style="cursor:pointer"><input type="checkbox" id="picker-select-all" onchange="togglePickerAll(this.checked)"> 전체 선택</label>
+        <span style="margin-left:12px" id="picker-selected-count">0건 선택</span>
+      </div>
+      <div style="max-height:400px;overflow-y:auto;border:1px solid var(--tl-border);border-radius:6px">
+        <table class="data-table" style="font-size:12px">
+          <thead><tr><th style="width:20px">선택</th><th>코드</th><th>대분류</th><th>중분류</th><th>모델명</th><th>제품설명</th><th>공급가</th><th style="color:#1D9E75">원가</th><th>재고</th></tr></thead>
+          <tbody id="picker-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeProductPicker()">취소</button>
+      <button class="btn-primary" onclick="confirmProductPicker()">선택 제품 추가</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <span id="status-products">제품: 0건</span>
+  <span id="status-save">마지막 저장: -</span>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
