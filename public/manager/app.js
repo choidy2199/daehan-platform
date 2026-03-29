@@ -5165,9 +5165,9 @@ function searchEstProducts(val) {
     // IN/OUT/파레트 셀
     var inCell, outCell, palletCell;
     if (p._source === 'general') {
-      inCell = (p.inQty && p.inPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:8px;color:#5A6070">' + p.inQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.inPrice.toLocaleString() + '</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
-      outCell = (p.outQty && p.outPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:8px;color:#5A6070">' + p.outQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.outPrice.toLocaleString() + '</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
-      palletCell = (p.palletQty && p.palletPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:8px;color:#5A6070">' + p.palletQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.palletPrice.toLocaleString() + '</span></div>' : p.palletQty ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:8px;color:#5A6070">' + p.palletQty + '개</span><span style="font-size:9px;color:#9BA3B2">단가없음</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
+      inCell = (p.inQty && p.inPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:10px;color:#5A6070">' + p.inQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.inPrice.toLocaleString() + '</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
+      outCell = (p.outQty && p.outPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:10px;color:#5A6070">' + p.outQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.outPrice.toLocaleString() + '</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
+      palletCell = (p.palletQty && p.palletPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:10px;color:#5A6070">' + p.palletQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.palletPrice.toLocaleString() + '</span></div>' : p.palletQty ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:10px;color:#5A6070">' + p.palletQty + '개</span><span style="font-size:10px;color:#9BA3B2">단가없음</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
     } else {
       inCell = '<span style="color:#DDE1EB;font-size:10px">-</span>';
       outCell = '<span style="color:#DDE1EB;font-size:10px">-</span>';
@@ -5275,7 +5275,7 @@ function searchClientAC(val) {
   results.forEach(function(c) {
     var idx = clientData.indexOf(c);
     html += '<div class="client-ac-item" data-idx="' + idx + '" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #F0F2F7">';
-    html += '<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E1F5EE;color:#085041;white-space:nowrap">등록</span>';
+    html += '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E1F5EE;color:#085041;white-space:nowrap">등록</span>';
     html += '<span style="font-weight:600;color:#1A1D23">' + (c.name || '') + '</span>';
     html += '<span style="font-size:10px;color:#5A6070">' + (c.bizNo || '') + '</span>';
     html += '<span style="font-size:10px;color:#9BA3B2">' + (c.ceo || '') + '</span>';
@@ -5283,7 +5283,7 @@ function searchClientAC(val) {
     html += '</div>';
   });
   html += '<div class="client-ac-new" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;background:#FAFBFC;border-top:2px solid #DDE1EB">';
-  html += '<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E6F1FB;color:#0C447C;white-space:nowrap">신규</span>';
+  html += '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E6F1FB;color:#0C447C;white-space:nowrap">신규</span>';
   html += '<span style="color:#185FA5;font-weight:500">"' + val + '"</span>';
   html += '<span style="font-size:10px;color:#9BA3B2">← 미등록 거래처로 직접 입력</span>';
   html += '</div>';
@@ -5321,7 +5321,7 @@ function showEstClientInfo(c) {
   info.style.background = '#F4F6FA';
   info.innerHTML =
     '<div><span style="color:#5A6070">상호: </span><span style="font-weight:500">' + (c.name || '') + '</span>' +
-    '<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E1F5EE;color:#085041;margin-left:4px">등록</span></div>' +
+    '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E1F5EE;color:#085041;margin-left:4px">등록</span></div>' +
     '<div><span style="color:#5A6070">사업자: </span><span>' + (c.bizNo || '-') + '</span></div>' +
     '<div><span style="color:#5A6070">대표: </span><span>' + (c.ceo || '-') + '</span></div>' +
     '<div><span style="color:#5A6070">전화: </span><span>' + (c.phone || c.mobile || '-') + '</span></div>' +
@@ -5336,7 +5336,7 @@ function showEstClientUnreg(name) {
   info.style.display = 'flex';
   info.style.background = '#FFF5F5';
   info.innerHTML =
-    '<span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;background:#FCEBEB;color:#791F1F">미등록</span>' +
+    '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:#FCEBEB;color:#791F1F">미등록</span>' +
     '<span style="color:#5A6070;font-size:11px">"' + name + '" — 설정 > 거래처 등록에서 등록하면 자동 연결됩니다</span>';
 }
 
@@ -5433,7 +5433,7 @@ function renderEstimateItems() {
       <td class="center" style="font-weight:500">${p ? p.model : item.model}</td>
       <td class="center" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p ? p.description : item.description}</td>
       <td class="center"><input type="number" value="${qty || ''}" onchange="onEstQtyChange(${i},this.value)" min="0" style="width:60px;text-align:center"></td>
-      <td class="num"><input type="number" value="${aPrice || ''}" onchange="onEstPriceChange(${i},this.value)" min="0" style="width:80px;text-align:right;font-size:12px">${item._tier === '파레트' ? '<span style="font-size:8px;background:#FAEEDA;color:#633806;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">파레트</span>' : item._tier === 'IN' ? '<span style="font-size:8px;background:#E6F1FB;color:#0C447C;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">IN</span>' : (item._tier === 'OUT' ? '<span style="font-size:8px;background:#E6F1FB;color:#0C447C;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">OUT</span>' : '')}</td>
+      <td class="num"><input type="number" value="${aPrice || ''}" onchange="onEstPriceChange(${i},this.value)" min="0" style="width:80px;text-align:right;font-size:12px">${item._tier === '파레트' ? '<span style="font-size:10px;background:#FAEEDA;color:#633806;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">파레트</span>' : item._tier === 'IN' ? '<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">IN</span>' : (item._tier === 'OUT' ? '<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">OUT</span>' : '')}</td>
       <td class="num" style="font-weight:600">${amount ? fmt(amount) : '-'}</td>
       <td class="num" style="color:#5A6070">${amount ? fmt(vat) : '-'}</td>
       <td class="center"><input value="${item.memo || ''}" onchange="onEstMemoChange(${i},this.value)" style="width:60px;font-size:12px;text-align:center"></td>
@@ -5447,7 +5447,7 @@ function renderEstimateItems() {
   }
   const totalVat = isVatExempt ? 0 : Math.round(total * 0.1);
   const vatLabel = isVatExempt ? '부가세 면제' : '부가세 ' + fmt(totalVat);
-  document.getElementById('est-total').innerHTML = `${fmt(total)} <span style="font-size:13px;color:#5A6070;font-weight:400">+</span> <span style="font-size:14px;color:${isVatExempt ? '#CC2222' : '#5A6070'}">${vatLabel}</span> <span style="font-size:13px;color:#5A6070;font-weight:400">=</span> <span style="font-size:18px;color:#CC2222">토탈 ${fmt(total + totalVat)}</span>`;
+  document.getElementById('est-total').innerHTML = `${fmt(total)} <span style="font-size:13px;color:#5A6070;font-weight:400">+</span> <span style="font-size:13px;color:${isVatExempt ? '#CC2222' : '#5A6070'}">${vatLabel}</span> <span style="font-size:13px;color:#5A6070;font-weight:400">=</span> <span style="font-size:18px;color:#CC2222">토탈 ${fmt(total + totalVat)}</span>`;
   initColumnResize('est-table');
   initStickyHeader('est-table');
 }
@@ -5543,7 +5543,7 @@ function previewEstimatePdf() {
       </div>
       <div style="text-align:right">
         <table style="border-collapse:collapse">
-          <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">합계금액</td><td style="padding:4px 12px;border:1px solid #ccc;font-weight:700;font-size:16px;color:#185FA5">${fmt(total)}</td></tr>
+          <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">합계금액</td><td style="padding:4px 12px;border:1px solid #ccc;font-weight:700;font-size:15px;color:#185FA5">${fmt(total)}</td></tr>
           <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">부가세(10%)</td><td style="padding:4px 12px;border:1px solid #ccc">${fmt(totalVat)}</td></tr>
           <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">총계(VAT포함)</td><td style="padding:4px 12px;border:1px solid #ccc;font-weight:700">${fmt(total + totalVat)}</td></tr>
         </table>
@@ -5573,7 +5573,7 @@ function previewEstimatePdf() {
     </table>
     ${shippingMessage}
     <div style="border-top:2px solid #1A1D23;padding-top:14px;font-size:12px;color:#555">
-      <div style="font-weight:700;font-size:14px;margin-bottom:8px;color:#222">공급자</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#222">공급자</div>
       <table style="border-collapse:collapse;width:100%">
         <tr><td style="padding:3px 10px;width:100px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">업체명</td><td style="padding:3px 10px;border:1px solid #ddd;font-weight:700">(주)대한종합상사</td><td style="padding:3px 10px;width:80px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">대표</td><td style="padding:3px 10px;border:1px solid #ddd">최병우</td></tr>
         <tr><td style="padding:3px 10px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">소재지</td><td colspan="3" style="padding:3px 10px;border:1px solid #ddd">경기도 양주시 백석읍 부흥로 1110</td></tr>
