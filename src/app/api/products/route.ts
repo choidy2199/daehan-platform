@@ -142,11 +142,28 @@ export async function PUT(request: NextRequest) {
 }
 
 /**
- * DELETE /api/products — 제품 1건 삭제
+ * DELETE /api/products
+ * Body: { id } — 1건 삭제
+ * Body: { deleteAll: true, productType: 'milwaukee' } — 전체 삭제
  */
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
+
+    // 전체 삭제
+    if (body.deleteAll && body.productType) {
+      const { data, error } = await supabase
+        .from('products')
+        .delete()
+        .eq('product_type', body.productType)
+        .select('id');
+      if (error) throw error;
+      const count = data ? data.length : 0;
+      console.log(`[Products DELETE ALL] ${body.productType}: ${count}건 삭제`);
+      return NextResponse.json({ success: true, deleted: count });
+    }
+
+    // 1건 삭제
     const { id } = body;
     if (!id) return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 });
 

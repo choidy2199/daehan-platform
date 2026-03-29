@@ -3878,6 +3878,46 @@ function exportGenProducts() {
   toast('일반제품 엑셀 다운로드 완료 (' + gp.length + '건)');
 }
 
+// ======================== 전체삭제 ========================
+function deleteAllMwProducts() {
+  var count = DB.products.length;
+  if (!count) { toast('삭제할 밀워키 제품이 없습니다'); return; }
+  if (!confirm('전체 삭제하시겠습니까? (' + count + '건)')) return;
+  if (!confirm('⚠️ 경고: 삭제된 데이터는 복구할 수 없습니다.\n정말 삭제하시겠습니까?')) return;
+
+  DB.products = [];
+  save(KEYS.products, DB.products);
+  DB.inventory = [];
+  save(KEYS.inventory, DB.inventory);
+  populateCatalogFilters();
+  renderCatalog();
+  // Supabase에서도 삭제
+  fetch('/api/products', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deleteAll: true, productType: 'milwaukee' })
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    console.log('[전체삭제] Supabase 밀워키 삭제:', d);
+  }).catch(function(e) {
+    console.error('[전체삭제] Supabase 삭제 실패:', e.message);
+  });
+  toast('밀워키 전체 삭제 완료 (' + count + '건)');
+}
+
+function deleteAllGenProducts() {
+  var gp = [];
+  try { gp = JSON.parse(localStorage.getItem('mw_gen_products') || '[]') || []; } catch(e) { gp = []; }
+  var count = gp.length;
+  if (!count) { toast('삭제할 일반제품이 없습니다'); return; }
+  if (!confirm('전체 삭제하시겠습니까? (' + count + '건)')) return;
+  if (!confirm('⚠️ 경고: 삭제된 데이터는 복구할 수 없습니다.\n정말 삭제하시겠습니까?')) return;
+
+  genProducts.length = 0;
+  localStorage.setItem('mw_gen_products', '[]');
+  renderGenProducts();
+  toast('일반제품 전체 삭제 완료 (' + count + '건)');
+}
+
 // ======================== STICKY HEADER (JS) ========================
 function initStickyHeader(tableId) {
   const table = document.getElementById(tableId);
