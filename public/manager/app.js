@@ -4606,6 +4606,7 @@ function renderGenProducts() {
       <td>${p.category || '-'}</td>
       <td style="font-weight:500">${p.model || '-'}</td>
       <td>${p.description || '-'}</td>
+      <td class="center">${p.stock != null && p.stock !== '' ? (p.stock > 0 ? '<span class="badge badge-green">' + p.stock + '</span>' : p.stock === 0 ? '<span class="badge badge-amber">0</span>' : '<span class="badge badge-red">' + p.stock + '</span>') : '<span class="badge badge-gray">-</span>'}</td>
       <td class="num" style="color:#1D9E75">${fmt(p.cost || 0)}</td>
       <td class="num">${fmt(p.priceA || 0)}</td>
       <td class="num">${fmt(p.priceNaver || 0)}${marginBadge(p.priceNaver, p.cost, DB.settings.naverFee || 0.0663)}</td>
@@ -4618,7 +4619,7 @@ function renderGenProducts() {
     </tr>`;
   }).join('');
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="15"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="16"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
   }
   document.getElementById('gen-count').textContent = `${genProducts.length}건`;
   initColumnResize('gen-table');
