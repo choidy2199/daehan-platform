@@ -2,8 +2,54 @@
 const KEYS = { products: 'mw_products', inventory: 'mw_inventory', promotions: 'mw_promotions', orders: 'mw_orders', settings: 'mw_settings', rebate: 'mw_rebate' };
 
 function load(key) { try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; } }
-function save(key, data) { localStorage.setItem(key, JSON.stringify(data)); updateStatus(); }
+function save(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+  updateStatus();
+  // products 변경 시 Supabase 백그라운드 동기화
+  if (key === KEYS.products && typeof syncProductsToSupabase === 'function') {
+    syncProductsToSupabase();
+  }
+}
 function loadObj(key, def) { try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; } }
+
+// Supabase에서 밀워키 제품 로드
+async function loadProductsFromSupabase() {
+  try {
+    var resp = await fetch('/api/products');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    if (data.products && data.products.length > 0) {
+      DB.products = data.products;
+      save(KEYS.products, DB.products); // localStorage 백업
+      console.log('[Supabase] 밀워키 제품 로드: ' + data.products.length + '건');
+      return true;
+    } else {
+      console.log('[Supabase] 제품 데이터 없음 — localStorage 폴백');
+      return false;
+    }
+  } catch (err) {
+    console.warn('[Supabase] 연결 실패 — localStorage 폴백:', err.message);
+    return false;
+  }
+}
+
+// Supabase에 밀워키 제품 전체 동기화 (localStorage 저장 후 백그라운드 업로드)
+function syncProductsToSupabase() {
+  var products = DB.products;
+  if (!products.length) return;
+  fetch('/api/products/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ products: products, mode: 'replace' })
+  }).then(function(resp) {
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    return resp.json();
+  }).then(function(data) {
+    console.log('[Supabase] 제품 동기화 완료:', data.result);
+  }).catch(function(err) {
+    console.warn('[Supabase] 제품 동기화 실패:', err.message);
+  });
+}
 
 let DB = {
   products: load(KEYS.products),
@@ -5409,6 +5455,16 @@ function init() {
   populateCatalogFilters();
   renderCatalog();
   updateStatus();
+
+  // Supabase에서 밀워키 제품 로드 (백그라운드, localStorage 먼저 표시 후 갱신)
+  loadProductsFromSupabase().then(function(loaded) {
+    if (loaded) {
+      populateCatalogFilters();
+      renderCatalog();
+      updateStatus();
+      console.log('[Supabase] 테이블 갱신 완료');
+    }
+  });
   initPromoMonths();
   loadPartsPricesUI();
   renderSetbun();
