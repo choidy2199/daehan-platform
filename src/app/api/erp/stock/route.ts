@@ -11,8 +11,8 @@ const ERP_USER_KEY = process.env.ERP_USER_KEY || '';
  * Body: { codes: string[] }  — 관리코드 배열 (최대 500개)
  * Response: { results: { code: string, stock: number }[], errors: string[] }
  *
- * 경영박사 SelectItemUrlEnc를 GET 방식으로 호출
- * URL: ?op=SelectItemUrlEnc&cUserKey=키&UrlEnc_WHERE='코드1','코드2'
+ * 경영박사 SelectItemUrlEnc를 HTTP POST (form-urlencoded) 방식으로 호출
+ * GET은 URL 길이 제한(~8000자)으로 대량 조회 시 404 발생
  */
 export async function POST(request: NextRequest) {
   try {
@@ -42,16 +42,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ results: [], errors: [] });
       }
 
-      // 관리코드를 '코드1','코드2','코드3' 형태로 조합 후 URL 인코딩
+      // 관리코드를 '코드1','코드2','코드3' 형태로 조합
       const whereValue = cleanCodes.map(c => `'${c}'`).join(',');
-      const encodedWhere = encodeURIComponent(whereValue);
 
-      // GET 방식으로 호출 (경영박사 API 문서 예제 방식)
-      const url = `${ERP_URL}/SelectItemUrlEnc?cUserKey=${encodeURIComponent(ERP_USER_KEY)}&UrlEnc_WHERE=${encodedWhere}`;
+      // HTTP POST form-urlencoded 방식 (URL 길이 제한 없음)
+      const formBody = `cUserKey=${encodeURIComponent(ERP_USER_KEY)}&UrlEnc_WHERE=${encodeURIComponent(whereValue)}`;
 
-      console.log(`[ERP Stock] GET 호출: ${cleanCodes.length}건 (원본 ${codes.length}건), URL길이: ${url.length}`);
+      console.log(`[ERP Stock] POST 호출: ${cleanCodes.length}건 (원본 ${codes.length}건), body길이: ${formBody.length}`);
 
-      const response = await fetch(url, { method: 'GET' });
+      const response = await fetch(`${ERP_URL}/SelectItemUrlEnc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formBody,
+      });
 
       if (!response.ok) {
         throw new Error(`ERP HTTP ${response.status} ${response.statusText}`);
@@ -60,20 +63,11 @@ export async function POST(request: NextRequest) {
       const xml = await response.text();
       console.log(`[ERP Stock] XML 응답 길이: ${xml.length}자`);
 
-      // XML 파싱 — 첫 500자 로그 (디버깅용)
-      if (xml.length < 500) {
-        console.log(`[ERP Stock] XML 전체:`, xml);
-      } else {
-        console.log(`[ERP Stock] XML 앞부분:`, xml.substring(0, 300));
-      }
-
       const rows = parseTablesFromXml(xml);
       console.log(`[ERP Stock] 파싱된 행: ${rows.length}건`);
 
-      // 첫 번째 행의 필드명 로그 (디버깅용)
       if (rows.length > 0) {
         console.log(`[ERP Stock] 첫 행 필드:`, Object.keys(rows[0]).join(', '));
-        console.log(`[ERP Stock] 첫 행 CODE2:`, rows[0].CODE2, 'JEGO:', rows[0].JEGO);
       }
 
       // CODE2(관리코드) → JEGO(현재고) 매핑
