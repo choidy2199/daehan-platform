@@ -944,13 +944,47 @@ function renderCatalog() {
   }
 
   const body = document.getElementById('catalog-body');
-  let html = '';
-  active.slice(0, 500).forEach(p => { html += buildRow(p); });
-  if (discontinued.length > 0) {
-    html += `<tr class="discontinued-divider"><td colspan="21">단종 품목 (${discontinued.length}건)</td></tr>`;
-    html += discontinued.slice(0, 200).map(buildRow).join('');
+  // 초기 50행만 렌더링, 나머지는 스크롤 시 점진 로드
+  var INITIAL_ROWS = 50;
+  var allRows = active.slice(0, 500);
+  var _catalogDiscontinued = discontinued;
+  var _catalogRenderedCount = 0;
+
+  function renderBatch(start, count) {
+    var fragment = '';
+    var end = Math.min(start + count, allRows.length);
+    for (var i = start; i < end; i++) { fragment += buildRow(allRows[i]); }
+    // 마지막 배치 후 단종 품목 추가
+    if (end >= allRows.length && _catalogDiscontinued.length > 0 && start < allRows.length) {
+      fragment += '<tr class="discontinued-divider"><td colspan="21">단종 품목 (' + _catalogDiscontinued.length + '건)</td></tr>';
+      fragment += _catalogDiscontinued.slice(0, 200).map(buildRow).join('');
+    }
+    _catalogRenderedCount = end;
+    return fragment;
   }
-  body.innerHTML = html;
+
+  body.innerHTML = renderBatch(0, INITIAL_ROWS);
+
+  // 스크롤 시 나머지 행 점진 로드
+  var scrollContainer = body.closest('.table-scroll');
+  if (scrollContainer && allRows.length > INITIAL_ROWS) {
+    var _loadingMore = false;
+    scrollContainer._catalogScroll = function() {
+      if (_loadingMore || _catalogRenderedCount >= allRows.length) return;
+      if (scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 200) {
+        _loadingMore = true;
+        requestAnimationFrame(function() {
+          var html = renderBatch(_catalogRenderedCount, 100);
+          if (html) body.insertAdjacentHTML('beforeend', html);
+          _loadingMore = false;
+          if (_catalogRenderedCount >= allRows.length && scrollContainer._catalogScroll) {
+            scrollContainer.removeEventListener('scroll', scrollContainer._catalogScroll);
+          }
+        });
+      }
+    };
+    scrollContainer.addEventListener('scroll', scrollContainer._catalogScroll);
+  }
 
   const activeCount = active.length;
   const disconCount = discontinued.length;
