@@ -818,6 +818,7 @@
   <div class="sub-tabs" id="settings-main-tabs" style="margin-bottom:8px">
     <button class="sub-tab active" onclick="switchSettingsMain('fee')">온라인 판매채널 수수료</button>
     <button class="sub-tab" onclick="switchSettingsMain('client')">거래처 등록</button>
+    <button class="sub-tab" onclick="switchSettingsMain('history')">작업이력</button>
   </div>
   <div id="settings-sub-fee">
   <div class="section">
@@ -932,6 +933,22 @@
       </div>
     </div>
   </div><!-- /settings-sub-client -->
+
+  <div id="settings-sub-history" style="display:none">
+  <div class="section">
+    <div class="section-header">
+      <span>작업이력</span>
+      <span style="font-size:12px;font-weight:400;opacity:0.7">최근 5건</span>
+    </div>
+    <div class="section-body" style="padding:16px">
+      <div id="action-history-empty" style="text-align:center;padding:40px;color:#9BA3B2;font-size:13px">작업이력이 없습니다.</div>
+      <table class="data-table" id="action-history-table" style="display:none">
+        <thead><tr><th style="width:150px">시간</th><th style="width:100px">작업</th><th style="width:80px">대상</th><th style="width:60px">건수</th><th style="width:80px"></th></tr></thead>
+        <tbody id="action-history-body"></tbody>
+      </table>
+    </div>
+  </div>
+  </div><!-- /settings-sub-history -->
 
 </div>
 

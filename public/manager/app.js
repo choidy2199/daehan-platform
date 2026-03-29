@@ -3878,6 +3878,89 @@ function exportGenProducts() {
   toast('일반제품 엑셀 다운로드 완료 (' + gp.length + '건)');
 }
 
+// ======================== 작업이력 ========================
+function getActionHistory() {
+  try { return JSON.parse(localStorage.getItem('mw_action_history') || '[]'); } catch(e) { return []; }
+}
+
+function saveActionHistory(action, target, count, backupData) {
+  var history = getActionHistory();
+  var now = new Date();
+  var timeStr = now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+  history.unshift({
+    action: action,
+    target: target,
+    count: count,
+    time: timeStr,
+    backup: backupData
+  });
+  // 최대 5건
+  if (history.length > 5) history = history.slice(0, 5);
+  localStorage.setItem('mw_action_history', JSON.stringify(history));
+}
+
+function renderActionHistory() {
+  var history = getActionHistory();
+  var emptyEl = document.getElementById('action-history-empty');
+  var tableEl = document.getElementById('action-history-table');
+  var bodyEl = document.getElementById('action-history-body');
+  if (!emptyEl || !tableEl || !bodyEl) return;
+
+  if (!history.length) {
+    emptyEl.style.display = '';
+    tableEl.style.display = 'none';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  tableEl.style.display = '';
+
+  var badgeStyles = {
+    '전체삭제': 'background:#FEE2E2;color:#991B1B',
+    '제품삭제': 'background:#FEE2E2;color:#991B1B',
+    '가져오기': 'background:#DBEAFE;color:#1E40AF',
+    '전체교체': 'background:#DBEAFE;color:#1E40AF',
+    '코드매칭': 'background:#DBEAFE;color:#1E40AF',
+    '제품추가': 'background:#D1FAE5;color:#065F46',
+    '제품수정': 'background:#FEF3C7;color:#92400E'
+  };
+
+  bodyEl.innerHTML = history.map(function(h, i) {
+    var bStyle = badgeStyles[h.action] || 'background:#F3F4F6;color:#374151';
+    var hasBackup = h.backup && (Array.isArray(h.backup) ? h.backup.length > 0 : true);
+    var restoreBtn = hasBackup
+      ? '<button onclick="restoreFromHistory(' + i + ')" style="background:#185FA5;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer">되돌리기</button>'
+      : '<span style="color:#ccc;font-size:11px">—</span>';
+    return '<tr>' +
+      '<td style="font-size:12px;white-space:nowrap">' + h.time + '</td>' +
+      '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;' + bStyle + '">' + h.action + '</span></td>' +
+      '<td style="font-size:12px">' + h.target + '</td>' +
+      '<td style="font-size:12px;text-align:center">' + h.count + '건</td>' +
+      '<td style="text-align:center">' + restoreBtn + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function restoreFromHistory(idx) {
+  var history = getActionHistory();
+  var h = history[idx];
+  if (!h || !h.backup) { toast('백업 데이터가 없습니다'); return; }
+  if (!confirm('이 작업 이전 상태로 되돌리시겠습니까?\n작업: ' + h.action + '\n시간: ' + h.time)) return;
+
+  if (h.target === '밀워키') {
+    DB.products = h.backup;
+    save(KEYS.products, DB.products);
+    populateCatalogFilters();
+    renderCatalog();
+  } else if (h.target === '일반제품') {
+    genProducts.length = 0;
+    h.backup.forEach(function(p) { genProducts.push(p); });
+    localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+    renderGenProducts();
+  }
+  toast('되돌리기 완료 (' + h.target + ')');
+  renderActionHistory();
+}
+
 // ======================== 전체삭제 ========================
 function deleteAllMwProducts() {
   var count = DB.products.length;
@@ -3885,13 +3968,13 @@ function deleteAllMwProducts() {
   if (!confirm('전체 삭제하시겠습니까? (' + count + '건)')) return;
   if (!confirm('⚠️ 경고: 삭제된 데이터는 복구할 수 없습니다.\n정말 삭제하시겠습니까?')) return;
 
+  saveActionHistory('전체삭제', '밀워키', count, JSON.parse(JSON.stringify(DB.products)));
   DB.products = [];
   save(KEYS.products, DB.products);
   DB.inventory = [];
   save(KEYS.inventory, DB.inventory);
   populateCatalogFilters();
   renderCatalog();
-  // Supabase에서도 삭제
   fetch('/api/products', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
@@ -3905,13 +3988,12 @@ function deleteAllMwProducts() {
 }
 
 function deleteAllGenProducts() {
-  var gp = [];
-  try { gp = JSON.parse(localStorage.getItem('mw_gen_products') || '[]') || []; } catch(e) { gp = []; }
-  var count = gp.length;
+  var count = genProducts.length;
   if (!count) { toast('삭제할 일반제품이 없습니다'); return; }
   if (!confirm('전체 삭제하시겠습니까? (' + count + '건)')) return;
   if (!confirm('⚠️ 경고: 삭제된 데이터는 복구할 수 없습니다.\n정말 삭제하시겠습니까?')) return;
 
+  saveActionHistory('전체삭제', '일반제품', count, JSON.parse(JSON.stringify(genProducts)));
   genProducts.length = 0;
   localStorage.setItem('mw_gen_products', '[]');
   renderGenProducts();
@@ -5707,10 +5789,13 @@ var clientData = loadObj('mw_clients', []);
 function switchSettingsMain(type) {
   document.getElementById('settings-sub-fee').style.display = type === 'fee' ? '' : 'none';
   document.getElementById('settings-sub-client').style.display = type === 'client' ? '' : 'none';
+  document.getElementById('settings-sub-history').style.display = type === 'history' ? '' : 'none';
   var tabs = document.querySelectorAll('#settings-main-tabs .sub-tab');
   tabs[0].classList.toggle('active', type === 'fee');
   tabs[1].classList.toggle('active', type === 'client');
+  tabs[2].classList.toggle('active', type === 'history');
   if (type === 'client') renderClients();
+  if (type === 'history') renderActionHistory();
 }
 
 function saveClients() {
