@@ -3129,7 +3129,7 @@ async function syncInventory() {
   function fetchBatch(batch, batchIdx) {
     var codes = batch.map(function(item) { return item.manageCode; });
     var controller = new AbortController();
-    var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
+    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
 
     return fetch('/api/erp/stock', {
       method: 'POST',

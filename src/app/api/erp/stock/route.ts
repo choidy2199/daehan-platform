@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseTablesFromXml } from '@/lib/erp';
 
-export const maxDuration = 30;
+export const maxDuration = 10;
 
 const ERP_URL = process.env.ERP_URL || 'https://drws20.softcity.co.kr:1448/WS_shop.asmx';
 const ERP_USER_KEY = process.env.ERP_USER_KEY || '';
