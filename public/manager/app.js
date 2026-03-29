@@ -3060,10 +3060,13 @@ async function syncInventory() {
     return;
   }
 
+  console.log('[재고동기화] 시작 — 총 ' + allItems.length + '건 (mw: ' + allItems.filter(function(x){return x.source==='mw'}).length + ', gen: ' + allItems.filter(function(x){return x.source==='gen'}).length + ')');
+
   // 2) 진행상황 표시용 토스트
   var total = allItems.length;
   var done = 0;
   var updated = 0;
+  var notFound = [];
   var errors = [];
   toast('재고 조회 중... 0/' + total);
 
@@ -3082,12 +3085,15 @@ async function syncInventory() {
 
       if (!resp.ok) {
         var errData = await resp.json().catch(function() { return {}; });
-        errors.push('배치 ' + (b/BATCH+1) + ': ' + (errData.error || resp.statusText));
+        var errMsg = '배치 ' + (b/BATCH+1) + ': ' + (errData.error || resp.statusText);
+        errors.push(errMsg);
+        console.error('[재고동기화] API 오류:', errMsg);
         done += batch.length;
         continue;
       }
 
       var data = await resp.json();
+      console.log('[재고동기화] 배치 ' + (b/BATCH+1) + ' 응답:', data.results ? data.results.length + '건' : 'results 없음', data.errors && data.errors.length ? '오류 ' + data.errors.length + '건' : '');
 
       // 4) 결과를 관리코드 → 재고 맵으로 변환
       var stockMap = {};
@@ -3102,10 +3108,13 @@ async function syncInventory() {
       // 5) 각 품목에 재고 반영
       batch.forEach(function(item) {
         var stock = stockMap[item.manageCode];
-        if (stock == null) return;
+        if (stock === undefined || stock === null) {
+          notFound.push(item.manageCode);
+          return;
+        }
 
         if (item.source === 'mw') {
-          // mw_products → DB.inventory에 반영
+          // mw_products → DB.inventory에 반영 (code 기준)
           var inv = DB.inventory.find(function(i) { return String(i.code) === String(item.code); });
           if (inv) {
             inv.stock = stock;
@@ -3123,7 +3132,9 @@ async function syncInventory() {
       });
 
     } catch (err) {
-      errors.push('배치 ' + (b/BATCH+1) + ': ' + (err.message || '네트워크 오류'));
+      var catchMsg = '배치 ' + (b/BATCH+1) + ': ' + (err.message || '네트워크 오류');
+      errors.push(catchMsg);
+      console.error('[재고동기화] fetch 예외:', catchMsg);
     }
 
     done += batch.length;
@@ -3141,16 +3152,37 @@ async function syncInventory() {
 
   // 7) 테이블 새로고침
   if (typeof renderCatalog === 'function') renderCatalog();
-  if (typeof renderGeneral === 'function') renderGeneral();
+  if (typeof renderGenProducts === 'function') renderGenProducts();
   if (typeof updateStatus === 'function') updateStatus();
 
-  // 8) 완료 알림
+  // 8) 완료 시간 저장 및 표시
+  var now = new Date();
+  var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  localStorage.setItem('last_inventory_sync', timeStr);
+  updateSyncTimeDisplay();
+
+  // 9) 완료 알림 + 디버깅 로그
+  console.log('[재고동기화] 완료 — 업데이트: ' + updated + '건, 매칭실패: ' + notFound.length + '건, 오류: ' + errors.length + '건');
+  if (notFound.length > 0) {
+    console.log('[재고동기화] 매칭 안 된 관리코드:', notFound.slice(0, 20).join(', ') + (notFound.length > 20 ? ' 외 ' + (notFound.length - 20) + '건' : ''));
+  }
   var msg = '재고 업데이트 완료 (' + updated + '건)';
   if (errors.length > 0) {
     msg += ' | 오류 ' + errors.length + '건';
     console.warn('[재고동기화 오류]', errors);
   }
   toast(msg);
+}
+
+function updateSyncTimeDisplay() {
+  var el = document.getElementById('inventory-sync-time');
+  if (!el) return;
+  var saved = localStorage.getItem('last_inventory_sync');
+  if (saved) {
+    el.textContent = '✓ ' + saved;
+  } else {
+    el.textContent = '';
+  }
 }
 
 function showOrderSettingsModal() {
@@ -5373,6 +5405,7 @@ function init() {
   renderGenProducts();
   renderAllPromosV2();
   initStickyHeader('catalog-table');
+  updateSyncTimeDisplay();
   makeModalDraggable('settings-modal');
   makeModalDraggable('order-settings-modal');
   makeModalDraggable('order-history-modal');
