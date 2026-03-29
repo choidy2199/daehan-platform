@@ -6120,6 +6120,9 @@ async function init() {
   // 브라우저 자동완성으로 검색 input에 값이 들어가는 문제 방지
   document.querySelectorAll('input[type="text"][placeholder*="검색"], input[type="text"][placeholder*="입력"]').forEach(function(input) {
     input.value = '';
+    // Chrome이 autocomplete="off"를 무시하는 경우 대비
+    if (!input.getAttribute('autocomplete')) input.setAttribute('autocomplete', 'off');
+    input.setAttribute('autocomplete', 'off');
   });
 
   // 0. localStorage에 핵심 데이터가 없으면 Supabase에서 로드
