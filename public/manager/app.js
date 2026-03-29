@@ -1,3 +1,4 @@
+var _scriptStart = performance.now();
 // ======================== PERF MONITORING ========================
 if (window.PerformanceObserver) {
   try {
@@ -185,6 +186,7 @@ function syncProductsToSupabase() { autoSyncToSupabase(KEYS.products); }
   }, 500);
 })();
 
+var _dbStart = performance.now();
 let DB = {
   products: load(KEYS.products),
   inventory: load(KEYS.inventory),
@@ -193,6 +195,7 @@ let DB = {
   settings: loadObj(KEYS.settings, { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] }),
   rebate: load(KEYS.rebate)
 };
+console.log('[PERF] DB localStorage 파싱: ' + (performance.now() - _dbStart).toFixed(0) + 'ms (products:' + DB.products.length + ', inventory:' + DB.inventory.length + ', promos:' + DB.promotions.length + ')');
 
 // Default rebate tiers
 if (!DB.rebate.length) {
@@ -6114,18 +6117,26 @@ function makeModalDraggable(modalBgId) {
 }
 
 // ======================== INIT ========================
+// 브라우저 자동완성 방지 — 3회 반복 클리어
+function clearSearchInputs() {
+  document.querySelectorAll('input[type="text"], input[type="search"]').forEach(function(input) {
+    if (input.placeholder && (input.placeholder.includes('검색') || input.placeholder.includes('입력'))) {
+      input.value = '';
+      input.setAttribute('autocomplete', 'off');
+    }
+  });
+}
+
 async function init() {
   var _initStart = performance.now();
 
-  // 브라우저 자동완성으로 검색 input에 값이 들어가는 문제 방지
-  document.querySelectorAll('input[type="text"][placeholder*="검색"], input[type="text"][placeholder*="입력"]').forEach(function(input) {
-    input.value = '';
-    // Chrome이 autocomplete="off"를 무시하는 경우 대비
-    if (!input.getAttribute('autocomplete')) input.setAttribute('autocomplete', 'off');
-    input.setAttribute('autocomplete', 'off');
-  });
+  // 브라우저 자동완성 방지 — 즉시 + 100ms + 500ms
+  clearSearchInputs();
+  setTimeout(clearSearchInputs, 100);
+  setTimeout(clearSearchInputs, 500);
 
   // 0. localStorage에 핵심 데이터가 없으면 Supabase에서 로드
+  var _t = performance.now();
   if (!localStorage.getItem('mw_products') || localStorage.getItem('mw_products') === '[]') {
     console.log('[Init] localStorage 비어있음 — Supabase에서 로드 시도');
     var supaLoaded = await loadFromSupabase();
@@ -6135,13 +6146,22 @@ async function init() {
       return;
     }
   }
+  console.log('[PERF] init — step0 supabase체크: ' + (performance.now() - _t).toFixed(0) + 'ms');
 
   // 1. 현재 보이는 탭(catalog)만 즉시 렌더링
+  _t = performance.now();
   populateCatalogFilters();
+  console.log('[PERF] init — step1a populateCatalogFilters: ' + (performance.now() - _t).toFixed(0) + 'ms');
+
+  _t = performance.now();
   renderCatalog();
+  console.log('[PERF] init — step1b renderCatalog: ' + (performance.now() - _t).toFixed(0) + 'ms');
+
+  _t = performance.now();
   updateStatus();
   _renderedTabs['catalog'] = true;
-  console.log('[PERF] init — catalog 렌더링: ' + (performance.now() - _initStart).toFixed(0) + 'ms');
+  console.log('[PERF] init — step1c updateStatus: ' + (performance.now() - _t).toFixed(0) + 'ms');
+  console.log('[PERF] init — catalog 전체: ' + (performance.now() - _initStart).toFixed(0) + 'ms');
 
   // 2. 나머지 탭은 지연 렌더링 (유저가 클릭할 때 또는 백그라운드)
   setTimeout(function() {
@@ -6165,12 +6185,20 @@ async function init() {
     });
   }, 15000);
 
+  _t = performance.now();
   initStickyHeader('catalog-table');
+  console.log('[PERF] init — step2 initStickyHeader: ' + (performance.now() - _t).toFixed(0) + 'ms');
+
   // 나머지 탭 초기화는 지연 (첫 방문 시 switchTab에서 렌더링)
   setTimeout(function() {
+    var t = performance.now();
     initPromoMonths();
+    console.log('[PERF] init — deferred initPromoMonths: ' + (performance.now() - t).toFixed(0) + 'ms');
+    t = performance.now();
     loadPartsPricesUI();
+    console.log('[PERF] init — deferred loadPartsPricesUI: ' + (performance.now() - t).toFixed(0) + 'ms');
   }, 500);
+
   // Supabase 업로드 버튼 동적 추가 (설정 탭 > 수수료 섹션 헤더)
   setTimeout(function() {
     var feeHeader = document.querySelector('#settings-sub-fee .section-header');
@@ -6185,10 +6213,15 @@ async function init() {
       else feeHeader.appendChild(btn);
     }
   }, 500);
+
+  _t = performance.now();
   makeModalDraggable('settings-modal');
   makeModalDraggable('order-settings-modal');
   makeModalDraggable('order-history-modal');
   makeModalDraggable('po-history-modal');
+  console.log('[PERF] init — step3 makeModalDraggable x4: ' + (performance.now() - _t).toFixed(0) + 'ms');
+
+  _t = performance.now();
   (function() {
     const now = Date.now();
     const weekMs = 7 * 24 * 60 * 60 * 1000;
@@ -6197,6 +6230,9 @@ async function init() {
     const recentPo = poHistory.filter(r => (now - new Date(r.date).getTime()) < weekMs);
     if (recentPo.length) updatePoSheetButtons(true);
   })();
+  console.log('[PERF] init — step4 orderSheetButtons: ' + (performance.now() - _t).toFixed(0) + 'ms');
+
+  console.log('[PERF] init 전체: ' + (performance.now() - _initStart).toFixed(0) + 'ms');
 }
 
 // ======================== 관리: 수수료 설정 ========================
@@ -6241,7 +6277,10 @@ function saveFeeSettings() {
 }
 
 // ======================== 설정 서브탭: 거래처 등록 ========================
+var _clientStart = performance.now();
 var clientData = loadObj('mw_clients', []);
+console.log('[PERF] clientData 파싱: ' + (performance.now() - _clientStart).toFixed(0) + 'ms (clients:' + clientData.length + ')');
+console.log('[PERF] 스크립트 전체 파싱+실행: ' + (performance.now() - _scriptStart).toFixed(0) + 'ms');
 
 function switchSettingsMain(type) {
   document.getElementById('settings-sub-fee').style.display = type === 'fee' ? '' : 'none';
