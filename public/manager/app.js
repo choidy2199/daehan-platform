@@ -3740,6 +3740,23 @@ function exportAll() {
   toast('전체 데이터 엑셀 파일 다운로드 완료');
 }
 
+function exportGenProducts() {
+  if (!window.XLSX) { toast('SheetJS 라이브러리 로딩 중...'); return; }
+  var gp = [];
+  try { gp = JSON.parse(localStorage.getItem('mw_gen_products') || '[]') || []; } catch(e) { gp = []; }
+  if (!gp.length) { toast('내보낼 일반제품 데이터가 없습니다'); return; }
+  var wb = XLSX.utils.book_new();
+  var data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜']];
+  gp.forEach(function(p) {
+    data.push([p.code, p.manageCode || '', p.category || '', p.model || '', p.description || '', p.cost || 0, p.priceA || 0, p.priceNaver || 0, p.priceOpen || 0, p.inQty || 0, p.inPrice || 0, p.outQty || 0, p.outPrice || 0, p.palletQty || 0, p.palletPrice || 0, p.memo || '', p.inDate || '']);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 25 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 20 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws, '일반제품');
+  XLSX.writeFile(wb, '일반제품_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  toast('일반제품 엑셀 다운로드 완료 (' + gp.length + '건)');
+}
+
 // ======================== STICKY HEADER (JS) ========================
 function initStickyHeader(tableId) {
   const table = document.getElementById(tableId);

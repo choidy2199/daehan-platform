@@ -702,10 +702,10 @@
       <span>일반제품 단가표</span>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="font-size:12px;font-weight:400;opacity:0.7" id="gen-count">0건</span>
-        <button class="btn-action-sub" onclick="downloadGenTemplate()">📥 양식 다운로드</button>
-        <button class="btn-action-sub" onclick="document.getElementById('gen-upload').click()">📤 업로드</button>
-        <input type="file" id="gen-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadGenProducts(this)">
         <button class="btn-action" onclick="addGenProduct()">+ 제품 추가</button>
+        <button class="btn-action-sub" onclick="document.getElementById('gen-upload').click()">📥 가져오기</button>
+        <input type="file" id="gen-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadGenProducts(this)">
+        <button class="btn-export" onclick="exportGenProducts()">📤 내보내기</button>
       </div>
     </div>
     <div class="section-body" style="padding:12px">
