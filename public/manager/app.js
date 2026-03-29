@@ -5368,6 +5368,120 @@ function downloadEstimatePdf() {
   setTimeout(() => { printWin.print(); }, 500);
 }
 
+// ======================== 전표 등록 (NewOrderOut) ========================
+// 견적서 버튼 행에 [전표 등록] 버튼 동적 추가
+(function() {
+  var observer = new MutationObserver(function() {
+    var pdfBtn = document.querySelector('[onclick="previewEstimatePdf()"]');
+    if (pdfBtn && !document.getElementById('btn-order-out')) {
+      var btn = document.createElement('button');
+      btn.id = 'btn-order-out';
+      btn.textContent = '📋 전표 등록';
+      btn.style.cssText = 'background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer';
+      btn.onclick = registerOrderOut;
+      pdfBtn.parentNode.insertBefore(btn, pdfBtn.nextSibling);
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  // 즉시 실행도 시도
+  setTimeout(function() {
+    var pdfBtn = document.querySelector('[onclick="previewEstimatePdf()"]');
+    if (pdfBtn && !document.getElementById('btn-order-out')) {
+      var btn = document.createElement('button');
+      btn.id = 'btn-order-out';
+      btn.textContent = '📋 전표 등록';
+      btn.style.cssText = 'background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer';
+      btn.onclick = registerOrderOut;
+      pdfBtn.parentNode.insertBefore(btn, pdfBtn.nextSibling);
+    }
+  }, 500);
+})();
+
+async function registerOrderOut() {
+  var btn = document.getElementById('btn-order-out');
+
+  // 거래처 확인
+  var clientName = document.getElementById('est-client').value.trim();
+  if (!clientName) { alert('거래처를 선택해주세요'); return; }
+
+  var customerCode = '';
+  if (estSelectedClient && estSelectedClient.manageCode) {
+    customerCode = estSelectedClient.manageCode;
+  } else if (estSelectedClient && estSelectedClient.code) {
+    customerCode = String(estSelectedClient.code);
+  } else {
+    alert('등록된 거래처를 선택해주세요.\n(경영박사에 등록된 거래처만 전표 등록 가능)');
+    return;
+  }
+
+  // 품목 확인
+  if (!currentEstItems.length) { alert('품목을 추가해주세요'); return; }
+
+  // 날짜
+  var dateVal = document.getElementById('est-date').value || '';
+  var erpDate = '';
+  if (dateVal) {
+    var d = new Date(dateVal);
+    erpDate = String(d.getFullYear()).slice(2) + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
+  }
+
+  // 품목 데이터 구성
+  var totalAmount = 0;
+  var itemsData = currentEstItems.filter(function(it) { return it.qty > 0; }).map(function(it) {
+    var p = findAnyProduct(it.code);
+    var price = it.customPrice != null ? it.customPrice : (p ? p.priceA : (it.priceA || 0));
+    var amount = price * it.qty;
+    var vat = Math.round(amount * 0.1);
+    totalAmount += amount;
+    return {
+      code: p ? (p.manageCode || p.code) : it.code,
+      qty: it.qty,
+      price: price,
+      amount: amount,
+      vat: vat,
+      memo: it.memo || ''
+    };
+  });
+
+  if (!itemsData.length) { alert('수량이 0인 품목은 등록할 수 없습니다'); return; }
+
+  // 확인
+  if (!confirm('매출 전표를 등록하시겠습니까?\n거래처: ' + clientName + '\n품목: ' + itemsData.length + '건\n합계: ' + totalAmount.toLocaleString() + '원')) return;
+
+  // API 호출
+  btn.disabled = true;
+  btn.textContent = '등록 중...';
+
+  try {
+    var resp = await fetch('/api/erp/order-out', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerCode: customerCode,
+        memo: '',
+        date: erpDate,
+        items: itemsData
+      })
+    });
+    var data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      alert('전표 등록 실패: ' + (data.error || '서버 오류'));
+    } else {
+      alert('전표 등록 완료\n' + (data.result || ''));
+      // 작업이력 기록
+      if (typeof saveActionHistory === 'function') {
+        saveActionHistory('전표등록', '밀워키', itemsData.length, null);
+      }
+    }
+  } catch (err) {
+    alert('전표 등록 실패: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📋 전표 등록';
+  }
+}
+
 // ======================== TAB 5: 세트및분해 ========================
 const PARTS_KEYS = ['M12B2','M12HB25','M12B4','M12HB5','M18B2','M18HB3','M18B5','M18FB6','M18FB8','M18FB12','C12C','M1218C','M1218FC'];
 const PARTS_LABELS = {'M12B2':'M12 B2','M12HB25':'M12 HB2.5','M12B4':'M12 B4','M12HB5':'M12 HB5','M18B2':'M18 B2','M18HB3':'M18 HB3','M18B5':'M18 B5','M18FB6':'M18 FB6','M18FB8':'M18 FB8','M18FB12':'M18 FB12','C12C':'C12C','M1218C':'M12-18C','M1218FC':'M12-18FC'};

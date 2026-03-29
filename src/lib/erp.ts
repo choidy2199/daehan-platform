@@ -86,6 +86,21 @@ export async function selectItem(search: string): Promise<Record<string, string>
 }
 
 /**
+ * NewOrderOut: 매출 전표 등록
+ * info: "거래처CODE2|비고|YY.MM.DD|"
+ * items: "품목CODE2$수량$단가$금액$부가세$비고|..."
+ * ibgum: "0|||" (입금 없음)
+ */
+export async function callNewOrderOut(info: string, items: string, ibgum: string): Promise<string> {
+  const xml = await soapCall('NewOrderOut', {
+    info: info,
+    items: items,
+    ibgum: ibgum,
+  });
+  return xml;
+}
+
+/**
  * XML 특수문자 이스케이프
  */
 function escapeXml(str: string): string {
