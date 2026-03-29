@@ -35,14 +35,21 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
 
     try {
+      // 관리코드 trim + 빈 값 제외
+      const cleanCodes = codes.map(c => c.trim()).filter(c => c && c !== '-');
+      if (!cleanCodes.length) {
+        console.log('[ERP Stock] 유효한 관리코드 없음');
+        return NextResponse.json({ results: [], errors: [] });
+      }
+
       // 관리코드를 '코드1','코드2','코드3' 형태로 조합 후 URL 인코딩
-      const whereValue = codes.map(c => `'${c}'`).join(',');
+      const whereValue = cleanCodes.map(c => `'${c}'`).join(',');
       const encodedWhere = encodeURIComponent(whereValue);
 
       // GET 방식으로 호출 (경영박사 API 문서 예제 방식)
       const url = `${ERP_URL}/SelectItemUrlEnc?cUserKey=${encodeURIComponent(ERP_USER_KEY)}&UrlEnc_WHERE=${encodedWhere}`;
 
-      console.log(`[ERP Stock] GET 호출: ${codes.length}건, URL길이: ${url.length}`);
+      console.log(`[ERP Stock] GET 호출: ${cleanCodes.length}건 (원본 ${codes.length}건), URL길이: ${url.length}`);
 
       const response = await fetch(url, { method: 'GET' });
 
@@ -80,10 +87,11 @@ export async function POST(request: NextRequest) {
 
       console.log(`[ERP Stock] stockMap 키 수: ${Object.keys(stockMap).length}`);
 
-      // 요청한 각 코드에 대해 결과 생성
+      // 요청한 각 코드에 대해 결과 생성 (trim 매칭)
       for (const code of codes) {
-        if (code in stockMap) {
-          results.push({ code, stock: stockMap[code] });
+        const trimmed = code.trim();
+        if (trimmed in stockMap) {
+          results.push({ code, stock: stockMap[trimmed] });
         } else {
           results.push({ code, stock: 0 });
         }
