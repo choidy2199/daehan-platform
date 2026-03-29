@@ -23,8 +23,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '관리코드 배열(codes)이 필요합니다' }, { status: 400 });
     }
 
-    if (codes.length > 500) {
-      return NextResponse.json({ error: '최대 500개까지 조회 가능합니다' }, { status: 400 });
+    if (codes.length > 200) {
+      return NextResponse.json({ error: '최대 200개까지 조회 가능합니다' }, { status: 400 });
     }
 
     if (!ERP_USER_KEY) {

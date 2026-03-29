@@ -3141,8 +3141,8 @@ async function syncInventory() {
   var notFound = [];
   var errors = [];
 
-  // 3) 500개씩 배치 분할 → 병렬 호출 (Promise.all)
-  var BATCH = 500;
+  // 3) 200개씩 배치 분할 → 병렬 호출 (Promise.all)
+  var BATCH = 200;
   var batches = [];
   for (var b = 0; b < allItems.length; b += BATCH) {
     batches.push(allItems.slice(b, b + BATCH));
@@ -3153,6 +3153,7 @@ async function syncInventory() {
   // 배치별 fetch 함수
   function fetchBatch(batch, batchIdx) {
     var codes = batch.map(function(item) { return item.manageCode; });
+    console.log('[재고동기화] 배치 ' + (batchIdx+1) + ' 전송: ' + codes.length + '건, 샘플: ' + codes.slice(0,3).join(', '));
     var controller = new AbortController();
     var timeoutId = setTimeout(function() { controller.abort(); }, 60000);
 
