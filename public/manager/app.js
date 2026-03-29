@@ -5856,6 +5856,9 @@ function saveClients() {
   localStorage.setItem('mw_clients', JSON.stringify(clientData));
 }
 
+var clientPage = 0;
+var CLIENT_PAGE_SIZE = 50;
+
 function renderClients() {
   var search = (document.getElementById('client-search').value || '').toLowerCase();
   var filtered = clientData;
@@ -5865,12 +5868,26 @@ function renderClients() {
              String(c.name || '').toLowerCase().includes(search) ||
              String(c.bizNo || '').includes(search) ||
              String(c.ceo || '').toLowerCase().includes(search) ||
+             String(c.manager || '').toLowerCase().includes(search) ||
              String(c.manageCode || '').toLowerCase().includes(search);
     });
   }
+
+  var totalPages = Math.ceil(filtered.length / CLIENT_PAGE_SIZE);
+  if (clientPage >= totalPages) clientPage = Math.max(0, totalPages - 1);
+  var start = clientPage * CLIENT_PAGE_SIZE;
+  var pageData = filtered.slice(start, start + CLIENT_PAGE_SIZE);
+
+  var kindBadge = function(k) {
+    if (k == 1) return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:#DBEAFE;color:#1E40AF">매입</span>';
+    if (k == 2) return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:#D1FAE5;color:#065F46">매출</span>';
+    return '<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:#F3F4F6;color:#6B7280">-</span>';
+  };
+
   var body = document.getElementById('client-body');
-  body.innerHTML = filtered.map(function(c) {
+  body.innerHTML = pageData.map(function(c) {
     var ri = clientData.indexOf(c);
+    var bankDisplay = (c.bankName && c.bankAccount) ? c.bankName + ' ' + c.bankAccount : (c.bankAccount || '-');
     return '<tr>' +
       '<td class="center"><span style="color:#CC2222;cursor:pointer;font-size:12px" onclick="removeClient(' + ri + ')">✕</span></td>' +
       '<td class="center" style="font-weight:600">' + (c.code || '-') + '</td>' +
@@ -5886,14 +5903,31 @@ function renderClients() {
       '<td class="center" style="font-size:10px">' + (c.bizType || '-') + '</td>' +
       '<td class="center" style="font-size:10px">' + (c.bizItem || '-') + '</td>' +
       '<td class="center" style="font-size:10px">' + (c.email || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.bankAccount || '-') + '</td>' +
+      '<td class="center" style="font-size:10px">' + bankDisplay + '</td>' +
+      '<td class="center" style="font-size:10px">' + (c.manager || '-') + '</td>' +
+      '<td class="center">' + kindBadge(c.kind) + '</td>' +
+      '<td class="center" style="font-size:10px">' + (c.priceGrade || '-') + '</td>' +
+      '<td class="center" style="font-size:10px">' + (c.bankHolder || '-') + '</td>' +
       '<td class="center"><button class="btn-primary" onclick="editClient(' + ri + ')" style="padding:2px 6px;font-size:9px">수정</button></td>' +
       '</tr>';
   }).join('');
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="16"><div class="empty-state"><p>거래처가 없습니다</p><p style="font-size:12px;color:#9BA3B2">엑셀 일괄등록 또는 + 개별 등록으로 추가하세요</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="20"><div class="empty-state"><p>거래처가 없습니다</p><p style="font-size:12px;color:#9BA3B2">경영박사 거래처 가져오기 또는 엑셀 일괄등록으로 추가하세요</p></div></td></tr>';
   }
-  document.getElementById('client-count').textContent = clientData.length + '건';
+  document.getElementById('client-count').textContent = clientData.length + '건' + (filtered.length !== clientData.length ? ' (검색 ' + filtered.length + '건)' : '');
+
+  // 페이지네이션
+  var pagEl = document.getElementById('client-pagination');
+  if (pagEl && totalPages > 1) {
+    var html = '';
+    for (var i = 0; i < totalPages; i++) {
+      var active = i === clientPage ? 'background:#185FA5;color:#fff' : 'background:#F3F4F6;color:#374151';
+      html += '<button onclick="clientPage=' + i + ';renderClients()" style="border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;' + active + '">' + (i+1) + '</button>';
+    }
+    pagEl.innerHTML = html;
+  } else if (pagEl) {
+    pagEl.innerHTML = '';
+  }
   initColumnResize('client-table');
   initStickyHeader('client-table');
 }
@@ -5908,7 +5942,8 @@ function addClient() {
   var code = 'C' + String(clientData.length + 1).padStart(3, '0');
   clientData.push({
     id: Date.now(), code: code, name: name, bizNo: bizNo, phone: phone, mobile: mobile,
-    fax: '', manageCode: '', ceo: ceo, zip: '', address: '', bizType: '', bizItem: '', email: '', bankAccount: ''
+    fax: '', manageCode: '', ceo: ceo, zip: '', address: '', bizType: '', bizItem: '', email: '', bankAccount: '',
+    manager: '', kind: 0, priceGrade: 0, bankHolder: '', bankName: ''
   });
   saveClients();
   renderClients();
@@ -5932,6 +5967,12 @@ function editClient(idx) {
   c.bizItem = prompt('종목', c.bizItem) || c.bizItem;
   c.email = prompt('이메일', c.email) || c.email;
   c.bankAccount = prompt('은행계좌', c.bankAccount) || c.bankAccount;
+  c.manager = prompt('담당자', c.manager || '') || c.manager || '';
+  c.bankHolder = prompt('예금주', c.bankHolder || '') || c.bankHolder || '';
+  var kindInput = prompt('거래처구분 (1=매입, 2=매출)', c.kind || '');
+  if (kindInput) c.kind = parseInt(kindInput) || 0;
+  var gradeInput = prompt('단가구분 (1~9)', c.priceGrade || '');
+  if (gradeInput) c.priceGrade = parseInt(gradeInput) || 0;
   saveClients();
   renderClients();
   toast('거래처 수정 완료: ' + name);
@@ -5943,6 +5984,32 @@ function removeClient(idx) {
   saveClients();
   renderClients();
   toast('거래처 삭제 완료');
+}
+
+async function importErpCustomers() {
+  if (!confirm('경영박사에서 거래처를 가져옵니다.\n기존 거래처 데이터는 전체 교체됩니다.\n진행하시겠습니까?')) return;
+  toast('거래처 가져오는 중...');
+  try {
+    var resp = await fetch('/api/erp/customers', { method: 'POST' });
+    if (!resp.ok) {
+      var err = await resp.json().catch(function(){return {}});
+      throw new Error(err.error || 'HTTP ' + resp.status);
+    }
+    var data = await resp.json();
+    if (!data.customers || !data.customers.length) {
+      toast('가져온 거래처가 없습니다');
+      return;
+    }
+    clientData.length = 0;
+    data.customers.forEach(function(c) { clientData.push(c); });
+    saveClients();
+    clientPage = 0;
+    renderClients();
+    toast('경영박사 거래처 가져오기 완료 (' + data.total + '건)');
+  } catch (err) {
+    toast('거래처 가져오기 실패: ' + err.message);
+    console.error('[거래처 가져오기]', err);
+  }
 }
 
 function downloadClientTemplate() {

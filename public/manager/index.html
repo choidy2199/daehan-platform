@@ -903,6 +903,7 @@
           <span style="font-size:12px;font-weight:400;opacity:0.7" id="client-count">0건</span>
         </div>
         <div style="display:flex;gap:6px">
+          <button onclick="importErpCustomers()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">📦 경영박사 거래처 가져오기</button>
           <button class="btn-action-sub" onclick="downloadClientTemplate()">📥 엑셀 양식 다운</button>
           <button class="btn-action-sub" onclick="document.getElementById('client-upload-input').click()">📤 엑셀 일괄등록</button>
           <input type="file" id="client-upload-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadClients(this)">
@@ -931,10 +932,15 @@
               <th>종목</th>
               <th>이메일</th>
               <th>은행계좌</th>
+              <th>담당자</th>
+              <th>구분</th>
+              <th>단가</th>
+              <th>예금주</th>
               <th style="width:50px">수정</th>
             </tr></thead>
             <tbody id="client-body"></tbody>
           </table>
+          <div id="client-pagination" style="display:flex;justify-content:center;gap:4px;padding:12px 0"></div>
         </div>
       </div>
     </div>
