@@ -2623,6 +2623,7 @@ function saveProduct() {
   };
 
   if (idx >= 0) {
+    saveActionHistory('제품수정', '밀워키', 1, null);
     DB.products[idx] = { ...DB.products[idx], ...item };
     toast(`"${model}" 제품 수정 완료`);
   } else {
@@ -2630,6 +2631,7 @@ function saveProduct() {
     if (DB.products.some(p => String(p.code) === String(code))) {
       if (!confirm(`코드 "${code}"가 이미 존재합니다. 그래도 추가하시겠습니까?`)) return;
     }
+    saveActionHistory('제품추가', '밀워키', 1, null);
     DB.products.push(item);
     toast(`"${model}" 제품 추가 완료`);
   }
@@ -2643,6 +2645,7 @@ function saveProduct() {
 function deleteProduct(idx) {
   const p = DB.products[idx];
   if (!confirm(`"${p.model || p.code}" 제품을 삭제하시겠습니까?`)) return;
+  saveActionHistory('제품삭제', '밀워키', 1, null);
   DB.products.splice(idx, 1);
   save(KEYS.products, DB.products);
   renderCatalog();
@@ -3819,6 +3822,10 @@ function importExcel() {
           <div style="margin-top:8px;font-size:11px;color:#5A6070">${imported.headerInfo ? '📊 ' + imported.headerInfo + ' | ' : ''}⚙ 분기 ${(DB.settings.quarterDC*100).toFixed(1)}% | 년간 ${(DB.settings.yearDC*100).toFixed(1)}% | 네이버 ${(DB.settings.naverFee*100).toFixed(1)}% | 오픈전동 ${(DB.settings.openElecFee*100).toFixed(1)}%</div>`;
       }
 
+      if (totalImported > 0) {
+        var actionName = importMode === 'merge' ? '코드매칭' : '전체교체';
+        saveActionHistory(actionName, '밀워키', imported.products || totalImported, null);
+      }
       toast(totalImported > 0 ? `가져오기 완료 (제품 ${imported.products}건)` : '⚠ 인식 가능한 시트가 없습니다');
       if (totalImported > 0) setTimeout(closeModal, 2500);
     } catch (err) {
@@ -4836,6 +4843,8 @@ function importGenExcel() {
 
       localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
       renderGenProducts();
+      var genActionName = mode === 'merge' ? '코드매칭' : '전체교체';
+      saveActionHistory(genActionName, '일반제품', imported.length, null);
       toast('일반제품 가져오기 완료 (' + imported.length + '건)');
       setTimeout(function() { closeGenImportModal(); }, 1500);
     } catch (err) {
