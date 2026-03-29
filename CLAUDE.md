@@ -24,3 +24,14 @@
 - 개발: npm run dev
 - 수정 완료 후 GitHub push
 - Vercel 자동 배포 (push 시 자동)
+- ⚠️ 로컬 한글 경로 이슈: Turbopack이 한글 경로에서 크래시함. 빌드 확인은 영문 경로(/tmp)에 복사 후 실행. Vercel 배포는 정상.
+
+## 라우트 구조
+- / → 대시보드 (메뉴 카드)
+- /catalog → 밀워키 단가표
+- /orders → 발주
+- /setbun → 세트및분해
+- /general → 일반제품 단가표
+- /estimate → 검색 및 견적
+- /sales → 온라인판매 관리
+- /settings → 설정

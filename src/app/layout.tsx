@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Navigation from "@/components/Navigation";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,11 +22,11 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
         />
       </head>
-      <body
-        className="min-h-full flex flex-col"
-        style={{ fontFamily: "'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, sans-serif" }}
-      >
-        {children}
+      <body className="min-h-full flex flex-col">
+        <Navigation />
+        <div className="content" style={{ flex: 1 }}>
+          {children}
+        </div>
       </body>
     </html>
   );
