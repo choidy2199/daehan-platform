@@ -5985,30 +5985,43 @@ function makeModalDraggable(modalBgId) {
 
 // ======================== INIT ========================
 function init() {
+  var _initStart = performance.now();
+
+  // 1. 현재 보이는 탭(catalog)만 즉시 렌더링
   populateCatalogFilters();
   renderCatalog();
   updateStatus();
+  _renderedTabs['catalog'] = true;
+  console.log('[PERF] init — catalog 렌더링: ' + (performance.now() - _initStart).toFixed(0) + 'ms');
 
-  // Supabase 로드는 10초 후 백그라운드 실행 (초기 로딩 속도 우선)
+  // 2. 나머지 탭은 지연 렌더링 (유저가 클릭할 때 또는 백그라운드)
+  setTimeout(function() {
+    var t = performance.now();
+    newEstimate();
+    updateSyncTimeDisplay();
+    console.log('[PERF] init — 지연 초기화: ' + (performance.now() - t).toFixed(0) + 'ms');
+  }, 200);
+
+  // 3. Supabase 로드는 15초 후
   setTimeout(function() {
     loadProductsFromSupabase().then(function(loaded) {
       if (loaded) {
+        _renderedTabs['catalog'] = false;
         populateCatalogFilters();
         renderCatalog();
+        _renderedTabs['catalog'] = true;
         updateStatus();
         console.log('[Supabase] 테이블 갱신 완료');
       }
     });
-  }, 10000);
-  initPromoMonths();
-  loadPartsPricesUI();
-  renderSetbun();
-  renderEstimateList();
-  newEstimate();
-  renderGenProducts();
-  renderAllPromosV2();
+  }, 15000);
+
   initStickyHeader('catalog-table');
-  updateSyncTimeDisplay();
+  // 나머지 탭 초기화는 지연 (첫 방문 시 switchTab에서 렌더링)
+  setTimeout(function() {
+    initPromoMonths();
+    loadPartsPricesUI();
+  }, 500);
   makeModalDraggable('settings-modal');
   makeModalDraggable('order-settings-modal');
   makeModalDraggable('order-history-modal');
