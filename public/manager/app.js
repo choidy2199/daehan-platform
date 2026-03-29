@@ -6326,21 +6326,7 @@ function toggleClientVat(idx, checked) {
 var clientPage = 0;
 var CLIENT_PAGE_SIZE = 50;
 
-var _clientVatHeaderAdded = false;
 function renderClients() {
-  // 부가세 컬럼 헤더 동적 추가 (1회만)
-  if (!_clientVatHeaderAdded) {
-    var thead = document.querySelector('#client-table thead tr');
-    if (thead) {
-      var ths = thead.querySelectorAll('th');
-      var editTh = ths[ths.length - 1]; // 마지막 "수정" th
-      var vatTh = document.createElement('th');
-      vatTh.textContent = '부가세';
-      vatTh.style.width = '60px';
-      thead.insertBefore(vatTh, editTh);
-      _clientVatHeaderAdded = true;
-    }
-  }
   var search = (document.getElementById('client-search').value || '').toLowerCase();
   var filtered = clientData;
   if (search) {
@@ -6369,10 +6355,12 @@ function renderClients() {
   body.innerHTML = pageData.map(function(c) {
     var ri = clientData.indexOf(c);
     var bankDisplay = (c.bankName && c.bankAccount) ? c.bankName + ' ' + c.bankAccount : (c.bankAccount || '-');
-    return '<tr>' +
+    var isExempt = !!c.vatExempt;
+    var exemptBadge = isExempt ? ' <span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:#FCEBEB;color:#791F1F">면제</span>' : '';
+    return '<tr style="' + (isExempt ? 'background:#FFF5F5' : '') + '">' +
       '<td class="center"><span style="color:#CC2222;cursor:pointer;font-size:12px" onclick="removeClient(' + ri + ')">✕</span></td>' +
       '<td class="center" style="font-weight:600">' + (c.code || '-') + '</td>' +
-      '<td style="text-align:left;font-weight:500">' + (c.name || '-') + '</td>' +
+      '<td style="text-align:left;font-weight:500">' + (c.name || '-') + exemptBadge + '</td>' +
       '<td class="center">' + (c.bizNo || '-') + '</td>' +
       '<td class="center">' + (c.ceo || '-') + '</td>' +
       '<td class="center">' + (c.phone || '-') + '</td>' +
@@ -6388,8 +6376,8 @@ function renderClients() {
       '<td class="center">' + (c.manager || '-') + '</td>' +
       '<td class="center">' + kindBadge(c.kind) + '</td>' +
       '<td class="center">' + (c.priceGrade || '-') + '</td>' +
-      '<td class="center">' + (c.bankHolder || '-') + '</td>' +
       '<td class="center"><input type="checkbox" ' + (c.vatExempt ? '' : 'checked') + ' onchange="toggleClientVat(' + ri + ',this.checked)" title="체크=부가세포함, 해제=면제"></td>' +
+      '<td class="center">' + (c.bankHolder || '-') + '</td>' +
       '<td class="center"><button class="btn-primary" onclick="editClient(' + ri + ')" style="padding:2px 6px;font-size:9px">수정</button></td>' +
       '</tr>';
   }).join('');
