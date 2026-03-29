@@ -3060,91 +3060,102 @@ async function syncInventory() {
     return;
   }
 
-  console.log('[재고동기화] 시작 — 총 ' + allItems.length + '건 (mw: ' + allItems.filter(function(x){return x.source==='mw'}).length + ', gen: ' + allItems.filter(function(x){return x.source==='gen'}).length + ')');
+  var mwCount = allItems.filter(function(x){return x.source==='mw'}).length;
+  var genCount = allItems.filter(function(x){return x.source==='gen'}).length;
+  console.log('[재고동기화] 시작 — 총 ' + allItems.length + '건 (mw: ' + mwCount + ', gen: ' + genCount + ')');
 
-  // 2) 진행상황 표시용 토스트
+  // 2) 진행상황 표시
   var total = allItems.length;
-  var done = 0;
   var updated = 0;
   var notFound = [];
   var errors = [];
-  toast('재고 조회 중... 0/' + total);
 
-  // 3) 50개씩 배치로 API 호출
-  var BATCH = 50;
+  // 3) 500개씩 배치 분할 → 병렬 호출 (Promise.all)
+  var BATCH = 500;
+  var batches = [];
   for (var b = 0; b < allItems.length; b += BATCH) {
-    var batch = allItems.slice(b, b + BATCH);
-    var codes = batch.map(function(item) { return item.manageCode; });
-
-    try {
-      var resp = await fetch('/api/erp/stock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codes: codes })
-      });
-
-      if (!resp.ok) {
-        var errData = await resp.json().catch(function() { return {}; });
-        var errMsg = '배치 ' + (b/BATCH+1) + ': ' + (errData.error || resp.statusText);
-        errors.push(errMsg);
-        console.error('[재고동기화] API 오류:', errMsg);
-        done += batch.length;
-        continue;
-      }
-
-      var data = await resp.json();
-      console.log('[재고동기화] 배치 ' + (b/BATCH+1) + ' 응답:', data.results ? data.results.length + '건' : 'results 없음', data.errors && data.errors.length ? '오류 ' + data.errors.length + '건' : '');
-
-      // 4) 결과를 관리코드 → 재고 맵으로 변환
-      var stockMap = {};
-      (data.results || []).forEach(function(r) {
-        stockMap[r.code] = r.stock;
-      });
-
-      if (data.errors && data.errors.length > 0) {
-        errors = errors.concat(data.errors);
-      }
-
-      // 5) 각 품목에 재고 반영
-      batch.forEach(function(item) {
-        var stock = stockMap[item.manageCode];
-        if (stock === undefined || stock === null) {
-          notFound.push(item.manageCode);
-          return;
-        }
-
-        if (item.source === 'mw') {
-          // mw_products → DB.inventory에 반영 (code 기준)
-          var inv = DB.inventory.find(function(i) { return String(i.code) === String(item.code); });
-          if (inv) {
-            inv.stock = stock;
-          } else {
-            DB.inventory.push({ code: item.code, stock: stock, note1: '', note2: '' });
-          }
-          updated++;
-        } else if (item.source === 'gen') {
-          // mw_gen_products → 해당 품목의 stock 필드 업데이트
-          if (gp[item.index]) {
-            gp[item.index].stock = stock;
-            updated++;
-          }
-        }
-      });
-
-    } catch (err) {
-      var catchMsg = '배치 ' + (b/BATCH+1) + ': ' + (err.message || '네트워크 오류');
-      errors.push(catchMsg);
-      console.error('[재고동기화] fetch 예외:', catchMsg);
-    }
-
-    done += batch.length;
-    toast('재고 조회 중... ' + Math.min(done, total) + '/' + total);
-
-    // API 과부하 방지 — 배치 사이 200ms 대기
-    if (b + BATCH < allItems.length) {
-      await new Promise(function(resolve) { setTimeout(resolve, 200); });
-    }
+    batches.push(allItems.slice(b, b + BATCH));
   }
+  console.log('[재고동기화] 배치 ' + batches.length + '개로 분할 (각 최대 ' + BATCH + '건), 병렬 호출');
+  toast('재고 조회 중... ' + total + '건 (' + batches.length + '개 배치)');
+
+  // 배치별 fetch 함수
+  function fetchBatch(batch, batchIdx) {
+    var codes = batch.map(function(item) { return item.manageCode; });
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, 30000);
+
+    return fetch('/api/erp/stock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codes: codes }),
+      signal: controller.signal
+    }).then(function(resp) {
+      clearTimeout(timeoutId);
+      if (!resp.ok) {
+        return resp.json().catch(function() { return {}; }).then(function(errData) {
+          throw new Error(errData.error || resp.statusText);
+        });
+      }
+      return resp.json();
+    }).then(function(data) {
+      console.log('[재고동기화] 배치 ' + (batchIdx+1) + ' 응답: ' + (data.results ? data.results.length + '건' : 'results 없음'));
+      return { batch: batch, data: data, error: null };
+    }).catch(function(err) {
+      clearTimeout(timeoutId);
+      var msg = err.name === 'AbortError' ? '타임아웃 (30초)' : (err.message || '네트워크 오류');
+      console.error('[재고동기화] 배치 ' + (batchIdx+1) + ' 오류:', msg);
+      return { batch: batch, data: null, error: '배치 ' + (batchIdx+1) + ': ' + msg };
+    });
+  }
+
+  // 4) 병렬 호출
+  var promises = batches.map(function(batch, idx) { return fetchBatch(batch, idx); });
+  var results = await Promise.all(promises);
+
+  // 5) 결과 처리
+  results.forEach(function(result) {
+    if (result.error) {
+      errors.push(result.error);
+      return;
+    }
+    var data = result.data;
+    var batch = result.batch;
+
+    // 관리코드 → 재고 맵
+    var stockMap = {};
+    (data.results || []).forEach(function(r) {
+      stockMap[r.code] = r.stock;
+    });
+
+    if (data.errors && data.errors.length > 0) {
+      errors = errors.concat(data.errors);
+    }
+
+    // 각 품목에 재고 반영
+    batch.forEach(function(item) {
+      var stock = stockMap[item.manageCode];
+      if (stock === undefined || stock === null) {
+        notFound.push(item.manageCode);
+        return;
+      }
+
+      if (item.source === 'mw') {
+        var inv = DB.inventory.find(function(i) { return String(i.code) === String(item.code); });
+        if (inv) {
+          inv.stock = stock;
+        } else {
+          DB.inventory.push({ code: item.code, stock: stock, note1: '', note2: '' });
+        }
+        updated++;
+      } else if (item.source === 'gen') {
+        if (gp[item.index]) {
+          gp[item.index].stock = stock;
+          updated++;
+        }
+      }
+    });
+  });
 
   // 6) localStorage 저장
   save(KEYS.inventory, DB.inventory);
