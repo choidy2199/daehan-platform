@@ -84,7 +84,7 @@ function syncProductsToSupabase() {
   if (!products.length) { console.log('[Supabase] 동기화 스킵: 제품 0건'); return; }
   if (_syncing) { console.log('[Supabase] 동기화 스킵: 이미 진행 중'); return; }
 
-  // 2초 디바운스 — save()가 여러 번 연속 호출돼도 마지막 1번만 실행
+  // 5초 디바운스 — save()가 여러 번 연속 호출돼도 마지막 1번만 실행
   if (_syncTimer) clearTimeout(_syncTimer);
   _syncTimer = setTimeout(function() {
     _syncing = true;
@@ -5760,15 +5760,17 @@ function init() {
   renderCatalog();
   updateStatus();
 
-  // Supabase에서 밀워키 제품 로드 (백그라운드, localStorage 먼저 표시 후 갱신)
-  loadProductsFromSupabase().then(function(loaded) {
-    if (loaded) {
-      populateCatalogFilters();
-      renderCatalog();
-      updateStatus();
-      console.log('[Supabase] 테이블 갱신 완료');
-    }
-  });
+  // Supabase 로드는 10초 후 백그라운드 실행 (초기 로딩 속도 우선)
+  setTimeout(function() {
+    loadProductsFromSupabase().then(function(loaded) {
+      if (loaded) {
+        populateCatalogFilters();
+        renderCatalog();
+        updateStatus();
+        console.log('[Supabase] 테이블 갱신 완료');
+      }
+    });
+  }, 10000);
   initPromoMonths();
   loadPartsPricesUI();
   renderSetbun();
