@@ -3112,7 +3112,8 @@ async function syncInventory() {
 
   // 2) 진행상황 표시
   var total = allItems.length;
-  var updated = 0;
+  var updatedMw = 0;
+  var updatedGen = 0;
   var notFound = [];
   var errors = [];
 
@@ -3129,7 +3130,7 @@ async function syncInventory() {
   function fetchBatch(batch, batchIdx) {
     var codes = batch.map(function(item) { return item.manageCode; });
     var controller = new AbortController();
-    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+    var timeoutId = setTimeout(function() { controller.abort(); }, 60000);
 
     return fetch('/api/erp/stock', {
       method: 'POST',
@@ -3153,7 +3154,7 @@ async function syncInventory() {
       return { batch: batch, data: data, error: null };
     }).catch(function(err) {
       clearTimeout(timeoutId);
-      var msg = err.name === 'AbortError' ? '타임아웃 (30초)' : (err.message || '네트워크 오류');
+      var msg = err.name === 'AbortError' ? '타임아웃 (60초)' : (err.message || '네트워크 오류');
       console.error('[재고동기화] 배치 ' + (batchIdx+1) + ' 오류:', msg);
       return { batch: batch, data: null, error: '배치 ' + (batchIdx+1) + ': ' + msg };
     });
@@ -3201,11 +3202,11 @@ async function syncInventory() {
         } else {
           DB.inventory.push({ code: item.code, stock: stock, note1: '', note2: '' });
         }
-        updated++;
+        updatedMw++;
       } else if (item.source === 'gen') {
         if (gp[item.index]) {
           gp[item.index].stock = stock;
-          updated++;
+          updatedGen++;
         }
       }
     });
@@ -3227,11 +3228,13 @@ async function syncInventory() {
   updateSyncTimeDisplay();
 
   // 9) 완료 알림 + 디버깅 로그
-  console.log('[재고동기화] 완료 — 업데이트: ' + updated + '건, 매칭실패: ' + notFound.length + '건, 오류: ' + errors.length + '건');
+  var totalUpdated = updatedMw + updatedGen;
+  console.log('[재고동기화] 완료 — 밀워키: ' + updatedMw + '건, 일반: ' + updatedGen + '건, 매칭실패: ' + notFound.length + '건, 오류: ' + errors.length + '건');
   if (notFound.length > 0) {
     console.log('[재고동기화] 매칭 안 된 관리코드:', notFound.slice(0, 20).join(', ') + (notFound.length > 20 ? ' 외 ' + (notFound.length - 20) + '건' : ''));
   }
-  var msg = '재고 업데이트 완료 (' + updated + '건)';
+  var msg = '재고 업데이트 완료 — 밀워키 ' + updatedMw + '건';
+  if (updatedGen > 0) msg += ' + 일반 ' + updatedGen + '건';
   if (errors.length > 0) {
     msg += ' | 오류 ' + errors.length + '건';
     console.warn('[재고동기화 오류]', errors);
