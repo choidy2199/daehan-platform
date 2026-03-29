@@ -4973,6 +4973,7 @@ function searchEstProducts(val) {
       <td class="center">${p.code} ${srcBadge}</td>
       <td class="center" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.description || '-'}</td>
       <td class="center" style="font-weight:500">${p.model || '-'}</td>
+      <td class="center">${(function(){ var s = p._source === 'milwaukee' ? findStock(p.code) : (p.stock != null ? p.stock : null); return s != null ? (s > 0 ? '<span class="badge badge-green">' + s + '</span>' : s === 0 ? '<span class="badge badge-amber">0</span>' : '<span class="badge badge-red">' + s + '</span>') : '<span class="badge badge-gray">-</span>'; })()}</td>
       <td class="num" style="color:#185FA5;font-weight:700">${fmt(aPrice)}</td>
       <td class="num">${naverPrice ? fmt(naverPrice) : '-'}</td>
       <td class="num">${openPrice ? fmt(openPrice) : '-'}</td>
