@@ -4977,9 +4977,12 @@ function searchEstProducts(val) {
     return `<tr>
       <td class="center"><button class="btn-edit" onclick="addEstimateProduct('${p.code}')">견적서 추가</button></td>
       <td class="center">${p.code} ${srcBadge}</td>
-      <td class="center" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.description || '-'}</td>
+      <td class="center" style="font-size:10px">${p.manageCode || '-'}</td>
+      <td class="center">${p.category || '-'}</td>
       <td class="center" style="font-weight:500">${p.model || '-'}</td>
+      <td class="center" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.description || '-'}</td>
       <td class="center">${(function(){ var s = p._source === 'milwaukee' ? findStock(p.code) : (p.stock != null ? p.stock : null); return s != null ? (s > 0 ? '<span class="badge badge-green">' + s + '</span>' : s === 0 ? '<span class="badge badge-amber">0</span>' : '<span class="badge badge-red">' + s + '</span>') : '<span class="badge badge-gray">-</span>'; })()}</td>
+      <td class="num" style="color:#1D9E75">${cost ? fmt(cost) : '-'}</td>
       <td class="num" style="color:#185FA5;font-weight:700">${fmt(aPrice)}</td>
       <td class="num">${naverPrice ? fmt(naverPrice) : '-'}</td>
       <td class="num">${openPrice ? fmt(openPrice) : '-'}</td>
@@ -5151,6 +5154,8 @@ function addEstimateProduct(code) {
   }
   currentEstItems.push({
     code: String(p.code),
+    manageCode: p.manageCode || '',
+    category: p.category || '',
     model: p.model || '',
     description: p.description || '',
     priceA: p.priceA || 0,
@@ -5197,6 +5202,8 @@ function renderEstimateItems() {
     return `<tr>
       <td class="center"><button class="btn-danger btn-sm" onclick="removeEstimateItem(${i})" style="padding:2px 6px">✕</button></td>
       <td class="center">${item.code}</td>
+      <td class="center" style="font-size:10px">${item.manageCode || (p ? p.manageCode : '') || '-'}</td>
+      <td class="center">${item.category || (p ? p.category : '') || '-'}</td>
       <td class="center" style="font-weight:500">${p ? p.model : item.model}</td>
       <td class="center" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p ? p.description : item.description}</td>
       <td class="center"><input type="number" value="${qty || ''}" onchange="onEstQtyChange(${i},this.value)" min="0" style="width:60px;text-align:center"></td>
@@ -5210,7 +5217,7 @@ function renderEstimateItems() {
     </tr>`;
   }).join('');
   if (!currentEstItems.length) {
-    body.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#9BA3B2;padding:20px">제품을 검색하여 추가하세요</td></tr>';
+    body.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#9BA3B2;padding:20px">제품을 검색하여 추가하세요</td></tr>';
   }
   const totalVat = Math.round(total * 0.1);
   document.getElementById('est-total').innerHTML = `${fmt(total)} <span style="font-size:13px;color:#5A6070;font-weight:400">+</span> <span style="font-size:14px;color:#5A6070">부가세 ${fmt(totalVat)}</span> <span style="font-size:13px;color:#5A6070;font-weight:400">=</span> <span style="font-size:18px;color:#CC2222">토탈 ${fmt(total + totalVat)}</span>`;
@@ -5369,34 +5376,6 @@ function downloadEstimatePdf() {
 }
 
 // ======================== 전표 등록 (NewOrderOut) ========================
-// 견적서 버튼 행에 [전표 등록] 버튼 동적 추가
-(function() {
-  var observer = new MutationObserver(function() {
-    var pdfBtn = document.querySelector('[onclick="previewEstimatePdf()"]');
-    if (pdfBtn && !document.getElementById('btn-order-out')) {
-      var btn = document.createElement('button');
-      btn.id = 'btn-order-out';
-      btn.textContent = '📋 전표 등록';
-      btn.style.cssText = 'background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer';
-      btn.onclick = registerOrderOut;
-      pdfBtn.parentNode.insertBefore(btn, pdfBtn.nextSibling);
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-  // 즉시 실행도 시도
-  setTimeout(function() {
-    var pdfBtn = document.querySelector('[onclick="previewEstimatePdf()"]');
-    if (pdfBtn && !document.getElementById('btn-order-out')) {
-      var btn = document.createElement('button');
-      btn.id = 'btn-order-out';
-      btn.textContent = '📋 전표 등록';
-      btn.style.cssText = 'background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer';
-      btn.onclick = registerOrderOut;
-      pdfBtn.parentNode.insertBefore(btn, pdfBtn.nextSibling);
-    }
-  }, 500);
-})();
-
 async function registerOrderOut() {
   var btn = document.getElementById('btn-order-out');
 
