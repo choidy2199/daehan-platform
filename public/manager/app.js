@@ -1,3 +1,40 @@
+// ======================== SESSION CHECK ========================
+(function checkSession() {
+  var token = localStorage.getItem('session_token') || sessionStorage.getItem('session_token');
+  if (!token) { window.location.href = '/login'; return; }
+
+  // 토큰 형식: "uuid|expiresISO" — 클라이언트에서 만료 확인
+  var parts = token.split('|');
+  if (parts.length >= 2) {
+    var expires = new Date(parts[1]);
+    if (new Date() > expires) {
+      localStorage.removeItem('session_token');
+      sessionStorage.removeItem('session_token');
+      window.location.href = '/login';
+      return;
+    }
+  }
+
+  // current_user에서 사용자 정보 복원
+  try {
+    var saved = JSON.parse(localStorage.getItem('current_user') || '{}');
+    if (saved && saved.name) {
+      window.currentUser = saved;
+      var nameEl = document.getElementById('current-user-name');
+      if (nameEl) nameEl.textContent = saved.name + '님';
+    }
+  } catch(e) {}
+})();
+
+function doLogout() {
+  var token = localStorage.getItem('session_token') || sessionStorage.getItem('session_token');
+  fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) }).catch(function(){});
+  localStorage.removeItem('session_token');
+  sessionStorage.removeItem('session_token');
+  localStorage.removeItem('current_user');
+  window.location.href = '/login';
+}
+
 // ======================== DATA STORE ========================
 const KEYS = { products: 'mw_products', inventory: 'mw_inventory', promotions: 'mw_promotions', orders: 'mw_orders', settings: 'mw_settings', rebate: 'mw_rebate' };
 
@@ -5801,12 +5838,15 @@ function switchSettingsMain(type) {
   document.getElementById('settings-sub-fee').style.display = type === 'fee' ? '' : 'none';
   document.getElementById('settings-sub-client').style.display = type === 'client' ? '' : 'none';
   document.getElementById('settings-sub-history').style.display = type === 'history' ? '' : 'none';
+  document.getElementById('settings-sub-users').style.display = type === 'users' ? '' : 'none';
   var tabs = document.querySelectorAll('#settings-main-tabs .sub-tab');
   tabs[0].classList.toggle('active', type === 'fee');
   tabs[1].classList.toggle('active', type === 'client');
   tabs[2].classList.toggle('active', type === 'history');
+  tabs[3].classList.toggle('active', type === 'users');
   if (type === 'client') renderClients();
   if (type === 'history') renderActionHistory();
+  if (type === 'users') renderUsers();
 }
 
 function saveClients() {
@@ -5956,6 +5996,133 @@ function uploadClients(input) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ======================== 사용자관리 ========================
+var _selectedRole = 'staff';
+
+function selectRole(role) {
+  _selectedRole = role;
+  var btns = document.querySelectorAll('#user-role-btns .role-btn');
+  var colors = { admin: { bg: '#DBEAFE', border: '#DBEAFE', color: '#1E40AF' }, staff: { bg: '#D1FAE5', border: '#D1FAE5', color: '#065F46' }, customer: { bg: '#FEF3C7', border: '#FEF3C7', color: '#92400E' } };
+  btns.forEach(function(btn) {
+    var r = btn.getAttribute('data-role');
+    var c = colors[r] || colors.staff;
+    if (r === role) {
+      btn.style.background = c.bg;
+      btn.style.borderColor = c.border;
+    } else {
+      btn.style.background = '#fff';
+      btn.style.borderColor = c.border;
+    }
+  });
+}
+
+function showUserModal(editId) {
+  document.getElementById('user-edit-id').value = editId || '';
+  document.getElementById('user-modal-title').textContent = editId ? '사용자 수정' : '사용자 추가';
+  document.getElementById('user-name').value = '';
+  document.getElementById('user-login-id').value = '';
+  document.getElementById('user-password').value = '';
+  document.getElementById('user-active').checked = true;
+  selectRole('staff');
+
+  if (editId) {
+    fetch('/api/auth/users').then(function(r){return r.json()}).then(function(d) {
+      var u = (d.users||[]).find(function(x){return x.id==editId});
+      if (u) {
+        document.getElementById('user-name').value = u.name || '';
+        document.getElementById('user-login-id').value = u.loginId || '';
+        document.getElementById('user-active').checked = u.isActive;
+        selectRole(u.role || 'staff');
+      }
+    });
+  }
+  document.getElementById('user-modal').style.display = '';
+  document.getElementById('user-modal').classList.add('show');
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal').style.display = 'none';
+  document.getElementById('user-modal').classList.remove('show');
+}
+
+function saveUser() {
+  var id = document.getElementById('user-edit-id').value;
+  var name = document.getElementById('user-name').value.trim();
+  var loginId = document.getElementById('user-login-id').value.trim();
+  var password = document.getElementById('user-password').value;
+  var isActive = document.getElementById('user-active').checked;
+
+  if (!name) { toast('이름을 입력하세요'); return; }
+  if (!loginId) { toast('아이디를 입력하세요'); return; }
+  if (!id && (!password || password.length < 6)) { toast('비밀번호는 6자 이상이어야 합니다'); return; }
+
+  var method = id ? 'PUT' : 'POST';
+  var body = { name: name, loginId: loginId, role: _selectedRole, isActive: isActive };
+  if (id) body.id = id;
+  if (password && password.length >= 6) body.password = password;
+
+  fetch('/api/auth/users', {
+    method: method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.error) { toast(d.error); return; }
+    toast(id ? '사용자 수정 완료' : '사용자 추가 완료');
+    closeUserModal();
+    renderUsers();
+  }).catch(function(e) { toast('오류: ' + e.message); });
+}
+
+function deleteUser(id) {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  fetch('/api/auth/users', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: id })
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.error) { toast(d.error); return; }
+    toast('사용자 삭제 완료');
+    renderUsers();
+  });
+}
+
+function toggleUserActive(id, current) {
+  fetch('/api/auth/users', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: id, isActive: !current })
+  }).then(function(r){return r.json()}).then(function(d) {
+    if (d.error) { toast(d.error); return; }
+    renderUsers();
+  });
+}
+
+function renderUsers() {
+  fetch('/api/auth/users').then(function(r){return r.json()}).then(function(d) {
+    var users = d.users || [];
+    document.getElementById('user-count').textContent = users.length + '명';
+    var roleBadge = { admin: 'background:#DBEAFE;color:#1E40AF', staff: 'background:#D1FAE5;color:#065F46', customer: 'background:#FEF3C7;color:#92400E' };
+    var roleLabel = { admin: '관리자', staff: '직원', customer: '거래처' };
+    document.getElementById('user-body').innerHTML = users.map(function(u, i) {
+      var badge = roleBadge[u.role] || roleBadge.staff;
+      var label = roleLabel[u.role] || u.role;
+      var activeColor = u.isActive ? '#22C55E' : '#DC2626';
+      var activeText = u.isActive ? 'ON' : 'OFF';
+      var lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleString('ko-KR') : '-';
+      return '<tr>' +
+        '<td class="center">' + (i+1) + '</td>' +
+        '<td style="font-weight:500">' + (u.name||'-') + '</td>' +
+        '<td>' + (u.loginId||'-') + '</td>' +
+        '<td style="color:#9BA3B2">********</td>' +
+        '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;' + badge + '">' + label + '</span></td>' +
+        '<td class="center"><button onclick="toggleUserActive(' + u.id + ',' + u.isActive + ')" style="background:' + activeColor + ';color:#fff;border:none;border-radius:10px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer">' + activeText + '</button></td>' +
+        '<td style="font-size:11px;color:#5A6070">' + lastLogin + '</td>' +
+        '<td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="showUserModal(' + u.id + ')">수정</button> <button class="btn-danger btn-sm" onclick="deleteUser(' + u.id + ')" style="padding:2px 6px;font-size:11px">삭제</button></td>' +
+        '</tr>';
+    }).join('');
+  });
 }
 
 init();
