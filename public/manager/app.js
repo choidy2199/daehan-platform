@@ -5466,7 +5466,7 @@ async function registerOrderOut() {
     var data = await resp.json();
 
     if (!resp.ok || data.error) {
-      alert('전표 등록 실패: ' + (data.error || '서버 오류'));
+      alert('전표 등록 실패: ' + (data.error || '서버 오류') + (data.detail ? '\n' + data.detail : ''));
     } else {
       alert('전표 등록 완료\n' + (data.result || ''));
       // 작업이력 기록

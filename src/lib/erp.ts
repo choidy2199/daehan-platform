@@ -87,17 +87,36 @@ export async function selectItem(search: string): Promise<Record<string, string>
 
 /**
  * NewOrderOut: 매출 전표 등록
- * info: "거래처CODE2|비고|YY.MM.DD|"
- * items: "품목CODE2$수량$단가$금액$부가세$비고|..."
- * ibgum: "0|||" (입금 없음)
+ * WSDL 파라미터: cUserKey, info, items, ibgum
+ * POST form-urlencoded 방식 (SOAP의 pUserKey/cUserKey 불일치 문제 회피)
  */
 export async function callNewOrderOut(info: string, items: string, ibgum: string): Promise<string> {
-  const xml = await soapCall('NewOrderOut', {
-    info: info,
-    items: items,
-    ibgum: ibgum,
+  if (!ERP_USER_KEY) throw new Error('ERP_USER_KEY 환경변수가 설정되지 않았습니다');
+
+  const formBody = [
+    `cUserKey=${encodeURIComponent(ERP_USER_KEY)}`,
+    `info=${encodeURIComponent(info)}`,
+    `items=${encodeURIComponent(items)}`,
+    `ibgum=${encodeURIComponent(ibgum)}`,
+  ].join('&');
+
+  console.log(`[callNewOrderOut] POST ${ERP_URL}/NewOrderOut, body길이: ${formBody.length}`);
+
+  const response = await fetch(`${ERP_URL}/NewOrderOut`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formBody,
   });
-  return xml;
+
+  const text = await response.text();
+  console.log(`[callNewOrderOut] HTTP ${response.status}, 응답길이: ${text.length}`);
+  console.log(`[callNewOrderOut] 응답: ${text.substring(0, 300)}`);
+
+  if (!response.ok) {
+    throw new Error(`ERP HTTP ${response.status}: ${text.substring(0, 200)}`);
+  }
+
+  return text;
 }
 
 /**

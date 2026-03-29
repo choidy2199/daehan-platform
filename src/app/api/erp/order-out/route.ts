@@ -56,6 +56,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, result, orderNo: result });
   } catch (err: any) {
     console.error('[NewOrderOut Error]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message, detail: String(err) }, { status: 500 });
   }
 }
