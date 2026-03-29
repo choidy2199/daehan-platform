@@ -5264,6 +5264,7 @@ function searchClientAC(val) {
       document.getElementById('est-client').value = c.name;
       estSelectedClient = c;
       showEstClientInfo(c);
+      renderEstimateItems();
       list.style.display = 'none';
     };
   });
@@ -5273,6 +5274,7 @@ function searchClientAC(val) {
       e.preventDefault();
       estSelectedClient = null;
       showEstClientUnreg(val);
+      renderEstimateItems();
       list.style.display = 'none';
     };
   }
@@ -5290,7 +5292,8 @@ function showEstClientInfo(c) {
     '<div><span style="color:#5A6070">대표: </span><span>' + (c.ceo || '-') + '</span></div>' +
     '<div><span style="color:#5A6070">전화: </span><span>' + (c.phone || c.mobile || '-') + '</span></div>' +
     '<div><span style="color:#5A6070">주소: </span><span>' + (c.address || '-') + '</span></div>' +
-    '<div><span style="color:#5A6070">이메일: </span><span>' + (c.email || '-') + '</span></div>';
+    '<div><span style="color:#5A6070">이메일: </span><span>' + (c.email || '-') + '</span></div>' +
+    (c.vatExempt ? '<div style="color:#CC2222;font-weight:600;margin-top:4px">⚠️ 부가세 면제 거래처</div>' : '');
 }
 
 function showEstClientUnreg(name) {
@@ -5377,6 +5380,7 @@ function onEstMemoChange(idx, val) {
 
 function renderEstimateItems() {
   const body = document.getElementById('est-body');
+  const isVatExempt = estSelectedClient && estSelectedClient.vatExempt === true;
   let total = 0;
   body.innerHTML = currentEstItems.map((item, i) => {
     const p = findAnyProduct(item.code);
@@ -5384,7 +5388,7 @@ function renderEstimateItems() {
     const stock = findStock(item.code);
     const qty = item.qty || 0;
     const amount = aPrice * qty;
-    const vat = Math.round(amount * 0.1);
+    const vat = isVatExempt ? 0 : Math.round(amount * 0.1);
     total += amount;
     const stockTxt = stock == null ? '-' : `<span style="color:#CC2222;font-weight:700">${stock}</span>`;
     return `<tr>
@@ -5407,8 +5411,9 @@ function renderEstimateItems() {
   if (!currentEstItems.length) {
     body.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#9BA3B2;padding:20px">제품을 검색하여 추가하세요</td></tr>';
   }
-  const totalVat = Math.round(total * 0.1);
-  document.getElementById('est-total').innerHTML = `${fmt(total)} <span style="font-size:13px;color:#5A6070;font-weight:400">+</span> <span style="font-size:14px;color:#5A6070">부가세 ${fmt(totalVat)}</span> <span style="font-size:13px;color:#5A6070;font-weight:400">=</span> <span style="font-size:18px;color:#CC2222">토탈 ${fmt(total + totalVat)}</span>`;
+  const totalVat = isVatExempt ? 0 : Math.round(total * 0.1);
+  const vatLabel = isVatExempt ? '부가세 면제' : '부가세 ' + fmt(totalVat);
+  document.getElementById('est-total').innerHTML = `${fmt(total)} <span style="font-size:13px;color:#5A6070;font-weight:400">+</span> <span style="font-size:14px;color:${isVatExempt ? '#CC2222' : '#5A6070'}">${vatLabel}</span> <span style="font-size:13px;color:#5A6070;font-weight:400">=</span> <span style="font-size:18px;color:#CC2222">토탈 ${fmt(total + totalVat)}</span>`;
   initColumnResize('est-table');
   initStickyHeader('est-table');
 }
@@ -5597,12 +5602,13 @@ async function registerOrderOut() {
   }
 
   // 품목 데이터 구성
+  var isVatExempt = estSelectedClient && estSelectedClient.vatExempt === true;
   var totalAmount = 0;
   var itemsData = currentEstItems.filter(function(it) { return it.qty > 0; }).map(function(it) {
     var p = findAnyProduct(it.code);
     var price = it.customPrice != null ? it.customPrice : (p ? p.priceA : (it.priceA || 0));
     var amount = price * it.qty;
-    var vat = Math.round(amount * 0.1);
+    var vat = isVatExempt ? 0 : Math.round(amount * 0.1);
     totalAmount += amount;
     return {
       code: p ? (p.manageCode || p.code) : it.code,
@@ -6308,12 +6314,33 @@ function switchSettingsMain(type) {
 
 function saveClients() {
   localStorage.setItem('mw_clients', JSON.stringify(clientData));
+  autoSyncToSupabase('mw_clients');
+}
+
+function toggleClientVat(idx, checked) {
+  // checked=true → 부가세 포함(기본), checked=false → 면제
+  clientData[idx].vatExempt = !checked;
+  saveClients();
 }
 
 var clientPage = 0;
 var CLIENT_PAGE_SIZE = 50;
 
+var _clientVatHeaderAdded = false;
 function renderClients() {
+  // 부가세 컬럼 헤더 동적 추가 (1회만)
+  if (!_clientVatHeaderAdded) {
+    var thead = document.querySelector('#client-table thead tr');
+    if (thead) {
+      var ths = thead.querySelectorAll('th');
+      var editTh = ths[ths.length - 1]; // 마지막 "수정" th
+      var vatTh = document.createElement('th');
+      vatTh.textContent = '부가세';
+      vatTh.style.width = '60px';
+      thead.insertBefore(vatTh, editTh);
+      _clientVatHeaderAdded = true;
+    }
+  }
   var search = (document.getElementById('client-search').value || '').toLowerCase();
   var filtered = clientData;
   if (search) {
@@ -6362,11 +6389,12 @@ function renderClients() {
       '<td class="center">' + kindBadge(c.kind) + '</td>' +
       '<td class="center">' + (c.priceGrade || '-') + '</td>' +
       '<td class="center">' + (c.bankHolder || '-') + '</td>' +
+      '<td class="center"><input type="checkbox" ' + (c.vatExempt ? '' : 'checked') + ' onchange="toggleClientVat(' + ri + ',this.checked)" title="체크=부가세포함, 해제=면제"></td>' +
       '<td class="center"><button class="btn-primary" onclick="editClient(' + ri + ')" style="padding:2px 6px;font-size:9px">수정</button></td>' +
       '</tr>';
   }).join('');
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="20"><div class="empty-state"><p>거래처가 없습니다</p><p style="font-size:12px;color:#9BA3B2">경영박사 거래처 가져오기 또는 엑셀 일괄등록으로 추가하세요</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="21"><div class="empty-state"><p>거래처가 없습니다</p><p style="font-size:12px;color:#9BA3B2">경영박사 거래처 가져오기 또는 엑셀 일괄등록으로 추가하세요</p></div></td></tr>';
   }
   document.getElementById('client-count').textContent = clientData.length + '건' + (filtered.length !== clientData.length ? ' (검색 ' + filtered.length + '건)' : '');
 
