@@ -5,16 +5,13 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/manager/index.html',
-        destination: '/manager',
+        destination: '/',
         permanent: true,
       },
-    ];
-  },
-  async rewrites() {
-    return [
       {
         source: '/manager',
-        destination: '/manager/index.html',
+        destination: '/',
+        permanent: true,
       },
     ];
   },

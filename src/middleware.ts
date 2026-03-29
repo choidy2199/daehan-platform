@@ -4,9 +4,9 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // / 접속 → /login으로 rewrite
+  // / 접속 → /manager/index.html 내부 rewrite (URL은 / 유지)
   if (pathname === '/') {
-    return NextResponse.rewrite(new URL('/login', request.url));
+    return NextResponse.rewrite(new URL('/manager/index.html', request.url));
   }
 }
 
