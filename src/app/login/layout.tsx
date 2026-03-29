@@ -4,8 +4,9 @@ export default function LoginLayout({ children }: { children: React.ReactNode })
   return (
     <>
       <style>{`
-        .top-nav, nav, .content { display: none !important; }
-        body { display: block !important; }
+        .top-nav, nav { display: none !important; }
+        .content { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+        body { display: block !important; margin: 0 !important; padding: 0 !important; }
       `}</style>
       {children}
     </>
