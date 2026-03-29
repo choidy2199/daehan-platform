@@ -3037,8 +3037,120 @@ let orderSettings = loadObj(ORDER_SETTINGS_KEY, {
   volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}]
 });
 
-function syncInventory() {
-  toast('경영박사 API 연동 준비 중입니다. (관리코드 기준 재고 동기화)');
+async function syncInventory() {
+  // 1) mw_products + mw_gen_products에서 관리코드 수집
+  var allItems = [];
+  DB.products.forEach(function(p, i) {
+    var mc = (p.manageCode || '').trim();
+    if (mc && mc !== '-') {
+      allItems.push({ source: 'mw', code: p.code, manageCode: mc, index: i });
+    }
+  });
+  var gp = [];
+  try { gp = JSON.parse(localStorage.getItem('mw_gen_products') || '[]') || []; } catch(e) { gp = []; }
+  gp.forEach(function(p, i) {
+    var mc = (p.manageCode || '').trim();
+    if (mc && mc !== '-') {
+      allItems.push({ source: 'gen', code: p.code, manageCode: mc, index: i });
+    }
+  });
+
+  if (allItems.length === 0) {
+    toast('관리코드가 있는 품목이 없습니다');
+    return;
+  }
+
+  // 2) 진행상황 표시용 토스트
+  var total = allItems.length;
+  var done = 0;
+  var updated = 0;
+  var errors = [];
+  toast('재고 조회 중... 0/' + total);
+
+  // 3) 50개씩 배치로 API 호출
+  var BATCH = 50;
+  for (var b = 0; b < allItems.length; b += BATCH) {
+    var batch = allItems.slice(b, b + BATCH);
+    var codes = batch.map(function(item) { return item.manageCode; });
+
+    try {
+      var resp = await fetch('/api/erp/stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codes: codes })
+      });
+
+      if (!resp.ok) {
+        var errData = await resp.json().catch(function() { return {}; });
+        errors.push('배치 ' + (b/BATCH+1) + ': ' + (errData.error || resp.statusText));
+        done += batch.length;
+        continue;
+      }
+
+      var data = await resp.json();
+
+      // 4) 결과를 관리코드 → 재고 맵으로 변환
+      var stockMap = {};
+      (data.results || []).forEach(function(r) {
+        stockMap[r.code] = r.stock;
+      });
+
+      if (data.errors && data.errors.length > 0) {
+        errors = errors.concat(data.errors);
+      }
+
+      // 5) 각 품목에 재고 반영
+      batch.forEach(function(item) {
+        var stock = stockMap[item.manageCode];
+        if (stock == null) return;
+
+        if (item.source === 'mw') {
+          // mw_products → DB.inventory에 반영
+          var inv = DB.inventory.find(function(i) { return String(i.code) === String(item.code); });
+          if (inv) {
+            inv.stock = stock;
+          } else {
+            DB.inventory.push({ code: item.code, stock: stock, note1: '', note2: '' });
+          }
+          updated++;
+        } else if (item.source === 'gen') {
+          // mw_gen_products → 해당 품목의 stock 필드 업데이트
+          if (gp[item.index]) {
+            gp[item.index].stock = stock;
+            updated++;
+          }
+        }
+      });
+
+    } catch (err) {
+      errors.push('배치 ' + (b/BATCH+1) + ': ' + (err.message || '네트워크 오류'));
+    }
+
+    done += batch.length;
+    toast('재고 조회 중... ' + Math.min(done, total) + '/' + total);
+
+    // API 과부하 방지 — 배치 사이 200ms 대기
+    if (b + BATCH < allItems.length) {
+      await new Promise(function(resolve) { setTimeout(resolve, 200); });
+    }
+  }
+
+  // 6) localStorage 저장
+  save(KEYS.inventory, DB.inventory);
+  localStorage.setItem('mw_gen_products', JSON.stringify(gp));
+
+  // 7) 테이블 새로고침
+  if (typeof renderCatalog === 'function') renderCatalog();
+  if (typeof renderGeneral === 'function') renderGeneral();
+  if (typeof updateStatus === 'function') updateStatus();
+
+  // 8) 완료 알림
+  var msg = '재고 업데이트 완료 (' + updated + '건)';
+  if (errors.length > 0) {
+    msg += ' | 오류 ' + errors.length + '건';
+    console.warn('[재고동기화 오류]', errors);
+  }
+  toast(msg);
 }
 
 function showOrderSettingsModal() {
