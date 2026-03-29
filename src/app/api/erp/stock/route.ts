@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { soapCall, parseTablesFromXml } from '@/lib/erp';
+import { parseTablesFromXml } from '@/lib/erp';
 
-// Vercel Serverless 타임아웃 설정 (30초)
 export const maxDuration = 30;
+
+const ERP_URL = process.env.ERP_URL || 'https://drws20.softcity.co.kr:1448/WS_shop.asmx';
+const ERP_USER_KEY = process.env.ERP_USER_KEY || '';
 
 /**
  * POST /api/erp/stock
  * Body: { codes: string[] }  — 관리코드 배열 (최대 500개)
  * Response: { results: { code: string, stock: number }[], errors: string[] }
  *
- * 경영박사 SelectItemUrlEnc의 UrlEnc_WHERE에 관리코드를 일괄 전달
- * 형식: '코드1','코드2','코드3'
+ * 경영박사 SelectItemUrlEnc를 GET 방식으로 호출
+ * URL: ?op=SelectItemUrlEnc&cUserKey=키&UrlEnc_WHERE='코드1','코드2'
  */
 export async function POST(request: NextRequest) {
   try {
@@ -25,20 +27,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '최대 500개까지 조회 가능합니다' }, { status: 400 });
     }
 
+    if (!ERP_USER_KEY) {
+      return NextResponse.json({ error: 'ERP_USER_KEY 환경변수가 설정되지 않았습니다' }, { status: 500 });
+    }
+
     const results: { code: string; stock: number }[] = [];
     const errors: string[] = [];
 
     try {
-      // 관리코드를 '코드1','코드2','코드3' 형태로 조합
+      // 관리코드를 '코드1','코드2','코드3' 형태로 조합 후 URL 인코딩
       const whereValue = codes.map(c => `'${c}'`).join(',');
-      const encoded = encodeURIComponent(whereValue);
+      const encodedWhere = encodeURIComponent(whereValue);
 
-      console.log(`[ERP Stock] 일괄 조회: ${codes.length}건`);
+      // GET 방식으로 호출 (경영박사 API 문서 예제 방식)
+      const url = `${ERP_URL}/SelectItemUrlEnc?cUserKey=${encodeURIComponent(ERP_USER_KEY)}&UrlEnc_WHERE=${encodedWhere}`;
 
-      const xml = await soapCall('SelectItemUrlEnc', { UrlEnc_WHERE: encoded });
+      console.log(`[ERP Stock] GET 호출: ${codes.length}건, URL길이: ${url.length}`);
+
+      const response = await fetch(url, { method: 'GET' });
+
+      if (!response.ok) {
+        throw new Error(`ERP HTTP ${response.status} ${response.statusText}`);
+      }
+
+      const xml = await response.text();
+      console.log(`[ERP Stock] XML 응답 길이: ${xml.length}자`);
+
+      // XML 파싱 — 첫 500자 로그 (디버깅용)
+      if (xml.length < 500) {
+        console.log(`[ERP Stock] XML 전체:`, xml);
+      } else {
+        console.log(`[ERP Stock] XML 앞부분:`, xml.substring(0, 300));
+      }
+
       const rows = parseTablesFromXml(xml);
+      console.log(`[ERP Stock] 파싱된 행: ${rows.length}건`);
 
-      console.log(`[ERP Stock] 응답: ${rows.length}건`);
+      // 첫 번째 행의 필드명 로그 (디버깅용)
+      if (rows.length > 0) {
+        console.log(`[ERP Stock] 첫 행 필드:`, Object.keys(rows[0]).join(', '));
+        console.log(`[ERP Stock] 첫 행 CODE2:`, rows[0].CODE2, 'JEGO:', rows[0].JEGO);
+      }
 
       // CODE2(관리코드) → JEGO(현재고) 매핑
       const stockMap: Record<string, number> = {};
@@ -49,20 +78,23 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      console.log(`[ERP Stock] stockMap 키 수: ${Object.keys(stockMap).length}`);
+
       // 요청한 각 코드에 대해 결과 생성
       for (const code of codes) {
         if (code in stockMap) {
           results.push({ code, stock: stockMap[code] });
         } else {
-          // ERP에 해당 품목 없음 — 재고 0으로 처리
           results.push({ code, stock: 0 });
         }
       }
+
     } catch (err: any) {
-      console.error('[ERP Stock] SOAP 호출 실패:', err.message);
+      console.error('[ERP Stock] 호출 실패:', err.message);
       errors.push(err.message);
     }
 
+    console.log(`[ERP Stock] 최종 결과: ${results.length}건, 오류: ${errors.length}건`);
     return NextResponse.json({ results, errors });
   } catch (err: any) {
     console.error('[ERP Stock API Error]', err);

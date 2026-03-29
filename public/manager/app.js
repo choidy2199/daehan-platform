@@ -3145,7 +3145,11 @@ async function syncInventory() {
       }
       return resp.json();
     }).then(function(data) {
-      console.log('[재고동기화] 배치 ' + (batchIdx+1) + ' 응답: ' + (data.results ? data.results.length + '건' : 'results 없음'));
+      console.log('[재고동기화] 배치 ' + (batchIdx+1) + ' 응답:', JSON.stringify({
+        results: data.results ? data.results.length + '건' : 'null',
+        errors: data.errors || [],
+        sample: data.results && data.results.length > 0 ? data.results.slice(0, 3) : 'empty'
+      }));
       return { batch: batch, data: data, error: null };
     }).catch(function(err) {
       clearTimeout(timeoutId);
@@ -3174,7 +3178,11 @@ async function syncInventory() {
       stockMap[r.code] = r.stock;
     });
 
+    var mapKeys = Object.keys(stockMap);
+    console.log('[재고동기화] stockMap 키 ' + mapKeys.length + '개, 샘플:', mapKeys.slice(0, 5).map(function(k) { return k + '=' + stockMap[k]; }).join(', '));
+
     if (data.errors && data.errors.length > 0) {
+      console.warn('[재고동기화] API 오류 목록:', data.errors);
       errors = errors.concat(data.errors);
     }
 
