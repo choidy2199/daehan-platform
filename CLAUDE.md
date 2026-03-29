@@ -5,6 +5,8 @@
 - Next.js: src/app/ (API Routes, React 페이지)
 - DB: Supabase (PostgreSQL)
 - 배포: Vercel (git push → 자동 배포)
+- 사이트 URL: https://daehantool.dev
+- 작업 완료 후 사이트 열 때: open "https://daehantool.dev/manager/index.html"
 
 ## 핵심 규칙
 1. 수정 요청한 것만 수정. 다른 파일/로직 절대 변경 금지.
@@ -61,8 +63,8 @@
 - Vercel 배포는 영문 경로이므로 문제없음
 
 ## 라우트 구조
-- / → 메인 대시보드
-- /manager/index.html → 기존 HTML 관리시스템
+- / → /manager/index.html로 리다이렉트
+- /manager/index.html → 기존 HTML 관리시스템 (메인)
 - /catalog → 밀워키 단가표 (React 버전)
 - /orders → 발주
 - /setbun → 세트및분해
