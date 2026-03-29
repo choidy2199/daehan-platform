@@ -4198,8 +4198,10 @@ function deleteAllGenProducts() {
 // ======================== STICKY HEADER (JS) ========================
 var _stickyTimers = {};
 function initStickyHeader(tableId) {
-  if (_stickyTimers[tableId]) clearTimeout(_stickyTimers[tableId]);
-  _stickyTimers[tableId] = setTimeout(function() { _initStickyHeaderImpl(tableId); }, 100);
+  if (_stickyTimers[tableId]) {
+    (window.cancelIdleCallback || clearTimeout)(_stickyTimers[tableId]);
+  }
+  _stickyTimers[tableId] = _rIC(function() { _initStickyHeaderImpl(tableId); });
 }
 function _initStickyHeaderImpl(tableId) {
   const table = document.getElementById(tableId);
@@ -4225,10 +4227,17 @@ function _initStickyHeaderImpl(tableId) {
 // ======================== COLUMN RESIZE ========================
 var _resizeTimers = {};
 var _origInitColumnResize = _initColumnResizeImpl;
+var _rIC = window.requestIdleCallback || function(cb) { setTimeout(cb, 150); };
 function initColumnResize(tableId) {
-  // setTimeout으로 지연 실행 → 메인 스레드 블로킹 방지
-  if (_resizeTimers[tableId]) clearTimeout(_resizeTimers[tableId]);
-  _resizeTimers[tableId] = setTimeout(function() { _initColumnResizeImpl(tableId); }, 100);
+  // requestIdleCallback으로 유휴 시 실행 → 메인 스레드 블로킹 방지
+  if (_resizeTimers[tableId]) {
+    (window.cancelIdleCallback || clearTimeout)(_resizeTimers[tableId]);
+  }
+  _resizeTimers[tableId] = _rIC(function() {
+    var t = performance.now();
+    _initColumnResizeImpl(tableId);
+    console.log('[PERF] initColumnResize(' + tableId + '): ' + (performance.now() - t).toFixed(0) + 'ms');
+  });
 }
 function _initColumnResizeImpl(tableId) {
   const table = document.getElementById(tableId);
