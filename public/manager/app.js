@@ -42,8 +42,9 @@ function load(key) { try { return JSON.parse(localStorage.getItem(key)) || []; }
 function save(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
   updateStatus();
-  // products 변경 시 Supabase 동기화 (2초 디바운스로 중복 방지)
+  // products 변경 시 탭 캐시 무효화 + Supabase 동기화
   if (key === KEYS.products) {
+    if (typeof _renderedTabs !== 'undefined') { _renderedTabs['catalog'] = false; _renderedTabs['estimate'] = false; }
     syncProductsToSupabase();
   }
 }
@@ -365,19 +366,24 @@ function getEffectiveCost(code) {
 }
 
 // ======================== TAB SWITCHING ========================
+var _renderedTabs = {};
 function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
-  event.target.classList.add('active');
-  if (tab === 'catalog') renderCatalog();
-  if (tab === 'order') renderAllOrders();
-  if (tab === 'sales') { renderSales(); renderOnlineSales(); }
-  if (tab === 'promo') { renderPromo(); renderAllPromosV2(); }
-  if (tab === 'setbun') renderSetbun();
-  if (tab === 'estimate') renderEstimateList();
-  if (tab === 'general') renderGenProducts();
-  if (tab === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
+  if (event && event.target) event.target.classList.add('active');
+  // 첫 방문 시만 렌더링, 이후는 CSS 전환만
+  if (!_renderedTabs[tab]) {
+    if (tab === 'catalog') renderCatalog();
+    if (tab === 'order') renderAllOrders();
+    if (tab === 'sales') { renderSales(); renderOnlineSales(); }
+    if (tab === 'promo') { renderPromo(); renderAllPromosV2(); }
+    if (tab === 'setbun') renderSetbun();
+    if (tab === 'estimate') renderEstimateList();
+    if (tab === 'general') renderGenProducts();
+    if (tab === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
+    _renderedTabs[tab] = true;
+  }
 }
 
 function switchOrderMain(type) {
@@ -5894,20 +5900,20 @@ function renderClients() {
       '<td style="text-align:left;font-weight:500">' + (c.name || '-') + '</td>' +
       '<td class="center">' + (c.bizNo || '-') + '</td>' +
       '<td class="center">' + (c.ceo || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.phone || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.mobile || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.fax || '-') + '</td>' +
+      '<td class="center">' + (c.phone || '-') + '</td>' +
+      '<td class="center">' + (c.mobile || '-') + '</td>' +
+      '<td class="center">' + (c.fax || '-') + '</td>' +
       '<td class="center">' + (c.manageCode || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.zip || '-') + '</td>' +
-      '<td style="text-align:left;font-size:10px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (c.address || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.bizType || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.bizItem || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.email || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + bankDisplay + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.manager || '-') + '</td>' +
+      '<td class="center">' + (c.zip || '-') + '</td>' +
+      '<td style="text-align:left;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (c.address || '-') + '</td>' +
+      '<td class="center">' + (c.bizType || '-') + '</td>' +
+      '<td class="center">' + (c.bizItem || '-') + '</td>' +
+      '<td class="center">' + (c.email || '-') + '</td>' +
+      '<td class="center">' + bankDisplay + '</td>' +
+      '<td class="center">' + (c.manager || '-') + '</td>' +
       '<td class="center">' + kindBadge(c.kind) + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.priceGrade || '-') + '</td>' +
-      '<td class="center" style="font-size:10px">' + (c.bankHolder || '-') + '</td>' +
+      '<td class="center">' + (c.priceGrade || '-') + '</td>' +
+      '<td class="center">' + (c.bankHolder || '-') + '</td>' +
       '<td class="center"><button class="btn-primary" onclick="editClient(' + ri + ')" style="padding:2px 6px;font-size:9px">수정</button></td>' +
       '</tr>';
   }).join('');
