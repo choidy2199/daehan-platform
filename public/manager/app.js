@@ -688,7 +688,7 @@ function showOrderSearchAC(input, type) {
     var stock = findStock(p.code);
     var stockTxt = stock != null ? stock : '-';
     var alreadyAdded = DB.orders[type].some(function(item) { return String(item.code) === String(p.code) && item.qty > 0; });
-    var addedBadge = alreadyAdded ? '<span style="background:#E6F1FB;color:#185FA5;font-size:9px;padding:1px 4px;border-radius:3px;margin-left:4px">추가됨</span>' : '';
+    var addedBadge = alreadyAdded ? '<span style="background:#E6F1FB;color:#185FA5;font-size:10px;padding:1px 4px;border-radius:3px;margin-left:4px">추가됨</span>' : '';
     return '<div onclick="selectOrderSearchAC(\'' + type + '\',\'' + p.code + '\')" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid #F0F2F7;display:flex;gap:8px;align-items:center" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'white\'">' +
       '<span style="color:#5A6070;min-width:35px;font-size:11px">' + (p.orderNum || '-') + '</span>' +
       '<span style="font-weight:600;min-width:50px">' + p.code + '</span>' +
@@ -787,7 +787,7 @@ function renderOrderSheet() {
     }).join('');
 
     if (items.length) {
-      body.innerHTML += '<tr style="background:#FAEEDA;border-top:2px solid var(--tl-border)"><td></td><td></td><td></td><td class="num" style="font-weight:700;font-size:14px;padding:8px 10px">' + fmt(totalSupply) + '</td><td class="num" style="font-weight:700;font-size:14px;padding:8px 10px;color:#1D9E75">' + fmt(totalCost) + '</td></tr>';
+      body.innerHTML += '<tr style="background:#FAEEDA;border-top:2px solid var(--tl-border)"><td></td><td></td><td></td><td class="num" style="font-weight:700;font-size:13px;padding:8px 10px">' + fmt(totalSupply) + '</td><td class="num" style="font-weight:700;font-size:13px;padding:8px 10px;color:#1D9E75">' + fmt(totalCost) + '</td></tr>';
     }
 
     if (!items.length) {
@@ -1464,7 +1464,7 @@ function showOrderHistory() {
       const dateStr = d.toLocaleDateString('ko') + ' ' + d.toLocaleTimeString('ko', {hour:'2-digit', minute:'2-digit'});
       return '<div style="border:1px solid var(--tl-border);border-radius:6px;padding:12px 16px;margin-bottom:8px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-        '<div><span style="font-weight:600;font-size:14px">#' + (recent.length - i) + '</span> <span style="color:#5A6070;font-size:12px">' + dateStr + '</span></div>' +
+        '<div><span style="font-weight:600;font-size:13px">#' + (recent.length - i) + '</span> <span style="color:#5A6070;font-size:12px">' + dateStr + '</span></div>' +
         '<button class="btn-danger btn-sm" onclick="cancelOrderHistory(' + r.id + ')" style="padding:3px 10px;font-size:11px">취소</button>' +
         '</div>' +
         '<div style="display:flex;gap:16px;font-size:12px;color:#5A6070">' +
@@ -1664,7 +1664,7 @@ function showPromoOrderHistory() {
       const dateStr = d.toLocaleDateString('ko') + ' ' + d.toLocaleTimeString('ko', {hour:'2-digit', minute:'2-digit'});
       return '<div style="border:1px solid var(--tl-border);border-radius:6px;padding:12px 16px;margin-bottom:8px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-        '<div><span style="font-weight:600;font-size:14px">#' + (recent.length - i) + '</span> <span style="color:#5A6070;font-size:12px">' + dateStr + '</span></div>' +
+        '<div><span style="font-weight:600;font-size:13px">#' + (recent.length - i) + '</span> <span style="color:#5A6070;font-size:12px">' + dateStr + '</span></div>' +
         '<button class="btn-danger btn-sm" onclick="cancelPoHistory(' + r.id + ')" style="padding:3px 10px;font-size:11px">취소</button>' +
         '</div>' +
         '<div style="display:flex;gap:16px;font-size:12px;color:#5A6070">' +
@@ -1816,11 +1816,11 @@ function renderPoOrder() {
     var orderTotal = (item.orderQty || 0) * (unitCost || 0);
     var memoHtml = '';
     if (isConf) {
-      memoHtml = '<span style="background:#E1F5EE;color:#085041;font-weight:600;padding:2px 6px;border-radius:3px;font-size:9px">발주완료</span>';
+      memoHtml = '<span style="background:#E1F5EE;color:#085041;font-weight:600;padding:2px 6px;border-radius:3px;font-size:10px">발주완료</span>';
     } else if (isCumul && item.orderQty > 0) {
       var cKey = String(item.code || item.model);
       var cs = cumulStats[cKey] || { qty: 0, total: 0 };
-      memoHtml = '<div style="display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-size:8px;color:#5A6070">공급가</span><span style="font-size:11px;font-weight:600;color:#185FA5">' + fmt(cs.total) + '</span><span style="font-size:10px;color:#5A6070">누적 ' + cs.qty + '개</span></div>';
+      memoHtml = '<div style="display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-size:10px;color:#5A6070">공급가</span><span style="font-size:11px;font-weight:600;color:#185FA5">' + fmt(cs.total) + '</span><span style="font-size:10px;color:#5A6070">누적 ' + cs.qty + '개</span></div>';
     }
     var rs = isConf ? ' style="background:#F9FBF9"' : '';
     var cs = isConf ? 'color:#9BA3B2' : '';
@@ -4739,7 +4739,7 @@ function renderQuarterPromos() {
   } else {
     container.innerHTML = data.map((p, i) => {
       const tierRows = (p.tiers || []).filter(t => t.amount).map(t =>
-        `<tr><td class="center" style="font-size:12px">${p.unit} 누적 ${t.amount} 이상</td><td class="center" style="font-weight:700;color:#1D9E75;font-size:14px">${t.rate}</td></tr>`
+        `<tr><td class="center" style="font-size:12px">${p.unit} 누적 ${t.amount} 이상</td><td class="center" style="font-weight:700;color:#1D9E75;font-size:13px">${t.rate}</td></tr>`
       ).join('');
 
       return `<div style="border:1px solid var(--tl-border);border-radius:8px;margin-bottom:12px;overflow:hidden">
@@ -5851,7 +5851,7 @@ function showSetbunAC(inputEl, callback) {
   acEl.innerHTML = results.map(function(p) {
     var stock = findStock(p.code);
     var stockTxt = stock != null ? '[' + stock + ']' : '';
-    var promoTag = mode === 'promo' ? '<span style="color:#CC2222;font-size:9px;margin-left:4px">P</span>' : '';
+    var promoTag = mode === 'promo' ? '<span style="color:#CC2222;font-size:10px;margin-left:4px">P</span>' : '';
     return '<div class="ac-item" data-code="' + p.code + '">' +
       '<span class="ac-code">' + p.code + '</span>' +
       '<span class="ac-model">' + String(p.model || '') + promoTag + '</span>' +
@@ -6080,10 +6080,10 @@ function renderSetbun() {
     promoHtml += '<tr>';
     promoHtml += '<td class="center">'+item.setCode+'</td>';
     promoHtml += '<td class="center" style="font-weight:500">'+(rp.setP?rp.setP.model:'-')+'</td>';
-    promoHtml += '<td class="num"><span style="color:#185FA5;font-weight:600">'+fmt(rp.setCost)+'</span>'+(setCostDiff!==0?'<div style="font-size:9px;color:#CC2222">'+(setCostDiff>0?'+':'')+fmt(setCostDiff)+'</div>':'')+'</td>';
+    promoHtml += '<td class="num"><span style="color:#185FA5;font-weight:600">'+fmt(rp.setCost)+'</span>'+(setCostDiff!==0?'<div style="font-size:10px;color:#CC2222">'+(setCostDiff>0?'+':'')+fmt(setCostDiff)+'</div>':'')+'</td>';
     promoHtml += '<td class="center">'+item.bareCode+'</td>';
     promoHtml += '<td class="center" style="font-weight:500">'+(rp.bareP?rp.bareP.model:'-')+'</td>';
-    promoHtml += '<td class="num"><span style="color:#185FA5;font-weight:600">'+fmt(rp.bareCost)+'</span>'+(bareCostDiff!==0?'<div style="font-size:9px;color:#CC2222">'+(bareCostDiff>0?'+':'')+fmt(bareCostDiff)+'</div>':'')+'</td>';
+    promoHtml += '<td class="num"><span style="color:#185FA5;font-weight:600">'+fmt(rp.bareCost)+'</span>'+(bareCostDiff!==0?'<div style="font-size:10px;color:#CC2222">'+(bareCostDiff>0?'+':'')+fmt(bareCostDiff)+'</div>':'')+'</td>';
     promoHtml += '<td class="num" style="font-weight:600">'+fmt(rp.partsTotal)+'</td>';
     promoHtml += '<td class="num" style="font-weight:600">'+fmt(rp.disassembledCost)+'</td>';
     promoHtml += '<td class="num" style="font-weight:700;color:'+(isSetP?'#1D9E75':'#CC2222')+'">'+(rp.diff>0?'+':'')+fmt(rp.diff)+'</td>';
@@ -6390,7 +6390,7 @@ function renderClients() {
     var ri = clientData.indexOf(c);
     var bankDisplay = (c.bankName && c.bankAccount) ? c.bankName + ' ' + c.bankAccount : (c.bankAccount || '-');
     var isExempt = !!c.vatExempt;
-    var exemptBadge = isExempt ? ' <span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:#FCEBEB;color:#791F1F">면제</span>' : '';
+    var exemptBadge = isExempt ? ' <span style="font-size:10px;font-weight:600;padding:1px 5px;border-radius:3px;background:#FCEBEB;color:#791F1F">면제</span>' : '';
     return '<tr style="' + (isExempt ? 'background:#FFF5F5' : '') + '">' +
       '<td class="center"><span style="color:#CC2222;cursor:pointer;font-size:12px" onclick="removeClient(' + ri + ')">✕</span></td>' +
       '<td class="center" style="font-weight:600">' + (c.code || '-') + '</td>' +
@@ -6412,7 +6412,7 @@ function renderClients() {
       '<td class="center">' + (c.priceGrade || '-') + '</td>' +
       '<td class="center"><input type="checkbox" ' + (c.vatExempt ? '' : 'checked') + ' onchange="toggleClientVat(' + ri + ',this.checked)" title="체크=부가세포함, 해제=면제"></td>' +
       '<td class="center">' + (c.bankHolder || '-') + '</td>' +
-      '<td class="center"><button class="btn-primary" onclick="editClient(' + ri + ')" style="padding:2px 6px;font-size:9px">수정</button></td>' +
+      '<td class="center"><button class="btn-primary" onclick="editClient(' + ri + ')" style="padding:2px 6px;font-size:10px">수정</button></td>' +
       '</tr>';
   }).join('');
   if (!filtered.length) {

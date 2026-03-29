@@ -234,7 +234,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 #fee-calc-table td input:focus { border-color:#185FA5; outline:none; }
 #fee-calc-table td input::placeholder { color:#9BA3B2; text-align:center; }
 .fc-result { text-align:right; padding-right:10px; line-height:1.4; }
-.fc-amount { font-size:14px; font-weight:600; display:block; }
+.fc-amount { font-size:13px; font-weight:600; display:block; }
 .fc-rate { font-size:11px; font-weight:600; display:block; }
 .fc-positive { color:#1D9E75; }
 .fc-negative { color:#CC2222; }
