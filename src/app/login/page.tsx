@@ -29,7 +29,7 @@ export default function LoginPage() {
         body: JSON.stringify({ token }),
       })
         .then((r) => r.json())
-        .then((d) => { if (d.valid) window.location.href = "/manager/index.html"; });
+        .then((d) => { if (d.valid) window.location.href = "/manager"; });
     }
   }, []);
 
@@ -74,7 +74,7 @@ export default function LoginPage() {
       // 사용자 정보 저장
       localStorage.setItem("current_user", JSON.stringify(data.user));
 
-      window.location.href = "/manager/index.html";
+      window.location.href = "/manager";
     } catch (err: any) {
       setError("서버 연결 오류");
       setLoading(false);
