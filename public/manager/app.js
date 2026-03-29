@@ -3168,8 +3168,8 @@ async function syncInventory() {
 
   // 8) 완료 시간 저장 및 표시
   var now = new Date();
-  var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-  localStorage.setItem('last_inventory_sync', timeStr);
+  var dateTimeStr = now.getFullYear() + '.' + String(now.getMonth()+1).padStart(2,'0') + '.' + String(now.getDate()).padStart(2,'0') + '. ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  localStorage.setItem('last_inventory_sync', dateTimeStr);
   updateSyncTimeDisplay();
 
   // 9) 완료 알림 + 디버깅 로그
