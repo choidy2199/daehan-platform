@@ -6,58 +6,66 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// camelCase(app.js) ↔ snake_case(DB) 변환
+// camelCase(app.js) → snake_case(기존 products 테이블) 변환
+// orderNum, ttiNum, ttiStock, inDate, raisedPrice, raiseRate → memo JSON에 저장
 function toDb(p: any) {
+  const extra: any = {};
+  if (p.orderNum) extra.orderNum = p.orderNum;
+  if (p.ttiNum) extra.ttiNum = p.ttiNum;
+  if (p.ttiStock) extra.ttiStock = p.ttiStock;
+  if (p.inDate) extra.inDate = p.inDate;
+  if (p.raisedPrice) extra.raisedPrice = p.raisedPrice;
+  if (p.raiseRate) extra.raiseRate = p.raiseRate;
+
   return {
-    code: p.code || '',
-    manage_code: p.manageCode || '',
+    part_code: p.code || '',
+    erp_code: p.manageCode || '',
     category: p.category || '',
-    subcategory: p.subcategory || '',
-    detail: p.detail || '',
-    order_num: p.orderNum || '',
-    tti_num: p.ttiNum || '',
-    model: p.model || '',
-    description: p.description || '',
+    mid_code: p.subcategory || '',
+    small_code: p.detail || '',
+    item_name: p.model || '',
+    spec: p.description || '',
     supply_price: p.supplyPrice || 0,
     product_dc: p.productDC || 0,
-    cost: p.cost || 0,
-    price_a: p.priceA || 0,
-    price_retail: p.priceRetail || 0,
-    price_naver: p.priceNaver || 0,
-    price_open: p.priceOpen || 0,
-    raised_price: p.raisedPrice || 0,
-    raise_rate: p.raiseRate || 0,
-    discontinued: p.discontinued || '',
-    tti_stock: p.ttiStock || '',
-    in_date: p.inDate || '',
+    calculated_cost: p.cost || 0,
+    out_price_a: p.priceA || 0,
+    out_price_base: p.priceRetail || 0,
+    out_price_b: p.priceNaver || 0,
+    out_price_c: p.priceOpen || 0,
+    is_active: !p.discontinued || p.discontinued === '' || p.discontinued === 'N',
+    memo: Object.keys(extra).length > 0 ? JSON.stringify(extra) : null,
     product_type: 'milwaukee',
   };
 }
 
+// snake_case(DB) → camelCase(app.js) 변환
 function toApp(row: any) {
+  let extra: any = {};
+  try { if (row.memo) extra = JSON.parse(row.memo); } catch {}
+
   return {
     id: row.id,
-    code: row.code || '',
-    manageCode: row.manage_code || '',
+    code: row.part_code || '',
+    manageCode: row.erp_code || '',
     category: row.category || '',
-    subcategory: row.subcategory || '',
-    detail: row.detail || '',
-    orderNum: row.order_num || '',
-    ttiNum: row.tti_num || '',
-    model: row.model || '',
-    description: row.description || '',
+    subcategory: row.mid_code || '',
+    detail: row.small_code || '',
+    orderNum: extra.orderNum || '',
+    ttiNum: extra.ttiNum || '',
+    model: row.item_name || '',
+    description: row.spec || '',
     supplyPrice: row.supply_price || 0,
     productDC: row.product_dc || 0,
-    cost: row.cost || 0,
-    priceA: row.price_a || 0,
-    priceRetail: row.price_retail || 0,
-    priceNaver: row.price_naver || 0,
-    priceOpen: row.price_open || 0,
-    raisedPrice: row.raised_price || 0,
-    raiseRate: row.raise_rate || 0,
-    discontinued: row.discontinued || '',
-    ttiStock: row.tti_stock || '',
-    inDate: row.in_date || '',
+    cost: row.calculated_cost || 0,
+    priceA: row.out_price_a || 0,
+    priceRetail: row.out_price_base || 0,
+    priceNaver: row.out_price_b || 0,
+    priceOpen: row.out_price_c || 0,
+    raisedPrice: extra.raisedPrice || 0,
+    raiseRate: extra.raiseRate || 0,
+    discontinued: row.is_active === false ? '단종' : '',
+    ttiStock: extra.ttiStock || '',
+    inDate: extra.inDate || '',
   };
 }
 
@@ -84,7 +92,6 @@ export async function GET() {
 
 /**
  * POST /api/products — 제품 1건 등록
- * Body: { product: {...} }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -98,7 +105,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) throw error;
-
     return NextResponse.json({ product: toApp(data) });
   } catch (err: any) {
     console.error('[Products POST]', err);
@@ -108,19 +114,15 @@ export async function POST(request: NextRequest) {
 
 /**
  * PUT /api/products — 제품 1건 수정
- * Body: { id, product: {...} }
  */
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const { id, product } = body;
-
-    if (!id) {
-      return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 });
-    }
+    if (!id) return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 });
 
     const dbRow = toDb(product);
-    delete (dbRow as any).product_type; // product_type은 변경 안 함
+    delete (dbRow as any).product_type;
 
     const { data, error } = await supabase
       .from('products')
@@ -130,7 +132,6 @@ export async function PUT(request: NextRequest) {
       .single();
 
     if (error) throw error;
-
     return NextResponse.json({ product: toApp(data) });
   } catch (err: any) {
     console.error('[Products PUT]', err);
@@ -140,24 +141,15 @@ export async function PUT(request: NextRequest) {
 
 /**
  * DELETE /api/products — 제품 1건 삭제
- * Body: { id }
  */
 export async function DELETE(request: NextRequest) {
   try {
     const body = await request.json();
     const { id } = body;
+    if (!id) return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 });
 
-    if (!id) {
-      return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 });
-    }
-
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', id);
-
+    const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) throw error;
-
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('[Products DELETE]', err);

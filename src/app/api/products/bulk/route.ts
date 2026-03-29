@@ -9,28 +9,31 @@ const supabase = createClient(
 );
 
 function toDb(p: any) {
+  const extra: any = {};
+  if (p.orderNum) extra.orderNum = p.orderNum;
+  if (p.ttiNum) extra.ttiNum = p.ttiNum;
+  if (p.ttiStock) extra.ttiStock = p.ttiStock;
+  if (p.inDate) extra.inDate = p.inDate;
+  if (p.raisedPrice) extra.raisedPrice = p.raisedPrice;
+  if (p.raiseRate) extra.raiseRate = p.raiseRate;
+
   return {
-    code: p.code || '',
-    manage_code: p.manageCode || '',
+    part_code: p.code || '',
+    erp_code: p.manageCode || '',
     category: p.category || '',
-    subcategory: p.subcategory || '',
-    detail: p.detail || '',
-    order_num: p.orderNum || '',
-    tti_num: p.ttiNum || '',
-    model: p.model || '',
-    description: p.description || '',
+    mid_code: p.subcategory || '',
+    small_code: p.detail || '',
+    item_name: p.model || '',
+    spec: p.description || '',
     supply_price: p.supplyPrice || 0,
     product_dc: p.productDC || 0,
-    cost: p.cost || 0,
-    price_a: p.priceA || 0,
-    price_retail: p.priceRetail || 0,
-    price_naver: p.priceNaver || 0,
-    price_open: p.priceOpen || 0,
-    raised_price: p.raisedPrice || 0,
-    raise_rate: p.raiseRate || 0,
-    discontinued: p.discontinued || '',
-    tti_stock: p.ttiStock || '',
-    in_date: p.inDate || '',
+    calculated_cost: p.cost || 0,
+    out_price_a: p.priceA || 0,
+    out_price_base: p.priceRetail || 0,
+    out_price_b: p.priceNaver || 0,
+    out_price_c: p.priceOpen || 0,
+    is_active: !p.discontinued || p.discontinued === '' || p.discontinued === 'N',
+    memo: Object.keys(extra).length > 0 ? JSON.stringify(extra) : null,
     product_type: 'milwaukee',
   };
 }
@@ -38,9 +41,6 @@ function toDb(p: any) {
 /**
  * POST /api/products/bulk
  * Body: { products: [...], mode: 'replace' | 'merge' }
- *
- * replace: 기존 milwaukee 전체 삭제 후 새로 등록
- * merge: code 기준 upsert (있으면 수정, 없으면 등록)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -53,36 +53,25 @@ export async function POST(request: NextRequest) {
     }
 
     const dbRows = products.map(toDb);
-    let result = { inserted: 0, updated: 0, deleted: 0 };
+    let result = { inserted: 0, updated: 0 };
 
-    if (mode === 'replace') {
-      // 기존 milwaukee 제품 전체 삭제
-      const { error: delError } = await supabase
-        .from('products')
-        .delete()
-        .eq('product_type', 'milwaukee');
+    // replace/merge 모두 delete+insert 방식 (유니크 인덱스 불필요)
+    // merge 시에도 app.js에서 이미 기존 데이터와 병합 후 전체를 보내므로 replace와 동일
+    const { error: delError } = await supabase
+      .from('products')
+      .delete()
+      .eq('product_type', 'milwaukee');
+    if (delError) throw delError;
 
-      if (delError) throw delError;
-
-      // 500개씩 배치 insert
-      for (let i = 0; i < dbRows.length; i += 500) {
-        const batch = dbRows.slice(i, i + 500);
-        const { error } = await supabase.from('products').insert(batch);
-        if (error) throw error;
-        result.inserted += batch.length;
-      }
-    } else {
-      // merge: code 기준 upsert (500개씩 배치)
-      for (let i = 0; i < dbRows.length; i += 500) {
-        const batch = dbRows.slice(i, i + 500);
-        const { error } = await supabase
-          .from('products')
-          .upsert(batch, { onConflict: 'code,product_type' });
-        if (error) throw error;
-        result.inserted += batch.length;
-      }
+    // 500개씩 배치 insert
+    for (let i = 0; i < dbRows.length; i += 500) {
+      const batch = dbRows.slice(i, i + 500);
+      const { error } = await supabase.from('products').insert(batch);
+      if (error) throw error;
+      result.inserted += batch.length;
     }
 
+    console.log('[Products Bulk] 완료:', mode, result);
     return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error('[Products Bulk]', err);
