@@ -5384,10 +5384,11 @@ async function registerOrderOut() {
   if (!clientName) { alert('거래처를 선택해주세요'); return; }
 
   var customerCode = '';
-  if (estSelectedClient && estSelectedClient.manageCode) {
+  if (estSelectedClient && estSelectedClient.manageCode && estSelectedClient.manageCode !== '-') {
     customerCode = estSelectedClient.manageCode;
-  } else if (estSelectedClient && estSelectedClient.code) {
-    customerCode = String(estSelectedClient.code);
+  } else if (estSelectedClient) {
+    alert('이 거래처에 관리코드(CODE2)가 없습니다.\n경영박사에서 거래처 관리코드를 등록한 후 다시 시도하세요.\n\n거래처: ' + clientName);
+    return;
   } else {
     alert('등록된 거래처를 선택해주세요.\n(경영박사에 등록된 거래처만 전표 등록 가능)');
     return;
