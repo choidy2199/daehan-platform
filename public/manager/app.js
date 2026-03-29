@@ -5029,7 +5029,6 @@ function newEstimate() {
   currentEstItems = [];
   document.getElementById('est-client').value = '';
   document.getElementById('est-date').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('est-current-no').textContent = genEstNo();
   estSelectedClient = null;
   var cInfo = document.getElementById('est-client-info');
   if (cInfo) { cInfo.style.display = 'none'; cInfo.style.background = '#F4F6FA'; cInfo.innerHTML = ''; }
@@ -5232,7 +5231,10 @@ function onEstPriceChange(idx, val) {
 }
 
 function saveEstimate() {
-  const no = document.getElementById('est-current-no').textContent;
+  var noEl = document.getElementById('est-current-no');
+  var no = noEl.textContent;
+  if (!no || no === '-') no = genEstNo();
+  noEl.textContent = no;
   const client = document.getElementById('est-client').value.trim();
   const date = document.getElementById('est-date').value;
   if (!client) { toast('거래처를 입력해주세요'); return; }
@@ -5449,6 +5451,8 @@ async function registerOrderOut() {
       alert('전표 등록 실패: ' + (data.error || '서버 오류') + (data.detail ? '\n' + data.detail : ''));
     } else {
       alert('전표 등록 완료\n' + (data.result || ''));
+      // 카운터 업데이트
+      updateInvoiceCounter(clientName, customerCode, totalAmount);
       // 작업이력 기록
       if (typeof saveActionHistory === 'function') {
         saveActionHistory('전표등록', '밀워키', itemsData.length, null);
@@ -5461,6 +5465,84 @@ async function registerOrderOut() {
     btn.textContent = '📋 전표 등록';
   }
 }
+
+// ======================== 전표 카운터 + 팝오버 ========================
+function getInvoiceToday() {
+  var saved = loadObj('mw_invoice_today', { date: '', count: 0, items: [] });
+  var today = new Date().toISOString().slice(0, 10);
+  if (saved.date !== today) return { date: today, count: 0, items: [] };
+  return saved;
+}
+
+function saveInvoiceToday(data) {
+  localStorage.setItem('mw_invoice_today', JSON.stringify(data));
+}
+
+function updateInvoiceCounter(customerName, customerCode, amount) {
+  var data = getInvoiceToday();
+  data.count++;
+  var found = data.items.find(function(it) { return it.customerCode === customerCode; });
+  if (found) {
+    found.count++;
+    found.totalAmount += amount;
+  } else {
+    data.items.push({ customer: customerName, customerCode: customerCode, count: 1, totalAmount: amount });
+  }
+  saveInvoiceToday(data);
+  renderInvoiceBadge();
+}
+
+function renderInvoiceBadge() {
+  var data = getInvoiceToday();
+  var badge = document.getElementById('invoice-count-badge');
+  if (badge) badge.textContent = data.count + '건';
+}
+
+function toggleInvoicePopover() {
+  var existing = document.getElementById('invoice-popover');
+  if (existing) { existing.remove(); return; }
+  var data = getInvoiceToday();
+  var badge = document.getElementById('invoice-count-badge');
+  if (!badge) return;
+
+  var pop = document.createElement('div');
+  pop.id = 'invoice-popover';
+  pop.style.cssText = 'position:absolute;top:100%;right:0;width:360px;background:#fff;border:1px solid #DDE1EB;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:500;font-size:12px;margin-top:4px';
+
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #EEF0F4"><span style="font-size:13px;font-weight:600;color:#1A1D23">오늘 전표 등록 이력</span><span onclick="document.getElementById(\'invoice-popover\').remove()" style="cursor:pointer;color:#9BA3B2;font-size:16px">&times;</span></div>';
+
+  if (!data.items.length) {
+    html += '<div style="padding:24px;text-align:center;color:#9BA3B2">오늘 등록된 전표가 없습니다</div>';
+  } else {
+    html += '<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid #EEF0F4"><th style="padding:8px 14px;text-align:left;color:#5A6070;font-weight:500">거래처</th><th style="padding:8px;text-align:center;color:#5A6070;font-weight:500">거래건수</th><th style="padding:8px 14px;text-align:right;color:#5A6070;font-weight:500">총금액</th></tr></thead><tbody>';
+    var totalAmt = 0;
+    data.items.forEach(function(it) {
+      totalAmt += it.totalAmount;
+      html += '<tr style="border-bottom:1px solid #F4F6FA"><td style="padding:6px 14px;font-weight:500">' + it.customer + '</td><td style="padding:6px 8px;text-align:center;color:#185FA5;font-weight:500">' + it.count + '건</td><td style="padding:6px 14px;text-align:right;color:#1D9E75;font-weight:500">' + it.totalAmount.toLocaleString() + '원</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="padding:8px 14px;background:#F9FAFB;border-top:1px solid #EEF0F4;display:flex;justify-content:space-between;font-weight:600"><span>오늘 합계 (' + data.count + '건)</span><span style="color:#1D9E75">' + totalAmt.toLocaleString() + '원</span></div>';
+  }
+  pop.innerHTML = html;
+
+  // badge의 부모에 position:relative 적용
+  var parent = badge.parentElement;
+  parent.style.position = 'relative';
+  parent.appendChild(pop);
+
+  // 바깥 클릭 닫기
+  setTimeout(function() {
+    document.addEventListener('click', function closePop(e) {
+      if (!pop.contains(e.target) && e.target !== badge) {
+        pop.remove();
+        document.removeEventListener('click', closePop);
+      }
+    });
+  }, 100);
+}
+
+// 페이지 로드 시 뱃지 초기화
+setTimeout(renderInvoiceBadge, 300);
 
 // ======================== TAB 5: 세트및분해 ========================
 const PARTS_KEYS = ['M12B2','M12HB25','M12B4','M12HB5','M18B2','M18HB3','M18B5','M18FB6','M18FB8','M18FB12','C12C','M1218C','M1218FC'];
