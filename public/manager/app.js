@@ -4591,6 +4591,107 @@ function uploadGenProducts(input) {
   reader.readAsArrayBuffer(file);
 }
 
+// ======================== GENERAL IMPORT MODAL ========================
+function openGenImportModal() {
+  document.getElementById('gen-import-modal').classList.add('show');
+  document.getElementById('gen-import-status').textContent = '';
+  var fileInput = document.getElementById('gen-excel-file');
+  if (fileInput) fileInput.value = '';
+  var radios = document.querySelectorAll('input[name="gen-import-mode"]');
+  if (radios[0]) radios[0].checked = true;
+}
+
+function closeGenImportModal() {
+  document.getElementById('gen-import-modal').classList.remove('show');
+}
+
+function importGenExcel() {
+  var fileInput = document.getElementById('gen-excel-file');
+  var file = fileInput && fileInput.files[0];
+  if (!file) { toast('파일을 선택해주세요'); return; }
+  if (!window.XLSX) { toast('SheetJS 로딩 중...'); return; }
+
+  var mode = 'replace';
+  var radios = document.querySelectorAll('input[name="gen-import-mode"]');
+  radios.forEach(function(r) { if (r.checked) mode = r.value; });
+
+  var statusEl = document.getElementById('gen-import-status');
+  statusEl.textContent = '파일 읽는 중...';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      var imported = [];
+      for (var i = 1; i < rows.length; i++) {
+        var r = rows[i];
+        if (!r || !r[0]) continue;
+        imported.push({
+          code: String(r[0] || ''),
+          manageCode: String(r[1] || ''),
+          category: String(r[2] || ''),
+          model: String(r[3] || ''),
+          description: String(r[4] || ''),
+          supplyPrice: 0,
+          cost: parseInt(r[5]) || 0,
+          priceA: parseInt(r[6]) || 0,
+          priceNaver: parseInt(r[7]) || 0,
+          priceOpen: parseInt(r[8]) || 0,
+          inQty: parseInt(r[9]) || 0,
+          inPrice: parseInt(r[10]) || 0,
+          outQty: parseInt(r[11]) || 0,
+          outPrice: parseInt(r[12]) || 0,
+          palletQty: parseInt(r[13]) || 0,
+          palletPrice: parseInt(r[14]) || 0,
+          memo: String(r[15] || ''),
+          inDate: String(r[16] || ''),
+          source: 'general'
+        });
+      }
+
+      if (!imported.length) {
+        statusEl.textContent = '가져올 데이터가 없습니다 (1행은 헤더)';
+        return;
+      }
+
+      if (mode === 'replace') {
+        genProducts.length = 0;
+        imported.forEach(function(item) { genProducts.push(item); });
+        statusEl.textContent = '전체 교체: ' + imported.length + '건 등록';
+      } else {
+        var updated = 0, added = 0;
+        imported.forEach(function(item) {
+          var idx = genProducts.findIndex(function(p) { return String(p.code) === String(item.code); });
+          if (idx >= 0) {
+            Object.keys(item).forEach(function(key) {
+              if (item[key] !== '' && item[key] !== 0 && item[key] !== null) {
+                genProducts[idx][key] = item[key];
+              }
+            });
+            updated++;
+          } else {
+            genProducts.push(item);
+            added++;
+          }
+        });
+        statusEl.textContent = '코드매칭: ' + updated + '건 업데이트, ' + added + '건 신규 추가';
+      }
+
+      localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+      renderGenProducts();
+      toast('일반제품 가져오기 완료 (' + imported.length + '건)');
+      setTimeout(function() { closeGenImportModal(); }, 1500);
+    } catch (err) {
+      statusEl.textContent = '오류: ' + err.message;
+      toast('가져오기 실패: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 // ======================== TAB 6: 견적서 ========================
 let estimates = loadObj('mw_estimates', []);
 let currentEstIdx = -1;
