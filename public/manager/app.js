@@ -504,13 +504,17 @@ function switchTab(tab) {
       if (tab === 'sales') { renderSales(); renderOnlineSales(); }
       if (tab === 'promo') { renderPromo(); renderAllPromosV2(); }
       if (tab === 'setbun') renderSetbun();
-      if (tab === 'estimate') renderEstimateList();
+      if (tab === 'estimate') { renderEstimateList(); if (!_estDateManuallySet) document.getElementById('est-date').value = getTodayStr(); }
       if (tab === 'general') renderGenProducts();
       if (tab === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
       _renderedTabs[tab] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
   } else {
+    // 견적 탭 재방문 시 날짜 갱신 (사용자가 직접 변경하지 않은 경우)
+    if (tab === 'estimate' && !_estDateManuallySet) {
+      document.getElementById('est-date').value = getTodayStr();
+    }
     console.log('[PERF] switchTab(' + tab + ') 캐시 히트: ' + (performance.now() - t0).toFixed(0) + 'ms');
   }
 }
@@ -5173,16 +5177,39 @@ function renderEstimateList() {
   document.getElementById('est-list-count').textContent = `${estimates.length}건`;
 }
 
+function getTodayStr() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+var _estDateManuallySet = false;
+
 function newEstimate() {
   currentEstIdx = -1;
   currentEstItems = [];
   document.getElementById('est-client').value = '';
-  document.getElementById('est-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('est-date').value = getTodayStr();
+  _estDateManuallySet = false;
   estSelectedClient = null;
   var cInfo = document.getElementById('est-client-info');
   if (cInfo) { cInfo.style.display = 'none'; cInfo.style.background = '#F4F6FA'; cInfo.innerHTML = ''; }
   renderEstimateItems();
 }
+
+// 견적 날짜 input 변경 감지 — 사용자 직접 변경 시 플래그 설정
+(function() {
+  function attachDateListener() {
+    var dateInput = document.getElementById('est-date');
+    if (dateInput && !dateInput._dateListenerAttached) {
+      dateInput._dateListenerAttached = true;
+      dateInput.addEventListener('change', function() { _estDateManuallySet = true; });
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachDateListener);
+  } else {
+    setTimeout(attachDateListener, 0);
+  }
+})();
 
 // ======================== 견적서 거래처 자동완성 ========================
 var estSelectedClient = null;
@@ -5279,6 +5306,7 @@ function openEstimate(idx) {
   currentEstItems = JSON.parse(JSON.stringify(e.items || []));
   document.getElementById('est-client').value = e.client || '';
   document.getElementById('est-date').value = e.date || '';
+  _estDateManuallySet = true; // 저장된 견적서의 날짜 유지
   document.getElementById('est-current-no').textContent = e.no || '';
   document.getElementById('est-list-modal').classList.remove('show');
   renderEstimateItems();
