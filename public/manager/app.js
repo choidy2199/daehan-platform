@@ -5895,6 +5895,7 @@ function init() {
   loadPartsPricesUI();
   renderSetbun();
   renderEstimateList();
+  newEstimate();
   renderGenProducts();
   renderAllPromosV2();
   initStickyHeader('catalog-table');
