@@ -389,6 +389,42 @@ function getEffectiveCost(code) {
   return { cost: 0, isPromo: false, promoName: '' };
 }
 
+// ======================== DEBOUNCE ========================
+function debounce(fn, delay) {
+  var timer;
+  return function() {
+    var args = arguments;
+    var ctx = this;
+    clearTimeout(timer);
+    timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
+  };
+}
+// 검색 input의 oninput을 debounce로 오버라이드 (index.html 수정 불가이므로)
+(function() {
+  var overrides = {
+    'catalog-search': function() { renderCatalog(); },
+    'gen-search': function() { renderGenProducts(); },
+    'est-search': function() { searchEstProducts(document.getElementById('est-search').value); },
+    'client-search': function() { renderClients(); }
+  };
+  function applyDebounce() {
+    Object.keys(overrides).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el && !el._debounced) {
+        el._debounced = true;
+        var debouncedFn = debounce(overrides[id], 300);
+        el.oninput = debouncedFn;
+      }
+    });
+  }
+  // DOM 로드 후 적용
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyDebounce);
+  } else {
+    setTimeout(applyDebounce, 0);
+  }
+})();
+
 // ======================== TAB SWITCHING ========================
 var _renderedTabs = {};
 function switchTab(tab) {
@@ -725,8 +761,12 @@ function setCatalogFilter(mode) {
   renderCatalog();
 }
 
+var _lastRenderCatalog = 0;
 function renderCatalog() {
-  var _rc0 = performance.now();
+  var now = performance.now();
+  if (now - _lastRenderCatalog < 200) return;
+  _lastRenderCatalog = now;
+  var _rc0 = now;
   const search = document.getElementById('catalog-search').value.toLowerCase();
   const cat = document.getElementById('catalog-cat').value;
   const sub = document.getElementById('catalog-sub').value;
