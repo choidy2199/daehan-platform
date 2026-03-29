@@ -1,3 +1,14 @@
+// ======================== PERF MONITORING ========================
+if (window.PerformanceObserver) {
+  try {
+    new PerformanceObserver(function(list) {
+      list.getEntries().forEach(function(e) {
+        if (e.duration > 50) console.warn('[PERF] 🚨 Long Task: ' + e.duration.toFixed(0) + 'ms');
+      });
+    }).observe({ entryTypes: ['longtask'] });
+  } catch(e) {}
+}
+
 // ======================== SESSION CHECK ========================
 (function checkSession() {
   var token = localStorage.getItem('session_token') || sessionStorage.getItem('session_token');
@@ -42,6 +53,8 @@ function load(key) { try { return JSON.parse(localStorage.getItem(key)) || []; }
 function save(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
   updateStatus();
+  // inventory 변경 시 stockMap 재생성
+  if (key === KEYS.inventory) { _stockMap = null; }
   // products 변경 시 탭 캐시 무효화 + Supabase 동기화
   if (key === KEYS.products) {
     if (typeof _renderedTabs !== 'undefined') { _renderedTabs['catalog'] = false; _renderedTabs['estimate'] = false; }
@@ -173,7 +186,18 @@ function updateStatus() {
 }
 
 function findProduct(code) { return DB.products.find(p => String(p.code) === String(code)); }
-function findStock(code) { const inv = DB.inventory.find(i => String(i.code) === String(code)); return inv ? inv.stock : null; }
+
+// findStock: HashMap으로 O(1) 조회 (기존 Array.find O(n) → 815건×4000회 = 먹통 원인)
+var _stockMap = null;
+function _buildStockMap() {
+  _stockMap = {};
+  DB.inventory.forEach(function(i) { _stockMap[String(i.code)] = i.stock; });
+}
+function findStock(code) {
+  if (!_stockMap) _buildStockMap();
+  var s = _stockMap[String(code)];
+  return s !== undefined ? s : null;
+}
 function findPromo(code) { return DB.promotions.find(p => String(p.code) === String(code)); }
 
 let currentPromoPop = null;
@@ -702,6 +726,7 @@ function setCatalogFilter(mode) {
 }
 
 function renderCatalog() {
+  var _rc0 = performance.now();
   const search = document.getElementById('catalog-search').value.toLowerCase();
   const cat = document.getElementById('catalog-cat').value;
   const sub = document.getElementById('catalog-sub').value;
@@ -839,6 +864,8 @@ function renderCatalog() {
     body.innerHTML = '<tr><td colspan="21"><div class="empty-state"><p>제품 데이터가 없습니다</p><button class="btn-primary" onclick="showImportModal()">📥 엑셀 가져오기</button> <button class="btn-primary" style="margin-left:8px" onclick="showProductModal()">+ 제품 추가</button></div></td></tr>';
   }
 
+  var _rc1 = performance.now();
+  console.log('[PERF] renderCatalog — buildRow+innerHTML: ' + (_rc1 - _rc0).toFixed(0) + 'ms');
   initColumnResize('catalog-table');
   initStickyHeader('catalog-table');
 
@@ -859,6 +886,7 @@ function renderCatalog() {
     if (tabs[4]) tabs[4].textContent = '관리코드없음(' + nocode.length + ')';
     if (tabs[5]) tabs[5].textContent = '코드없음(' + nosku.length + ')';
   })();
+  console.log('[PERF] renderCatalog 전체: ' + (performance.now() - _rc0).toFixed(0) + 'ms');
 }
 
 function toggleDiscontinued(idx, checked) {
