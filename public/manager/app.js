@@ -368,21 +368,28 @@ function getEffectiveCost(code) {
 // ======================== TAB SWITCHING ========================
 var _renderedTabs = {};
 function switchTab(tab) {
+  var t0 = performance.now();
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   if (event && event.target) event.target.classList.add('active');
-  // 첫 방문 시만 렌더링, 이후는 CSS 전환만
+  // 첫 방문 시만 렌더링, 이후는 CSS 전환만 (즉시)
   if (!_renderedTabs[tab]) {
-    if (tab === 'catalog') renderCatalog();
-    if (tab === 'order') renderAllOrders();
-    if (tab === 'sales') { renderSales(); renderOnlineSales(); }
-    if (tab === 'promo') { renderPromo(); renderAllPromosV2(); }
-    if (tab === 'setbun') renderSetbun();
-    if (tab === 'estimate') renderEstimateList();
-    if (tab === 'general') renderGenProducts();
-    if (tab === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
-    _renderedTabs[tab] = true;
+    // 무거운 렌더링을 requestAnimationFrame으로 지연 → UI 먼저 전환
+    requestAnimationFrame(function() {
+      if (tab === 'catalog') renderCatalog();
+      if (tab === 'order') renderAllOrders();
+      if (tab === 'sales') { renderSales(); renderOnlineSales(); }
+      if (tab === 'promo') { renderPromo(); renderAllPromosV2(); }
+      if (tab === 'setbun') renderSetbun();
+      if (tab === 'estimate') renderEstimateList();
+      if (tab === 'general') renderGenProducts();
+      if (tab === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
+      _renderedTabs[tab] = true;
+      console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
+    });
+  } else {
+    console.log('[PERF] switchTab(' + tab + ') 캐시 히트: ' + (performance.now() - t0).toFixed(0) + 'ms');
   }
 }
 
@@ -4052,7 +4059,12 @@ function deleteAllGenProducts() {
 }
 
 // ======================== STICKY HEADER (JS) ========================
+var _stickyTimers = {};
 function initStickyHeader(tableId) {
+  if (_stickyTimers[tableId]) clearTimeout(_stickyTimers[tableId]);
+  _stickyTimers[tableId] = setTimeout(function() { _initStickyHeaderImpl(tableId); }, 100);
+}
+function _initStickyHeaderImpl(tableId) {
   const table = document.getElementById(tableId);
   if (!table) return;
   const scrollContainer = table.closest('.table-scroll');
@@ -4074,7 +4086,14 @@ function initStickyHeader(tableId) {
 }
 
 // ======================== COLUMN RESIZE ========================
+var _resizeTimers = {};
+var _origInitColumnResize = _initColumnResizeImpl;
 function initColumnResize(tableId) {
+  // setTimeout으로 지연 실행 → 메인 스레드 블로킹 방지
+  if (_resizeTimers[tableId]) clearTimeout(_resizeTimers[tableId]);
+  _resizeTimers[tableId] = setTimeout(function() { _initColumnResizeImpl(tableId); }, 100);
+}
+function _initColumnResizeImpl(tableId) {
   const table = document.getElementById(tableId);
   if (!table) return;
   const ths = table.querySelectorAll('thead th');
