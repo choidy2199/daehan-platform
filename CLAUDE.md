@@ -72,3 +72,8 @@
 - /settings → 설정
 - /api/erp/* → 경영박사 API (서버사이드)
 - /api/naver/* → 네이버 API (서버사이드)
+
+## API 문서 위치
+- 경영박사 ERP API: docs/경영박사_API.md
+- 네이버 커머스 API: docs/네이버_커머스_API.md
+- ERP/네이버 관련 작업 시 반드시 해당 문서를 읽고 참고할 것.
