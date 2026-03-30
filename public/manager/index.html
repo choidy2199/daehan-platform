@@ -357,6 +357,14 @@
       </div>
     </div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center" id="po-sheet-actions">
+      <div style="display:inline-flex;align-items:center;gap:0;">
+        <button onclick="handleAutoOrder('promo')" style="background:#CC2222;color:#fff;border:1.5px solid #e83333;border-right:none;padding:6px 14px;border-radius:4px 0 0 4px;font-size:13px;cursor:pointer;">밀워키 자동발주</button>
+        <span id="autoOrderBadge-promo" onclick="showAutoOrderPopover(event,'promo')" style="background:#991a1a;color:#FFD700;padding:6px 10px;border-radius:0 4px 4px 0;font-size:12px;border:1.5px solid #e83333;border-left:1px solid #e83333;cursor:pointer;font-weight:500;">0건</span>
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:0;">
+        <button onclick="handlePurchaseInvoice('promo')" style="background:#1D9E75;color:#fff;border:1.5px solid #25d494;border-right:none;padding:6px 14px;border-radius:4px 0 0 4px;font-size:13px;cursor:pointer;">매입전표 등록</button>
+        <span id="purchaseInvoiceBadge-promo" onclick="showPurchaseInvoicePopover(event,'promo')" style="background:#157a5a;color:#FFD700;padding:6px 10px;border-radius:0 4px 4px 0;font-size:12px;border:1.5px solid #25d494;border-left:1px solid #25d494;cursor:pointer;font-weight:500;">0건</span>
+      </div>
       <button class="btn-action" id="po-confirm-btn" onclick="confirmPromoOrder()">✅ 발주 확정</button>
       <button class="btn-export" id="po-export-btn" onclick="exportPromoOrder()">📤 엑셀 다운로드</button>
       <button class="btn-action-sub" id="po-history-btn" onclick="showPromoOrderHistory()">📋 발주 이력</button>
@@ -450,6 +458,14 @@
       </div>
     </div>
     <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;align-items:center" id="order-sheet-actions">
+      <div style="display:inline-flex;align-items:center;gap:0;">
+        <button onclick="handleAutoOrder('normal')" style="background:#CC2222;color:#fff;border:1.5px solid #e83333;border-right:none;padding:6px 14px;border-radius:4px 0 0 4px;font-size:13px;cursor:pointer;">밀워키 자동발주</button>
+        <span id="autoOrderBadge-normal" onclick="showAutoOrderPopover(event,'normal')" style="background:#991a1a;color:#FFD700;padding:6px 10px;border-radius:0 4px 4px 0;font-size:12px;border:1.5px solid #e83333;border-left:1px solid #e83333;cursor:pointer;font-weight:500;">0건</span>
+      </div>
+      <div style="display:inline-flex;align-items:center;gap:0;">
+        <button onclick="handlePurchaseInvoice('normal')" style="background:#1D9E75;color:#fff;border:1.5px solid #25d494;border-right:none;padding:6px 14px;border-radius:4px 0 0 4px;font-size:13px;cursor:pointer;">매입전표 등록</button>
+        <span id="purchaseInvoiceBadge-normal" onclick="showPurchaseInvoicePopover(event,'normal')" style="background:#157a5a;color:#FFD700;padding:6px 10px;border-radius:0 4px 4px 0;font-size:12px;border:1.5px solid #25d494;border-left:1px solid #25d494;cursor:pointer;font-weight:500;">0건</span>
+      </div>
       <button class="btn-action" id="order-confirm-btn" onclick="confirmOrder()">✅ 발주 확정</button>
       <button class="btn-export" id="order-export-btn" onclick="exportOrder()">📤 엑셀 다운로드</button>
       <button class="btn-action-sub" id="order-history-btn" onclick="showOrderHistory()">📋 발주 이력</button>

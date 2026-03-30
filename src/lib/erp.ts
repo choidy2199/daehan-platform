@@ -120,6 +120,40 @@ export async function callNewOrderOut(info: string, items: string, ibgum: string
 }
 
 /**
+ * NewOrderIn: 매입 전표 등록
+ * WSDL 파라미터: cUserKey, info, items, ibgum
+ * POST form-urlencoded 방식 (NewOrderOut과 동일 패턴)
+ */
+export async function callNewOrderIn(info: string, items: string, ibgum: string): Promise<string> {
+  if (!ERP_USER_KEY) throw new Error('ERP_USER_KEY 환경변수가 설정되지 않았습니다');
+
+  const formBody = [
+    `cUserKey=${encodeURIComponent(ERP_USER_KEY)}`,
+    `info=${encodeURIComponent(info)}`,
+    `items=${encodeURIComponent(items)}`,
+    `ibgum=${encodeURIComponent(ibgum)}`,
+  ].join('&');
+
+  console.log(`[callNewOrderIn] POST ${ERP_URL}/NewOrderIn, body길이: ${formBody.length}`);
+
+  const response = await fetch(`${ERP_URL}/NewOrderIn`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formBody,
+  });
+
+  const text = await response.text();
+  console.log(`[callNewOrderIn] HTTP ${response.status}, 응답길이: ${text.length}`);
+  console.log(`[callNewOrderIn] 응답: ${text.substring(0, 300)}`);
+
+  if (!response.ok) {
+    throw new Error(`ERP HTTP ${response.status}: ${text.substring(0, 200)}`);
+  }
+
+  return text;
+}
+
+/**
  * XML 특수문자 이스케이프
  */
 function escapeXml(str: string): string {

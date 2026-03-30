@@ -5773,6 +5773,386 @@ function toggleInvoicePopover() {
 // 페이지 로드 시 뱃지 초기화
 setTimeout(renderInvoiceBadge, 300);
 
+// ======================== 밀워키 자동발주 카운터 + 팝오버 ========================
+
+function getAutoOrderToday() {
+  var saved = loadObj('mw_auto_order_today', { date: '', count: 0, items: [] });
+  var today = new Date().toISOString().slice(0, 10);
+  if (saved.date !== today) return { date: today, count: 0, items: [] };
+  return saved;
+}
+
+function saveAutoOrderToday(data) {
+  localStorage.setItem('mw_auto_order_today', JSON.stringify(data));
+}
+
+function updateAutoOrderCounter(type, label, supplyTotal, costTotal) {
+  var data = getAutoOrderToday();
+  data.count++;
+  var found = data.items.find(function(it) { return it.type === type; });
+  if (found) {
+    found.count++;
+    found.supplyTotal += supplyTotal;
+    found.costTotal += costTotal;
+  } else {
+    data.items.push({ type: type, label: label, count: 1, supplyTotal: supplyTotal, costTotal: costTotal });
+  }
+  saveAutoOrderToday(data);
+  renderAutoOrderBadge();
+}
+
+function renderAutoOrderBadge() {
+  var data = getAutoOrderToday();
+  var b1 = document.getElementById('autoOrderBadge-normal');
+  var b2 = document.getElementById('autoOrderBadge-promo');
+  if (b1) b1.textContent = data.count + '건';
+  if (b2) b2.textContent = data.count + '건';
+}
+
+function showAutoOrderPopover(event, orderType) {
+  event.stopPropagation();
+  var popId = 'autoOrder-popover';
+  var existing = document.getElementById(popId);
+  if (existing) { existing.remove(); return; }
+
+  var data = getAutoOrderToday();
+  var badge = document.getElementById('autoOrderBadge-' + orderType);
+  if (!badge) return;
+
+  var pop = document.createElement('div');
+  pop.id = popId;
+  pop.style.cssText = 'position:absolute;top:100%;right:0;width:420px;background:#fff;border:1px solid #DDE1EB;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:500;font-size:12px;margin-top:4px';
+
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #EEF0F4"><span style="font-size:13px;font-weight:600;color:#1A1D23">오늘 밀워키 발주 이력</span><span onclick="document.getElementById(\'' + popId + '\').remove()" style="cursor:pointer;color:#9BA3B2;font-size:16px">&times;</span></div>';
+
+  if (!data.items.length) {
+    html += '<div style="padding:24px;text-align:center;color:#9BA3B2">오늘 발주 이력이 없습니다</div>';
+  } else {
+    html += '<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid #EEF0F4"><th style="padding:8px 14px;text-align:left;color:#5A6070;font-weight:500">구분</th><th style="padding:8px;text-align:center;color:#5A6070;font-weight:500">건수</th><th style="padding:8px;text-align:right;color:#5A6070;font-weight:500">공급합계</th><th style="padding:8px 14px;text-align:right;color:#5A6070;font-weight:500">원가합계</th></tr></thead><tbody>';
+    var totalSupply = 0, totalCost = 0;
+    data.items.forEach(function(it) {
+      totalSupply += it.supplyTotal;
+      totalCost += it.costTotal;
+      html += '<tr style="border-bottom:1px solid #F4F6FA"><td style="padding:6px 14px;font-weight:500">' + it.label + '</td><td style="padding:6px 8px;text-align:center;color:#185FA5;font-weight:500">' + it.count + '건</td><td style="padding:6px 8px;text-align:right">' + totalSupply.toLocaleString() + '원</td><td style="padding:6px 14px;text-align:right;color:#1D9E75;font-weight:500">' + it.costTotal.toLocaleString() + '원</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="padding:8px 14px;background:#F9FAFB;border-top:1px solid #EEF0F4;display:flex;justify-content:space-between;font-weight:600"><span>합계 (' + data.count + '건)</span><span>공급 ' + totalSupply.toLocaleString() + '원 / <span style="color:#1D9E75">원가 ' + totalCost.toLocaleString() + '원</span></span></div>';
+  }
+  pop.innerHTML = html;
+
+  var parent = badge.parentElement;
+  parent.style.position = 'relative';
+  parent.appendChild(pop);
+
+  setTimeout(function() {
+    document.addEventListener('click', function closePop(e) {
+      if (!pop.contains(e.target) && e.target !== badge) {
+        pop.remove();
+        document.removeEventListener('click', closePop);
+      }
+    });
+  }, 100);
+}
+
+// ======================== 매입전표 카운터 + 팝오버 ========================
+
+function getPurchaseInvoiceToday() {
+  var saved = loadObj('mw_purchase_invoice_today', { date: '', count: 0, items: [] });
+  var today = new Date().toISOString().slice(0, 10);
+  if (saved.date !== today) return { date: today, count: 0, items: [] };
+  return saved;
+}
+
+function savePurchaseInvoiceToday(data) {
+  localStorage.setItem('mw_purchase_invoice_today', JSON.stringify(data));
+}
+
+function updatePurchaseInvoiceCounter(type, label, productCount, costTotal) {
+  var data = getPurchaseInvoiceToday();
+  data.count++;
+  var found = data.items.find(function(it) { return it.type === type; });
+  if (found) {
+    found.count++;
+    found.productCount += productCount;
+    found.costTotal += costTotal;
+  } else {
+    data.items.push({ type: type, label: label, count: 1, productCount: productCount, costTotal: costTotal });
+  }
+  savePurchaseInvoiceToday(data);
+  renderPurchaseInvoiceBadge();
+}
+
+function renderPurchaseInvoiceBadge() {
+  var data = getPurchaseInvoiceToday();
+  var b1 = document.getElementById('purchaseInvoiceBadge-normal');
+  var b2 = document.getElementById('purchaseInvoiceBadge-promo');
+  if (b1) b1.textContent = data.count + '건';
+  if (b2) b2.textContent = data.count + '건';
+}
+
+function showPurchaseInvoicePopover(event, orderType) {
+  event.stopPropagation();
+  var popId = 'purchaseInvoice-popover';
+  var existing = document.getElementById(popId);
+  if (existing) { existing.remove(); return; }
+
+  var data = getPurchaseInvoiceToday();
+  var badge = document.getElementById('purchaseInvoiceBadge-' + orderType);
+  if (!badge) return;
+
+  var pop = document.createElement('div');
+  pop.id = popId;
+  pop.style.cssText = 'position:absolute;top:100%;right:0;width:400px;background:#fff;border:1px solid #DDE1EB;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:500;font-size:12px;margin-top:4px';
+
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #EEF0F4"><span style="font-size:13px;font-weight:600;color:#1A1D23">오늘 매입전표 등록 이력</span><span onclick="document.getElementById(\'' + popId + '\').remove()" style="cursor:pointer;color:#9BA3B2;font-size:16px">&times;</span></div>';
+
+  if (!data.items.length) {
+    html += '<div style="padding:24px;text-align:center;color:#9BA3B2">오늘 등록된 매입전표가 없습니다</div>';
+  } else {
+    html += '<table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid #EEF0F4"><th style="padding:8px 14px;text-align:left;color:#5A6070;font-weight:500">구분</th><th style="padding:8px;text-align:center;color:#5A6070;font-weight:500">건수</th><th style="padding:8px 14px;text-align:right;color:#5A6070;font-weight:500">매입원가 합계</th></tr></thead><tbody>';
+    var totalCost = 0;
+    data.items.forEach(function(it) {
+      totalCost += it.costTotal;
+      html += '<tr style="border-bottom:1px solid #F4F6FA"><td style="padding:6px 14px;font-weight:500">' + it.label + '</td><td style="padding:6px 8px;text-align:center;color:#185FA5;font-weight:500">' + it.count + '건(' + it.productCount + '품목)</td><td style="padding:6px 14px;text-align:right;color:#1D9E75;font-weight:500">' + it.costTotal.toLocaleString() + '원</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div style="padding:8px 14px;background:#F9FAFB;border-top:1px solid #EEF0F4;display:flex;justify-content:space-between;font-weight:600"><span>합계 (' + data.count + '건)</span><span style="color:#1D9E75">' + totalCost.toLocaleString() + '원</span></div>';
+  }
+  pop.innerHTML = html;
+
+  var parent = badge.parentElement;
+  parent.style.position = 'relative';
+  parent.appendChild(pop);
+
+  setTimeout(function() {
+    document.addEventListener('click', function closePop(e) {
+      if (!pop.contains(e.target) && e.target !== badge) {
+        pop.remove();
+        document.removeEventListener('click', closePop);
+      }
+    });
+  }, 100);
+}
+
+// ======================== 자동발주 + 매입전표 핸들러 ========================
+
+// 발주서 품목 수집 (일반/프로모션 공통)
+function collectOrderItems(orderType) {
+  var items = [];
+  if (orderType === 'normal') {
+    ['elec', 'hand', 'pack'].forEach(function(type) {
+      (DB.orders[type] || []).forEach(function(item) {
+        if (!item.code || !item.qty || item.qty <= 0) return;
+        var p = findProduct(item.code);
+        if (!p) return;
+        var supply = p.supplyPrice || 0;
+        var cost = Math.round(calcOrderCost(supply, p.productDC || 0));
+        items.push({
+          code: item.code,
+          orderNum: p.orderNum || '',
+          ttiNum: p.ttiNum || '',
+          model: p.model || '',
+          qty: item.qty,
+          supplyPrice: supply,
+          costPrice: cost,
+          productDC: p.productDC || 0
+        });
+      });
+    });
+  } else {
+    // 프로모션: poOrderData + spotOrderData
+    (typeof poOrderData !== 'undefined' ? poOrderData : []).forEach(function(item) {
+      if (!item.orderQty || item.orderQty <= 0) return;
+      var code = item.code || findCodeByModel(item.model, item.ttiNum);
+      var p = code ? findProduct(code) : null;
+      items.push({
+        code: code || '',
+        orderNum: item.orderNum || (p ? p.orderNum : '') || '',
+        ttiNum: item.ttiNum || (p ? p.ttiNum : '') || '',
+        model: item.model || '',
+        qty: item.orderQty,
+        supplyPrice: item.promoPrice || item.basePrice || 0,
+        costPrice: p ? Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0)) : 0,
+        productDC: p ? (p.productDC || 0) : 0
+      });
+    });
+    (typeof spotOrderData !== 'undefined' ? spotOrderData : []).forEach(function(item) {
+      if (!item.orderQty || item.orderQty <= 0) return;
+      var code = item.code || findCodeByModel(item.model, item.ttiNum);
+      var p = code ? findProduct(code) : null;
+      items.push({
+        code: code || '',
+        orderNum: item.orderNum || (p ? p.orderNum : '') || '',
+        ttiNum: item.ttiNum || (p ? p.ttiNum : '') || '',
+        model: item.model || '',
+        qty: item.orderQty,
+        supplyPrice: item.promoPrice || item.basePrice || 0,
+        costPrice: p ? Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0)) : 0,
+        productDC: p ? (p.productDC || 0) : 0
+      });
+    });
+  }
+  return items;
+}
+
+// 밀워키 자동발주
+function handleAutoOrder(orderType) {
+  var items = collectOrderItems(orderType);
+  if (!items.length) {
+    toast('발주할 품목이 없습니다');
+    return;
+  }
+
+  // TTI 순번이 있는 품목만 추출
+  var ttiItems = items.filter(function(it) { return it.orderNum; });
+  if (!ttiItems.length) {
+    toast('TTI 순번이 있는 품목이 없습니다');
+    return;
+  }
+
+  // 확장 프로그램 설치 확인
+  if (!window._daehanExtensionReady) {
+    alert('크롬 확장 프로그램(밀워키 자동발주)을 설치해주세요.\n\n설치 후 페이지를 새로고침하세요.');
+    return;
+  }
+
+  var label = orderType === 'normal' ? '일반주문' : '프로모션';
+  var supplyTotal = 0, costTotal = 0;
+  ttiItems.forEach(function(it) {
+    supplyTotal += it.supplyPrice * it.qty;
+    costTotal += it.costPrice * it.qty;
+  });
+
+  if (!confirm('[밀워키 자동발주]\n\n' + label + ' ' + ttiItems.length + '건\n공급가 합계: ' + supplyTotal.toLocaleString() + '원\n원가 합계: ' + costTotal.toLocaleString() + '원\n\nTTI 사이트에서 자동 발주를 진행하시겠습니까?')) {
+    return;
+  }
+
+  // 확장 프로그램에 메시지 전송
+  window.postMessage({
+    type: 'DAEHAN_AUTO_ORDER',
+    action: 'autoOrder',
+    orderType: orderType,
+    items: ttiItems.map(function(it) { return { code: it.orderNum, qty: it.qty }; })
+  }, '*');
+
+  // 카운터 업데이트
+  updateAutoOrderCounter(orderType, label, supplyTotal, costTotal);
+  toast('자동 발주 요청 전송 (' + ttiItems.length + '건)');
+}
+
+// 매입전표 등록 (경영박사 NewOrderIn)
+async function handlePurchaseInvoice(orderType) {
+  var items = collectOrderItems(orderType);
+  if (!items.length) {
+    toast('매입전표 등록할 품목이 없습니다');
+    return;
+  }
+
+  // 매입원가 계산
+  var costTotal = 0;
+  items.forEach(function(it) { costTotal += it.costPrice * it.qty; });
+  var label = orderType === 'normal' ? '일반주문 매입' : '프로모션 매입';
+
+  if (!confirm('[매입전표 등록]\n\n' + label + '\n품목: ' + items.length + '건\n매입원가 합계: ' + costTotal.toLocaleString() + '원\n\n경영박사에 매입전표를 등록하시겠습니까?')) {
+    return;
+  }
+
+  // 날짜 포맷: YY.MM.DD
+  var now = new Date();
+  var yy = String(now.getFullYear()).slice(2);
+  var mm = String(now.getMonth() + 1).padStart(2, '0');
+  var dd = String(now.getDate()).padStart(2, '0');
+  var dateStr = yy + '.' + mm + '.' + dd;
+
+  // TTI코리아 거래처코드 (DB.customers에서 찾기 또는 하드코딩)
+  var ttiCustomerCode = '';
+  if (typeof DB !== 'undefined' && DB.customers) {
+    var ttiCustomer = DB.customers.find(function(c) { return (c.name || '').includes('TTI') || (c.name || '').includes('티티아이'); });
+    if (ttiCustomer) ttiCustomerCode = ttiCustomer.code2 || ttiCustomer.code || '';
+  }
+
+  if (!ttiCustomerCode) {
+    ttiCustomerCode = prompt('TTI코리아 거래처 코드(CODE2)를 입력하세요:', '');
+    if (!ttiCustomerCode) { toast('거래처 코드 필요'); return; }
+  }
+
+  try {
+    var apiItems = items.map(function(it) {
+      var amount = it.costPrice * it.qty;
+      var vat = Math.round(amount / 10);
+      return {
+        code: it.code,
+        qty: it.qty,
+        price: it.costPrice,
+        amount: amount,
+        vat: vat,
+        memo: ''
+      };
+    });
+
+    var res = await fetch('/api/erp/order-in', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerCode: ttiCustomerCode,
+        memo: '발주매입',
+        date: dateStr,
+        items: apiItems
+      })
+    });
+
+    var result = await res.json();
+    if (!res.ok || result.error) {
+      toast('매입전표 등록 실패: ' + (result.error || '알 수 없는 오류'), 'error');
+      console.error('[매입전표]', result);
+      return;
+    }
+
+    toast('매입전표 등록 완료: ' + (result.orderNo || ''));
+    updatePurchaseInvoiceCounter(orderType, label, items.length, costTotal);
+
+  } catch (err) {
+    toast('매입전표 등록 오류: ' + err.message, 'error');
+    console.error('[매입전표 오류]', err);
+  }
+}
+
+// ======================== 크롬 확장 연결 ========================
+
+window._daehanExtensionReady = false;
+
+window.addEventListener('message', function(event) {
+  if (event.source !== window) return;
+
+  // 확장 프로그램 READY 신호
+  if (event.data && event.data.type === 'DAEHAN_EXTENSION_READY') {
+    window._daehanExtensionReady = true;
+    console.log('[자동발주] 크롬 확장 프로그램 감지됨, 버전:', event.data.version);
+  }
+
+  // 자동발주 결과 수신
+  if (event.data && event.data.type === 'DAEHAN_ORDER_RESULT') {
+    console.log('[자동발주] 결과 수신:', event.data);
+    if (event.data.success) {
+      toast('TTI 자동 발주 시작됨');
+    } else {
+      toast('자동 발주 실패: ' + (event.data.error || event.data.message), 'error');
+    }
+  }
+
+  // 확장 상태 응답
+  if (event.data && event.data.type === 'DAEHAN_EXTENSION_STATUS') {
+    window._daehanExtensionReady = event.data.installed;
+  }
+});
+
+// 페이지 로드 시 확장 확인 + 뱃지 초기화
+setTimeout(function() {
+  window.postMessage({ type: 'DAEHAN_CHECK_EXTENSION' }, '*');
+  renderAutoOrderBadge();
+  renderPurchaseInvoiceBadge();
+}, 500);
+
 // ======================== TAB 5: 세트및분해 ========================
 const PARTS_KEYS = ['M12B2','M12HB25','M12B4','M12HB5','M18B2','M18HB3','M18B5','M18FB6','M18FB8','M18FB12','C12C','M1218C','M1218FC'];
 const PARTS_LABELS = {'M12B2':'M12 B2','M12HB25':'M12 HB2.5','M12B4':'M12 B4','M12HB5':'M12 HB5','M18B2':'M18 B2','M18HB3':'M18 HB3','M18B5':'M18 B5','M18FB6':'M18 FB6','M18FB8':'M18 FB8','M18FB12':'M18 FB12','C12C':'C12C','M1218C':'M12-18C','M1218FC':'M12-18FC'};
