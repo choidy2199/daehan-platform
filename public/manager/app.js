@@ -6650,7 +6650,7 @@ function sbSelectSet(code) {
     document.getElementById('sb-bare-candidates').style.display = 'block';
     if (_ph2) _ph2.style.display = 'none';
     listEl.innerHTML = candidates.map(function(bp) {
-      return '<button onclick="sbSelectBare(\'' + bp.code + '\')" style="padding:4px 10px;font-size:12px;border:1px solid #DDE1EB;border-radius:4px;background:#fff;cursor:pointer;color:#1A1D23">' + bp.model + ' <span style="color:#1D9E75;font-size:11px">' + fmt(bp.cost) + '</span></button>';
+      return '<button onclick="sbSelectBare(\'' + bp.code + '\')" style="padding:4px 10px;font-size:12px;border:1px solid #DDE1EB;border-radius:4px;background:#fff;cursor:pointer;color:#1A1D23">' + bp.model + '</button>';
     }).join('');
     // 후보가 1개면 자동 선택
     if (candidates.length === 1) {
