@@ -6796,6 +6796,17 @@ function clearSearchInputs() {
 async function init() {
   var _initStart = performance.now();
 
+  // 마지막 활성 탭 즉시 복원 (딜레이 없이)
+  var savedTab = localStorage.getItem('mw_active_tab');
+  if (savedTab && savedTab !== 'catalog' && document.getElementById('tab-' + savedTab)) {
+    document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
+    document.getElementById('tab-' + savedTab).classList.add('active');
+    document.querySelectorAll('.nav-tab').forEach(function(el) {
+      if (el.getAttribute('onclick') && el.getAttribute('onclick').indexOf("'" + savedTab + "'") !== -1) el.classList.add('active');
+    });
+  }
+
   // 브라우저 자동완성 방지 — 즉시 + 100ms + 500ms
   clearSearchInputs();
   setTimeout(clearSearchInputs, 100);
@@ -6836,19 +6847,17 @@ async function init() {
   }
   console.log('[PERF] init — step0 supabase동기화: ' + (performance.now() - _t).toFixed(0) + 'ms');
 
-  // 1. 현재 보이는 탭(catalog)만 즉시 렌더링
+  // 1. 현재 보이는 탭 즉시 렌더링
   _t = performance.now();
   populateCatalogFilters();
-  console.log('[PERF] init — step1a populateCatalogFilters: ' + (performance.now() - _t).toFixed(0) + 'ms');
-
-  _t = performance.now();
   renderCatalog();
-  console.log('[PERF] init — step1b renderCatalog: ' + (performance.now() - _t).toFixed(0) + 'ms');
-
-  _t = performance.now();
-  updateStatus();
   _renderedTabs['catalog'] = true;
-  console.log('[PERF] init — step1c updateStatus: ' + (performance.now() - _t).toFixed(0) + 'ms');
+  // savedTab이 있으면 해당 탭도 렌더링
+  if (savedTab && savedTab !== 'catalog') {
+    switchTab(savedTab);
+  }
+  updateStatus();
+  console.log('[PERF] init — step1 초기 렌더링: ' + (performance.now() - _t).toFixed(0) + 'ms');
   console.log('[PERF] init — catalog 전체: ' + (performance.now() - _initStart).toFixed(0) + 'ms');
 
   // 2. 나머지 탭은 지연 렌더링 (유저가 클릭할 때 또는 백그라운드)
@@ -6856,15 +6865,6 @@ async function init() {
     var t = performance.now();
     newEstimate();
     updateSyncTimeDisplay();
-    // 마지막 활성 탭 복원 (새로고침 시)
-    var savedTab = localStorage.getItem('mw_active_tab');
-    if (savedTab && savedTab !== 'catalog' && document.getElementById('tab-' + savedTab)) {
-      switchTab(savedTab);
-      // nav 탭 버튼도 active 표시
-      document.querySelectorAll('.nav-tab').forEach(function(el) {
-        if (el.getAttribute('onclick') && el.getAttribute('onclick').indexOf("'" + savedTab + "'") !== -1) el.classList.add('active');
-      });
-    }
     console.log('[PERF] init — 지연 초기화: ' + (performance.now() - t).toFixed(0) + 'ms');
   }, 200);
 
