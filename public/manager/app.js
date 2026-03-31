@@ -801,8 +801,7 @@ function switchOrderSub(type) {
   ['elec', 'hand', 'pack'].forEach(t => {
     const btn = document.getElementById('order-sub-' + t);
     if (!btn) return;
-    var hasQty = DB.orders[t] && DB.orders[t].some(function(item) { return (item.qty || 0) > 0; });
-    btn.className = (t === type || hasQty) ? 'btn-action' : 'btn-sub-inactive';
+    btn.className = t === type ? 'btn-action' : 'btn-sub-inactive';
   });
   const sheetBtn = document.getElementById('order-sub-sheet');
   if (sheetBtn) { sheetBtn.className = 'btn-header-accent'; }
