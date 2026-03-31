@@ -73,8 +73,9 @@ function autoSyncToSupabase(key) {
   _syncTimers[key] = setTimeout(function() {
     var raw = localStorage.getItem(key);
     if (!raw) return;
-    // 본인 저장 타임스탬프 기록 (Realtime 이벤트에서 본인 필터용)
-    sessionStorage.setItem('_lastSyncTs', String(Date.now()));
+    // 본인 저장 타임스탬프 기록 (키별 — Realtime 이벤트에서 본인 필터용)
+    sessionStorage.setItem('_lastSyncTs_' + key, String(Date.now()));
+    sessionStorage.setItem('_lastSyncTs', String(Date.now())); // forceUpload 호환
     fetch('/api/sync/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -293,12 +294,19 @@ var _realtimeRefreshTimer = null;
 
   _realtimeChannel = sbClient.channel('app_data_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data' }, function(payload) {
-      console.log('[Realtime] 변경 감지:', payload.eventType, payload.new ? payload.new.key : '');
+      var changedKey = payload.new ? payload.new.key : '';
+      console.log('[Realtime] 변경 감지:', payload.eventType, changedKey);
 
-      // 본인이 방금 저장한 변경이면 무시 (3초 이내)
-      var lastTs = parseInt(sessionStorage.getItem('_lastSyncTs') || '0');
-      if (Date.now() - lastTs < 3000) {
-        console.log('[Realtime] 본인 저장 → 무시');
+      // 본인이 방금 저장한 키의 변경이면 무시 (키별 3초 필터)
+      var keyTs = parseInt(sessionStorage.getItem('_lastSyncTs_' + changedKey) || '0');
+      if (changedKey && Date.now() - keyTs < 3000) {
+        console.log('[Realtime] 본인 저장 → 무시 (' + changedKey + ')');
+        return;
+      }
+      // forceUpload 전체 업로드 시 글로벌 필터 (3초)
+      var globalTs = parseInt(sessionStorage.getItem('_lastSyncTs') || '0');
+      if (Date.now() - globalTs < 3000) {
+        console.log('[Realtime] 전체 업로드 직후 → 무시');
         return;
       }
 
