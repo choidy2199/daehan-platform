@@ -729,6 +729,8 @@ function switchTab(tab) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   if (event && event.target) event.target.classList.add('active');
+  // 현재 탭 기억 (새로고침 시 복원용, 동기화 대상 아님)
+  localStorage.setItem('mw_active_tab', tab);
   // 첫 방문 시만 렌더링, 이후는 CSS 전환만 (즉시)
   if (!_renderedTabs[tab]) {
     // 무거운 렌더링을 requestAnimationFrame으로 지연 → UI 먼저 전환
@@ -6854,6 +6856,15 @@ async function init() {
     var t = performance.now();
     newEstimate();
     updateSyncTimeDisplay();
+    // 마지막 활성 탭 복원 (새로고침 시)
+    var savedTab = localStorage.getItem('mw_active_tab');
+    if (savedTab && savedTab !== 'catalog' && document.getElementById('tab-' + savedTab)) {
+      switchTab(savedTab);
+      // nav 탭 버튼도 active 표시
+      document.querySelectorAll('.nav-tab').forEach(function(el) {
+        if (el.getAttribute('onclick') && el.getAttribute('onclick').indexOf("'" + savedTab + "'") !== -1) el.classList.add('active');
+      });
+    }
     console.log('[PERF] init — 지연 초기화: ' + (performance.now() - t).toFixed(0) + 'ms');
   }, 200);
 
