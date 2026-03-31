@@ -1534,7 +1534,7 @@ function _sortOrderItems(items) {
   // 각 항목에 모델명과 분류 정보 추가
   var entries = items.map(function(item, i) {
     var p = findProduct(item.code);
-    var model = p ? (p.model || '') : '';
+    var model = p ? String(p.model || '') : '';
     var barePattern = model.replace(/-\d+([A-Za-z]*)$/, '-0$1');
     var lastHyphen = model.lastIndexOf('-');
     var afterHyphen = lastHyphen >= 0 ? model.substring(lastHyphen + 1) : '';
