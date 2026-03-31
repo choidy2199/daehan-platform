@@ -7046,6 +7046,11 @@ async function init() {
     document.querySelectorAll('.nav-tab').forEach(function(el) {
       if (el.getAttribute('onclick') && el.getAttribute('onclick').indexOf("'" + savedTab + "'") !== -1) el.classList.add('active');
     });
+    // 이전 세션 HTML 제거 — 서버 데이터 로드 전 깜빡임 방지
+    var activeTab = document.getElementById('tab-' + savedTab);
+    if (activeTab) {
+      activeTab.querySelectorAll('tbody').forEach(function(tb) { tb.innerHTML = ''; });
+    }
   }
 
   // 브라우저 자동완성 방지 — 즉시 + 100ms + 500ms
