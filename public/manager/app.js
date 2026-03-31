@@ -801,8 +801,8 @@ function switchOrderSub(type) {
   ['elec', 'hand', 'pack'].forEach(t => {
     const btn = document.getElementById('order-sub-' + t);
     if (!btn) return;
-    var hasItems = DB.orders[t] && DB.orders[t].length > 0;
-    btn.className = (t === type || hasItems) ? 'btn-action' : 'btn-sub-inactive';
+    var hasQty = DB.orders[t] && DB.orders[t].some(function(item) { return (item.qty || 0) > 0; });
+    btn.className = (t === type || hasQty) ? 'btn-action' : 'btn-sub-inactive';
   });
   const sheetBtn = document.getElementById('order-sub-sheet');
   if (sheetBtn) { sheetBtn.className = 'btn-header-accent'; }
@@ -1569,10 +1569,10 @@ function calcOrderTotals() {
     return sum + (p ? (p.supplyPrice || 0) * (item.qty || 0) : 0);
   }, 0);
   const elec = calc('elec'), hand = calc('hand'), pack = calc('pack');
-  document.getElementById('order-elec-total').textContent = fmt(elec);
-  document.getElementById('order-hand-total').textContent = fmt(hand);
-  document.getElementById('order-pack-total').textContent = fmt(pack);
-  document.getElementById('order-grand-total').textContent = fmt(elec + hand + pack);
+  document.getElementById('order-elec-total').textContent = comma(elec);
+  document.getElementById('order-hand-total').textContent = comma(hand);
+  document.getElementById('order-pack-total').textContent = comma(pack);
+  document.getElementById('order-grand-total').textContent = comma(elec + hand + pack);
   // Auto-refresh 발주서 if visible
   if (document.getElementById('order-sheet').style.display !== 'none') renderOrderSheet();
 }
