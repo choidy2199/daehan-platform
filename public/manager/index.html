@@ -807,7 +807,7 @@
         <div class="form-field">
           <label class="label">공급받는자 (거래처)</label>
           <div style="position:relative" id="client-ac-wrap">
-            <input class="input" id="est-client" placeholder="거래처명 또는 사업자번호 검색..." autocomplete="off"
+            <input class="input" id="est-client" type="search" name="search_naf_est_client" placeholder="거래처명 또는 사업자번호 검색..." autocomplete="off"
               oninput="searchClientAC(this.value)"
               onfocus="if(this.value) searchClientAC(this.value)">
             <div id="client-ac-list" style="display:none;position:absolute;top:100%;left:0;width:100%;max-height:220px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:300;font-size:12px"></div>
@@ -1526,7 +1526,7 @@
       </div>
       <div style="font-weight:600;margin-bottom:6px">적용 제품 리스트</div>
       <div style="margin-bottom:8px;display:flex;gap:8px">
-        <input class="input" id="cumul-item-search" placeholder="모델명/코드 검색" style="max-width:300px"
+        <input class="input" id="cumul-item-search" type="search" name="search_naf_cumul" placeholder="모델명/코드 검색" style="max-width:300px" autocomplete="off"
           oninput="showAC(this, c => cumulAddItem(c))">
         <button class="btn-action" onclick="cumulAddEmpty()">빈 행 추가</button>
       </div>
@@ -1644,7 +1644,7 @@
 
       <div style="font-weight:600;margin-bottom:6px">제품 리스트</div>
       <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center">
-        <input class="input" id="pv2-item-search" placeholder="모델명/코드 검색으로 추가" style="max-width:300px"
+        <input class="input" id="pv2-item-search" type="search" name="search_naf_pv2" placeholder="모델명/코드 검색으로 추가" style="max-width:300px" autocomplete="off"
           oninput="showAC(this, c => pv2AddItemByCode(c))">
         <button class="btn-action" onclick="pv2AddEmptyItem()">빈 행 추가</button>
       </div>
@@ -1722,7 +1722,7 @@
       <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">
         <div style="flex:1">
           <label class="label">모델명 검색</label>
-          <input class="input" id="sb-set-model-input" placeholder="모델명 검색 (예: FID2)"
+          <input class="input" id="sb-set-model-input" type="search" name="search_naf_setbun" placeholder="모델명 검색 (예: FID2)" autocomplete="off"
             oninput="showSetbunAC(this, c => sbSelectSet(c))"
             onfocus="if(this.value) showSetbunAC(this, c => sbSelectSet(c))">
         </div>
@@ -1780,7 +1780,7 @@
     </div>
     <div class="modal-body" style="overflow-y:auto;max-height:calc(90vh - 130px)">
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
-        <input class="input" id="picker-search" placeholder="코드, 모델명, 제품설명 검색..." oninput="renderPickerList()" style="flex:1">
+        <input class="input" id="picker-search" type="search" name="search_naf_picker" placeholder="코드, 모델명, 제품설명 검색..." autocomplete="off" oninput="renderPickerList()" style="flex:1">
         <select class="select" id="picker-cat" onchange="renderPickerList()" style="width:140px">
           <option value="">전체 대분류</option>
         </select>
