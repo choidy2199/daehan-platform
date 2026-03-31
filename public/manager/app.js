@@ -6596,32 +6596,49 @@ function sbSelectSet(code) {
   document.getElementById('sb-set-code').value = code;
   document.getElementById('sb-set-model-input').value = p.model || '';
   document.getElementById('sb-set-info').innerHTML = `<span style="font-weight:600">${p.model}</span> — ${p.description || ''}<br><span style="color:#1D9E75">원가: ${fmt(p.cost)}</span> / 공급가: ${fmt(p.supplyPrice)} / 코드: ${code}`;
+  // 드롭다운 즉시 닫기 + input blur로 onfocus 재트리거 방지
+  hideAC();
+  document.getElementById('sb-set-model-input').blur();
 
   // Detect M12 or M18
   const series = (p.model || '').startsWith('M18') || (p.model || '').startsWith('C18') ? 'M18' : 'M12';
   sbUpdateBatteryOptions(series);
 
-  // Auto-recommend bare tools
-  const baseModel = (p.model || '').replace(/[-]\S*$/, ''); // M12 FID2
-  if (baseModel) {
-    const bareSuffixes = ['-0', '-0X', '-0X0', '-0B', '-0C', '-0C0'];
-    const candidates = DB.products.filter(bp => {
-      if (!bp.model) return false;
-      const bpBase = bp.model.replace(/[-]\S*$/, '');
-      if (bpBase !== baseModel) return false;
-      return bareSuffixes.some(s => bp.model.endsWith(s)) || bp.model.includes('-0');
-    });
+  // Auto-recommend bare tools (규칙: 마지막 하이픈 뒤 숫자→0, 알파벳 유지)
+  var setModel = p.model || '';
+  var bareModel = setModel.replace(/-\d+([A-Za-z]*)$/, '-0$1');
+  var baseModel = setModel.replace(/[-]\S*$/, '');
 
-    const listEl = document.getElementById('sb-bare-list');
-    if (candidates.length > 0) {
-      document.getElementById('sb-bare-candidates').style.display = 'block';
-      listEl.innerHTML = candidates.map(bp => {
-        return `<button class="btn-action" onclick="sbSelectBare('${bp.code}')" style="padding:4px 10px;font-size:12px">${bp.model} <span style="color:#1D9E75;font-size:11px">${fmt(bp.cost)}</span></button>`;
-      }).join('');
-    } else {
-      document.getElementById('sb-bare-candidates').style.display = 'block';
-      listEl.innerHTML = '<span style="color:#9BA3B2;font-size:12px">추천 베어툴 없음 — 아래에서 직접 검색하세요</span>';
+  // 1순위: 정확한 베어툴 모델 매칭 (예: FID3-502X → FID3-0X)
+  var exactBare = bareModel !== setModel ? DB.products.filter(function(bp) { return bp.model === bareModel; }) : [];
+  // 2순위: 기존 suffix 매칭 (호환성 유지)
+  var bareSuffixes = ['-0', '-0X', '-0X0', '-0B', '-0C', '-0C0'];
+  var suffixBare = baseModel ? DB.products.filter(function(bp) {
+    if (!bp.model) return false;
+    var bpBase = bp.model.replace(/[-]\S*$/, '');
+    if (bpBase !== baseModel) return false;
+    return bareSuffixes.some(function(s) { return bp.model.endsWith(s); }) || bp.model.includes('-0');
+  }) : [];
+  // 중복 제거 후 합침 (1순위 우선)
+  var seenCodes = {};
+  var candidates = [];
+  exactBare.concat(suffixBare).forEach(function(bp) {
+    if (!seenCodes[bp.code]) { seenCodes[bp.code] = true; candidates.push(bp); }
+  });
+
+  var listEl = document.getElementById('sb-bare-list');
+  if (candidates.length > 0) {
+    document.getElementById('sb-bare-candidates').style.display = 'block';
+    listEl.innerHTML = candidates.map(function(bp) {
+      return '<button class="btn-action" onclick="sbSelectBare(\'' + bp.code + '\')" style="padding:4px 10px;font-size:12px">' + bp.model + ' <span style="color:#1D9E75;font-size:11px">' + fmt(bp.cost) + '</span></button>';
+    }).join('');
+    // 1순위 매칭이 있으면 자동 선택
+    if (exactBare.length === 1) {
+      sbSelectBare(exactBare[0].code);
     }
+  } else {
+    document.getElementById('sb-bare-candidates').style.display = 'block';
+    listEl.innerHTML = '<span style="color:#9BA3B2;font-size:12px">베어툴을 찾을 수 없습니다 (' + bareModel + ') — 아래에서 직접 검색하세요</span>';
   }
 }
 
