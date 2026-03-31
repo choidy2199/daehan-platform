@@ -346,6 +346,11 @@ async function realtimeDownloadAndRefresh() {
     for (var i = 0; i < data.length; i++) {
       var item = data[i];
       if (item.key && item.value) {
+        // 로컬에 아직 업로드 안 된 변경이 있으면 서버 데이터로 덮어쓰지 않음
+        if (_syncTimers[item.key]) {
+          console.log('[Realtime] 로컬 변경 대기 중, 스킵:', item.key);
+          continue;
+        }
         var newVal = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
         var oldVal = localStorage.getItem(item.key);
         if (newVal !== oldVal) {
@@ -6808,6 +6813,10 @@ async function init() {
       DB.settings = loadObj(KEYS.settings, DB.settings);
       DB.rebate = load(KEYS.rebate);
       _stockMap = null;
+      // 추가 글로벌 변수도 서버 데이터로 동기화
+      if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gp = loadObj('mw_gen_products', []); for (var j = 0; j < _gp.length; j++) genProducts.push(_gp[j]); }
+      if (typeof estimates !== 'undefined') { estimates.length = 0; var _es = loadObj('mw_estimates', []); for (var j = 0; j < _es.length; j++) estimates.push(_es[j]); }
+      if (typeof clientData !== 'undefined') { clientData.length = 0; var _cl = loadObj('mw_clients', []); for (var j = 0; j < _cl.length; j++) clientData.push(_cl[j]); }
       updateSyncStatus('동기화 완료');
     } else if (!localStorage.getItem('mw_products') || localStorage.getItem('mw_products') === '[]') {
       // 서버에도 데이터 없고 로컬도 비어있으면 기본 상태 유지
