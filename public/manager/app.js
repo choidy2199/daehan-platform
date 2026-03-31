@@ -73,6 +73,8 @@ function autoSyncToSupabase(key) {
   _syncTimers[key] = setTimeout(function() {
     var raw = localStorage.getItem(key);
     if (!raw) return;
+    // 본인 저장 타임스탬프 기록 (Realtime 이벤트에서 본인 필터용)
+    sessionStorage.setItem('_lastSyncTs', String(Date.now()));
     fetch('/api/sync/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -185,6 +187,126 @@ function syncProductsToSupabase() { autoSyncToSupabase(KEYS.products); }
     }
   }, 500);
 })();
+
+// ======================== SUPABASE REALTIME 구독 ========================
+var _realtimeChannel = null;
+var _realtimeRefreshTimer = null;
+
+(function initSupabaseRealtime() {
+  // CDN에서 로드된 supabase 객체 확인
+  if (typeof supabase === 'undefined' || !supabase.createClient) {
+    console.log('[Realtime] Supabase CDN 미로드, 구독 건너뜀');
+    return;
+  }
+
+  var SUPABASE_URL = 'https://vmbqutwrfzhruukerfkc.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtYnF1dHdyZnpocnV1a2VyZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Mzc5MjAsImV4cCI6MjA5MDIxMzkyMH0.-FI_3De1sRmAxLNQ8J45MT9hO9U9aSTchxBcq47_b-I';
+
+  var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  _realtimeChannel = sbClient.channel('app_data_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data' }, function(payload) {
+      console.log('[Realtime] 변경 감지:', payload.eventType, payload.new ? payload.new.key : '');
+
+      // 본인이 방금 저장한 변경이면 무시 (3초 이내)
+      var lastTs = parseInt(sessionStorage.getItem('_lastSyncTs') || '0');
+      if (Date.now() - lastTs < 3000) {
+        console.log('[Realtime] 본인 저장 → 무시');
+        return;
+      }
+
+      // 다른 사용자의 변경 → 데이터 다운로드
+      updateSyncStatus('동기화 중...');
+
+      // 여러 키가 연속 변경될 수 있으므로 500ms debounce
+      if (_realtimeRefreshTimer) clearTimeout(_realtimeRefreshTimer);
+      _realtimeRefreshTimer = setTimeout(function() {
+        realtimeDownloadAndRefresh();
+      }, 500);
+    })
+    .subscribe(function(status) {
+      console.log('[Realtime] 구독 상태:', status);
+      if (status === 'SUBSCRIBED') {
+        updateSyncStatus('실시간 연결');
+      }
+    });
+
+  console.log('[Realtime] Supabase Realtime 구독 시작');
+})();
+
+// 다른 사용자 변경 시 다운로드 + UI 갱신
+async function realtimeDownloadAndRefresh() {
+  try {
+    var res = await fetch('/api/sync/download');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var result = await res.json();
+    var data = result.data || [];
+    if (!data.length) return;
+
+    var updated = 0;
+    for (var i = 0; i < data.length; i++) {
+      var item = data[i];
+      if (item.key && item.value) {
+        var newVal = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
+        var oldVal = localStorage.getItem(item.key);
+        if (newVal !== oldVal) {
+          localStorage.setItem(item.key, newVal);
+          updated++;
+        }
+      }
+    }
+
+    if (updated > 0) {
+      console.log('[Realtime] ' + updated + '개 키 갱신, UI 새로고침');
+
+      // DB 객체 재로드 (화면 깜빡임 없이 데이터만 갱신)
+      DB.products = load(KEYS.products);
+      DB.inventory = load(KEYS.inventory);
+      DB.promotions = load(KEYS.promotions);
+      DB.orders = loadObj(KEYS.orders, { elec: [], hand: [], pack: [] });
+      DB.settings = loadObj(KEYS.settings, DB.settings);
+      DB.rebate = load(KEYS.rebate);
+      _stockMap = null; // 재고 캐시 초기화
+
+      // 현재 활성 탭 UI만 갱신
+      refreshActiveTab();
+    }
+
+    updateSyncStatus('동기화 완료');
+  } catch (err) {
+    console.error('[Realtime] 다운로드 실패:', err.message);
+    updateSyncStatus('동기화 실패');
+  }
+}
+
+// 현재 활성 탭의 UI만 새로고침 (깜빡임 없이)
+function refreshActiveTab() {
+  try {
+    // 어떤 메인 탭이 활성인지 확인
+    var activeTab = document.querySelector('.tab-content[style*="display: block"], .tab-content[style*="display:block"]');
+    if (!activeTab) return;
+    var tabId = activeTab.id;
+
+    if (tabId === 'tab-catalog' && typeof renderCatalog === 'function') renderCatalog();
+    if (tabId === 'tab-promo' && typeof renderPromo === 'function') renderPromo();
+    if (tabId === 'tab-order') {
+      if (typeof renderOrderTab === 'function') {
+        ['elec', 'hand', 'pack'].forEach(function(t) { renderOrderTab(t); });
+      }
+      if (typeof renderOrderSheet === 'function') renderOrderSheet();
+    }
+    if (tabId === 'tab-sales' && typeof renderSales === 'function') renderSales();
+    if (tabId === 'tab-manage') {
+      if (typeof renderClients === 'function') renderClients();
+    }
+    if (tabId === 'tab-estimate' && typeof renderEstimateList === 'function') renderEstimateList();
+    if (tabId === 'tab-general' && typeof renderGenProducts === 'function') renderGenProducts();
+
+    console.log('[Realtime] UI 갱신 완료:', tabId);
+  } catch (e) {
+    console.warn('[Realtime] UI 갱신 중 오류:', e.message);
+  }
+}
 
 var _dbStart = performance.now();
 let DB = {
