@@ -140,7 +140,7 @@ async function forceUploadAll() {
   if (btn) btn.disabled = true;
   updateSyncStatus('동기화 중...');
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices'];
 
   try {
     var uploadData = [];
@@ -187,7 +187,7 @@ async function uploadAllToSupabase() {
   btn.style.background = '#888';
   btn.style.color = '#fff';
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices'];
 
   try {
     var uploadData = [];
@@ -358,6 +358,11 @@ async function realtimeDownloadAndRefresh() {
       DB.settings = loadObj(KEYS.settings, DB.settings);
       DB.rebate = load(KEYS.rebate);
       _stockMap = null; // 재고 캐시 초기화
+
+      // 추가 글로벌 변수 재로드
+      if (typeof estimates !== 'undefined') { estimates.length = 0; var _estArr = loadObj('mw_estimates', []); for (var j = 0; j < _estArr.length; j++) estimates.push(_estArr[j]); }
+      if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gpArr = loadObj('mw_gen_products', []); for (var j = 0; j < _gpArr.length; j++) genProducts.push(_gpArr[j]); }
+      if (typeof clientData !== 'undefined') { clientData.length = 0; var _clArr = loadObj('mw_clients', []); for (var j = 0; j < _clArr.length; j++) clientData.push(_clArr[j]); }
 
       // 현재 활성 탭 UI만 갱신
       refreshActiveTab();
@@ -2373,32 +2378,32 @@ let salesItems = loadObj('mw_sales_items', []);
 
 function addSalesRow() {
   salesItems.push({ code: '', naverPrice: 0, openPrice: 0 });
-  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems));
+  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems)); autoSyncToSupabase('mw_sales_items');
   renderSales();
 }
 
 function clearSales() {
   if (!confirm('온라인 판매 항목을 모두 삭제하시겠습니까?')) return;
   salesItems = [];
-  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems));
+  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems)); autoSyncToSupabase('mw_sales_items');
   renderSales();
 }
 
 function onSalesCodeChange(idx, val) {
   salesItems[idx].code = val;
-  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems));
+  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems)); autoSyncToSupabase('mw_sales_items');
   renderSales();
 }
 
 function onSalesPriceChange(idx, field, val) {
   salesItems[idx][field] = parseInt(val) || 0;
-  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems));
+  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems)); autoSyncToSupabase('mw_sales_items');
   calcSalesRow(idx);
 }
 
 function removeSalesRow(idx) {
   salesItems.splice(idx, 1);
-  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems));
+  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems)); autoSyncToSupabase('mw_sales_items');
   renderSales();
 }
 
@@ -3673,7 +3678,7 @@ async function syncInventory() {
 
   // 6) localStorage 저장
   save(KEYS.inventory, DB.inventory);
-  localStorage.setItem('mw_gen_products', JSON.stringify(gp));
+  localStorage.setItem('mw_gen_products', JSON.stringify(gp)); autoSyncToSupabase('mw_gen_products');
 
   // 7) 테이블 새로고침
   if (typeof renderCatalog === 'function') renderCatalog();
@@ -4396,7 +4401,7 @@ function restoreFromHistory(idx) {
   } else if (h.target === '일반제품') {
     genProducts.length = 0;
     h.backup.forEach(function(p) { genProducts.push(p); });
-    localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+    localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
     renderGenProducts();
   }
   toast('되돌리기 완료 (' + h.target + ')');
@@ -5094,7 +5099,7 @@ function addGenProduct() {
   const priceOpen = parseInt(prompt('오픈마켓 가격을 입력하세요') || '0') || 0;
   const memo = prompt('비고를 입력하세요') || '';
   genProducts.push({ code, manageCode, category, model, description, supplyPrice: 0, cost, priceA, priceNaver, priceOpen, memo, source: 'general' });
-  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
   renderGenProducts();
   toast('일반제품 추가 완료');
 }
@@ -5102,13 +5107,13 @@ function addGenProduct() {
 function removeGenProduct(idx) {
   if (!confirm('이 제품을 삭제하시겠습니까?')) return;
   genProducts.splice(idx, 1);
-  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
   renderGenProducts();
 }
 
 function updateGenMemo(idx, val) {
   genProducts[idx].memo = val.trim();
-  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
 }
 
 function editTierField(idx, type) {
@@ -5135,7 +5140,7 @@ function editTierField(idx, type) {
     genProducts[idx].palletQty = parseInt(String(qty).replace(/,/g,'')) || 0;
     genProducts[idx].palletPrice = parseInt(String(price).replace(/,/g,'')) || 0;
   }
-  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
   renderGenProducts();
 }
 
@@ -5145,7 +5150,7 @@ function editGenInDate(idx) {
   const val = prompt('입고날짜 메모 (삭제하려면 비워두세요):', current);
   if (val === null) return;
   genProducts[idx].inDate = val.trim();
-  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
   renderGenProducts();
   toast(val.trim() ? '입고날짜 메모 저장' : '입고날짜 메모 삭제');
 }
@@ -5198,7 +5203,7 @@ function uploadGenProducts(input) {
         });
         count++;
       }
-      localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+      localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
       renderGenProducts();
       toast(`${count}건 업로드 완료`);
     } catch (err) {
@@ -5298,7 +5303,7 @@ function importGenExcel() {
         statusEl.textContent = '코드매칭: ' + updated + '건 업데이트, ' + added + '건 신규 추가';
       }
 
-      localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+      localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
       renderGenProducts();
       var genActionName = mode === 'merge' ? '코드매칭' : '전체교체';
       saveActionHistory(genActionName, '일반제품', imported.length, null);
@@ -5578,6 +5583,7 @@ function deleteEstimate(idx) {
   if (!confirm('이 견적서를 삭제하시겠습니까?')) return;
   estimates.splice(idx, 1);
   localStorage.setItem('mw_estimates', JSON.stringify(estimates));
+  autoSyncToSupabase('mw_estimates');
   if (currentEstIdx === idx) { currentEstIdx = -1; currentEstItems = []; renderEstimateItems(); }
   renderEstimateList();
   toast('견적서 삭제 완료');
@@ -5696,6 +5702,7 @@ function saveEstimate() {
     currentEstIdx = estimates.length - 1;
   }
   localStorage.setItem('mw_estimates', JSON.stringify(estimates));
+  autoSyncToSupabase('mw_estimates');
   renderEstimateList();
   toast('견적서 저장 완료');
 }
@@ -6395,7 +6402,7 @@ function savePartsPrices() {
     const pel = document.getElementById('ppp-' + k);
     if (pel) promoParts[k] = parseInt(pel.value.replace(/,/g, '')) || 0;
   });
-  localStorage.setItem('mw_parts_prices', JSON.stringify(partsPrices));
+  localStorage.setItem('mw_parts_prices', JSON.stringify(partsPrices)); autoSyncToSupabase('mw_parts_prices');
   localStorage.setItem('mw_parts_prices_promo', JSON.stringify(promoParts));
   renderSetbun();
   toast('배터리/충전기 시세 저장 완료 (일반+프로모션)');
@@ -6592,7 +6599,7 @@ function saveSetbunItem() {
   } else {
     setbunItems.push(item);
   }
-  localStorage.setItem('mw_setbun_items', JSON.stringify(setbunItems));
+  localStorage.setItem('mw_setbun_items', JSON.stringify(setbunItems)); autoSyncToSupabase('mw_setbun_items');
   closeSetbunModal();
   renderSetbun();
   toast(idx >= 0 ? '분석 수정 완료' : '분석 추가 완료');
@@ -6601,7 +6608,7 @@ function saveSetbunItem() {
 function deleteSetbunItem(idx) {
   if (!confirm('이 분석 항목을 삭제하시겠습니까?')) return;
   setbunItems.splice(idx, 1);
-  localStorage.setItem('mw_setbun_items', JSON.stringify(setbunItems));
+  localStorage.setItem('mw_setbun_items', JSON.stringify(setbunItems)); autoSyncToSupabase('mw_setbun_items');
   renderSetbun();
   toast('삭제 완료');
 }
