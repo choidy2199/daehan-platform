@@ -6605,27 +6605,40 @@ function sbSelectSet(code) {
   const series = (p.model || '').startsWith('M18') || (p.model || '').startsWith('C18') ? 'M18' : 'M12';
   sbUpdateBatteryOptions(series);
 
-  // Auto-recommend bare tools (규칙: 마지막 하이픈 뒤 숫자→0, 알파벳 유지)
+  // Auto-recommend bare tools
   var setModel = p.model || '';
+  // 규칙: 마지막 하이픈 뒤 숫자→0, 알파벳 유지 (예: -502X → -0X)
   var bareModel = setModel.replace(/-\d+([A-Za-z]*)$/, '-0$1');
   var baseModel = setModel.replace(/[-]\S*$/, '');
+  console.log('[SetBun] 베어툴 매칭:', setModel, '→', bareModel, '/ base:', baseModel);
 
-  // 1순위: 정확한 베어툴 모델 매칭 (예: FID3-502X → FID3-0X)
-  var exactBare = bareModel !== setModel ? DB.products.filter(function(bp) { return bp.model === bareModel; }) : [];
-  // 2순위: 기존 suffix 매칭 (호환성 유지)
+  // 1순위: 정확 매칭 + 변형 매칭 (예: -0X, -0X0 둘 다 시도)
+  var exactCandidates = [];
+  if (bareModel !== setModel) {
+    // -0X 패턴과 -0X0 패턴 둘 다 시도
+    var tryModels = [bareModel];
+    if (/[A-Za-z]$/.test(bareModel)) tryModels.push(bareModel + '0');
+    tryModels.push(bareModel.replace(/[A-Za-z]+$/, '') + '0');
+    DB.products.forEach(function(bp) {
+      if (bp.model && tryModels.indexOf(bp.model) !== -1) exactCandidates.push(bp);
+    });
+    console.log('[SetBun] 정확 매칭 시도:', tryModels.join(', '), '→', exactCandidates.length + '개');
+  }
+  // 2순위: base 모델 + suffix 매칭
   var bareSuffixes = ['-0', '-0X', '-0X0', '-0B', '-0C', '-0C0'];
   var suffixBare = baseModel ? DB.products.filter(function(bp) {
-    if (!bp.model) return false;
+    if (!bp.model || typeof bp.model !== 'string') return false;
     var bpBase = bp.model.replace(/[-]\S*$/, '');
     if (bpBase !== baseModel) return false;
-    return bareSuffixes.some(function(s) { return bp.model.endsWith(s); }) || bp.model.includes('-0');
+    return bareSuffixes.some(function(s) { return bp.model.endsWith(s); }) || bp.model.indexOf('-0') !== -1;
   }) : [];
-  // 중복 제거 후 합침 (1순위 우선)
+  // 중복 제거 후 합침
   var seenCodes = {};
   var candidates = [];
-  exactBare.concat(suffixBare).forEach(function(bp) {
+  exactCandidates.concat(suffixBare).forEach(function(bp) {
     if (!seenCodes[bp.code]) { seenCodes[bp.code] = true; candidates.push(bp); }
   });
+  console.log('[SetBun] 총 후보:', candidates.length + '개');
 
   var listEl = document.getElementById('sb-bare-list');
   if (candidates.length > 0) {
@@ -6633,9 +6646,9 @@ function sbSelectSet(code) {
     listEl.innerHTML = candidates.map(function(bp) {
       return '<button class="btn-action" onclick="sbSelectBare(\'' + bp.code + '\')" style="padding:4px 10px;font-size:12px">' + bp.model + ' <span style="color:#1D9E75;font-size:11px">' + fmt(bp.cost) + '</span></button>';
     }).join('');
-    // 1순위 매칭이 있으면 자동 선택
-    if (exactBare.length === 1) {
-      sbSelectBare(exactBare[0].code);
+    // 후보가 1개면 자동 선택
+    if (candidates.length === 1) {
+      sbSelectBare(candidates[0].code);
     }
   } else {
     document.getElementById('sb-bare-candidates').style.display = 'block';
