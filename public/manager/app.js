@@ -2845,7 +2845,7 @@ function renderSales() {
         oninput="showAC(this, c => onSalesCodeChange(${i},c))"
         onchange="onSalesCodeChange(${i},this.value)"
         onfocus="if(this.value) showAC(this, c => onSalesCodeChange(${i},c))"
-        placeholder="코드/모델 검색" style="width:120px"></td>
+        type="search" name="search_naf_sales_code" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="코드/모델 검색" style="width:120px"></td>
       <td style="font-weight:500;white-space:nowrap">${p ? p.model : '-'}</td>
       <td class="center">${stock != null ? stock : '-'}</td>
       <td class="num">${fmt(cost)} ${costLabel}</td>
