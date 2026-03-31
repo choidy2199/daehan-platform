@@ -181,11 +181,11 @@ async function forceUploadAll() {
 async function uploadAllToSupabase() {
   var btn = document.getElementById('btn-supabase-upload');
   if (!btn) return;
-  if (!confirm('모든 데이터를 Supabase에 업로드합니다.\n이후 모든 기기에서 동일한 데이터를 볼 수 있습니다.\n진행하시겠습니까?')) return;
 
   btn.disabled = true;
   btn.textContent = '업로드 중...';
   btn.style.background = '#888';
+  btn.style.color = '#fff';
 
   var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history'];
 
@@ -199,6 +199,8 @@ async function uploadAllToSupabase() {
       }
     }
 
+    sessionStorage.setItem('_lastSyncTs', String(Date.now()));
+
     var res = await fetch('/api/sync/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -207,19 +209,24 @@ async function uploadAllToSupabase() {
     if (!res.ok) throw new Error('업로드 실패: ' + res.status);
     var result = await res.json();
 
-    alert('업로드 완료! ' + (result.saved || uploadData.length) + '개 데이터 동기화됨.\n이제 다른 기기에서도 동일한 데이터가 표시됩니다.');
-
-    btn.textContent = '업로드 완료';
-    btn.style.background = '#444';
-    btn.style.color = '#888';
-    btn.style.cursor = 'not-allowed';
-    btn.disabled = true;
-    localStorage.setItem('supabase_uploaded', 'true');
-    updateSyncStatus('동기화 완료');
-  } catch (error) {
-    alert('업로드 실패: ' + error.message);
-    btn.textContent = '최초 업로드';
+    btn.textContent = '업로드 완료!';
     btn.style.background = '#1D9E75';
+    updateSyncStatus('동기화 완료');
+
+    // 2초 후 기본 상태 복귀
+    setTimeout(function() {
+      btn.textContent = '업로드';
+      btn.style.background = '#185FA5';
+      btn.style.color = '#fff';
+      btn.style.cursor = 'pointer';
+      btn.disabled = false;
+    }, 2000);
+  } catch (error) {
+    alert('업로드 실패. 다시 시도해주세요.\n' + error.message);
+    btn.textContent = '업로드';
+    btn.style.background = '#185FA5';
+    btn.style.color = '#fff';
+    btn.style.cursor = 'pointer';
     btn.disabled = false;
   }
 }
@@ -254,16 +261,16 @@ async function loadFromSupabase() {
 // 하위 호환
 function syncProductsToSupabase() { autoSyncToSupabase(KEYS.products); }
 
-// 업로드 완료 상태 복원
+// 업로드 버튼 초기 상태 설정
 (function() {
   setTimeout(function() {
     var btn = document.getElementById('btn-supabase-upload');
-    if (btn && localStorage.getItem('supabase_uploaded') === 'true') {
-      btn.textContent = '업로드 완료';
-      btn.style.background = '#444';
-      btn.style.color = '#888';
-      btn.style.cursor = 'not-allowed';
-      btn.disabled = true;
+    if (btn) {
+      btn.textContent = '업로드';
+      btn.style.background = '#185FA5';
+      btn.style.color = '#fff';
+      btn.style.cursor = 'pointer';
+      btn.disabled = false;
     }
   }, 500);
 })();
@@ -6846,7 +6853,7 @@ async function init() {
     if (feeHeader && !document.getElementById('btn-supabase-upload')) {
       var btn = document.createElement('button');
       btn.id = 'btn-supabase-upload';
-      btn.textContent = '📤 Supabase 업로드';
+      btn.textContent = '업로드';
       btn.style.cssText = 'background:#185FA5;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-left:8px';
       btn.onclick = uploadAllToSupabase;
       var headerRight = feeHeader.querySelector('button');
