@@ -2579,7 +2579,7 @@ function renderOnlineSales() {
     else { html += '-'; }
     html += '</td>';
     html += '<td style="text-align:left"><span class="os-promo-badge">'+(item.promoName||'-')+'</span></td>';
-    if (editable) { html += '<td class="center" style="white-space:nowrap"><button class="btn-primary" onclick="insertOsRowAfter('+ri+')" style="padding:2px 6px;font-size:10px;margin-right:3px">+</button><button class="os-del-btn" onclick="removeOsRow('+ri+')">✕</button></td>'; }
+    if (editable) { html += '<td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="insertOsRowAfter('+ri+')" style="padding:2px 8px;font-size:11px;margin-right:3px">추가</button><button class="btn-danger btn-sm" onclick="removeOsRow('+ri+')" style="padding:2px 8px;font-size:11px">삭제</button></td>'; }
     else { html += '<td></td>'; }
     html += '</tr>';
   });
@@ -2770,7 +2770,7 @@ function renderFeeCalc() {
     html += '<td class="fc-result">' + formatFeeResult(naverResult) + '</td>';
     html += '<td class="fc-result">' + formatFeeResult(coupangMpResult) + '</td>';
     html += '<td class="fc-result">' + formatFeeResult(coupangRgResult) + '</td>';
-    html += '<td class="center"><button class="os-del-btn" onclick="removeFeeCalcRow(' + i + ')">✕</button></td>';
+    html += '<td class="center"><button class="btn-danger btn-sm" onclick="removeFeeCalcRow(' + i + ')" style="padding:2px 8px;font-size:11px">삭제</button></td>';
     html += '</tr>';
   });
 
