@@ -6534,10 +6534,12 @@ function handleAutoOrder(orderType) {
 }
 
 // 매입전표 등록 (경영박사 NewOrderIn)
+var TTI_CUSTOMER_CODE = '20260401_2159';
+
 async function handlePurchaseInvoice(orderType) {
   var items = collectOrderItems(orderType);
   if (!items.length) {
-    toast('매입전표 등록할 품목이 없습니다');
+    alert('발주서에 수량이 입력된 품목이 없습니다');
     return;
   }
 
@@ -6546,7 +6548,7 @@ async function handlePurchaseInvoice(orderType) {
   items.forEach(function(it) { costTotal += it.costPrice * it.qty; });
   var label = orderType === 'normal' ? '일반주문 매입' : '프로모션 매입';
 
-  if (!confirm('[매입전표 등록]\n\n' + label + '\n품목: ' + items.length + '건\n매입원가 합계: ' + costTotal.toLocaleString() + '원\n\n경영박사에 매입전표를 등록하시겠습니까?')) {
+  if (!confirm('매입전표를 등록하시겠습니까?\n\n거래처: TTI코리아\n품목: ' + items.length + '건\n매입원가 합계: ' + costTotal.toLocaleString() + '원')) {
     return;
   }
 
@@ -6557,24 +6559,15 @@ async function handlePurchaseInvoice(orderType) {
   var dd = String(now.getDate()).padStart(2, '0');
   var dateStr = yy + '.' + mm + '.' + dd;
 
-  // TTI코리아 거래처코드 (DB.customers에서 찾기 또는 하드코딩)
-  var ttiCustomerCode = '';
-  if (typeof DB !== 'undefined' && DB.customers) {
-    var ttiCustomer = DB.customers.find(function(c) { return (c.name || '').includes('TTI') || (c.name || '').includes('티티아이'); });
-    if (ttiCustomer) ttiCustomerCode = ttiCustomer.code2 || ttiCustomer.code || '';
-  }
-
-  if (!ttiCustomerCode) {
-    ttiCustomerCode = prompt('TTI코리아 거래처 코드(CODE2)를 입력하세요:', '');
-    if (!ttiCustomerCode) { toast('거래처 코드 필요'); return; }
-  }
-
   try {
+    // 품목별 manageCode(CODE2) 조회 + 매입원가 계산
     var apiItems = items.map(function(it) {
+      var p = findProduct(it.code);
+      var code2 = p ? (p.manageCode || p.ttiNum || String(it.code)) : String(it.code);
       var amount = it.costPrice * it.qty;
       var vat = Math.round(amount / 10);
       return {
-        code: it.code,
+        code: code2,
         qty: it.qty,
         price: it.costPrice,
         amount: amount,
@@ -6583,12 +6576,14 @@ async function handlePurchaseInvoice(orderType) {
       };
     });
 
+    console.log('[매입전표] 거래처:', TTI_CUSTOMER_CODE, '품목:', apiItems.length + '건', '합계:', costTotal);
+
     var res = await fetch('/api/erp/order-in', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        customerCode: ttiCustomerCode,
-        memo: '발주매입',
+        customerCode: TTI_CUSTOMER_CODE,
+        memo: '밀워키 발주매입',
         date: dateStr,
         items: apiItems
       })
@@ -6596,16 +6591,17 @@ async function handlePurchaseInvoice(orderType) {
 
     var result = await res.json();
     if (!res.ok || result.error) {
-      toast('매입전표 등록 실패: ' + (result.error || '알 수 없는 오류'), 'error');
-      console.error('[매입전표]', result);
+      alert('등록 실패: ' + (result.error || '알 수 없는 오류'));
+      console.error('[매입전표 실패]', result);
       return;
     }
 
-    toast('매입전표 등록 완료: ' + (result.orderNo || ''));
+    alert('매입전표 등록 완료' + (result.orderNo ? ' — 전표번호: ' + result.orderNo : ''));
+    console.log('[매입전표 성공]', result);
     updatePurchaseInvoiceCounter(orderType, label, items.length, costTotal);
 
   } catch (err) {
-    toast('매입전표 등록 오류: ' + err.message, 'error');
+    alert('서버 연결 실패: ' + err.message);
     console.error('[매입전표 오류]', err);
   }
 }

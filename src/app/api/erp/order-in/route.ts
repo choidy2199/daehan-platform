@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
       `${it.code || ''}$${it.qty || 0}$${it.price || 0}$${it.amount || 0}$${it.vat || 0}$${it.memo || ''}`
     ).join('|');
 
-    // ibgum: 출금금액|출금방법|출금메모|
-    const ibgum = '0|||';
+    // ibgum: 매입전표만 등록 (출금 없음)
+    const ibgum = '';
 
     console.log(`[NewOrderIn] info: ${info}`);
     console.log(`[NewOrderIn] items: ${itemsStr.substring(0, 200)}`);
