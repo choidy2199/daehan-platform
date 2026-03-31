@@ -1530,9 +1530,66 @@ function onOrderMemoChange(type, idx, val) {
   save(KEYS.orders, DB.orders);
 }
 
+// 발주 정렬: 세트→베어툴 그룹핑
+function _sortOrderItems(items) {
+  // 각 항목에 모델명과 분류 정보 추가
+  var entries = items.map(function(item, i) {
+    var p = findProduct(item.code);
+    var model = p ? (p.model || '') : '';
+    var barePattern = model.replace(/-\d+([A-Za-z]*)$/, '-0$1');
+    var lastHyphen = model.lastIndexOf('-');
+    var afterHyphen = lastHyphen >= 0 ? model.substring(lastHyphen + 1) : '';
+    var numPart = parseInt(afterHyphen) || 0;
+    var isSet = lastHyphen >= 0 && /^[1-9]\d*/.test(afterHyphen);
+    var isBare = lastHyphen >= 0 && /^0[A-Za-z0]*$/.test(afterHyphen);
+    var baseKey = model.replace(/-\S*$/, '');
+    return { origIdx: i, model: model, baseKey: baseKey, barePattern: barePattern, isSet: isSet, isBare: isBare };
+  });
+
+  // 1. 세트와 베어툴 매칭
+  var setItems = entries.filter(function(e) { return e.isSet; });
+  var bareItems = entries.filter(function(e) { return e.isBare; });
+  var otherItems = entries.filter(function(e) { return !e.isSet && !e.isBare; });
+
+  // 세트를 모델명순 정렬
+  setItems.sort(function(a, b) { return a.model.localeCompare(b.model); });
+
+  var usedBare = {};
+  var groups = [];
+
+  // 세트 + 매칭 베어툴 그룹
+  setItems.forEach(function(se) {
+    groups.push(se);
+    // 매칭 베어툴 찾기
+    bareItems.forEach(function(be) {
+      if (usedBare[be.origIdx]) return;
+      if (be.baseKey === se.baseKey) {
+        groups.push(be);
+        usedBare[be.origIdx] = true;
+      }
+    });
+  });
+
+  // 매칭 안 된 베어툴 (모델명순)
+  var unmatchedBare = bareItems.filter(function(be) { return !usedBare[be.origIdx]; });
+  unmatchedBare.sort(function(a, b) { return a.model.localeCompare(b.model); });
+
+  // 기타 제품 (모델명순)
+  otherItems.sort(function(a, b) { return a.model.localeCompare(b.model); });
+
+  return groups.concat(unmatchedBare).concat(otherItems);
+}
+
 function renderOrderTab(type) {
   const body = document.getElementById(`order-${type}-body`);
-  body.innerHTML = DB.orders[type].map((item, i) => {
+
+  // 세트→베어툴 그룹핑 정렬
+  var items = DB.orders[type];
+  var sorted = _sortOrderItems(items);
+
+  body.innerHTML = sorted.map(si => {
+    var i = si.origIdx;
+    var item = items[i];
     const p = findProduct(item.code);
     const stock = findStock(item.code);
     const supplyPrice = p ? p.supplyPrice : 0;
