@@ -5076,7 +5076,6 @@ function renderGenProducts() {
   body.innerHTML = filtered.map((p, i) => {
     const idx = genProducts.indexOf(p);
     return `<tr>
-      <td class="center"><button class="btn-danger btn-sm" onclick="removeGenProduct(${idx})" style="padding:2px 6px">✕</button></td>
       <td>${p.code || '-'}</td>
       <td>${p.manageCode || '-'}</td>
       <td>${p.category || '-'}</td>
@@ -5092,6 +5091,7 @@ function renderGenProducts() {
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'pallet')">${(p.palletQty || p.palletPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.palletQty ? '<span style="font-size:10px;color:#5A6070">' + p.palletQty + '개</span>' : '') + (p.palletPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.palletPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
       <td><input value="${(p.memo || '').replace(/"/g,'&quot;')}" onchange="updateGenMemo(${idx},this.value)" placeholder="" style="width:100%;font-size:12px;border:1px solid #DDE1EB;border-radius:4px;padding:2px 6px;background:#fff;color:#1A1D23;text-align:left"></td>
       <td style="text-align:left;font-size:12px;cursor:pointer;white-space:nowrap;padding-left:8px" onclick="editGenInDate(${idx})">${p.inDate ? '<span style="color:#CC2222;margin-right:4px">●</span>' + p.inDate : '-'}</td>
+      <td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="editGenProduct(${idx})" style="padding:2px 8px;font-size:11px">수정</button> <button class="btn-danger btn-sm" onclick="removeGenProduct(${idx})" style="padding:2px 6px;font-size:11px">삭제</button></td>
     </tr>`;
   }).join('');
   if (!filtered.length) {
@@ -5117,6 +5117,44 @@ function addGenProduct() {
   localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
   renderGenProducts();
   toast('일반제품 추가 완료');
+}
+
+function editGenProduct(idx) {
+  var p = genProducts[idx];
+  if (!p) return;
+  var code = prompt('코드', p.code || '');
+  if (code === null) return;
+  var manageCode = prompt('관리코드(바코드)', p.manageCode || '');
+  if (manageCode === null) return;
+  var category = prompt('대분류', p.category || '');
+  if (category === null) return;
+  var model = prompt('모델명', p.model || '');
+  if (model === null) return;
+  var description = prompt('제품설명', p.description || '');
+  if (description === null) return;
+  var cost = prompt('원가', p.cost || '');
+  if (cost === null) return;
+  var priceA = prompt('판매가(도매A)', p.priceA || '');
+  if (priceA === null) return;
+  var priceNaver = prompt('스토어팜 가격', p.priceNaver || '');
+  if (priceNaver === null) return;
+  var priceOpen = prompt('오픈마켓 가격', p.priceOpen || '');
+  if (priceOpen === null) return;
+  var memo = prompt('비고', p.memo || '');
+  if (memo === null) return;
+  genProducts[idx].code = code;
+  genProducts[idx].manageCode = manageCode;
+  genProducts[idx].category = category;
+  genProducts[idx].model = model;
+  genProducts[idx].description = description;
+  genProducts[idx].cost = parseInt(String(cost).replace(/,/g,'')) || 0;
+  genProducts[idx].priceA = parseInt(String(priceA).replace(/,/g,'')) || 0;
+  genProducts[idx].priceNaver = parseInt(String(priceNaver).replace(/,/g,'')) || 0;
+  genProducts[idx].priceOpen = parseInt(String(priceOpen).replace(/,/g,'')) || 0;
+  genProducts[idx].memo = memo;
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
+  renderGenProducts();
+  toast('제품 정보 수정 완료');
 }
 
 function removeGenProduct(idx) {
