@@ -2531,7 +2531,7 @@ function renderOnlineSales() {
     html += '<td><span class="os-date">'+(item.date||'-')+'</span></td>';
     html += '<td>'+(item.code||'-')+'</td>';
     if (editable) {
-      html += '<td><input class="os-input os-input-text" type="search" name="search_naf_os_model" autocomplete="off" data-form-type="other" data-lpignore="true" value="'+(item.model||'')+'" placeholder="코드, 모델명 검색..." oninput="showAC(this, function(code){ onOsProductSelect('+ri+',code); })" onfocus="if(this.value) showAC(this, function(code){ onOsProductSelect('+ri+',code); })" onchange="updateOsField('+ri+',\'model\',this.value)" style="font-weight:500;min-width:160px"></td>';
+      html += '<td><input class="os-input os-input-text" type="search" name="search_naf_os_model" autocomplete="nope" data-form-type="other" data-lpignore="true" value="'+(item.model||'')+'" placeholder="코드, 모델명 검색..." oninput="showAC(this, function(code){ onOsProductSelect('+ri+',code); })" onfocus="if(this.value) showAC(this, function(code){ onOsProductSelect('+ri+',code); })" onchange="updateOsField('+ri+',\'model\',this.value)" style="font-weight:500;min-width:160px"></td>';
     } else {
       html += '<td style="text-align:left;font-weight:500">'+(item.model||'-')+'</td>';
     }
@@ -2845,7 +2845,7 @@ function renderSales() {
         oninput="showAC(this, c => onSalesCodeChange(${i},c))"
         onchange="onSalesCodeChange(${i},this.value)"
         onfocus="if(this.value) showAC(this, c => onSalesCodeChange(${i},c))"
-        type="search" name="search_naf_sales_code" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="코드/모델 검색" style="width:120px"></td>
+        type="search" name="search_naf_sales_code" autocomplete="nope" data-form-type="other" data-lpignore="true" placeholder="코드/모델 검색" style="width:120px"></td>
       <td style="font-weight:500;white-space:nowrap">${p ? p.model : '-'}</td>
       <td class="center">${stock != null ? stock : '-'}</td>
       <td class="num">${fmt(cost)} ${costLabel}</td>
@@ -6764,7 +6764,7 @@ function clearSearchInputs() {
   document.querySelectorAll('input[type="text"], input[type="search"]').forEach(function(input) {
     if (input.placeholder && (input.placeholder.includes('검색') || input.placeholder.includes('입력'))) {
       input.value = '';
-      input.setAttribute('autocomplete', 'off');
+      input.setAttribute('autocomplete', 'nope');
       input.setAttribute('data-form-type', 'other');
       input.setAttribute('data-lpignore', 'true');
     }
