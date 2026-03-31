@@ -800,7 +800,9 @@ function switchOrderSub(type) {
 
   ['elec', 'hand', 'pack'].forEach(t => {
     const btn = document.getElementById('order-sub-' + t);
-    if (btn) { btn.className = t === type ? 'btn-action' : 'btn-sub-inactive'; }
+    if (!btn) return;
+    var hasItems = DB.orders[t] && DB.orders[t].length > 0;
+    btn.className = (t === type || hasItems) ? 'btn-action' : 'btn-sub-inactive';
   });
   const sheetBtn = document.getElementById('order-sub-sheet');
   if (sheetBtn) { sheetBtn.className = 'btn-header-accent'; }
@@ -1564,7 +1566,7 @@ function renderOrderTab(type) {
 function calcOrderTotals() {
   const calc = type => DB.orders[type].reduce((sum, item) => {
     const p = findProduct(item.code);
-    return sum + (p ? Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0)) * (item.qty || 0) : 0);
+    return sum + (p ? (p.supplyPrice || 0) * (item.qty || 0) : 0);
   }, 0);
   const elec = calc('elec'), hand = calc('hand'), pack = calc('pack');
   document.getElementById('order-elec-total').textContent = fmt(elec);
