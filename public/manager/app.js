@@ -2764,7 +2764,7 @@ function renderFeeCalc() {
     var coupangRgResult = calcFeeProfit(price, cost, coupangRgFee, coupangLogi);
 
     html += '<tr>';
-    html += '<td><input value="' + (item.name || '').replace(/"/g,'&quot;') + '" placeholder="제품명 입력" oninput="updateFeeCalcField(' + i + ',\'name\',this.value)" style="text-align:left"></td>';
+    html += '<td><input value="' + (item.name || '').replace(/"/g,'&quot;') + '" placeholder="제품명/코드 검색" oninput="updateFeeCalcField(' + i + ',\'name\',this.value); showFeeCalcAC(this,' + i + ')" onfocus="if(this.value) showFeeCalcAC(this,' + i + ')" autocomplete="nope" data-form-type="other" data-lpignore="true" style="text-align:left"></td>';
     html += '<td><input value="' + (cost ? cost.toLocaleString() : '') + '" placeholder="매입가" oninput="updateFeeCalcField(' + i + ',\'cost\',this.value)"></td>';
     html += '<td><input value="' + (price ? price.toLocaleString() : '') + '" placeholder="판매가" oninput="updateFeeCalcField(' + i + ',\'price\',this.value)" style="font-weight:600"></td>';
     html += '<td class="fc-result">' + formatFeeResult(naverResult) + '</td>';
@@ -2775,7 +2775,7 @@ function renderFeeCalc() {
   });
 
   html += '<tr style="background:#F4F6FA">';
-  html += '<td><input placeholder="제품명 입력" id="fc-new-name" style="text-align:left"></td>';
+  html += '<td><input placeholder="제품명/코드 검색" id="fc-new-name" oninput="showFeeCalcAC(this,-1)" onfocus="if(this.value) showFeeCalcAC(this,-1)" autocomplete="nope" data-form-type="other" data-lpignore="true" style="text-align:left"></td>';
   html += '<td><input placeholder="매입가" id="fc-new-cost"></td>';
   html += '<td><input placeholder="판매가" id="fc-new-price" onkeydown="if(event.key===\'Enter\')addFeeCalcFromInput()"></td>';
   html += '<td class="fc-result"><span class="fc-dash">-</span></td>';
@@ -2809,7 +2809,29 @@ function formatFeeResult(r) {
 function updateFeeCalcField(idx, field, val) {
   feeCalcData[idx][field] = val;
   saveFeeCalc();
-  renderFeeCalc();
+  // name 입력 시 리렌더링하지 않음 (input 포커스 유지)
+  if (field === 'name') return;
+  // cost/price 변경 시 해당 행의 결과 셀만 갱신
+  updateFeeCalcRow(idx);
+}
+
+function updateFeeCalcRow(idx) {
+  var s = DB.settings;
+  var naverFee = s.naverFee || 0.0663;
+  var coupangMpFee = s.coupangMpFee ? s.coupangMpFee / 100 : 0.108;
+  var coupangRgFee = s.coupangRgFee ? s.coupangRgFee / 100 : 0.108;
+  var coupangLogi = s.coupangLogi || 2800;
+  var item = feeCalcData[idx];
+  var cost = parseInt(String(item.cost || '').replace(/,/g, '')) || 0;
+  var price = parseInt(String(item.price || '').replace(/,/g, '')) || 0;
+  var rows = document.getElementById('fee-calc-body').querySelectorAll('tr');
+  if (!rows[idx]) return;
+  var cells = rows[idx].querySelectorAll('.fc-result');
+  if (cells.length >= 3) {
+    cells[0].innerHTML = formatFeeResult(calcFeeProfit(price, cost, naverFee, 0));
+    cells[1].innerHTML = formatFeeResult(calcFeeProfit(price, cost, coupangMpFee, 0));
+    cells[2].innerHTML = formatFeeResult(calcFeeProfit(price, cost, coupangRgFee, coupangLogi));
+  }
 }
 
 function addFeeCalcRow() {
@@ -2832,6 +2854,53 @@ function removeFeeCalcRow(idx) {
   feeCalcData.splice(idx, 1);
   saveFeeCalc();
   renderFeeCalc();
+}
+
+// 수수료계산기 자동완성 (밀워키 + 일반제품 통합 검색)
+function showFeeCalcAC(inputEl, rowIdx) {
+  var val = inputEl.value.trim().toLowerCase();
+  if (!val || val.length < 1) { hideAC(); return; }
+  // 밀워키 검색
+  var mwResults = DB.products.filter(function(p) {
+    return String(p.code).includes(val) || String(p.model || '').toLowerCase().includes(val) || String(p.description || '').toLowerCase().includes(val);
+  }).slice(0, 8).map(function(p) { return { code: p.code, model: p.model || '', desc: (p.description || '').slice(0, 30), cost: p.cost || p.supplyPrice || 0, price: p.priceA || p.priceNaver || 0, source: 'MW' }; });
+  // 일반제품 검색
+  var genResults = (typeof genProducts !== 'undefined' ? genProducts : []).filter(function(p) {
+    return String(p.code || '').includes(val) || String(p.model || '').toLowerCase().includes(val) || String(p.description || '').toLowerCase().includes(val);
+  }).slice(0, 7).map(function(p) { return { code: p.code, model: p.model || '', desc: (p.description || '').slice(0, 30), cost: p.cost || 0, price: p.priceNaver || p.priceA || 0, source: '일반' }; });
+  var results = mwResults.concat(genResults).slice(0, 12);
+  if (!results.length) { hideAC(); return; }
+
+  acActive = { input: inputEl, callback: function(code) {
+    var found = results.find(function(r) { return r.code === code; });
+    if (!found) return;
+    if (rowIdx >= 0) {
+      // 기존 행 업데이트
+      feeCalcData[rowIdx].name = (found.model || found.code) + ' ' + found.desc;
+      feeCalcData[rowIdx].cost = String(found.cost);
+      feeCalcData[rowIdx].price = String(found.price);
+      saveFeeCalc();
+      renderFeeCalc();
+    } else {
+      // 새 행 추가
+      feeCalcData.push({ name: (found.model || found.code) + ' ' + found.desc, cost: String(found.cost), price: String(found.price) });
+      saveFeeCalc();
+      renderFeeCalc();
+    }
+  }};
+  acEl.innerHTML = results.map(function(r) {
+    return '<div class="ac-item" data-code="' + r.code + '">' +
+      '<span class="ac-code">' + r.code + '</span>' +
+      '<span class="ac-model">' + r.model + '</span>' +
+      '<span class="ac-desc">' + r.desc + '</span>' +
+      '<span class="ac-price">' + fmt(r.cost) + ' <span style="font-size:10px;color:#9BA3B2">' + r.source + '</span></span>' +
+    '</div>';
+  }).join('');
+  var rect = inputEl.getBoundingClientRect();
+  acEl.style.position = 'fixed';
+  acEl.style.top = (rect.bottom + 2) + 'px';
+  acEl.style.left = rect.left + 'px';
+  acEl.classList.add('show');
 }
 
 function clearFeeCalc() {
