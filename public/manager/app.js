@@ -6546,8 +6546,10 @@ function addSetbunItem(mode) {
   document.getElementById('sb-bare-code').value = '';
   document.getElementById('sb-set-model-input').value = '';
   document.getElementById('sb-set-info').textContent = '-';
-  document.getElementById('sb-bare-info').textContent = '베어툴: 세트 제품을 먼저 선택하세요';
+  document.getElementById('sb-bare-info').textContent = '-';
   document.getElementById('sb-bare-candidates').style.display = 'none';
+  var _ph = document.getElementById('sb-bare-placeholder');
+  if (_ph) _ph.style.display = '';
   document.getElementById('sb-promo').value = '';
   document.getElementById('sb-promo-cost').value = '';
   sbUpdateBatteryOptions('');
@@ -6641,10 +6643,12 @@ function sbSelectSet(code) {
   console.log('[SetBun] 총 후보:', candidates.length + '개');
 
   var listEl = document.getElementById('sb-bare-list');
+  var _ph2 = document.getElementById('sb-bare-placeholder');
   if (candidates.length > 0) {
     document.getElementById('sb-bare-candidates').style.display = 'block';
+    if (_ph2) _ph2.style.display = 'none';
     listEl.innerHTML = candidates.map(function(bp) {
-      return '<button class="btn-action" onclick="sbSelectBare(\'' + bp.code + '\')" style="padding:4px 10px;font-size:12px">' + bp.model + ' <span style="color:#1D9E75;font-size:11px">' + fmt(bp.cost) + '</span></button>';
+      return '<button onclick="sbSelectBare(\'' + bp.code + '\')" style="padding:4px 10px;font-size:12px;border:1px solid #DDE1EB;border-radius:4px;background:#fff;cursor:pointer;color:#1A1D23">' + bp.model + ' <span style="color:#1D9E75;font-size:11px">' + fmt(bp.cost) + '</span></button>';
     }).join('');
     // 후보가 1개면 자동 선택
     if (candidates.length === 1) {
@@ -6652,7 +6656,8 @@ function sbSelectSet(code) {
     }
   } else {
     document.getElementById('sb-bare-candidates').style.display = 'block';
-    listEl.innerHTML = '<span style="color:#9BA3B2;font-size:12px">베어툴을 찾을 수 없습니다 (' + bareModel + ') — 아래에서 직접 검색하세요</span>';
+    if (_ph2) _ph2.style.display = 'none';
+    listEl.innerHTML = '<span style="color:#9BA3B2;font-size:12px">추천 베어툴 없음 — 아래에서 직접 검색하세요</span>';
   }
 }
 
@@ -6663,8 +6668,10 @@ function sbSelectBare(code) {
   document.getElementById('sb-bare-info').innerHTML = `<span style="font-weight:600">${p.model}</span> — ${p.description || ''}<br><span style="color:#1D9E75">원가: ${fmt(p.cost)}</span> / 공급가: ${fmt(p.supplyPrice)} / 코드: ${code}`;
   // Highlight selected button
   document.querySelectorAll('#sb-bare-list button').forEach(btn => {
-    btn.style.background = btn.textContent.includes(p.model) ? '#E6F1FB' : '';
-    btn.style.borderColor = btn.textContent.includes(p.model) ? '#185FA5' : '';
+    var isSelected = btn.textContent.includes(p.model);
+    btn.style.background = isSelected ? '#E6F1FB' : '#fff';
+    btn.style.borderColor = isSelected ? '#185FA5' : '#DDE1EB';
+    btn.style.fontWeight = isSelected ? '600' : '';
   });
 }
 
@@ -6721,8 +6728,13 @@ function editSetbunItem(idx) {
 
   // Fill bare info
   const bareP = findProduct(item.bareCode);
+  var _phEdit = document.getElementById('sb-bare-placeholder');
   if (bareP) {
     document.getElementById('sb-bare-info').innerHTML = `<span style="font-weight:600">${bareP.model}</span> — ${bareP.description || ''}<br><span style="color:#1D9E75">원가: ${fmt(bareP.cost)}</span> / 공급가: ${fmt(bareP.supplyPrice)} / 코드: ${item.bareCode}`;
+    if (_phEdit) _phEdit.style.display = 'none';
+  } else {
+    document.getElementById('sb-bare-info').textContent = '-';
+    if (_phEdit) _phEdit.style.display = '';
   }
   document.getElementById('sb-bare-candidates').style.display = 'none';
 
