@@ -259,6 +259,65 @@ async function loadFromSupabase() {
   }
 }
 
+// 백그라운드 서버 동기화 — localStorage 캐시로 이미 렌더링된 후 변경분만 업데이트
+function _bgSyncFromSupabase(activeTab) {
+  var t0 = performance.now();
+  fetch('/api/sync/download').then(function(res) {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }).then(function(result) {
+    var data = result.data || [];
+    if (!data.length) {
+      // 서버에 데이터 없고 로컬에 있으면 업로드
+      if (localStorage.getItem('mw_products') && localStorage.getItem('mw_products') !== '[]') {
+        console.log('[BgSync] 서버 데이터 없음 — 로컬 데이터 업로드');
+        sessionStorage.setItem('_lastSyncTs', String(Date.now()));
+        forceUploadAll();
+      }
+      updateSyncStatus('동기화 완료');
+      return;
+    }
+
+    var changedKeys = [];
+    for (var i = 0; i < data.length; i++) {
+      var item = data[i];
+      if (!item.key || !item.value) continue;
+      // pending sync가 있는 키는 스킵 (로컬 변경 보호)
+      if (_syncTimers[item.key]) continue;
+      var newVal = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
+      var oldVal = localStorage.getItem(item.key);
+      if (newVal !== oldVal) {
+        localStorage.setItem(item.key, newVal);
+        changedKeys.push(item.key);
+      }
+    }
+
+    console.log('[BgSync] 완료: ' + (performance.now() - t0).toFixed(0) + 'ms, 변경 ' + changedKeys.length + '개 키');
+
+    if (changedKeys.length > 0) {
+      // DB 객체 재로드
+      DB.products = load(KEYS.products);
+      DB.inventory = load(KEYS.inventory);
+      DB.promotions = load(KEYS.promotions);
+      DB.orders = loadObj(KEYS.orders, { elec: [], hand: [], pack: [] });
+      DB.settings = loadObj(KEYS.settings, DB.settings);
+      DB.rebate = load(KEYS.rebate);
+      _stockMap = null;
+      if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gp = loadObj('mw_gen_products', []); for (var j = 0; j < _gp.length; j++) genProducts.push(_gp[j]); }
+      if (typeof estimates !== 'undefined') { estimates.length = 0; var _es = loadObj('mw_estimates', []); for (var j = 0; j < _es.length; j++) estimates.push(_es[j]); }
+      if (typeof clientData !== 'undefined') { clientData.length = 0; var _cl = loadObj('mw_clients', []); for (var j = 0; j < _cl.length; j++) clientData.push(_cl[j]); }
+
+      // 변경된 키에 해당하는 탭만 리렌더링
+      refreshActiveTab();
+      console.log('[BgSync] 변경 키:', changedKeys.join(', '));
+    }
+    updateSyncStatus('동기화 완료');
+  }).catch(function(e) {
+    console.warn('[BgSync] 실패:', e.message);
+    updateSyncStatus('동기화 실패');
+  });
+}
+
 // 하위 호환
 function syncProductsToSupabase() { autoSyncToSupabase(KEYS.products); }
 
@@ -7046,11 +7105,7 @@ async function init() {
     document.querySelectorAll('.nav-tab').forEach(function(el) {
       if (el.getAttribute('onclick') && el.getAttribute('onclick').indexOf("'" + savedTab + "'") !== -1) el.classList.add('active');
     });
-    // 이전 세션 HTML 제거 — 서버 데이터 로드 전 깜빡임 방지
-    var activeTab = document.getElementById('tab-' + savedTab);
-    if (activeTab) {
-      activeTab.querySelectorAll('tbody').forEach(function(tb) { tb.innerHTML = ''; });
-    }
+    // localStorage 캐시 데이터로 즉시 렌더링되므로 tbody 비우기 불필요
   }
 
   // 브라우저 자동완성 방지 — 즉시 + 100ms + 500ms
@@ -7058,53 +7113,20 @@ async function init() {
   setTimeout(clearSearchInputs, 100);
   setTimeout(clearSearchInputs, 500);
 
-  // 0. 항상 Supabase에서 최신 데이터 다운로드 (서버 기준 동기화)
+  // 0. localStorage 캐시로 즉시 렌더링 (서버 다운로드 기다리지 않음)
   var _t = performance.now();
-  updateSyncStatus('동기화 중...');
-  try {
-    var supaLoaded = await loadFromSupabase();
-    if (supaLoaded) {
-      console.log('[Init] Supabase 다운로드 완료 — DB 객체 재로드');
-      DB.products = load(KEYS.products);
-      DB.inventory = load(KEYS.inventory);
-      DB.promotions = load(KEYS.promotions);
-      DB.orders = loadObj(KEYS.orders, { elec: [], hand: [], pack: [] });
-      DB.settings = loadObj(KEYS.settings, DB.settings);
-      DB.rebate = load(KEYS.rebate);
-      _stockMap = null;
-      // 추가 글로벌 변수도 서버 데이터로 동기화
-      if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gp = loadObj('mw_gen_products', []); for (var j = 0; j < _gp.length; j++) genProducts.push(_gp[j]); }
-      if (typeof estimates !== 'undefined') { estimates.length = 0; var _es = loadObj('mw_estimates', []); for (var j = 0; j < _es.length; j++) estimates.push(_es[j]); }
-      if (typeof clientData !== 'undefined') { clientData.length = 0; var _cl = loadObj('mw_clients', []); for (var j = 0; j < _cl.length; j++) clientData.push(_cl[j]); }
-      updateSyncStatus('동기화 완료');
-    } else if (!localStorage.getItem('mw_products') || localStorage.getItem('mw_products') === '[]') {
-      // 서버에도 데이터 없고 로컬도 비어있으면 기본 상태 유지
-      console.log('[Init] 서버/로컬 모두 데이터 없음');
-      updateSyncStatus('동기화 완료');
-    } else {
-      // 서버 데이터 없지만 로컬에는 있음 → 로컬 데이터 자동 업로드
-      console.log('[Init] 서버 데이터 없음 — 로컬 데이터 자동 업로드');
-      sessionStorage.setItem('_lastSyncTs', String(Date.now()));
-      forceUploadAll();
-    }
-  } catch (e) {
-    console.warn('[Init] Supabase 다운로드 실패, 로컬 데이터 사용:', e.message);
-    updateSyncStatus('동기화 실패');
-  }
-  console.log('[PERF] init — step0 supabase동기화: ' + (performance.now() - _t).toFixed(0) + 'ms');
-
-  // 1. 현재 보이는 탭 즉시 렌더링
-  _t = performance.now();
   populateCatalogFilters();
   renderCatalog();
   _renderedTabs['catalog'] = true;
-  // savedTab이 있으면 해당 탭도 렌더링
   if (savedTab && savedTab !== 'catalog') {
     switchTab(savedTab);
   }
   updateStatus();
-  console.log('[PERF] init — step1 초기 렌더링: ' + (performance.now() - _t).toFixed(0) + 'ms');
-  console.log('[PERF] init — catalog 전체: ' + (performance.now() - _initStart).toFixed(0) + 'ms');
+  console.log('[PERF] init — step0 즉시 렌더링: ' + (performance.now() - _t).toFixed(0) + 'ms');
+
+  // 1. 백그라운드에서 Supabase 다운로드 → 변경분만 업데이트
+  updateSyncStatus('동기화 중...');
+  _bgSyncFromSupabase(savedTab);
 
   // 2. 나머지 탭은 지연 렌더링 (유저가 클릭할 때 또는 백그라운드)
   setTimeout(function() {
@@ -7113,6 +7135,7 @@ async function init() {
     updateSyncTimeDisplay();
     console.log('[PERF] init — 지연 초기화: ' + (performance.now() - t).toFixed(0) + 'ms');
   }, 200);
+  console.log('[PERF] init 전체: ' + (performance.now() - _initStart).toFixed(0) + 'ms');
 
   // 3. (init에서 이미 서버 동기화 완료 — Realtime이 이후 변경 감지)
 
