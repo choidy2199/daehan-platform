@@ -44,6 +44,10 @@
   </div>
   <span id="inventory-sync-time" style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7);margin-right:6px"></span>
   <button class="btn-ghost" onclick="syncInventory()" style="padding:5px 12px;font-size:13px;font-weight:600">📦 재고가져오기</button>
+  <button id="header-sync-btn" onclick="forceUploadAll()" style="display:inline-flex;align-items:center;gap:5px;background:rgba(29,158,117,0.25);color:#7DFFCC;border:1px solid rgba(29,158,117,0.5);border-radius:6px;padding:6px 14px;font-size:12px;font-weight:500;cursor:pointer;margin-left:8px;transition:all 0.2s">
+    <svg id="header-sync-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    <span id="header-sync-text">동기화 완료</span>
+  </button>
   <div style="display:flex;align-items:center;gap:8px;margin-left:12px">
     <span id="current-user-name" style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.85)"></span>
     <button onclick="doLogout()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer">로그아웃</button>

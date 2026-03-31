@@ -89,12 +89,92 @@ function autoSyncToSupabase(key) {
 }
 
 function updateSyncStatus(text) {
+  // 기존 설정 탭 #sync-status 업데이트
   var el = document.getElementById('sync-status');
-  if (!el) return;
-  var dot = text.includes('완료') ? '#1D9E75' : text.includes('실패') ? '#CC2222' : '#EF9F27';
-  var now = new Date();
-  var timeStr = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
-  el.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:' + dot + ';display:inline-block"></span> ' + text + ' · ' + timeStr;
+  if (el) {
+    var dot = text.includes('완료') || text.includes('연결') ? '#1D9E75' : text.includes('실패') || text.includes('끊김') ? '#CC2222' : '#EF9F27';
+    var now = new Date();
+    var timeStr = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
+    el.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:' + dot + ';display:inline-block"></span> ' + text + ' · ' + timeStr;
+  }
+
+  // 헤더 동기화 버튼 업데이트
+  var btn = document.getElementById('header-sync-btn');
+  var icon = document.getElementById('header-sync-icon');
+  var txt = document.getElementById('header-sync-text');
+  if (!btn || !icon || !txt) return;
+
+  var now2 = new Date();
+  var ts = now2.getHours() + ':' + String(now2.getMinutes()).padStart(2, '0');
+
+  if (text.includes('완료') || text.includes('연결')) {
+    // 상태 1: 동기화 완료 (녹색)
+    btn.style.background = 'rgba(29,158,117,0.25)';
+    btn.style.color = '#7DFFCC';
+    btn.style.borderColor = 'rgba(29,158,117,0.5)';
+    icon.style.animation = 'none';
+    icon.innerHTML = '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>';
+    txt.textContent = '동기화 완료 · ' + ts;
+  } else if (text.includes('실패') || text.includes('끊김')) {
+    // 상태 3: 연결 끊김 (빨간색)
+    btn.style.background = 'rgba(204,34,34,0.25)';
+    btn.style.color = '#FF8080';
+    btn.style.borderColor = 'rgba(204,34,34,0.5)';
+    icon.style.animation = 'none';
+    icon.innerHTML = '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>';
+    txt.textContent = '연결 끊김 · 재시도';
+  } else {
+    // 상태 2: 동기화 중 (주황색 + 회전)
+    btn.style.background = 'rgba(239,159,39,0.25)';
+    btn.style.color = '#FFD080';
+    btn.style.borderColor = 'rgba(239,159,39,0.5)';
+    icon.style.animation = 'spin 1s linear infinite';
+    icon.innerHTML = '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>';
+    txt.textContent = '동기화 중...';
+  }
+}
+
+// 헤더 버튼 클릭: 즉시 강제 업로드
+async function forceUploadAll() {
+  var btn = document.getElementById('header-sync-btn');
+  if (btn) btn.disabled = true;
+  updateSyncStatus('동기화 중...');
+
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history'];
+
+  try {
+    var uploadData = [];
+    for (var i = 0; i < keys.length; i++) {
+      var raw = localStorage.getItem(keys[i]);
+      if (raw) uploadData.push({ key: keys[i], value: raw });
+    }
+
+    if (!uploadData.length) {
+      updateSyncStatus('동기화 완료');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    // 본인 저장 타임스탬프 (Realtime 이벤트 무시용)
+    sessionStorage.setItem('_lastSyncTs', String(Date.now()));
+
+    var res = await fetch('/api/sync/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: uploadData })
+    });
+    if (!res.ok) throw new Error('업로드 실패: HTTP ' + res.status);
+    var result = await res.json();
+
+    console.log('[강제 업로드] 완료:', result.saved || uploadData.length, '개 키');
+    updateSyncStatus('동기화 완료');
+  } catch (err) {
+    console.error('[강제 업로드 실패]', err);
+    updateSyncStatus('동기화 실패');
+    alert('저장 실패. 다시 시도해주세요.\n' + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // 전체 업로드 (최초 1회)
@@ -227,7 +307,11 @@ var _realtimeRefreshTimer = null;
     .subscribe(function(status) {
       console.log('[Realtime] 구독 상태:', status);
       if (status === 'SUBSCRIBED') {
-        updateSyncStatus('실시간 연결');
+        updateSyncStatus('동기화 완료');
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        updateSyncStatus('연결 끊김');
+      } else if (status === 'CLOSED') {
+        updateSyncStatus('연결 끊김');
       }
     });
 
@@ -6686,18 +6770,36 @@ async function init() {
   setTimeout(clearSearchInputs, 100);
   setTimeout(clearSearchInputs, 500);
 
-  // 0. localStorage에 핵심 데이터가 없으면 Supabase에서 로드
+  // 0. 항상 Supabase에서 최신 데이터 다운로드 (서버 기준 동기화)
   var _t = performance.now();
-  if (!localStorage.getItem('mw_products') || localStorage.getItem('mw_products') === '[]') {
-    console.log('[Init] localStorage 비어있음 — Supabase에서 로드 시도');
+  updateSyncStatus('동기화 중...');
+  try {
     var supaLoaded = await loadFromSupabase();
     if (supaLoaded) {
-      console.log('[Init] Supabase 로드 성공 — 새로고침');
-      location.reload();
-      return;
+      console.log('[Init] Supabase 다운로드 완료 — DB 객체 재로드');
+      DB.products = load(KEYS.products);
+      DB.inventory = load(KEYS.inventory);
+      DB.promotions = load(KEYS.promotions);
+      DB.orders = loadObj(KEYS.orders, { elec: [], hand: [], pack: [] });
+      DB.settings = loadObj(KEYS.settings, DB.settings);
+      DB.rebate = load(KEYS.rebate);
+      _stockMap = null;
+      updateSyncStatus('동기화 완료');
+    } else if (!localStorage.getItem('mw_products') || localStorage.getItem('mw_products') === '[]') {
+      // 서버에도 데이터 없고 로컬도 비어있으면 기본 상태 유지
+      console.log('[Init] 서버/로컬 모두 데이터 없음');
+      updateSyncStatus('동기화 완료');
+    } else {
+      // 서버 데이터 없지만 로컬에는 있음 → 로컬 데이터 자동 업로드
+      console.log('[Init] 서버 데이터 없음 — 로컬 데이터 자동 업로드');
+      sessionStorage.setItem('_lastSyncTs', String(Date.now()));
+      forceUploadAll();
     }
+  } catch (e) {
+    console.warn('[Init] Supabase 다운로드 실패, 로컬 데이터 사용:', e.message);
+    updateSyncStatus('동기화 실패');
   }
-  console.log('[PERF] init — step0 supabase체크: ' + (performance.now() - _t).toFixed(0) + 'ms');
+  console.log('[PERF] init — step0 supabase동기화: ' + (performance.now() - _t).toFixed(0) + 'ms');
 
   // 1. 현재 보이는 탭(catalog)만 즉시 렌더링
   _t = performance.now();
@@ -6722,19 +6824,7 @@ async function init() {
     console.log('[PERF] init — 지연 초기화: ' + (performance.now() - t).toFixed(0) + 'ms');
   }, 200);
 
-  // 3. Supabase 로드는 15초 후
-  setTimeout(function() {
-    loadFromSupabase().then(function(loaded) {
-      if (loaded) {
-        _renderedTabs['catalog'] = false;
-        populateCatalogFilters();
-        renderCatalog();
-        _renderedTabs['catalog'] = true;
-        updateStatus();
-        console.log('[Supabase] 테이블 갱신 완료');
-      }
-    });
-  }, 15000);
+  // 3. (init에서 이미 서버 동기화 완료 — Realtime이 이후 변경 감지)
 
   _t = performance.now();
   initStickyHeader('catalog-table');
