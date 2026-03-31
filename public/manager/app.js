@@ -5168,6 +5168,7 @@ function renderGenProducts() {
   }
   document.getElementById('gen-count').textContent = `${genProducts.length}건`;
   initColumnResize('gen-table');
+  initStickyHeader('gen-table');
 }
 
 function addGenProduct() {
