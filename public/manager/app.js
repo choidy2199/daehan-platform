@@ -1626,10 +1626,43 @@ function calcOrderTotals() {
     return sum + (p ? (p.supplyPrice || 0) * (item.qty || 0) : 0);
   }, 0);
   const elec = calc('elec'), hand = calc('hand'), pack = calc('pack');
-  document.getElementById('order-elec-total').textContent = comma(elec);
-  document.getElementById('order-hand-total').textContent = comma(hand);
-  document.getElementById('order-pack-total').textContent = comma(pack);
-  document.getElementById('order-grand-total').textContent = comma(elec + hand + pack);
+  const grand = elec + hand + pack;
+
+  // 텍스트: 0이면 "-", 아니면 콤마 포맷
+  document.getElementById('order-elec-total').textContent = elec > 0 ? comma(elec) : '-';
+  document.getElementById('order-hand-total').textContent = hand > 0 ? comma(hand) : '-';
+  document.getElementById('order-pack-total').textContent = pack > 0 ? comma(pack) : '-';
+  document.getElementById('order-grand-total').textContent = grand > 0 ? comma(grand) : '-';
+
+  // 배경색: 금액>0이면 검정, 아니면 흰색+테두리
+  [['order-elec-total', elec], ['order-hand-total', hand], ['order-pack-total', pack]].forEach(function(pair) {
+    var el = document.getElementById(pair[0]);
+    var wrap = el ? el.parentElement : null;
+    if (!wrap) return;
+    if (pair[1] > 0) {
+      wrap.style.background = '#1A1D23'; wrap.style.border = 'none';
+      wrap.children[0].style.color = 'rgba(255,255,255,0.6)';
+      el.style.color = '#FFF';
+    } else {
+      wrap.style.background = '#F4F6FA'; wrap.style.border = '1px solid #DDE1EB';
+      wrap.children[0].style.color = '#5A6070';
+      el.style.color = '#1A1D23';
+    }
+  });
+  // 발주합계: 금액>0이면 빨강, 아니면 흰색+테두리
+  var grandEl = document.getElementById('order-grand-total');
+  var grandWrap = grandEl ? grandEl.parentElement : null;
+  if (grandWrap) {
+    if (grand > 0) {
+      grandWrap.style.background = '#A32D2D'; grandWrap.style.border = 'none';
+      grandWrap.children[0].style.color = 'rgba(255,255,255,0.7)';
+      grandEl.style.color = '#FFF';
+    } else {
+      grandWrap.style.background = '#F4F6FA'; grandWrap.style.border = '1px solid #DDE1EB';
+      grandWrap.children[0].style.color = '#5A6070';
+      grandEl.style.color = '#1A1D23';
+    }
+  }
   // Auto-refresh 발주서 if visible
   if (document.getElementById('order-sheet').style.display !== 'none') renderOrderSheet();
 }
