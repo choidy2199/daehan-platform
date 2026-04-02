@@ -1144,7 +1144,7 @@ function renderCatalog() {
     if (cat && p.category !== cat) return false;
     if (sub && p.subcategory !== sub) return false;
     if (search) {
-      const s = `${p.code} ${p.manageCode || ''} ${p.model} ${p.description} ${p.subcategory} ${p.detail} ${p.ttiNum}`.toLowerCase();
+      const s = `${p.code} ${p.manageCode || ''} ${p.category || ''} ${p.subcategory || ''} ${p.detail || ''} ${p.orderNum || ''} ${p.model} ${p.description} ${p.ttiNum}`.toLowerCase();
       return s.includes(search);
     }
     return true;
@@ -1348,7 +1348,7 @@ function toggleAllDiscontinued(checked) {
     if (cat && p.category !== cat) match = false;
     if (sub && p.subcategory !== sub) match = false;
     if (search) {
-      const s = `${p.code} ${p.manageCode || ''} ${p.model} ${p.description} ${p.subcategory} ${p.detail} ${p.ttiNum}`.toLowerCase();
+      const s = `${p.code} ${p.manageCode || ''} ${p.category || ''} ${p.subcategory || ''} ${p.detail || ''} ${p.orderNum || ''} ${p.model} ${p.description} ${p.ttiNum}`.toLowerCase();
       if (!s.includes(search)) match = false;
     }
     if (match) p.discontinued = checked ? '단종' : '';
