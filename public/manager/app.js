@@ -3663,26 +3663,71 @@ function closeModal() { document.getElementById('import-modal').classList.remove
 // ======================== SETTINGS ========================
 function showSettingsModal() {
   const s = DB.settings;
+  // 리베이트
   document.getElementById('set-quarter').value = ((s.quarterDC || 0.04) * 100).toFixed(1);
   document.getElementById('set-year').value = ((s.yearDC || 0.018) * 100).toFixed(1);
+  // 이익율
   document.getElementById('set-mk-domae').value = s.mkDomae || 1;
   document.getElementById('set-mk-retail').value = s.mkRetail || 15;
   document.getElementById('set-mk-naver').value = s.mkNaver || 1;
   document.getElementById('set-mk-open-elec').value = s.mkOpenElec || 0.5;
   document.getElementById('set-mk-open-hand').value = s.mkOpenHand || 0.5;
+
+  // 제품 추가 DC select 동적 채우기
+  var cats = ['<option value="">대분류 선택</option>'];
+  var catList = [];
+  try { catList = [...new Set(DB.products.map(function(p) { return p.category; }).filter(Boolean))].sort(); } catch(e) {}
+  catList.forEach(function(c) { cats.push('<option value="' + c + '">' + c + '</option>'); });
+  var catHtml = cats.join('');
+  for (var i = 1; i <= 5; i++) {
+    var el12 = document.getElementById('dc12cat' + i);
+    var el13 = document.getElementById('dc13cat' + i);
+    if (el12) el12.innerHTML = catHtml;
+    if (el13) el13.innerHTML = catHtml;
+  }
+  // 저장된 productDCRules 값 로드
+  var rules = s.productDCRules || [];
+  rules.forEach(function(rule) {
+    var prefix = rule.rate === 12 ? 'dc12cat' : rule.rate === 13 ? 'dc13cat' : '';
+    if (!prefix) return;
+    (rule.categories || []).forEach(function(cat, idx) {
+      var el = document.getElementById(prefix + (idx + 1));
+      if (el) el.value = cat;
+    });
+  });
+
+  // 커머셜 프로모션 값 로드
+  var os = orderSettings;
+  var arP = os.arPromos || [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}];
+  var volP = os.volPromos || [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}];
+  for (var j = 0; j < 4; j++) {
+    var arn = document.getElementById('os-ar-name-' + j);
+    var arr = document.getElementById('os-ar-rate-' + j);
+    var vln = document.getElementById('os-vol-name-' + j);
+    var vlr = document.getElementById('os-vol-rate-' + j);
+    if (arn) arn.value = (arP[j] && arP[j].name) || '';
+    if (arr) arr.value = (arP[j] && arP[j].rate) || '';
+    if (vln) vln.value = (volP[j] && volP[j].name) || '';
+    if (vlr) vlr.value = (volP[j] && volP[j].rate) || '';
+  }
+
+  // 기본 탭: 밀워키 리베이트
+  switchSettingsTab('rebate');
   document.getElementById('settings-modal').classList.add('show');
 }
 function closeSettingsModal() {
   document.getElementById('settings-modal').classList.remove('show');
-  switchSettingsTab('settings');
+  switchSettingsTab('rebate');
 }
 
 // ======================== 설정 모달 탭 전환 ========================
 function switchSettingsTab(tab) {
-  document.getElementById('settings-tab-settings').style.display = tab === 'settings' ? '' : 'none';
-  document.getElementById('settings-tab-datamgmt').style.display = tab === 'datamgmt' ? '' : 'none';
-  document.getElementById('stab-settings').classList.toggle('active', tab === 'settings');
-  document.getElementById('stab-datamgmt').classList.toggle('active', tab === 'datamgmt');
+  ['rebate', 'online', 'datamgmt'].forEach(function(t) {
+    var el = document.getElementById('settings-tab-' + t);
+    var btn = document.getElementById('stab-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
   if (tab === 'datamgmt') updateDataMgmtCounts();
 }
 
@@ -4017,6 +4062,29 @@ function applySettings() {
   DB.settings.mkOpenElec = pv('set-mk-open-elec', 0.5);
   DB.settings.mkOpenHand = pv('set-mk-open-hand', 0.5);
   DB.settings.vat = 0.1;
+
+  // 제품 추가 DC 규칙 저장
+  var dc12cats = [], dc13cats = [];
+  for (var i = 1; i <= 5; i++) {
+    var v12 = document.getElementById('dc12cat' + i); if (v12 && v12.value) dc12cats.push(v12.value);
+    var v13 = document.getElementById('dc13cat' + i); if (v13 && v13.value) dc13cats.push(v13.value);
+  }
+  DB.settings.productDCRules = [
+    { rate: 12, categories: dc12cats },
+    { rate: 13, categories: dc13cats }
+  ];
+
+  // 커머셜 프로모션 저장 (설정 모달로 통합)
+  orderSettings.arPromos = [];
+  orderSettings.volPromos = [];
+  for (var j = 0; j < 4; j++) {
+    var arRate = parseFloat((document.getElementById('os-ar-rate-' + j) || {}).value);
+    var volRate = parseFloat((document.getElementById('os-vol-rate-' + j) || {}).value);
+    orderSettings.arPromos.push({ name: ((document.getElementById('os-ar-name-' + j) || {}).value || '').trim(), rate: isNaN(arRate) ? 0 : arRate });
+    orderSettings.volPromos.push({ name: ((document.getElementById('os-vol-name-' + j) || {}).value || '').trim(), rate: isNaN(volRate) ? 0 : volRate });
+  }
+  localStorage.setItem(ORDER_SETTINGS_KEY, JSON.stringify(orderSettings));
+
   save(KEYS.settings, DB.settings);
   recalcAll();
   closeSettingsModal();

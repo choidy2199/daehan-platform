@@ -1138,78 +1138,146 @@
 
 <!-- Settings Modal -->
 <div class="modal-bg" id="settings-modal">
-  <div class="modal" style="max-width:700px">
+  <div class="modal" style="max-width:740px">
     <div class="modal-header">
       <h3>⚙ 할인율·수수료 설정</h3>
       <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
     </div>
     <div style="display:flex;gap:0;border-bottom:2px solid #DDE1EB;margin:0 20px">
-      <button id="stab-settings" class="settings-tab active" onclick="switchSettingsTab('settings')">설정</button>
-      <button id="stab-datamgmt" class="settings-tab" onclick="switchSettingsTab('datamgmt')">데이터 관리</button>
+      <button id="stab-rebate" class="settings-tab active" onclick="switchSettingsTab('rebate')">밀워키 리베이트</button>
+      <button id="stab-online" class="settings-tab" onclick="switchSettingsTab('online')">온라인 판매수수료</button>
+      <button id="stab-datamgmt" class="settings-tab" onclick="switchSettingsTab('datamgmt')">데이터관리</button>
     </div>
-    <div class="modal-body" id="settings-tab-settings" style="padding:16px 20px;max-height:calc(100vh - 200px);overflow-y:auto">
 
-      <!-- 섹션1: 밀워키 리베이트 -->
+    <!-- 탭1: 밀워키 리베이트 -->
+    <div class="modal-body" id="settings-tab-rebate" style="padding:16px 20px;max-height:calc(100vh - 200px);overflow-y:auto">
+
+      <!-- (A) 년간/분기 리베이트 -->
       <div style="margin-bottom:16px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#1A1D23">① 밀워키 리베이트</div>
         <div class="form-grid" style="grid-template-columns:1fr 1fr">
           <div class="form-field">
-            <label class="label">분기 리베이트 (%)</label>
+            <label class="label">분기 리베이트 (%) <span style="background:#E6F1FB;color:#185FA5;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500">AR</span></label>
             <input class="input" id="set-quarter" type="number" step="0.1">
           </div>
           <div class="form-field">
-            <label class="label">년간 리베이트 (%)</label>
+            <label class="label">년간 리베이트 (%) <span style="background:#E6F1FB;color:#185FA5;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500">AR</span></label>
             <input class="input" id="set-year" type="number" step="0.1">
           </div>
         </div>
+        <div style="font-size:10px;color:#888;margin-top:4px">계산: 공급가 × (1 - 리베이트%)</div>
       </div>
 
-      <div style="height:1px;background:#E2E5EA;margin:18px 0"></div>
+      <div style="height:1px;background:#E2E5EA;margin:14px 0"></div>
 
-      <!-- 섹션2: 채널별 목표 이익률 -->
+      <!-- (B) 제품 추가 DC -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:#1A1D23">제품 추가 DC <span style="background:#FAEEDA;color:#854F0B;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500">물량</span></div>
+        <div style="font-size:10px;color:#888;margin-bottom:10px">계산: 공급가 ÷ (1 + DC%)</div>
+        <div style="border:1px solid #DDE1EB;border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <span style="background:#185FA5;color:#fff;font-size:11px;padding:2px 10px;border-radius:4px;font-weight:600;min-width:40px;text-align:center">12%</span>
+            <select class="input" id="dc12cat1" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+            <select class="input" id="dc12cat2" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+            <select class="input" id="dc12cat3" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+            <select class="input" id="dc12cat4" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+            <select class="input" id="dc12cat5" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <span style="background:#EF9F27;color:#fff;font-size:11px;padding:2px 10px;border-radius:4px;font-weight:600;min-width:40px;text-align:center">13%</span>
+            <select class="input" id="dc13cat1" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+            <select class="input" id="dc13cat2" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+            <select class="input" id="dc13cat3" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+            <select class="input" id="dc13cat4" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+            <select class="input" id="dc13cat5" style="flex:1;min-width:80px;height:30px;font-size:12px"><option value="">대분류 선택</option></select>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:#E2E5EA;margin:14px 0"></div>
+
+      <!-- (C) 커머셜 프로모션 -->
       <div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#1A1D23">채널별 목표 이익률</div>
-        <div style="background:#E6F1FB;border-radius:6px;padding:8px 12px;font-size:11px;color:#0C447C;margin-bottom:14px;line-height:1.5">
-          목표 이익률을 입력하면, 각 채널의 수수료와 부가세(10%)를 고려하여 판매가를 자동 역산합니다.<br>
-          수수료는 설정 > 수수료 설정에서 관리됩니다. 판매가는 백원 단위 반올림 (소매는 천원 단위).
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px;color:#1A1D23">커머셜 프로모션</div>
+        <div style="background:#E6F1FB;border-radius:6px;padding:8px 12px;font-size:11px;color:#0C447C;margin-bottom:12px;line-height:1.5">
+          일반발주·프로모션발주 모두에 적용되는 커머셜 할인율입니다.<br>
+          단가표 원가(분기+년간)와 별도로, 발주 시 추가 적용됩니다.<br>
+          AR차감: 공급가에서 직접 차감 · 물량지원: 추가 수량으로 개당 단가 인하
         </div>
-        <div class="form-grid" style="grid-template-columns:1fr 1fr">
-          <div class="form-field">
-            <label class="label">A(도매) 이익률 (%)</label>
-            <input class="input" id="set-mk-domae" type="number" step="0.1">
-            <span style="font-size:10px;color:#9BA3B2">단순 마크업 · 백원 반올림</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#5A6070;margin-bottom:6px;padding:4px 8px;background:#EAECF2;border-radius:4px">AR차감 방식 <span style="background:#E6F1FB;color:#185FA5;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500">AR</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-ar-name-0" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-ar-rate-0" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+              <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-ar-name-1" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-ar-rate-1" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+              <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-ar-name-2" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-ar-rate-2" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+              <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-ar-name-3" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-ar-rate-3" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+            </div>
           </div>
-          <div class="form-field">
-            <label class="label">소매 이익률 (%)</label>
-            <input class="input" id="set-mk-retail" type="number" step="0.1">
-            <span style="font-size:10px;color:#9BA3B2">단순 마크업 · 천원 반올림</span>
-          </div>
-        </div>
-        <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:8px">
-          <div class="form-field">
-            <label class="label">스토어팜 이익률 (%)</label>
-            <input class="input" id="set-mk-naver" type="number" step="0.1">
-            <span style="font-size:10px;color:#9BA3B2">수수료+VAT 역산 · 백원</span>
-          </div>
-          <div class="form-field">
-            <label class="label">오픈마켓 전동 이익률 (%)</label>
-            <input class="input" id="set-mk-open-elec" type="number" step="0.1">
-            <span style="font-size:10px;color:#9BA3B2">수수료+VAT 역산 · 백원</span>
-          </div>
-          <div class="form-field">
-            <label class="label">오픈마켓 수공구 이익률 (%)</label>
-            <input class="input" id="set-mk-open-hand" type="number" step="0.1">
-            <span style="font-size:10px;color:#9BA3B2">수수료+VAT 역산 · 백원</span>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:#5A6070;margin-bottom:6px;padding:4px 8px;background:#EAECF2;border-radius:4px">물량지원 방식 <span style="background:#FAEEDA;color:#854F0B;font-size:10px;padding:1px 6px;border-radius:4px;font-weight:500">물량</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-vol-name-0" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-vol-rate-0" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+              <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-vol-name-1" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-vol-rate-1" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+              <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-vol-name-2" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-vol-rate-2" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+              <div style="display:flex;gap:6px;align-items:center"><input class="input" id="os-vol-name-3" placeholder="프로모션명" style="flex:1;height:32px;font-size:12px"><input class="input" id="os-vol-rate-3" type="number" step="0.1" placeholder="%" style="width:70px;height:32px;font-size:12px;text-align:right"><span style="font-size:12px;color:#5A6070">%</span></div>
+            </div>
           </div>
         </div>
-      </div>
-
-      <!-- 수수료 안내 -->
-      <div style="background:#F4F6FA;border-radius:6px;padding:10px 14px;font-size:12px;color:#5A6070;margin-top:18px">
-        온라인 판매채널 수수료는 <strong>설정 > 수수료 설정</strong>에서 통합 관리합니다.
       </div>
 
     </div>
+
+    <!-- 탭2: 온라인 판매수수료 -->
+    <div class="modal-body" id="settings-tab-online" style="display:none;padding:16px 20px;max-height:calc(100vh - 200px);overflow-y:auto">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:#1A1D23">채널별 목표 이익율</div>
+      <div style="display:flex;border:1px solid #DDE1EB;border-radius:8px;overflow:hidden">
+        <!-- 오프라인 -->
+        <div style="flex:2;padding:14px 16px;text-align:center">
+          <span style="background:#3B6D11;color:#fff;font-size:11px;padding:3px 14px;border-radius:20px;font-weight:500">오프라인</span>
+          <div style="display:flex;gap:12px;justify-content:center;margin-top:12px">
+            <div style="text-align:center">
+              <div style="font-size:11px;color:#5A6070;margin-bottom:4px">A단가</div>
+              <div style="display:flex;align-items:center;gap:3px;justify-content:center"><input class="input" id="set-mk-domae" type="number" step="0.1" style="width:60px;height:32px;font-size:13px;text-align:center"><span style="font-size:12px;color:#5A6070">%</span></div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:11px;color:#5A6070;margin-bottom:4px">소매</div>
+              <div style="display:flex;align-items:center;gap:3px;justify-content:center"><input class="input" id="set-mk-retail" type="number" step="0.1" style="width:60px;height:32px;font-size:13px;text-align:center"><span style="font-size:12px;color:#5A6070">%</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- 구분선 -->
+        <div style="width:1px;background:#DDE1EB"></div>
+        <!-- 스토어팜 -->
+        <div style="flex:1;padding:14px 16px;text-align:center">
+          <span style="background:#185FA5;color:#fff;font-size:11px;padding:3px 14px;border-radius:20px;font-weight:500">스토어팜</span>
+          <div style="margin-top:12px;text-align:center">
+            <div style="font-size:11px;color:#5A6070;margin-bottom:4px">스토어팜</div>
+            <div style="display:flex;align-items:center;gap:3px;justify-content:center"><input class="input" id="set-mk-naver" type="number" step="0.1" style="width:60px;height:32px;font-size:13px;text-align:center"><span style="font-size:12px;color:#5A6070">%</span></div>
+          </div>
+        </div>
+        <!-- 구분선 -->
+        <div style="width:1px;background:#DDE1EB"></div>
+        <!-- 오픈마켓 -->
+        <div style="flex:2;padding:14px 16px;text-align:center">
+          <span style="background:#854F0B;color:#fff;font-size:11px;padding:3px 14px;border-radius:20px;font-weight:500">오픈마켓</span>
+          <div style="display:flex;gap:12px;justify-content:center;margin-top:12px">
+            <div style="text-align:center">
+              <div style="font-size:11px;color:#5A6070;margin-bottom:4px">전동</div>
+              <div style="display:flex;align-items:center;gap:3px;justify-content:center"><input class="input" id="set-mk-open-elec" type="number" step="0.1" style="width:60px;height:32px;font-size:13px;text-align:center"><span style="font-size:12px;color:#5A6070">%</span></div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:11px;color:#5A6070;margin-bottom:4px">수공구</div>
+              <div style="display:flex;align-items:center;gap:3px;justify-content:center"><input class="input" id="set-mk-open-hand" type="number" step="0.1" style="width:60px;height:32px;font-size:13px;text-align:center"><span style="font-size:12px;color:#5A6070">%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#E6F1FB;border-radius:6px;padding:8px 12px;font-size:11px;color:#0C447C;margin-top:14px;line-height:1.5">
+        각 채널별 목표 이익율은 밀워키 단가표의 판매가 계산에 반영됩니다.
+      </div>
+    </div>
+
+    <!-- 탭3: 데이터관리 -->
     <div class="modal-body" id="settings-tab-datamgmt" style="display:none;padding:16px 20px;max-height:calc(100vh - 200px);overflow-y:auto">
       <div style="background:#FAEEDA;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#412402">
         ⚠️ 초기화하면 해당 데이터가 영구 삭제됩니다. 엑셀 백업 후 진행하세요.
@@ -1237,6 +1305,7 @@
       <div style="font-size:12px;color:#5A6070;margin-bottom:12px">모든 데이터를 삭제하고 앱을 초기 상태로 되돌립니다.</div>
       <button class="btn-danger" onclick="executeFullReset()" style="background:#791F1F">🗑 전체 초기화 (복구 불가)</button>
     </div>
+
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeSettingsModal()">취소</button>
       <button class="btn-primary" onclick="applySettings()">적용 (전체 재계산)</button>
