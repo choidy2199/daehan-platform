@@ -1173,6 +1173,10 @@ function renderCatalog() {
   const active = sortProducts(filtered.filter(p => !p.discontinued));
   const discontinued = sortProducts(filtered.filter(p => p.discontinued));
 
+  function getCategoryColor(cat) {
+    var map = { '파워툴': { bg:'#DBEAFE', color:'#1E40AF' }, '수공구': { bg:'#D1FAE5', color:'#065F46' }, '악세사리': { bg:'#FEF3C7', color:'#92400E' }, '팩아웃': { bg:'#FCE7F3', color:'#9D174D' } };
+    return map[cat] || { bg:'#F3F4F6', color:'#374151' };
+  }
   function buildRow(p) {
     const idx = DB.products.indexOf(p);
     const stock = findStock(p.code);
@@ -1182,10 +1186,11 @@ function renderCatalog() {
       `<span class="badge badge-red">${stock}</span>`;
     // 제품DC 컬럼 제거됨 (카테고리 기반으로 변경)
     const isD = !!p.discontinued;
+    const cc = getCategoryColor(p.category);
     return `<tr class="${isD ? 'row-discontinued' : ''}">
       <td style="font-weight:500">${p.code}</td>
       <td>${p.manageCode || '-'}</td>
-      <td><span class="badge badge-blue">${p.category || '-'}</span></td>
+      <td><span style="background:${cc.bg};color:${cc.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${p.category || '-'}</span></td>
       <td>${p.subcategory || '-'}</td>
       <td>${p.detail || '-'}</td>
       <td class="center">${p.orderNum || '-'}</td>
