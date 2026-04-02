@@ -3700,10 +3700,9 @@ function showSettingsModal() {
     });
   });
 
-  // 커머셜 프로모션 값 로드
-  var os = orderSettings;
-  var arP = os.arPromos || [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}];
-  var volP = os.volPromos || [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}];
+  // 커머셜 프로모션 값 로드 (mw_settings에서)
+  var arP = s.arPromos || [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}];
+  var volP = s.volPromos || [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}];
   for (var j = 0; j < 4; j++) {
     var arn = document.getElementById('os-ar-name-' + j);
     var arr = document.getElementById('os-ar-rate-' + j);
@@ -3775,7 +3774,6 @@ function executeDataReset() {
       DB.orders = { elec: [], hand: [], pack: [] }; save(KEYS.orders, DB.orders);
       localStorage.removeItem('mw_po_orders');
       localStorage.removeItem('mw_spot_orders');
-      localStorage.removeItem('mw_order_settings');
       if (typeof poOrderData !== 'undefined') poOrderData = [];
       if (typeof spotOrderData !== 'undefined') spotOrderData = [];
     }
@@ -3822,12 +3820,7 @@ function executeFullReset() {
   setTimeout(function() { location.reload(); }, 1000);
 }
 
-// ======================== 커머셜 프로모션 설정 ========================
-const ORDER_SETTINGS_KEY = 'mw_order_settings';
-let orderSettings = loadObj(ORDER_SETTINGS_KEY, {
-  arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}],
-  volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}]
-});
+// 커머셜 프로모션은 설정 팝업(mw_settings)에서 통합 관리
 
 async function syncInventory() {
   // 1) mw_products + mw_gen_products에서 관리코드 수집
@@ -4000,43 +3993,6 @@ function updateSyncTimeDisplay() {
   }
 }
 
-function showOrderSettingsModal() {
-  const s = orderSettings;
-  const arP = s.arPromos || [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}];
-  const volP = s.volPromos || [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}];
-  for (let i = 0; i < 4; i++) {
-    document.getElementById('os-ar-name-' + i).value = (arP[i] && arP[i].name) || '';
-    document.getElementById('os-ar-rate-' + i).value = (arP[i] && arP[i].rate) || '';
-    document.getElementById('os-vol-name-' + i).value = (volP[i] && volP[i].name) || '';
-    document.getElementById('os-vol-rate-' + i).value = (volP[i] && volP[i].rate) || '';
-  }
-  document.getElementById('order-settings-modal').classList.add('show');
-}
-
-function closeOrderSettingsModal() {
-  document.getElementById('order-settings-modal').classList.remove('show');
-}
-
-function applyOrderSettings() {
-  orderSettings.arPromos = [];
-  orderSettings.volPromos = [];
-  for (let i = 0; i < 4; i++) {
-    const arRate = parseFloat(document.getElementById('os-ar-rate-' + i).value);
-    const volRate = parseFloat(document.getElementById('os-vol-rate-' + i).value);
-    orderSettings.arPromos.push({
-      name: document.getElementById('os-ar-name-' + i).value.trim(),
-      rate: isNaN(arRate) ? 0 : arRate
-    });
-    orderSettings.volPromos.push({
-      name: document.getElementById('os-vol-name-' + i).value.trim(),
-      rate: isNaN(volRate) ? 0 : volRate
-    });
-  }
-  localStorage.setItem(ORDER_SETTINGS_KEY, JSON.stringify(orderSettings));
-  closeOrderSettingsModal();
-  renderCatalog();
-  toast('커머셜 프로모션 설정 적용 완료');
-}
 
 // 발주용 매입원가 계산 (분기+년간+커머셜 모두 적용)
 function calcOrderCost(price, category) {
@@ -4044,14 +4000,11 @@ function calcOrderCost(price, category) {
   const s = DB.settings;
   // 분기+년간 리베이트 (단가표 설정에서)
   let arTotal = price * (s.quarterDC || 0) + price * (s.yearDC || 0);
-  // 단가표 커머셜 AR (기존 — 호환 유지)
+  // 커머셜 AR (설정에서 통합 관리)
   (s.arPromos || []).forEach(ap => { if (ap.rate > 0) arTotal += price * (ap.rate / 100); });
-  // 발주 커머셜 AR 추가
-  (orderSettings.arPromos || []).forEach(ap => { if (ap.rate > 0) arTotal += price * (ap.rate / 100); });
-  // 물량지원: 단가표 커머셜 + 발주 커머셜 + 카테고리DC
+  // 물량지원: 커머셜 + 카테고리DC
   let volPct = 0;
   (s.volPromos || []).forEach(vp => { if (vp.rate > 0) volPct += vp.rate; });
-  (orderSettings.volPromos || []).forEach(vp => { if (vp.rate > 0) volPct += vp.rate; });
   // 카테고리 기반 제품DC 조회
   var catDC = 0;
   (s.productDCRules || []).forEach(function(rule) {
@@ -4083,16 +4036,15 @@ function applySettings() {
     { rate: 13, categories: dc13cats }
   ];
 
-  // 커머셜 프로모션 저장 (설정 모달로 통합)
-  orderSettings.arPromos = [];
-  orderSettings.volPromos = [];
+  // 커머셜 프로모션 저장 (mw_settings에 통합)
+  DB.settings.arPromos = [];
+  DB.settings.volPromos = [];
   for (var j = 0; j < 4; j++) {
     var arRate = parseFloat((document.getElementById('os-ar-rate-' + j) || {}).value);
     var volRate = parseFloat((document.getElementById('os-vol-rate-' + j) || {}).value);
-    orderSettings.arPromos.push({ name: ((document.getElementById('os-ar-name-' + j) || {}).value || '').trim(), rate: isNaN(arRate) ? 0 : arRate });
-    orderSettings.volPromos.push({ name: ((document.getElementById('os-vol-name-' + j) || {}).value || '').trim(), rate: isNaN(volRate) ? 0 : volRate });
+    DB.settings.arPromos.push({ name: ((document.getElementById('os-ar-name-' + j) || {}).value || '').trim(), rate: isNaN(arRate) ? 0 : arRate });
+    DB.settings.volPromos.push({ name: ((document.getElementById('os-vol-name-' + j) || {}).value || '').trim(), rate: isNaN(volRate) ? 0 : volRate });
   }
-  localStorage.setItem(ORDER_SETTINGS_KEY, JSON.stringify(orderSettings));
 
   save(KEYS.settings, DB.settings);
   recalcAll();
@@ -7243,7 +7195,6 @@ async function init() {
 
   _t = performance.now();
   makeModalDraggable('settings-modal');
-  makeModalDraggable('order-settings-modal');
   makeModalDraggable('order-history-modal');
   makeModalDraggable('po-history-modal');
   console.log('[PERF] init — step3 makeModalDraggable x4: ' + (performance.now() - _t).toFixed(0) + 'ms');
