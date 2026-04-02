@@ -673,18 +673,17 @@ function calcCost(supplyPrice, category) {
   // AR차감: 분기 + 년간 + AR커머셜들
   let arTotal = sp * s.quarterDC + sp * s.yearDC;
   (s.arPromos || []).forEach(ap => { if (ap.rate > 0) arTotal += sp * (ap.rate / 100); });
-  // 물량지원: 커머셜들 + 카테고리DC
-  let volPct = 0;
-  (s.volPromos || []).forEach(vp => { if (vp.rate > 0) volPct += vp.rate; });
-  // 카테고리 기반 제품DC 조회
-  var catDC = 0;
-  (s.productDCRules || []).forEach(function(rule) {
-    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) { catDC = rule.rate; }
-  });
-  volPct += catDC;
-  // 물량지원: 공급가 기준으로 독립 계산
+  // 물량지원: 각 항목을 공급가 기준으로 개별 계산
   var volTotal = 0;
-  if (volPct > 0) { volTotal = sp - (sp / (1 + volPct / 100)); }
+  (s.volPromos || []).forEach(function(vp) {
+    if (vp.rate > 0) { volTotal += sp - (sp / (1 + vp.rate / 100)); }
+  });
+  // 제품 추가 DC (카테고리 기반) — 개별 계산
+  (s.productDCRules || []).forEach(function(rule) {
+    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
+      volTotal += sp - (sp / (1 + rule.rate / 100));
+    }
+  });
   // 최종: 공급가 - AR할인합계 - 물량할인합계
   return sp - arTotal - volTotal;
 }
@@ -4005,18 +4004,17 @@ function calcOrderCost(price, category) {
   let arTotal = price * (s.quarterDC || 0) + price * (s.yearDC || 0);
   // 커머셜 AR (설정에서 통합 관리)
   (s.arPromos || []).forEach(ap => { if (ap.rate > 0) arTotal += price * (ap.rate / 100); });
-  // 물량지원: 커머셜 + 카테고리DC
-  let volPct = 0;
-  (s.volPromos || []).forEach(vp => { if (vp.rate > 0) volPct += vp.rate; });
-  // 카테고리 기반 제품DC 조회
-  var catDC = 0;
-  (s.productDCRules || []).forEach(function(rule) {
-    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) { catDC = rule.rate; }
-  });
-  volPct += catDC;
-  // 물량지원: 공급가 기준으로 독립 계산
+  // 물량지원: 각 항목을 공급가 기준으로 개별 계산
   var volTotal = 0;
-  if (volPct > 0) { volTotal = price - (price / (1 + volPct / 100)); }
+  (s.volPromos || []).forEach(function(vp) {
+    if (vp.rate > 0) { volTotal += price - (price / (1 + vp.rate / 100)); }
+  });
+  // 제품 추가 DC (카테고리 기반) — 개별 계산
+  (s.productDCRules || []).forEach(function(rule) {
+    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
+      volTotal += price - (price / (1 + rule.rate / 100));
+    }
+  });
   // 최종: 공급가 - AR할인합계 - 물량할인합계
   return price - arTotal - volTotal;
 }
