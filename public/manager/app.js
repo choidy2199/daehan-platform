@@ -666,17 +666,22 @@ document.addEventListener('click', function(e) {
 });
 
 // Calculate cost from supply price (엑셀 원가 공식)
-function calcCost(supplyPrice, productDC) {
+function calcCost(supplyPrice, category) {
   if (!supplyPrice) return 0;
   const s = DB.settings;
   const sp = supplyPrice;
   // AR차감: 분기 + 년간 + AR커머셜들
   let arTotal = sp * s.quarterDC + sp * s.yearDC;
   (s.arPromos || []).forEach(ap => { if (ap.rate > 0) arTotal += sp * (ap.rate / 100); });
-  // 물량지원: 커머셜들 + 제품DC
+  // 물량지원: 커머셜들 + 카테고리DC
   let volPct = 0;
   (s.volPromos || []).forEach(vp => { if (vp.rate > 0) volPct += vp.rate; });
-  volPct += (productDC || 0) * 100;
+  // 카테고리 기반 제품DC 조회
+  var catDC = 0;
+  (s.productDCRules || []).forEach(function(rule) {
+    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) { catDC = rule.rate; }
+  });
+  volPct += catDC;
   // 최종 매입원가
   return (sp - arTotal) / (1 + volPct / 100);
 }
@@ -1065,7 +1070,7 @@ function renderOrderSheet() {
     body.innerHTML = items.map(item => {
       const p = findProduct(item.code);
       const supply = p ? p.supplyPrice : 0;
-      const cost = p ? Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0)) : 0;
+      const cost = p ? Math.round(calcOrderCost(p.supplyPrice, p.category || '')) : 0;
       const amountSupply = supply * item.qty;
       const amountCost = cost * item.qty;
       totalSupply += amountSupply;
@@ -1173,7 +1178,7 @@ function renderCatalog() {
       stock > 0 ? `<span class="badge badge-green">${stock}</span>` :
       stock === 0 ? '<span class="badge badge-amber">0</span>' :
       `<span class="badge badge-red">${stock}</span>`;
-    const dcDisplay = p.productDC ? pct(p.productDC) : '-';
+    // 제품DC 컬럼 제거됨 (카테고리 기반으로 변경)
     const isD = !!p.discontinued;
     return `<tr class="${isD ? 'row-discontinued' : ''}">
       <td style="font-weight:500">${p.code}</td>
@@ -1186,7 +1191,6 @@ function renderCatalog() {
       <td style="font-weight:500">${p.model || '-'}</td>
       <td title="${p.description || ''}">${p.description || '-'}</td>
       <td class="num">${fmt(p.supplyPrice)}</td>
-      <td class="center">${dcDisplay}</td>
       <td class="num">${fmt(p.cost)}</td>
       ${(function() {
   const code = String(p.code);
@@ -1651,7 +1655,7 @@ function renderOrderTab(type) {
     const p = findProduct(item.code);
     const stock = findStock(item.code);
     const supplyPrice = p ? p.supplyPrice : 0;
-    const cost = p ? Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0)) : 0;
+    const cost = p ? Math.round(calcOrderCost(p.supplyPrice, p.category || '')) : 0;
     const qty = item.qty || 0;
     const stockBadge = stock == null ? '-' : stock > 0 ? `<span class="badge badge-green">${stock}</span>` : `<span class="badge badge-red">${stock}</span>`;
     return `<tr>
@@ -1741,7 +1745,7 @@ function confirmOrder() {
     DB.orders[type].forEach(item => {
       const p = findProduct(item.code);
       if (p && item.qty > 0) {
-        const cost = Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0));
+        const cost = Math.round(calcOrderCost(p.supplyPrice, p.category || ''));
         items.push({
           code: item.code,
           model: p.model,
@@ -1902,7 +1906,7 @@ function confirmPromoOrder() {
   poOrderData.forEach(item => {
     if (item.orderQty > 0) {
       const prod = item.code ? findProduct(item.code) : null;
-      const pdc = prod ? (prod.productDC || 0) : 0;
+      const pdc = prod ? (prod.category || '') : '';
       const unitCost = Math.round(calcOrderCost(item.promoPrice || 0, pdc));
       items.push({
         code: item.code || '',
@@ -1922,7 +1926,7 @@ function confirmPromoOrder() {
   spotOrderData.forEach(item => {
     if (item.orderQty > 0) {
       const prod = item.code ? findProduct(item.code) : null;
-      const pdc = prod ? (prod.productDC || 0) : 0;
+      const pdc = prod ? (prod.category || '') : '';
       const unitCost = Math.round(calcOrderCost(item.promoPrice || 0, pdc));
       items.push({
         code: item.code || '',
@@ -2134,7 +2138,7 @@ function exportOrder() {
       DB.orders[type].forEach(item => {
         const p = findProduct(item.code);
         if (p && item.qty > 0) {
-          const oc = Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0));
+          const oc = Math.round(calcOrderCost(p.supplyPrice, p.category || ''));
           data.push([item.code, item.qty, oc * item.qty, item.memo || '']);
           totalItems++;
         }
@@ -2194,7 +2198,7 @@ function renderPoOrder() {
     var isCumul = item.promoName && item.promoName.indexOf('누적') >= 0;
     var isConf = item.confirmed && !isCumul;
     var prod = item.code ? findProduct(item.code) : null;
-    var pdc = prod ? (prod.productDC || 0) : 0;
+    var pdc = prod ? (prod.category || '') : '';
     var unitCost = item.promoPrice ? Math.round(calcOrderCost(item.promoPrice, pdc)) : 0;
     var orderTotal = (item.orderQty || 0) * (unitCost || 0);
     var memoHtml = '';
@@ -2418,7 +2422,7 @@ function renderPromoOrderSheet() {
     const supplyAmt = (item.promoPrice || 0) * item.orderQty;
     promoSupplyTotal += supplyAmt;
     const prod = code ? findProduct(code) : null;
-    const pdc = prod ? (prod.productDC || 0) : 0;
+    const pdc = prod ? (prod.category || '') : '';
     const unitCost = Math.round(calcOrderCost(item.promoPrice || 0, pdc));
     const costAmt = unitCost * item.orderQty;
     promoCostTotal += costAmt;
@@ -2442,7 +2446,7 @@ function renderPromoOrderSheet() {
     const supplyAmt = (item.promoPrice || 0) * item.orderQty;
     spotSupplyTotal += supplyAmt;
     const prod = code ? findProduct(code) : null;
-    const pdc = prod ? (prod.productDC || 0) : 0;
+    const pdc = prod ? (prod.category || '') : '';
     const unitCost = Math.round(calcOrderCost(item.promoPrice || 0, pdc));
     const costAmt = unitCost * item.orderQty;
     spotCostTotal += costAmt;
@@ -2506,7 +2510,7 @@ function exportPromoOrder() {
         const code = item.code || findCodeByModel(item.model, item.ttiNum);
         const supplyAmt = (item.promoPrice || 0) * item.orderQty;
         const prod = code ? findProduct(code) : null;
-        const pdc = prod ? (prod.productDC || 0) : 0;
+        const pdc = prod ? (prod.category || '') : '';
         const unitCost = Math.round(calcOrderCost(item.promoPrice || 0, pdc));
         data.push([code || item.orderNum || '', item.orderQty, item.promoPrice || 0, supplyAmt, unitCost, unitCost * item.orderQty, item.promoName || '']);
         totalItems++;
@@ -2518,7 +2522,7 @@ function exportPromoOrder() {
         const code = item.code || findCodeByModel(item.model, item.ttiNum);
         const supplyAmt = (item.promoPrice || 0) * item.orderQty;
         const prod = code ? findProduct(code) : null;
-        const pdc = prod ? (prod.productDC || 0) : 0;
+        const pdc = prod ? (prod.category || '') : '';
         const unitCost = Math.round(calcOrderCost(item.promoPrice || 0, pdc));
         data.push([code || '', item.orderQty, item.promoPrice || 0, supplyAmt, unitCost, unitCost * item.orderQty, item.promoName || '스팟']);
         totalItems++;
@@ -2690,7 +2694,7 @@ function renderOnlineSales() {
     var stockNum = findStock(item.code);
     if (stockNum==null) stockNum = item.stock||0;
     var osProd = item.code ? findProduct(item.code) : null;
-    var osPdc = osProd ? (osProd.productDC || 0) : 0;
+    var osPdc = osProd ? (osProd.category || '') : '';
     var costP = item.promoCost ? Math.round(calcOrderCost(item.promoCost, osPdc)) : 0;
     var naver = calcOsProfit(item.naverPrice||0, costP||0, naverFee);
     var open = calcOsProfit(item.openPrice||0, costP||0, openFee);
@@ -2746,7 +2750,7 @@ function renderOsSummary(data, naverFee, openFee) {
   var promos=[],nRates=[],oRates=[],warn=0;
   data.forEach(function(item){
     if(item.promoName&&promos.indexOf(item.promoName)===-1)promos.push(item.promoName);
-    var sProd=item.code?findProduct(item.code):null;var sPdc=sProd?(sProd.productDC||0):0;var sCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,sPdc)):0;
+    var sProd=item.code?findProduct(item.code):null;var sCat=sProd?(sProd.category||''):'';var sCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,sCat)):0;
     if(item.naverPrice&&sCostP){var n=calcOsProfit(item.naverPrice,sCostP,naverFee);nRates.push(n.rate);}
     if(item.openPrice&&sCostP){var o=calcOsProfit(item.openPrice,sCostP,openFee);oRates.push(o.rate);}
     var sn=findStock(item.code);if(sn==null)sn=item.stock||0;if(sn<=2)warn++;
@@ -2864,7 +2868,7 @@ function exportOnlineSalesExcel(){
   var s=DB.settings,naverFee=s.naverFee||0.0663,openFee=s.openElecFee||0.13,data=getOsData();
   var rows=[['날짜','코드','모델','재고','업체명','판매가','원가P','스토어팜판매가','스토어팜이익','스토어팜이익률','오픈마켓판매가','오픈마켓이익','오픈마켓이익률','프로모션']];
   data.forEach(function(item){
-    var xProd=item.code?findProduct(item.code):null;var xPdc=xProd?(xProd.productDC||0):0;var xCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,xPdc)):0;
+    var xProd=item.code?findProduct(item.code):null;var xCat=xProd?(xProd.category||''):'';var xCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,xCat)):0;
     var naver=calcOsProfit(item.naverPrice||0,xCostP||0,naverFee);
     var open=calcOsProfit(item.openPrice||0,xCostP||0,openFee);
     rows.push([item.date,item.code,item.model,item.stock,item.vendor,item.price,xCostP,item.naverPrice,naver.profit,Math.round(naver.rate*10)/10,item.openPrice,open.profit,Math.round(open.rate*10)/10,item.promoName]);
@@ -3202,10 +3206,10 @@ function downloadTemplate() {
   const wb = XLSX.utils.book_new();
 
   const priceHeaders = [
-    [null, '코드', '관리코드', '대분류', '중분류', '소분류', '순번', 'TTI#', '모델명', '제품설명', '공급가', '제품DC', '원가', '원가P', 'A(도매)', '소매', '스토어팜', '오픈마켓', '재고', '본사가용', '입고날짜'],
-    [null, '', '', '', '', '', '', '', '', '', '', '', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '', '적정/임박/소진', '← 메모용'],
-    [null, 21815, '', '파워툴', '12V FUEL', '드릴 드라이버', 1093, 1093, 'M12 FDD2-0X', '12V FUEL 드릴 드라이버(GEN3) 베어툴', 139000, 0, '', '', '', '', '', '', 5, '적정', '4월 중순 입고예정'],
-    [null, 21817, '', '파워툴', '12V FUEL', '해머드릴 드라이버', 1126, 18622019, 'M12 FPD2-0X', '12V FUEL 해머드릴 드라이버(GEN3) 베어툴', 153000, 0.13, '', '', '', '', '', '', 3, '소진', '']
+    [null, '코드', '관리코드', '대분류', '중분류', '소분류', '순번', 'TTI#', '모델명', '제품설명', '공급가', '원가', '원가P', 'A(도매)', '소매', '스토어팜', '오픈마켓', '재고', '본사가용', '입고날짜'],
+    [null, '', '', '', '', '', '', '', '', '', '', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '', '적정/임박/소진', '← 메모용'],
+    [null, 21815, '', '파워툴', '12V FUEL', '드릴 드라이버', 1093, 1093, 'M12 FDD2-0X', '12V FUEL 드릴 드라이버(GEN3) 베어툴', 139000, '', '', '', '', '', '', 5, '적정', '4월 중순 입고예정'],
+    [null, 21817, '', '파워툴', '12V FUEL', '해머드릴 드라이버', 1126, 18622019, 'M12 FPD2-0X', '12V FUEL 해머드릴 드라이버(GEN3) 베어툴', 153000, '', '', '', '', '', '', 3, '소진', '']
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(priceHeaders);
   ws1['!cols'] = [{wch:2},{wch:10},{wch:14},{wch:10},{wch:15},{wch:15},{wch:8},{wch:12},{wch:25},{wch:40},{wch:12},{wch:8},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:15}];
@@ -3233,11 +3237,11 @@ function showProductModal(idx) {
     document.getElementById('prod-model').value = p.model || '';
     document.getElementById('prod-supplyPrice').value = p.supplyPrice || '';
     document.getElementById('prod-description').value = p.description || '';
-    document.getElementById('prod-productDC').value = p.productDC || '';
+    // prod-productDC 제거됨 (카테고리 기반 DC로 변경)
     document.getElementById('prod-discontinued').value = p.discontinued || '';
     document.getElementById('prod-inDate').value = p.inDate || '';
   } else {
-    ['prod-code','prod-manageCode','prod-category','prod-subcategory','prod-detail','prod-orderNum','prod-ttiNum','prod-model','prod-supplyPrice','prod-description','prod-productDC','prod-inDate'].forEach(id => document.getElementById(id).value = '');
+    ['prod-code','prod-manageCode','prod-category','prod-subcategory','prod-detail','prod-orderNum','prod-ttiNum','prod-model','prod-supplyPrice','prod-description','prod-inDate'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('prod-discontinued').value = '';
   }
   document.getElementById('product-modal').classList.add('show');
@@ -3266,11 +3270,11 @@ function saveProduct() {
   if (!supplyPrice) { toast('공급가를 입력해주세요'); return; }
 
   const idx = parseInt(document.getElementById('prod-edit-idx').value);
-  const productDC = parseFloat(document.getElementById('prod-productDC').value) || 0;
+  const prodCategory = document.getElementById('prod-category').value.trim();
 
   // Calculate cost and prices using current settings (same as recalcAll)
   const s = DB.settings;
-  const cost = calcCost(supplyPrice, productDC);
+  const cost = calcCost(supplyPrice, prodCategory);
 
   const item = {
     code: code,
@@ -3283,7 +3287,7 @@ function saveProduct() {
     model: model,
     description: document.getElementById('prod-description').value.trim(),
     supplyPrice: supplyPrice,
-    productDC: productDC,
+    productDC: 0,
     discontinued: document.getElementById('prod-discontinued').value,
     inDate: document.getElementById('prod-inDate').value.trim(),
     cost: Math.round(cost),
@@ -4035,7 +4039,7 @@ function applyOrderSettings() {
 }
 
 // 발주용 매입원가 계산 (분기+년간+커머셜 모두 적용)
-function calcOrderCost(price, productDC) {
+function calcOrderCost(price, category) {
   if (!price) return 0;
   const s = DB.settings;
   // 분기+년간 리베이트 (단가표 설정에서)
@@ -4044,11 +4048,16 @@ function calcOrderCost(price, productDC) {
   (s.arPromos || []).forEach(ap => { if (ap.rate > 0) arTotal += price * (ap.rate / 100); });
   // 발주 커머셜 AR 추가
   (orderSettings.arPromos || []).forEach(ap => { if (ap.rate > 0) arTotal += price * (ap.rate / 100); });
-  // 물량지원: 단가표 커머셜 + 발주 커머셜 + 제품DC
+  // 물량지원: 단가표 커머셜 + 발주 커머셜 + 카테고리DC
   let volPct = 0;
   (s.volPromos || []).forEach(vp => { if (vp.rate > 0) volPct += vp.rate; });
   (orderSettings.volPromos || []).forEach(vp => { if (vp.rate > 0) volPct += vp.rate; });
-  volPct += (productDC || 0) * 100;
+  // 카테고리 기반 제품DC 조회
+  var catDC = 0;
+  (s.productDCRules || []).forEach(function(rule) {
+    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) { catDC = rule.rate; }
+  });
+  volPct += catDC;
   return (price - arTotal) / (1 + volPct / 100);
 }
 
@@ -4099,7 +4108,7 @@ function recalcAll() {
 
   DB.products.forEach(function(p) {
     if (!p.supplyPrice) return;
-    var cost = calcCost(p.supplyPrice, p.productDC || 0);
+    var cost = calcCost(p.supplyPrice, p.category || '');
     p.cost = Math.round(cost);
 
     // 도매: 단순 마크업, 백원 반올림
@@ -4124,8 +4133,8 @@ function recalcAll() {
   DB.promotions.forEach(function(pr) {
     if (pr.promoPrice > 0) {
       var prod = pr.code ? findProduct(pr.code) : null;
-      var pdc = prod ? (prod.productDC || 0) : 0;
-      pr.cost = Math.round(calcCost(pr.promoPrice, pdc));
+      var pCat = prod ? (prod.category || '') : '';
+      pr.cost = Math.round(calcCost(pr.promoPrice, pCat));
     }
   });
 
@@ -4163,10 +4172,10 @@ function editPromo(idx) {
   document.getElementById('promo-edit-modal').classList.add('show');
 }
 
-function calcPromoCost(promoPrice, productDC) {
+function calcPromoCost(promoPrice, category) {
   // 프로모션 공급가에 동일한 설정값(리베이트+커머셜) 적용
   if (!promoPrice || promoPrice <= 0) return 0;
-  return calcCost(promoPrice, productDC || 0);
+  return calcCost(promoPrice, category || '');
 }
 
 function savePromo() {
@@ -4399,9 +4408,9 @@ function importExcel() {
           if (!code && !(row[col.모델명 ?? 8])) continue;
 
           const supplyPrice = row[col.공급가 ?? 10] || 0;
-          const productDC = is26 ? (row[col.제품DC ?? 13] || 0) : (row[col.제품DC ?? 11] || 0);
+          const importCategory = row[col.대분류 ?? 3] || '';
           const costVal = row[col.원가 ?? (is26 ? 14 : 12)] || 0;
-          const cost = costVal || calcCost(supplyPrice, productDC);
+          const cost = costVal || calcCost(supplyPrice, importCategory);
 
           var newItem = {
             discontinued: (String(row[col.단종 ?? 1] || '').trim() === '단종') ? '단종' : '',
@@ -4415,7 +4424,7 @@ function importExcel() {
             model: row[col.모델명 ?? 8] || '',
             description: row[col.제품설명 ?? 9] || '',
             supplyPrice: supplyPrice,
-            productDC: productDC,
+            productDC: 0,
             cost: Math.round(cost || 0),
             priceA: 0, priceRetail: 0, priceNaver: 0, priceOpen: 0,
             raisedPrice: is26 ? (row[col.인상가 ?? 11] || 0) : 0,
@@ -4585,8 +4594,8 @@ function exportAll() {
 
   // Products
   if (DB.products.length) {
-    const pData = [['단종', '코드', '관리코드', '대분류', '중분류', '소분류', '순번', 'TTI#', '모델명', '제품설명', '공급가', '제품DC', '원가', 'A(도매)', '소매', '스토어팜', '오픈마켓']];
-    DB.products.forEach(p => pData.push([p.discontinued, p.code, p.manageCode || '', p.category, p.subcategory, p.detail, p.orderNum, p.ttiNum, p.model, p.description, p.supplyPrice, p.productDC, p.cost, p.priceA, p.priceRetail, p.priceNaver, p.priceOpen]));
+    const pData = [['단종', '코드', '관리코드', '대분류', '중분류', '소분류', '순번', 'TTI#', '모델명', '제품설명', '공급가', '원가', 'A(도매)', '소매', '스토어팜', '오픈마켓']];
+    DB.products.forEach(p => pData.push([p.discontinued, p.code, p.manageCode || '', p.category, p.subcategory, p.detail, p.orderNum, p.ttiNum, p.model, p.description, p.supplyPrice, p.cost, p.priceA, p.priceRetail, p.priceNaver, p.priceOpen]));
     const ws = XLSX.utils.aoa_to_sheet(pData);
     ws['!cols'] = [{ wch: 6 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 25 }, { wch: 40 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws, '전체가격표');
@@ -6507,7 +6516,7 @@ function collectOrderItems(orderType) {
         var p = findProduct(item.code);
         if (!p) return;
         var supply = p.supplyPrice || 0;
-        var cost = Math.round(calcOrderCost(supply, p.productDC || 0));
+        var cost = Math.round(calcOrderCost(supply, p.category || ''));
         items.push({
           code: item.code,
           orderNum: p.orderNum || '',
@@ -6533,7 +6542,7 @@ function collectOrderItems(orderType) {
         model: item.model || '',
         qty: item.orderQty,
         supplyPrice: item.promoPrice || item.basePrice || 0,
-        costPrice: p ? Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0)) : 0,
+        costPrice: p ? Math.round(calcOrderCost(p.supplyPrice, p.category || '')) : 0,
         productDC: p ? (p.productDC || 0) : 0
       });
     });
@@ -6548,7 +6557,7 @@ function collectOrderItems(orderType) {
         model: item.model || '',
         qty: item.orderQty,
         supplyPrice: item.promoPrice || item.basePrice || 0,
-        costPrice: p ? Math.round(calcOrderCost(p.supplyPrice, p.productDC || 0)) : 0,
+        costPrice: p ? Math.round(calcOrderCost(p.supplyPrice, p.category || '')) : 0,
         productDC: p ? (p.productDC || 0) : 0
       });
     });
