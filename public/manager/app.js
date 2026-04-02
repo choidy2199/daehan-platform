@@ -1264,8 +1264,14 @@ function renderCatalog() {
 
   body.innerHTML = renderBatch(0, INITIAL_ROWS);
 
-  // 스크롤 시 나머지 행 점진 로드
+  // 스크롤 시 나머지 행 점진 로드 — 이전 리스너 제거 후 재등록
   var scrollContainer = body.closest('.table-scroll');
+  if (scrollContainer) {
+    if (scrollContainer._catalogScroll) {
+      scrollContainer.removeEventListener('scroll', scrollContainer._catalogScroll);
+      scrollContainer._catalogScroll = null;
+    }
+  }
   if (scrollContainer && allRows.length > INITIAL_ROWS) {
     var _loadingMore = false;
     scrollContainer._catalogScroll = function() {
