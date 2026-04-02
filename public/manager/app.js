@@ -682,8 +682,11 @@ function calcCost(supplyPrice, category) {
     if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) { catDC = rule.rate; }
   });
   volPct += catDC;
-  // 최종 매입원가
-  return (sp - arTotal) / (1 + volPct / 100);
+  // 물량지원: 공급가 기준으로 독립 계산
+  var volTotal = 0;
+  if (volPct > 0) { volTotal = sp - (sp / (1 + volPct / 100)); }
+  // 최종: 공급가 - AR할인합계 - 물량할인합계
+  return sp - arTotal - volTotal;
 }
 
 // ======================== AUTOCOMPLETE ========================
@@ -3678,7 +3681,7 @@ function showSettingsModal() {
   document.getElementById('set-mk-open-hand').value = s.mkOpenHand || 0.5;
 
   // 제품 추가 DC select 동적 채우기
-  var cats = ['<option value="">대분류 선택</option>'];
+  var cats = ['<option value="">분류 선택</option>'];
   var catList = [];
   try { catList = [...new Set(DB.products.map(function(p) { return p.category; }).filter(Boolean))].sort(); } catch(e) {}
   catList.forEach(function(c) { cats.push('<option value="' + c + '">' + c + '</option>'); });
@@ -3686,8 +3689,8 @@ function showSettingsModal() {
   for (var i = 1; i <= 5; i++) {
     var el12 = document.getElementById('dc12cat' + i);
     var el13 = document.getElementById('dc13cat' + i);
-    if (el12) el12.innerHTML = catHtml;
-    if (el13) el13.innerHTML = catHtml;
+    if (el12) { el12.innerHTML = catHtml; el12.style.backgroundColor = ''; el12.onchange = function() { this.style.backgroundColor = this.value ? '#e9ecef' : ''; }; }
+    if (el13) { el13.innerHTML = catHtml; el13.style.backgroundColor = ''; el13.onchange = function() { this.style.backgroundColor = this.value ? '#e9ecef' : ''; }; }
   }
   // 저장된 productDCRules 값 로드
   var rules = s.productDCRules || [];
@@ -3696,7 +3699,7 @@ function showSettingsModal() {
     if (!prefix) return;
     (rule.categories || []).forEach(function(cat, idx) {
       var el = document.getElementById(prefix + (idx + 1));
-      if (el) el.value = cat;
+      if (el) { el.value = cat; el.style.backgroundColor = cat ? '#e9ecef' : ''; }
     });
   });
 
@@ -4011,7 +4014,11 @@ function calcOrderCost(price, category) {
     if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) { catDC = rule.rate; }
   });
   volPct += catDC;
-  return (price - arTotal) / (1 + volPct / 100);
+  // 물량지원: 공급가 기준으로 독립 계산
+  var volTotal = 0;
+  if (volPct > 0) { volTotal = price - (price / (1 + volPct / 100)); }
+  // 최종: 공급가 - AR할인합계 - 물량할인합계
+  return price - arTotal - volTotal;
 }
 
 function applySettings() {
