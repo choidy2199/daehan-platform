@@ -1795,9 +1795,9 @@ function renderPOTab() {
 
   // 매출 카드 3개
   var saleCards = [
-    { label: '파워툴', color: '#185FA5', amount: '12,450,000', target: '목표 2,000만 · 62%', pct: 62 },
-    { label: '수공구', color: '#1D9E75', amount: '3,280,000', target: '목표 500만 · 66%', pct: 66 },
-    { label: '팩아웃', color: '#EF9F27', amount: '1,150,000', target: '목표 300만 · 38%', pct: 38 }
+    { label: '파워툴', color: '#185FA5', amount: '0', target: '목표 - · 0%', pct: 0 },
+    { label: '수공구', color: '#1D9E75', amount: '0', target: '목표 - · 0%', pct: 0 },
+    { label: '팩아웃', color: '#EF9F27', amount: '0', target: '목표 - · 0%', pct: 0 }
   ];
   saleCards.forEach(function(c) {
     html += '<div class="po-sale-card">';
@@ -1812,8 +1812,8 @@ function renderPOTab() {
 
   // 누적프로모션 카드 (더미 2개)
   var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [
-    { name: 'GEN4+FQID2', amount: '8,500,000', benefit: '200만당 본품증정', achieved: 4, next: '1,500,000', paletteIdx: 0 },
-    { name: 'CBL2', amount: '2,100,000', benefit: '100만당 본품증정', achieved: 2, next: '900,000', paletteIdx: 1 }
+    { name: 'GEN4+FQID2', amount: '0', benefit: '200만당 본품증정', achieved: 0, next: '0', paletteIdx: 0 },
+    { name: 'CBL2', amount: '0', benefit: '100만당 본품증정', achieved: 0, next: '0', paletteIdx: 1 }
   ];
   promos.forEach(function(p, i) {
     var pal = _poPromoPalette[p.paletteIdx || i] || _poPromoPalette[0];
@@ -1821,7 +1821,7 @@ function renderPOTab() {
     html += '<div class="po-promo-name"><span style="width:6px;height:6px;border-radius:50%;background:' + pal.main + ';display:inline-block"></span> ' + p.name + '</div>';
     html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + p.amount + '</div>';
     html += '<div class="po-promo-benefit">' + p.benefit + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">달성 ' + p.achieved + '회</span></div>';
-    html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:60%;background:' + pal.main + '"></div></div>';
+    html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:0%;background:' + pal.main + '"></div></div>';
     html += '<div class="po-promo-next">다음까지 ' + p.next + '원</div>';
     html += '</div>';
   });
@@ -1833,12 +1833,12 @@ function renderPOTab() {
   // 합계 카드
   html += '<div class="po-total-card">';
   html += '<div class="po-total-label">합계 · ' + month + '월</div>';
-  html += '<div class="po-total-amount">16,880,000</div>';
-  html += '<div class="po-total-pct">전체 목표 대비 60%</div>';
-  html += '<div class="po-progress" style="margin-top:4px;background:rgba(255,255,255,0.2)"><div class="po-progress-fill" style="width:60%;background:#fff"></div></div>';
+  html += '<div class="po-total-amount">0</div>';
+  html += '<div class="po-total-pct">전체 목표 대비 0%</div>';
+  html += '<div class="po-progress" style="margin-top:4px;background:rgba(255,255,255,0.2)"><div class="po-progress-fill" style="width:0%;background:#fff"></div></div>';
   html += '<div class="po-total-halves">';
-  html += '<div class="po-total-half">1~15일 9,200,000</div>';
-  html += '<div class="po-total-half">16~30일 7,680,000</div>';
+  html += '<div class="po-total-half">1~15일 0</div>';
+  html += '<div class="po-total-half">16~30일 0</div>';
   html += '</div>';
   html += '</div>';
 
@@ -1927,15 +1927,24 @@ function buildPOProductPanel() {
 
   // 테이블
   html += '<div class="po-panel-body" id="po-prod-scroll">';
-  html += '<table class="po-table"><thead><tr>';
-  html += '<th>분류</th><th style="min-width:180px">모델명</th><th class="num">공급가</th><th class="num">원가</th><th class="center">본사</th><th class="center" style="width:50px">수량</th><th class="center" style="width:30px">🛒</th>';
+  html += '<table class="po-table po-table-lg"><thead><tr>';
+  html += '<th class="center" style="width:36px">No</th><th>프로모션번호</th><th>제품번호</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
   html += '</tr></thead><tbody id="po-prod-body">';
   html += '</tbody></table></div></div>';
   return html;
 }
 
-// 제품 행 빌드 (1행)
-function buildPOProductRow(p) {
+// 누적프로모션 색상 팔레트 (행 배경 + 태그)
+var _poCumulPromoRowStyles = [
+  { bg: 'rgba(238,237,254,0.35)', tagBg: '#EEEDFE', tagColor: '#3C3489' },
+  { bg: 'rgba(250,236,231,0.35)', tagBg: '#FAECE7', tagColor: '#712B13' },
+  { bg: 'rgba(225,245,238,0.35)', tagBg: '#E1F5EE', tagColor: '#085041' },
+  { bg: 'rgba(251,234,240,0.35)', tagBg: '#FBEAF0', tagColor: '#72243E' },
+  { bg: 'rgba(230,241,251,0.35)', tagBg: '#E6F1FB', tagColor: '#0C447C' }
+];
+
+// 제품 행 빌드 (1행) — rowIndex는 표시 순번
+function buildPOProductRow(p, rowIndex) {
   var code = normalizeTtiCode(p.ttiNum);
   var stockStatus = code && _poTtiStockMap[code] !== undefined ? _poTtiStockMap[code] : null;
   var stockIcon;
@@ -1944,16 +1953,31 @@ function buildPOProductRow(p) {
   else if (stockStatus === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
   else stockIcon = '<span style="color:#B4B2A9">-</span>';
 
-  var catColor = { '파워툴': '#185FA5', '수공구': '#1D9E75', '악세사리': '#EF9F27', '팩아웃': '#D4537E' }[p.category] || '#5A6070';
+  // 누적프로모션 매칭 확인
+  var promoTag = '';
+  var rowBg = '';
+  var cumulPromos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null');
+  if (cumulPromos && Array.isArray(cumulPromos)) {
+    for (var pi = 0; pi < cumulPromos.length; pi++) {
+      var cp = cumulPromos[pi];
+      if (cp.products && Array.isArray(cp.products) && cp.products.indexOf(p.ttiNum) !== -1) {
+        var rs = _poCumulPromoRowStyles[pi] || _poCumulPromoRowStyles[0];
+        rowBg = rs.bg;
+        promoTag = ' <span class="po-promo-tag" style="background:' + rs.tagBg + ';color:' + rs.tagColor + '">' + cp.name + '</span>';
+        break;
+      }
+    }
+  }
 
-  var tr = '<tr>';
-  tr += '<td><span style="font-size:10px;color:' + catColor + ';font-weight:600">' + (p.category || '-') + '</span></td>';
-  tr += '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
+  var tr = '<tr' + (rowBg ? ' style="background:' + rowBg + '"' : '') + '>';
+  tr += '<td class="center" style="color:#9BA3B2">' + (rowIndex + 1) + '</td>';
+  tr += '<td>' + (p.orderNum || '-') + '</td>';
+  tr += '<td style="font-family:monospace;font-size:12px">' + (p.ttiNum || p.code || '-') + '</td>';
+  tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + promoTag + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
-  tr += '<td class="num">-</td>';
   tr += '<td class="center">' + stockIcon + '</td>';
-  tr += '<td class="center"><input type="number" min="1" value="1" style="width:40px;height:24px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:11px;font-family:Pretendard,sans-serif" data-code="' + (p.ttiNum || '') + '"></td>';
-  tr += '<td class="center"><button class="po-cart-btn" onclick="addToCart(\'' + (p.ttiNum || '') + '\')">🛒</button></td>';
+  tr += '<td class="center"><input type="number" min="0" value="0" style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif" data-code="' + (p.ttiNum || '') + '"></td>';
+  tr += '<td class="center"><button class="po-cart-btn-dark" onclick="addToCart(\'' + (p.ttiNum || '') + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button></td>';
   tr += '</tr>';
   return tr;
 }
@@ -1964,9 +1988,9 @@ function renderPOProductRows() {
   if (!body) return;
   _poRenderedCount = Math.min(50, _poFilteredProducts.length);
   var html = '';
-  for (var i = 0; i < _poRenderedCount; i++) { html += buildPOProductRow(_poFilteredProducts[i]); }
+  for (var i = 0; i < _poRenderedCount; i++) { html += buildPOProductRow(_poFilteredProducts[i], i); }
   if (_poFilteredProducts.length === 0) {
-    html = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">검색 결과가 없습니다</td></tr>';
+    html = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">검색 결과가 없습니다</td></tr>';
   }
   body.innerHTML = html;
   // 건수 업데이트
@@ -1984,7 +2008,7 @@ function onPOProductScroll() {
     if (!body) return;
     var end = Math.min(_poRenderedCount + 100, _poFilteredProducts.length);
     var html = '';
-    for (var i = _poRenderedCount; i < end; i++) { html += buildPOProductRow(_poFilteredProducts[i]); }
+    for (var i = _poRenderedCount; i < end; i++) { html += buildPOProductRow(_poFilteredProducts[i], i); }
     body.insertAdjacentHTML('beforeend', html);
     _poRenderedCount = end;
   }
@@ -2042,8 +2066,8 @@ function switchPOSubTab(tabName) {
 // 누적프로모션 추가
 function addCumulativePromo() {
   var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [
-    { name: 'GEN4+FQID2', amount: '8,500,000', benefit: '200만당 본품증정', achieved: 4, next: '1,500,000', paletteIdx: 0 },
-    { name: 'CBL2', amount: '2,100,000', benefit: '100만당 본품증정', achieved: 2, next: '900,000', paletteIdx: 1 }
+    { name: 'GEN4+FQID2', amount: '0', benefit: '200만당 본품증정', achieved: 0, next: '0', paletteIdx: 0 },
+    { name: 'CBL2', amount: '0', benefit: '100만당 본품증정', achieved: 0, next: '0', paletteIdx: 1 }
   ];
   if (promos.length >= 5) { toast('최대 5개까지 추가할 수 있습니다'); return; }
   promos.push({ name: '새 프로모션', amount: '0', benefit: '클릭하여 설정', achieved: 0, next: '0', paletteIdx: promos.length });

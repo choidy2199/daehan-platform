@@ -325,6 +325,12 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-table tr:hover { background:#F8FBFF; }
 .po-cart-btn { width:24px; height:24px; border-radius:4px; border:1px solid #DDE1EB; background:#fff; cursor:pointer; font-size:12px; display:inline-flex; align-items:center; justify-content:center; }
 .po-cart-btn:hover { background:#E6F1FB; border-color:#185FA5; }
+.po-cart-btn-dark { width:26px; height:26px; border-radius:4px; border:none; background:#1A1D23; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+.po-cart-btn-dark:hover { background:#333; }
+
+/* 제품 목록 큰 글씨 */
+.po-table-lg th { font-size:13px !important; }
+.po-table-lg td { font-size:14px !important; }
 .po-promo-tag { display:inline-block; font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; margin-left:4px; }
 
 /* 주문 목록 하단 합계 */
@@ -334,7 +340,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 /* 필터 행 */
 .po-filter-row { display:flex; gap:6px; padding:6px 8px; align-items:center; border-bottom:1px solid #F0F2F7; }
-.po-filter-row input, .po-filter-row select { height:28px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:11px; font-family:'Pretendard',sans-serif; }
+.po-filter-row input, .po-filter-row select { height:30px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:14px; font-family:'Pretendard',sans-serif; }
 .po-filter-row input { flex:1; }
 
 /* 제품등록 검색행 */
