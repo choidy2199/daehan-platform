@@ -7541,6 +7541,26 @@ function clearSearchInputs() {
 async function init() {
   var _initStart = performance.now();
 
+  // 1회성 마이그레이션: SDS 드릴비트 대분류 수정
+  (function migrateDrillbitCategory() {
+    var flag = localStorage.getItem('_migration_drillbit_v1');
+    if (flag) return;
+    var products = load('mw_products');
+    if (!products || !products.length) return;
+    var count = 0;
+    products.forEach(function(p) {
+      if (p.subcategory && (p.subcategory.indexOf('SDS') === 0 || p.subcategory === 'SDS +' || p.subcategory === 'SDS MAX')) {
+        if (p.category !== '드릴비트') { p.category = '드릴비트'; count++; }
+      }
+    });
+    if (count > 0) {
+      save('mw_products', products);
+      DB.products = products;
+      console.log('[마이그레이션] SDS 드릴비트 대분류 수정: ' + count + '건');
+    }
+    localStorage.setItem('_migration_drillbit_v1', '1');
+  })();
+
   // 마지막 활성 탭 즉시 복원 (딜레이 없이)
   var savedTab = localStorage.getItem('mw_active_tab');
   if (savedTab && savedTab !== 'catalog' && document.getElementById('tab-' + savedTab)) {
