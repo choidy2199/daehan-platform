@@ -14,6 +14,8 @@
 - Next.js: src/app/ (API Routes, React 페이지)
 - DB: Supabase (PostgreSQL)
 - 배포: git push → Vercel 자동 배포
+- 배포 확인: curl -s -o /dev/null -w "%{http_code}" https://daehantool.dev/ 로 200 확인
+- 결과 확인: open https://daehantool.dev/
 - 빌드: `npm run build`
 - 로컬: `npm run dev` → http://localhost:3000
 - 사이트 열기: `open "https://daehantool.dev/manager/index.html"`
