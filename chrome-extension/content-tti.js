@@ -340,7 +340,10 @@ function scrapeProductSearchPage() {
 // 프로모션 페이지 범용 테이블 스크래핑 (헤더 기반)
 function scrapePromoPage() {
   var table = document.querySelector('table.table_1');
-  if (!table) {
+  if (!table || table.rows.length < 2) {
+    table = document.querySelector('table.table_2');
+  }
+  if (!table || table.rows.length < 2) {
     var tables = document.querySelectorAll('table');
     var maxRows = 0;
     tables.forEach(function(t) { if (t.rows.length > maxRows) { maxRows = t.rows.length; table = t; } });
