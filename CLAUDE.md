@@ -92,7 +92,14 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 (작업 마무리 시 아래에 추가)
 - [2026-03-31] Supabase Realtime WebSocket 동기화, per-key upsert, 헤더 동기화 버튼
 
-## 완료 루틴 (모든 작업 종료 시 필수)
+## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
+1. 현재 프로젝트 폴더 확인 및 출력
+2. git remote -v 로 원격 저장소 연결 상태 확인
+3. git status 로 커밋 안 된 변경사항 확인
+4. git log --oneline -3 으로 최근 커밋 3개 출력
+5. 위 결과를 요약해서 현재 상태 브리핑
+
+## 마무리 루틴 (사용자가 "마무리"라고 입력하면 실행)
 1. node -c 로 수정된 .js 파일 문법 검사
 2. git add -A && git commit -m "변경 요약"
 3. git remote -v 로 원격 저장소 확인
@@ -103,5 +110,4 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 6. 체크리스트 마지막 항목으로 push 성공 여부 명시 (✅ 또는 ❌)
 
 ⚠️ push 성공 없이는 작업 완료로 간주하지 않음
-⚠️ 현재 작업 폴더가 올바른 프로젝트인지 확인 후 push할 것
 ⚠️ remote가 없는 로컬 전용 git인 경우 반드시 사용자에게 알릴 것

@@ -7077,6 +7077,21 @@ window.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'DAEHAN_EXTENSION_STATUS') {
     window._daehanExtensionReady = event.data.installed;
   }
+
+  // TTI 제품 스크래핑 결과 수신
+  if (event.data && event.data.type === 'DAEHAN_SCRAPE_RESULT') {
+    handleTtiScrapeResult(event.data);
+  }
+
+  // TTI 스크래핑 진행 상태
+  if (event.data && event.data.type === 'DAEHAN_SCRAPE_PROGRESS') {
+    showTtiSyncProgress(event.data.status || (event.data.current + '/' + event.data.total + ' 페이지 스크래핑 중... (' + event.data.count + '건)'));
+  }
+
+  // TTI 프로모션 스크래핑 결과 수신
+  if (event.data && event.data.type === 'DAEHAN_SCRAPE_PROMO_RESULT') {
+    handleTtiPromoResult(event.data);
+  }
 });
 
 // 페이지 로드 시 확장 확인 + 뱃지 초기화
@@ -7085,6 +7100,422 @@ setTimeout(function() {
   renderAutoOrderBadge();
   renderPurchaseInvoiceBadge();
 }, 500);
+
+// ========================================
+// Phase 2-1: TTI 제품연동 (크롬 확장 연동)
+// ========================================
+
+// TTI 제품 스크래핑 요청
+function startTtiProductScrape() {
+  if (!window._daehanExtensionReady) {
+    alert('크롬 확장 프로그램이 설치되어 있지 않습니다.\n대한종합상사 자동발주 확장을 설치해주세요.');
+    return;
+  }
+
+  console.log('[TTI연동] 제품 스크래핑 요청');
+  window.postMessage({ type: 'DAEHAN_SCRAPE_PRODUCTS' }, '*');
+
+  // 진행 상태 표시
+  showTtiSyncProgress('제품 데이터 수집 중...');
+}
+
+// TTI 프로모션 스크래핑 요청
+function startTtiPromoScrape() {
+  if (!window._daehanExtensionReady) {
+    alert('크롬 확장 프로그램이 설치되어 있지 않습니다.');
+    return;
+  }
+
+  console.log('[TTI연동] 프로모션 스크래핑 요청');
+  window.postMessage({ type: 'DAEHAN_SCRAPE_PROMOTIONS' }, '*');
+
+  showTtiSyncProgress('프로모션 데이터 수집 중...');
+}
+
+// 스크래핑 진행 상태 표시
+function showTtiSyncProgress(message) {
+  var statusEl = document.getElementById('tti-sync-status');
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.id = 'tti-sync-status';
+    statusEl.style.cssText = 'position:fixed;top:20px;right:20px;background:#1e3a5f;color:white;padding:12px 20px;border-radius:8px;z-index:10000;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+    document.body.appendChild(statusEl);
+  }
+  statusEl.textContent = message;
+  statusEl.style.display = 'block';
+}
+
+// 스크래핑 진행 상태 숨기기
+function hideTtiSyncProgress() {
+  var statusEl = document.getElementById('tti-sync-status');
+  if (statusEl) statusEl.style.display = 'none';
+}
+
+// TTI 스크래핑 결과 수신 처리
+function handleTtiScrapeResult(data) {
+  console.log('[TTI연동] 제품 스크래핑 결과:', data.totalCount || data.data.length, '건');
+  hideTtiSyncProgress();
+
+  // TTI 데이터를 localStorage에 임시 저장
+  var ttiProducts = data.data || [];
+  localStorage.setItem('mw_tti_products', JSON.stringify({
+    data: ttiProducts,
+    count: ttiProducts.length,
+    scrapedAt: new Date().toISOString()
+  }));
+
+  // 비교 실행 → 결과 팝업 표시
+  showProductSyncReport(ttiProducts);
+}
+
+// TTI 프로모션 결과 수신 처리
+function handleTtiPromoResult(data) {
+  console.log('[TTI연동] 프로모션 스크래핑 결과:', data);
+  hideTtiSyncProgress();
+
+  localStorage.setItem('mw_tti_promotions', JSON.stringify({
+    data: data.data,
+    scrapedAt: new Date().toISOString()
+  }));
+}
+
+// TTI vs 대한플랫폼 제품 비교
+function showProductSyncReport(ttiProducts) {
+  // 기존 mw_products 로드
+  var mwProducts = JSON.parse(localStorage.getItem('mw_products') || '[]');
+
+  // 제품번호(CODE2) 기준 매핑
+  var mwMap = {};
+  mwProducts.forEach(function(p) {
+    var code = p.관리코드 || p.code2 || p.CODE2 || p.productCode || '';
+    if (code) mwMap[code] = p;
+  });
+
+  var newProducts = [];      // TTI에만 있는 제품
+  var priceChanged = [];     // 공급가 다른 제품
+  var infoChanged = [];      // 기타 정보 다른 제품
+  var matched = [];          // 일치
+  var ttiMap = {};           // TTI 제품 맵 (단종 체크용)
+
+  ttiProducts.forEach(function(tti) {
+    ttiMap[tti.productCode] = tti;
+    var mw = mwMap[tti.productCode];
+
+    if (!mw) {
+      newProducts.push(tti);
+      return;
+    }
+
+    // 공급가 비교
+    var mwPrice = parseInt(String(mw.공급가 || mw.supplyPrice || 0).replace(/,/g, '')) || 0;
+    if (mwPrice > 0 && tti.supplyPrice > 0 && mwPrice !== tti.supplyPrice) {
+      priceChanged.push({
+        tti: tti,
+        mw: mw,
+        oldPrice: mwPrice,
+        newPrice: tti.supplyPrice
+      });
+      return;
+    }
+
+    matched.push(tti);
+  });
+
+  // 단종 의심: mw에 있지만 TTI에 없는 제품
+  var discontinued = [];
+  mwProducts.forEach(function(mw) {
+    var code = mw.관리코드 || mw.code2 || mw.CODE2 || mw.productCode || '';
+    if (code && !ttiMap[code]) {
+      discontinued.push(mw);
+    }
+  });
+
+  console.log('[TTI연동] 비교 결과: 신규', newProducts.length, '가격변경', priceChanged.length, '단종의심', discontinued.length, '일치', matched.length);
+
+  // 결과를 localStorage에 저장 (팝업에서 사용)
+  localStorage.setItem('mw_tti_sync_report', JSON.stringify({
+    newProducts: newProducts,
+    priceChanged: priceChanged,
+    infoChanged: infoChanged,
+    discontinued: discontinued,
+    matched: matched,
+    ttiTotal: ttiProducts.length,
+    mwTotal: mwProducts.length,
+    generatedAt: new Date().toISOString()
+  }));
+
+  // 팝업 표시
+  showSyncReportPopup();
+}
+
+// 제품연동 결과 팝업 표시
+function showSyncReportPopup() {
+  var report = JSON.parse(localStorage.getItem('mw_tti_sync_report') || '{}');
+  if (!report.newProducts) {
+    alert('비교 결과가 없습니다. 먼저 TTI 스캔을 실행해주세요.');
+    return;
+  }
+
+  // 기존 팝업 제거
+  var existing = document.getElementById('tti-sync-popup');
+  if (existing) existing.remove();
+
+  var popup = document.createElement('div');
+  popup.id = 'tti-sync-popup';
+  popup.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:flex-start;justify-content:center;padding-top:40px;';
+
+  var newCount = report.newProducts.length;
+  var priceCount = report.priceChanged.length;
+  var discCount = report.discontinued.length;
+  var matchCount = report.matched.length;
+
+  var html = '<div style="background:white;border-radius:12px;width:90%;max-width:800px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">';
+
+  // 헤더
+  html += '<div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">';
+  html += '<div><span style="font-size:16px;font-weight:600;">제품연동</span><span style="font-size:12px;color:#888;margin-left:8px;">TTI 제품검색 vs 대한플랫폼 단가표</span></div>';
+  html += '<button onclick="document.getElementById(\'tti-sync-popup\').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;">✕</button>';
+  html += '</div>';
+
+  // 상태 바
+  html += '<div style="padding:8px 20px;background:#f8f8f8;border-bottom:1px solid #eee;font-size:11px;color:#666;">';
+  html += 'TTI ' + report.ttiTotal + '건 vs 대한플랫폼 ' + report.mwTotal + '건 비교 완료 | ' + report.generatedAt;
+  html += '</div>';
+
+  // 요약 카드
+  html += '<div style="display:flex;gap:8px;padding:12px 20px;">';
+  html += '<div style="flex:1;padding:10px;border-radius:8px;background:#e6f1fb;text-align:center;"><div style="font-size:20px;font-weight:600;color:#0c447c;">' + newCount + '</div><div style="font-size:11px;color:#666;">신규 제품</div></div>';
+  html += '<div style="flex:1;padding:10px;border-radius:8px;background:#faeeda;text-align:center;"><div style="font-size:20px;font-weight:600;color:#854f0b;">' + priceCount + '</div><div style="font-size:11px;color:#666;">가격 변경</div></div>';
+  html += '<div style="flex:1;padding:10px;border-radius:8px;background:#fcebeb;text-align:center;"><div style="font-size:20px;font-weight:600;color:#a32d2d;">' + discCount + '</div><div style="font-size:11px;color:#666;">단종 의심</div></div>';
+  html += '<div style="flex:1;padding:10px;border-radius:8px;background:#f1efe8;text-align:center;"><div style="font-size:20px;font-weight:600;color:#888;">' + matchCount + '</div><div style="font-size:11px;color:#666;">일치</div></div>';
+  html += '</div>';
+
+  // 탭
+  html += '<div style="display:flex;gap:0;border-bottom:1px solid #eee;padding:0 20px;" id="sync-tabs">';
+  html += '<button class="sync-tab active" onclick="switchSyncTab(\'new\')" data-tab="new" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid #185fa5;font-size:12px;font-weight:500;cursor:pointer;">신규 추가 (' + newCount + ')</button>';
+  html += '<button class="sync-tab" onclick="switchSyncTab(\'price\')" data-tab="price" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid transparent;font-size:12px;color:#888;cursor:pointer;">가격 변경 (' + priceCount + ')</button>';
+  html += '<button class="sync-tab" onclick="switchSyncTab(\'disc\')" data-tab="disc" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid transparent;font-size:12px;color:#888;cursor:pointer;">단종 의심 (' + discCount + ')</button>';
+  html += '</div>';
+
+  // 테이블 영역 (스크롤)
+  html += '<div style="flex:1;overflow-y:auto;padding:0;" id="sync-table-area">';
+  html += buildSyncTable('new', report);
+  html += '</div>';
+
+  // 하단
+  html += '<div style="padding:12px 20px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;background:#f8f8f8;">';
+  html += '<span style="font-size:11px;color:#888;" id="sync-selected-count">선택: 0건</span>';
+  html += '<div style="display:flex;gap:8px;">';
+  html += '<button onclick="selectAllSyncItems()" style="padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:white;font-size:11px;cursor:pointer;">전체 선택</button>';
+  html += '<button onclick="deselectAllSyncItems()" style="padding:6px 12px;border:1px solid #ddd;border-radius:6px;background:white;font-size:11px;cursor:pointer;">선택 해제</button>';
+  html += '<button onclick="applySyncItems()" style="padding:6px 14px;border:none;border-radius:6px;background:#185fa5;color:white;font-size:12px;font-weight:500;cursor:pointer;">선택 항목 적용</button>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>';
+  popup.innerHTML = html;
+  document.body.appendChild(popup);
+
+  // 팝업 외부 클릭 시 닫기
+  popup.addEventListener('click', function(e) {
+    if (e.target === popup) popup.remove();
+  });
+
+  updateSyncSelectedCount();
+}
+
+// 탭별 테이블 빌드
+function buildSyncTable(tab, report) {
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+
+  if (tab === 'new') {
+    html += '<tr style="background:#f8f8f8;"><th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;width:24px;"><input type="checkbox" onchange="toggleAllSync(this)" checked></th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품번호</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">순번</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품군</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품구성</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">모델명</th>';
+    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">공급가</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">상태</th></tr>';
+
+    report.newProducts.forEach(function(p, i) {
+      html += '<tr style="background:#f5f9ff;" data-sync-type="new" data-sync-idx="' + i + '">';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><input type="checkbox" class="sync-check" data-type="new" data-idx="' + i + '" checked onchange="updateSyncSelectedCount()"></td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:10px;">' + p.productCode + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + p.promoNo + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + p.category + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + p.subCategory + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + p.modelName + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:500;">' + (p.supplyPrice || 0).toLocaleString() + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><span style="background:#e6f1fb;color:#0c447c;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">신규</span></td>';
+      html += '</tr>';
+    });
+  }
+
+  if (tab === 'price') {
+    html += '<tr style="background:#f8f8f8;"><th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;width:24px;"><input type="checkbox" onchange="toggleAllSync(this)" checked></th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품번호</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">모델명</th>';
+    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">기존 공급가</th>';
+    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">변경 공급가</th>';
+    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">차이</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">상태</th></tr>';
+
+    report.priceChanged.forEach(function(p, i) {
+      var diff = p.newPrice - p.oldPrice;
+      var diffColor = diff > 0 ? '#a32d2d' : '#0f6e56';
+      html += '<tr style="background:#fffbf0;" data-sync-type="price" data-sync-idx="' + i + '">';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><input type="checkbox" class="sync-check" data-type="price" data-idx="' + i + '" checked onchange="updateSyncSelectedCount()"></td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:10px;">' + p.tti.productCode + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + p.tti.modelName + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;text-decoration:line-through;color:#999;">' + p.oldPrice.toLocaleString() + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:500;color:#0f6e56;">' + p.newPrice.toLocaleString() + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:' + diffColor + ';">' + (diff > 0 ? '+' : '') + diff.toLocaleString() + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><span style="background:#faeeda;color:#854f0b;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">가격변경</span></td>';
+      html += '</tr>';
+    });
+  }
+
+  if (tab === 'disc') {
+    html += '<tr style="background:#f8f8f8;">';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">코드</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">모델명</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품설명</th>';
+    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">공급가</th>';
+    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">상태</th></tr>';
+
+    report.discontinued.forEach(function(p) {
+      html += '<tr style="background:#fff5f5;">';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + (p.코드 || p.code || '') + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + (p.모델명 || p.model || '') + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + (p.제품설명 || p.description || '') + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">' + (parseInt(String(p.공급가 || 0).replace(/,/g, '')) || 0).toLocaleString() + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><span style="background:#fcebeb;color:#a32d2d;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">단종의심</span></td>';
+      html += '</tr>';
+    });
+  }
+
+  if (html.indexOf('<tr style="background:') === -1 || html.split('<tr').length < 3) {
+    html += '<tr><td colspan="8" style="padding:40px;text-align:center;color:#999;font-size:13px;">해당 항목이 없습니다.</td></tr>';
+  }
+
+  html += '</table>';
+  return html;
+}
+
+// 탭 전환
+function switchSyncTab(tab) {
+  var report = JSON.parse(localStorage.getItem('mw_tti_sync_report') || '{}');
+  var area = document.getElementById('sync-table-area');
+  if (area) area.innerHTML = buildSyncTable(tab, report);
+
+  // 탭 스타일 전환
+  document.querySelectorAll('.sync-tab').forEach(function(btn) {
+    if (btn.getAttribute('data-tab') === tab) {
+      btn.style.borderBottom = '2px solid #185fa5';
+      btn.style.color = '#333';
+      btn.style.fontWeight = '500';
+    } else {
+      btn.style.borderBottom = '2px solid transparent';
+      btn.style.color = '#888';
+      btn.style.fontWeight = '400';
+    }
+  });
+
+  updateSyncSelectedCount();
+}
+
+// 전체 선택/해제
+function toggleAllSync(masterCheckbox) {
+  document.querySelectorAll('.sync-check').forEach(function(cb) {
+    cb.checked = masterCheckbox.checked;
+  });
+  updateSyncSelectedCount();
+}
+function selectAllSyncItems() {
+  document.querySelectorAll('.sync-check').forEach(function(cb) { cb.checked = true; });
+  updateSyncSelectedCount();
+}
+function deselectAllSyncItems() {
+  document.querySelectorAll('.sync-check').forEach(function(cb) { cb.checked = false; });
+  updateSyncSelectedCount();
+}
+
+// 선택 카운트 업데이트
+function updateSyncSelectedCount() {
+  var count = document.querySelectorAll('.sync-check:checked').length;
+  var el = document.getElementById('sync-selected-count');
+  if (el) el.textContent = '선택: ' + count + '건';
+}
+
+// 선택 항목 적용 (본사재고 + 신규 제품 추가 + 가격 변경)
+function applySyncItems() {
+  var report = JSON.parse(localStorage.getItem('mw_tti_sync_report') || '{}');
+  var ttiRaw = JSON.parse(localStorage.getItem('mw_tti_products') || '{}');
+  var ttiProducts = ttiRaw.data || [];
+  var mwProducts = JSON.parse(localStorage.getItem('mw_products') || '[]');
+
+  var applied = { new: 0, price: 0, stock: 0 };
+
+  // 선택된 신규 제품 추가
+  document.querySelectorAll('.sync-check:checked[data-type="new"]').forEach(function(cb) {
+    var idx = parseInt(cb.getAttribute('data-idx'));
+    var tti = report.newProducts[idx];
+    if (tti) {
+      mwProducts.push({
+        코드: '',
+        관리코드: tti.productCode,
+        대분류: '파워툴',
+        중분류: tti.category || '',
+        소분류: tti.subCategory || '',
+        순번: tti.promoNo || '',
+        'TTI#': '',
+        모델명: tti.modelName || '',
+        제품설명: '',
+        공급가: tti.supplyPrice || 0,
+        본사: tti.available ? '●' : '✕'
+      });
+      applied.new++;
+    }
+  });
+
+  // 선택된 가격 변경 적용
+  document.querySelectorAll('.sync-check:checked[data-type="price"]').forEach(function(cb) {
+    var idx = parseInt(cb.getAttribute('data-idx'));
+    var item = report.priceChanged[idx];
+    if (item) {
+      for (var i = 0; i < mwProducts.length; i++) {
+        var code = mwProducts[i].관리코드 || mwProducts[i].code2 || mwProducts[i].CODE2 || '';
+        if (code === item.tti.productCode) {
+          mwProducts[i].공급가 = item.newPrice;
+          applied.price++;
+          break;
+        }
+      }
+    }
+  });
+
+  // 본사재고 업데이트 (전체 TTI 제품에 대해)
+  var ttiMap = {};
+  ttiProducts.forEach(function(t) { ttiMap[t.productCode] = t; });
+
+  mwProducts.forEach(function(mw) {
+    var code = mw.관리코드 || mw.code2 || mw.CODE2 || '';
+    if (code && ttiMap[code]) {
+      mw.본사 = ttiMap[code].available ? '●' : '✕';
+      applied.stock++;
+    }
+  });
+
+  // 저장
+  save('mw_products', mwProducts);
+
+  alert('적용 완료!\n\n신규 추가: ' + applied.new + '건\n가격 변경: ' + applied.price + '건\n본사재고 업데이트: ' + applied.stock + '건');
+
+  // 팝업 닫기 + 단가표 새로고침
+  document.getElementById('tti-sync-popup').remove();
+  renderCatalog();
+}
 
 // ======================== TAB 5: 세트및분해 ========================
 const PARTS_KEYS = ['M12B2','M12HB25','M12B4','M12HB5','M18B2','M18HB3','M18B5','M18FB6','M18FB8','M18FB12','C12C','M1218C','M1218FC'];

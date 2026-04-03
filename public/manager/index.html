@@ -1069,6 +1069,14 @@
       <button class="modal-close" onclick="closeModal()">&times;</button>
     </div>
     <div class="modal-body" style="padding:20px;max-height:calc(100vh - 160px);overflow-y:auto">
+      <!-- TTI 제품연동 버튼 -->
+      <div style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#1e3a8a;">TTI 제품연동</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:2px;">크롬 확장에서 TTI 제품검색 데이터를 가져와 비교합니다</div>
+        </div>
+        <button onclick="startTtiProductScrape(); closeModal();" style="padding:8px 16px;border:none;border-radius:6px;background:#185FA5;color:white;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">TTI에서 가져오기</button>
+      </div>
       <!-- 파일 업로드 영역 -->
       <div style="margin-bottom:12px;text-align:right">
         <button onclick="downloadTemplate()" style="font-size:12px;padding:5px 12px;background:none;border:1px solid #cbd5e1;border-radius:6px;color:#64748b;cursor:pointer">📋 양식 다운로드</button>
