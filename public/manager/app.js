@@ -1174,7 +1174,7 @@ function renderCatalog() {
   const discontinued = sortProducts(filtered.filter(p => p.discontinued));
 
   function getCategoryColor(cat) {
-    var map = { '파워툴': { bg:'#DBEAFE', color:'#1E40AF' }, '수공구': { bg:'#D1FAE5', color:'#065F46' }, '악세사리': { bg:'#FEF3C7', color:'#92400E' }, '팩아웃': { bg:'#FCE7F3', color:'#9D174D' } };
+    var map = { '파워툴': { bg:'#DBEAFE', color:'#1E40AF' }, '수공구': { bg:'#D1FAE5', color:'#065F46' }, '악세사리': { bg:'#FEF3C7', color:'#92400E' }, '팩아웃': { bg:'#FCE7F3', color:'#9D174D' }, '드릴비트': { bg:'#E0E7FF', color:'#3730A3' } };
     return map[cat] || { bg:'#F3F4F6', color:'#374151' };
   }
   function buildRow(p) {
