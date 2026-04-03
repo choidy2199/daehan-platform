@@ -1075,11 +1075,11 @@
       </div>
       <div id="import-upload-area" style="border:1.5px dashed #cbd5e1;border-radius:8px;padding:28px 20px;text-align:center;margin-bottom:16px;cursor:pointer" onclick="document.getElementById('import-file-input').click()">
         <div style="font-size:13px;color:#64748b;margin-bottom:6px">파일을 클릭하여 선택</div>
-        <div style="font-size:11px;color:#94a3b8">.xlsx 파일 지원</div>
+        <div style="font-size:11px;color:#94a3b8">.xlsx 또는 .pdf 파일 지원</div>
         <div style="margin-top:12px">
           <span style="display:inline-block;font-size:12px;padding:6px 16px;border:1px solid #cbd5e1;border-radius:6px;color:#64748b">파일 선택</span>
         </div>
-        <input type="file" id="import-file-input" accept=".xlsx,.xls" style="display:none" onchange="handleImportFile(this)">
+        <input type="file" id="import-file-input" accept=".xlsx,.xls,.pdf" style="display:none" onchange="handleImportFile(this)">
       </div>
 
       <!-- 선택된 파일 표시 -->

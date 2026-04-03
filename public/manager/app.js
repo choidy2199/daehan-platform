@@ -3707,6 +3707,15 @@ function handleImportFile(input) {
   document.getElementById('import-file-info').style.display = 'block';
   document.getElementById('import-file-name').textContent = '📄 ' + file.name;
 
+  var ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'pdf') {
+    handleImportPdf(file);
+  } else {
+    handleImportXlsx(file);
+  }
+}
+
+function handleImportXlsx(file) {
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
@@ -3728,6 +3737,34 @@ function handleImportFile(input) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+async function handleImportPdf(file) {
+  try {
+    document.getElementById('import-compare-area').style.display = 'none';
+    var formData = new FormData();
+    formData.append('file', file);
+
+    var res = await fetch('/api/import/parse-pdf', { method: 'POST', body: formData });
+    if (!res.ok) throw new Error('PDF 파싱 실패: HTTP ' + res.status);
+
+    var data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (!data.rows || data.rows.length === 0) {
+      alert('PDF에서 파싱 가능한 데이터가 없습니다.');
+      resetImportFile();
+      return;
+    }
+
+    console.log('[PDF Import] 파싱 완료:', data.rows.length + '행, ' + (data.pageCount || '?') + '페이지');
+    _importParsedRows = data.rows;
+    _importCompareResult = compareWithExisting(data.rows);
+    renderImportComparison(_importCompareResult);
+  } catch (err) {
+    console.error('PDF 파싱 오류:', err);
+    alert('PDF 파싱 중 오류: ' + err.message);
+    resetImportFile();
+  }
 }
 
 function toggleFullReplace() {
