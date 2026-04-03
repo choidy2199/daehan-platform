@@ -7275,7 +7275,7 @@ function showSyncReportPopup() {
   var discCount = report.discontinued.length;
   var matchCount = report.matched.length;
 
-  var html = '<div style="background:white;border-radius:12px;width:90%;max-width:800px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">';
+  var html = '<div style="background:white;border-radius:12px;width:1400px;max-width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;">';
 
   // 헤더
   html += '<div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">';
@@ -7298,13 +7298,13 @@ function showSyncReportPopup() {
 
   // 탭
   html += '<div style="display:flex;gap:0;border-bottom:1px solid #eee;padding:0 20px;" id="sync-tabs">';
-  html += '<button class="sync-tab active" onclick="switchSyncTab(\'new\')" data-tab="new" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid #185fa5;font-size:12px;font-weight:500;cursor:pointer;">신규 추가 (' + newCount + ')</button>';
-  html += '<button class="sync-tab" onclick="switchSyncTab(\'price\')" data-tab="price" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid transparent;font-size:12px;color:#888;cursor:pointer;">가격 변경 (' + priceCount + ')</button>';
-  html += '<button class="sync-tab" onclick="switchSyncTab(\'disc\')" data-tab="disc" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid transparent;font-size:12px;color:#888;cursor:pointer;">단종 의심 (' + discCount + ')</button>';
+  html += '<button class="sync-tab active" onclick="switchSyncTab(\'new\')" data-tab="new" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid #185fa5;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;">신규 추가 (' + newCount + ')</button>';
+  html += '<button class="sync-tab" onclick="switchSyncTab(\'price\')" data-tab="price" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid transparent;font-size:12px;color:#888;cursor:pointer;white-space:nowrap;">가격 변경 (' + priceCount + ')</button>';
+  html += '<button class="sync-tab" onclick="switchSyncTab(\'disc\')" data-tab="disc" style="padding:8px 16px;border:none;background:none;border-bottom:2px solid transparent;font-size:12px;color:#888;cursor:pointer;white-space:nowrap;">단종 의심 (' + discCount + ')</button>';
   html += '</div>';
 
   // 테이블 영역 (스크롤)
-  html += '<div style="flex:1;overflow-y:auto;padding:0;" id="sync-table-area">';
+  html += '<div style="flex:1;overflow-y:auto;overflow-x:auto;padding:0;" id="sync-table-area">';
   html += buildSyncTable('new', report);
   html += '</div>';
 
@@ -7332,71 +7332,74 @@ function showSyncReportPopup() {
 
 // 탭별 테이블 빌드
 function buildSyncTable(tab, report) {
+  var thStyle = 'padding:6px 8px;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;white-space:nowrap;';
+  var tdStyle = 'padding:6px 8px;border-bottom:1px solid #eee;white-space:nowrap;';
+  var modelTdStyle = tdStyle + 'max-width:400px;overflow:hidden;text-overflow:ellipsis;';
   var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
 
   if (tab === 'new') {
-    html += '<tr style="background:#f8f8f8;"><th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;width:24px;"><input type="checkbox" onchange="toggleAllSync(this)" checked></th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품번호</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">순번</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품군</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품구성</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">모델명</th>';
-    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">공급가</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">상태</th></tr>';
+    html += '<tr style="background:#f8f8f8;"><th style="' + thStyle + 'text-align:left;width:24px;"><input type="checkbox" onchange="toggleAllSync(this)" checked></th>';
+    html += '<th style="' + thStyle + 'text-align:left;">제품번호</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">순번</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">제품군</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">제품구성</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">모델명</th>';
+    html += '<th style="' + thStyle + 'text-align:right;">공급가</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">상태</th></tr>';
 
     report.newProducts.forEach(function(p, i) {
       html += '<tr style="background:#f5f9ff;" data-sync-type="new" data-sync-idx="' + i + '">';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><input type="checkbox" class="sync-check" data-type="new" data-idx="' + i + '" checked onchange="updateSyncSelectedCount()"></td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:10px;">' + p.productCode + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + p.promoNo + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + p.category + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + p.subCategory + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + p.modelName + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:500;">' + (p.supplyPrice || 0).toLocaleString() + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><span style="background:#e6f1fb;color:#0c447c;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">신규</span></td>';
+      html += '<td style="' + tdStyle + '"><input type="checkbox" class="sync-check" data-type="new" data-idx="' + i + '" checked onchange="updateSyncSelectedCount()"></td>';
+      html += '<td style="' + tdStyle + 'font-family:monospace;font-size:10px;">' + p.productCode + '</td>';
+      html += '<td style="' + tdStyle + '">' + p.promoNo + '</td>';
+      html += '<td style="' + tdStyle + '">' + p.category + '</td>';
+      html += '<td style="' + tdStyle + '">' + p.subCategory + '</td>';
+      html += '<td style="' + modelTdStyle + 'font-size:11px;" title="' + (p.modelName || '').replace(/"/g, '&quot;') + '">' + p.modelName + '</td>';
+      html += '<td style="' + tdStyle + 'text-align:right;font-weight:500;">' + (p.supplyPrice || 0).toLocaleString() + '</td>';
+      html += '<td style="' + tdStyle + '"><span style="background:#e6f1fb;color:#0c447c;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">신규</span></td>';
       html += '</tr>';
     });
   }
 
   if (tab === 'price') {
-    html += '<tr style="background:#f8f8f8;"><th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;width:24px;"><input type="checkbox" onchange="toggleAllSync(this)" checked></th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품번호</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">모델명</th>';
-    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">기존 공급가</th>';
-    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">변경 공급가</th>';
-    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">차이</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">상태</th></tr>';
+    html += '<tr style="background:#f8f8f8;"><th style="' + thStyle + 'text-align:left;width:24px;"><input type="checkbox" onchange="toggleAllSync(this)" checked></th>';
+    html += '<th style="' + thStyle + 'text-align:left;">제품번호</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">모델명</th>';
+    html += '<th style="' + thStyle + 'text-align:right;">기존 공급가</th>';
+    html += '<th style="' + thStyle + 'text-align:right;">변경 공급가</th>';
+    html += '<th style="' + thStyle + 'text-align:right;">차이</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">상태</th></tr>';
 
     report.priceChanged.forEach(function(p, i) {
       var diff = p.newPrice - p.oldPrice;
       var diffColor = diff > 0 ? '#a32d2d' : '#0f6e56';
       html += '<tr style="background:#fffbf0;" data-sync-type="price" data-sync-idx="' + i + '">';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><input type="checkbox" class="sync-check" data-type="price" data-idx="' + i + '" checked onchange="updateSyncSelectedCount()"></td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-family:monospace;font-size:10px;">' + p.tti.productCode + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + p.tti.modelName + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;text-decoration:line-through;color:#999;">' + p.oldPrice.toLocaleString() + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:500;color:#0f6e56;">' + p.newPrice.toLocaleString() + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:' + diffColor + ';">' + (diff > 0 ? '+' : '') + diff.toLocaleString() + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><span style="background:#faeeda;color:#854f0b;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">가격변경</span></td>';
+      html += '<td style="' + tdStyle + '"><input type="checkbox" class="sync-check" data-type="price" data-idx="' + i + '" checked onchange="updateSyncSelectedCount()"></td>';
+      html += '<td style="' + tdStyle + 'font-family:monospace;font-size:10px;">' + p.tti.productCode + '</td>';
+      html += '<td style="' + modelTdStyle + 'font-size:11px;" title="' + (p.tti.modelName || '').replace(/"/g, '&quot;') + '">' + p.tti.modelName + '</td>';
+      html += '<td style="' + tdStyle + 'text-align:right;text-decoration:line-through;color:#999;">' + p.oldPrice.toLocaleString() + '</td>';
+      html += '<td style="' + tdStyle + 'text-align:right;font-weight:500;color:#0f6e56;">' + p.newPrice.toLocaleString() + '</td>';
+      html += '<td style="' + tdStyle + 'text-align:right;color:' + diffColor + ';">' + (diff > 0 ? '+' : '') + diff.toLocaleString() + '</td>';
+      html += '<td style="' + tdStyle + '"><span style="background:#faeeda;color:#854f0b;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">가격변경</span></td>';
       html += '</tr>';
     });
   }
 
   if (tab === 'disc') {
     html += '<tr style="background:#f8f8f8;">';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">코드</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">모델명</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">제품설명</th>';
-    html += '<th style="padding:6px 8px;text-align:right;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">공급가</th>';
-    html += '<th style="padding:6px 8px;text-align:left;font-weight:500;font-size:11px;color:#888;border-bottom:1px solid #eee;">상태</th></tr>';
+    html += '<th style="' + thStyle + 'text-align:left;">코드</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">모델명</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">제품설명</th>';
+    html += '<th style="' + thStyle + 'text-align:right;">공급가</th>';
+    html += '<th style="' + thStyle + 'text-align:left;">상태</th></tr>';
 
     report.discontinued.forEach(function(p) {
       html += '<tr style="background:#fff5f5;">';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + (p.code || '') + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + (p.model || '') + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + (p.detail || '') + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">' + (parseInt(String(p.supplyPrice || 0).replace(/,/g, '')) || 0).toLocaleString() + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><span style="background:#fcebeb;color:#a32d2d;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">단종의심</span></td>';
+      html += '<td style="' + tdStyle + '">' + (p.code || '') + '</td>';
+      html += '<td style="' + modelTdStyle + 'font-size:11px;" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '') + '</td>';
+      html += '<td style="' + modelTdStyle + 'font-size:11px;" title="' + (p.detail || '').replace(/"/g, '&quot;') + '">' + (p.detail || '') + '</td>';
+      html += '<td style="' + tdStyle + 'text-align:right;">' + (parseInt(String(p.supplyPrice || 0).replace(/,/g, '')) || 0).toLocaleString() + '</td>';
+      html += '<td style="' + tdStyle + '"><span style="background:#fcebeb;color:#a32d2d;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">단종의심</span></td>';
       html += '</tr>';
     });
   }
