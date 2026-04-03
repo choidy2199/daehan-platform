@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '파일이 필요합니다' }, { status: 400 });
     }
 
-    // pdf-parse v1 임포트
-    const pdfParse = require('pdf-parse');
+    // pdf-parse v1 — lib 직접 임포트 (index.js의 테스트 코드 우회)
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js');
     const buffer = Buffer.from(await file.arrayBuffer());
     const pdfData = await pdfParse(buffer);
     const text = pdfData.text;
