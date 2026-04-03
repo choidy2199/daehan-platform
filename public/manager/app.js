@@ -3930,6 +3930,7 @@ function renderImportComparison(result) {
 
   // 디버그 정보 콘솔 출력
   if (result.debug) { console.log('[Import Debug]', result.debug); }
+  if (result.changed && result.changed[0]) { console.log('비교결과 changed[0]:', JSON.stringify(result.changed[0], null, 2)); }
 
   // 요약 카드
   var summary = document.getElementById('import-summary');
