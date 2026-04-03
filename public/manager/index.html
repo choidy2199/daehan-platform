@@ -119,6 +119,10 @@
 
 <!-- =============== TAB 2: 주문하기 =============== -->
 <div id="tab-order" class="tab-content">
+  <!-- 새 발주 탭 (Step B-1a) -->
+  <div id="tab-order-new"></div>
+  <!-- 기존 발주 탭 (숨김 보존) -->
+  <div id="tab-order-old" style="display:none">
   <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;gap:8px;flex-wrap:wrap">
     <div class="sub-tabs" id="order-main-tabs" style="margin-bottom:0;flex-shrink:0">
       <button class="sub-tab active" onclick="switchOrderMain('normal')">일반주문</button>
@@ -482,6 +486,7 @@
     </div>
   </div>
 
+  </div><!-- /tab-order-old -->
 </div>
 
 <!-- =============== TAB 3: 온라인 판매 =============== -->

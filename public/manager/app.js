@@ -802,7 +802,7 @@ function switchTab(tab) {
     // 무거운 렌더링을 requestAnimationFrame으로 지연 → UI 먼저 전환
     requestAnimationFrame(function() {
       if (tab === 'catalog') renderCatalog();
-      if (tab === 'order') renderAllOrders();
+      if (tab === 'order') renderPOTab();
       if (tab === 'sales') { renderSales(); renderOnlineSales(); }
       if (tab === 'promo') { renderPromo(); renderAllPromosV2(); }
       if (tab === 'setbun') renderSetbun();
@@ -1758,6 +1758,285 @@ function calcOrderTotals() {
   }
   // Auto-refresh 발주서 if visible
   if (document.getElementById('order-sheet').style.display !== 'none') renderOrderSheet();
+}
+
+// ========================================
+// 발주 탭 리디자인 (Step B-1a)
+// ========================================
+
+var _poSubTabs = [
+  { id: 'normal', label: '일반주문', dot: '#4B9FE8', activeBg: '#185FA5' },
+  { id: 'kit', label: '키트구성 패키지', dot: '#5DCAA5', activeBg: '#0F6E56' },
+  { id: 't5', label: 'T5 이달의특가 5%', dot: '#F09595', activeBg: '#A32D2D' },
+  { id: 't6', label: 'T6 아웃도어 8%', dot: '#ED93B1', activeBg: '#993556' },
+  { id: 'package', label: '패키지 프로모션', dot: '#FAC775', activeBg: '#854F0B' },
+  { id: 'list', label: '발주 리스트', dot: '#B4B2A9', activeBg: '#444441' },
+  { id: 'foc', label: 'FOC 발주', dot: '#AFA9EC', activeBg: '#534AB7' }
+];
+
+var _poPromoPalette = [
+  { main: '#7F77DD', bg: '#EEEDFE', text: '#3C3489' },
+  { main: '#D85A30', bg: '#FAECE7', text: '#712B13' },
+  { main: '#1D9E75', bg: '#E1F5EE', text: '#085041' },
+  { main: '#D4537E', bg: '#FBEAF0', text: '#72243E' },
+  { main: '#378ADD', bg: '#E6F1FB', text: '#0C447C' }
+];
+
+function renderPOTab() {
+  var container = document.getElementById('tab-order-new');
+  if (!container) return;
+
+  var activeSubTab = localStorage.getItem('mw_po_active_subtab') || 'normal';
+  var now = new Date();
+  var month = now.getMonth() + 1;
+
+  // 상단 KPI 카드
+  var html = '<div class="po-kpi-row">';
+
+  // 매출 카드 3개
+  var saleCards = [
+    { label: '파워툴', color: '#185FA5', amount: '12,450,000', target: '목표 2,000만 · 62%', pct: 62 },
+    { label: '수공구', color: '#1D9E75', amount: '3,280,000', target: '목표 500만 · 66%', pct: 66 },
+    { label: '팩아웃', color: '#EF9F27', amount: '1,150,000', target: '목표 300만 · 38%', pct: 38 }
+  ];
+  saleCards.forEach(function(c) {
+    html += '<div class="po-sale-card">';
+    html += '<div class="po-card-label" style="color:' + c.color + '">' + c.label + '</div>';
+    html += '<div class="po-card-amount">' + c.amount + '</div>';
+    html += '<div class="po-card-target">' + c.target + '</div>';
+    html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + c.pct + '%;background:' + c.color + '"></div></div>';
+    html += '</div>';
+  });
+
+  html += '<div class="po-divider"></div>';
+
+  // 누적프로모션 카드 (더미 2개)
+  var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [
+    { name: 'GEN4+FQID2', amount: '8,500,000', benefit: '200만당 본품증정', achieved: 4, next: '1,500,000', paletteIdx: 0 },
+    { name: 'CBL2', amount: '2,100,000', benefit: '100만당 본품증정', achieved: 2, next: '900,000', paletteIdx: 1 }
+  ];
+  promos.forEach(function(p, i) {
+    var pal = _poPromoPalette[p.paletteIdx || i] || _poPromoPalette[0];
+    html += '<div class="po-promo-card" style="border-left:3px solid ' + pal.main + '" onclick="openCumulativePromoModal(' + i + ')">';
+    html += '<div class="po-promo-name"><span style="width:6px;height:6px;border-radius:50%;background:' + pal.main + ';display:inline-block"></span> ' + p.name + '</div>';
+    html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + p.amount + '</div>';
+    html += '<div class="po-promo-benefit">' + p.benefit + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">달성 ' + p.achieved + '회</span></div>';
+    html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:60%;background:' + pal.main + '"></div></div>';
+    html += '<div class="po-promo-next">다음까지 ' + p.next + '원</div>';
+    html += '</div>';
+  });
+
+  html += '<button class="po-add-promo-btn" onclick="addCumulativePromo()"><span class="po-add-icon">+</span><span class="po-add-label">추가</span></button>';
+
+  html += '<div class="po-divider"></div>';
+
+  // 합계 카드
+  html += '<div class="po-total-card">';
+  html += '<div class="po-total-label">합계 · ' + month + '월</div>';
+  html += '<div class="po-total-amount">16,880,000</div>';
+  html += '<div class="po-total-pct">전체 목표 대비 60%</div>';
+  html += '<div class="po-progress" style="margin-top:4px;background:rgba(255,255,255,0.2)"><div class="po-progress-fill" style="width:60%;background:#fff"></div></div>';
+  html += '<div class="po-total-halves">';
+  html += '<div class="po-total-half">1~15일 9,200,000</div>';
+  html += '<div class="po-total-half">16~30일 7,680,000</div>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>'; // .po-kpi-row
+
+  // 서브탭 7개
+  html += '<div class="po-subtabs">';
+  _poSubTabs.forEach(function(t) {
+    var isActive = t.id === activeSubTab;
+    var bg = isActive ? t.activeBg : '#1A1D23';
+    html += '<button class="po-sub-tab" data-tab="' + t.id + '" style="background:' + bg + '" onclick="switchPOSubTab(\'' + t.id + '\')">';
+    html += '<span class="po-tab-dot" style="background:' + t.dot + '"></span>' + t.label;
+    html += '</button>';
+  });
+  html += '</div>';
+
+  // 탭 콘텐츠 영역
+  html += '<div id="po-tab-contents" style="padding:8px 12px">';
+
+  // 일반주문 탭
+  html += '<div id="po-content-normal" class="po-tab-content" style="display:' + (activeSubTab === 'normal' ? 'grid' : 'none') + ';grid-template-columns:1fr 1fr;gap:10px;">';
+  html += buildPOProductPanel();
+  html += buildPOOrderPanel();
+  html += '</div>';
+
+  // 나머지 6개 탭 placeholder
+  var placeholders = [
+    { id: 'kit', name: '키트구성 패키지' },
+    { id: 't5', name: 'T5 이달의특가 5%' },
+    { id: 't6', name: 'T6 아웃도어 8%' },
+    { id: 'package', name: '패키지 프로모션' },
+    { id: 'list', name: '발주 리스트' },
+    { id: 'foc', name: 'FOC 발주' }
+  ];
+  placeholders.forEach(function(p) {
+    html += '<div id="po-content-' + p.id + '" class="po-tab-content" style="display:' + (activeSubTab === p.id ? 'block' : 'none') + '">';
+    html += '<div class="po-placeholder"><div class="po-ph-icon">🚧</div>';
+    html += '<div class="po-ph-title">' + p.name + ' 준비 중</div>';
+    html += '<div class="po-ph-desc">다음 단계에서 구현됩니다</div></div>';
+    html += '</div>';
+  });
+
+  html += '</div>'; // #po-tab-contents
+
+  container.innerHTML = html;
+}
+
+// 왼쪽 패널 — 제품 목록
+function buildPOProductPanel() {
+  var products = DB.products || [];
+  var first50 = products.filter(function(p) { return !p.discontinued; }).slice(0, 50);
+
+  // TTI 재고 맵
+  var ttiStockMap = {};
+  try {
+    var ttiRaw = JSON.parse(localStorage.getItem('mw_tti_products') || '{}');
+    (ttiRaw.data || []).forEach(function(t) { ttiStockMap[normalizeTtiCode(t.productCode)] = t.stockStatus || ''; });
+  } catch(e) {}
+
+  var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
+  html += '<div class="po-panel-header"><span>제품 목록<span class="po-header-count">' + first50.length + '건</span></span></div>';
+
+  // 필터 행
+  html += '<div class="po-filter-row">';
+  html += '<input type="search" placeholder="코드, 모델명 검색" id="po-prod-search" oninput="filterPOProducts()">';
+  html += '<select id="po-prod-cat" onchange="filterPOProducts()" style="min-width:80px"><option value="">전체</option><option value="파워툴">파워툴</option><option value="수공구">수공구</option><option value="악세사리">악세사리</option><option value="팩아웃">팩아웃</option></select>';
+  html += '<select id="po-prod-stock" onchange="filterPOProducts()" style="min-width:80px"><option value="">본사전체</option><option value="a">적정</option><option value="b">임박</option><option value="c">소진</option></select>';
+  html += '</div>';
+
+  // 테이블
+  html += '<div class="po-panel-body">';
+  html += '<table class="po-table"><thead><tr>';
+  html += '<th>분류</th><th style="min-width:180px">모델명</th><th class="num">공급가</th><th class="num">원가</th><th class="center">본사</th><th class="center" style="width:50px">수량</th><th class="center" style="width:30px">🛒</th>';
+  html += '</tr></thead><tbody id="po-prod-body">';
+
+  first50.forEach(function(p) {
+    var code = normalizeTtiCode(p.ttiNum);
+    var stockStatus = code && ttiStockMap[code] !== undefined ? ttiStockMap[code] : null;
+    var stockIcon;
+    if (stockStatus === 'a') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="#4A90D9"/></svg>';
+    else if (stockStatus === 'b') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,2 12,11 2,11" fill="#F5A623"/></svg>';
+    else if (stockStatus === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
+    else stockIcon = '<span style="color:#B4B2A9">-</span>';
+
+    var catColor = { '파워툴': '#185FA5', '수공구': '#1D9E75', '악세사리': '#EF9F27', '팩아웃': '#D4537E' }[p.category] || '#5A6070';
+
+    html += '<tr>';
+    html += '<td><span style="font-size:10px;color:' + catColor + ';font-weight:600">' + (p.category || '-') + '</span></td>';
+    html += '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
+    html += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
+    html += '<td class="num">-</td>';
+    html += '<td class="center">' + stockIcon + '</td>';
+    html += '<td class="center"><input type="number" min="1" value="1" style="width:40px;height:24px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:11px;font-family:Pretendard,sans-serif" data-code="' + (p.ttiNum || '') + '"></td>';
+    html += '<td class="center"><button class="po-cart-btn" onclick="addToCart(\'' + (p.ttiNum || '') + '\')">🛒</button></td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+// 오른쪽 패널 — 주문 목록
+function buildPOOrderPanel() {
+  var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
+  html += '<div class="po-panel-header"><span>주문 목록<span class="po-header-count">0건</span></span>';
+  html += '<button style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="clearPOCart()">비우기</button>';
+  html += '</div>';
+
+  // 제품등록 검색행
+  html += '<div class="po-register-row">';
+  html += '<span style="font-size:12px;font-weight:600;color:#5A6070;white-space:nowrap">제품등록 :</span>';
+  html += '<input type="search" placeholder="상품번호, 모델명, 제품명 검색 → Enter" id="po-cart-search" onkeydown="if(event.key===\'Enter\')addPOCartItem()">';
+  html += '<button class="po-register-btn" onclick="addPOCartItem()">+ 등록</button>';
+  html += '</div>';
+
+  // 테이블
+  html += '<div class="po-panel-body">';
+  html += '<table class="po-table"><thead><tr>';
+  html += '<th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="num">원가</th><th class="center" style="width:30px">✕</th>';
+  html += '</tr></thead><tbody id="po-cart-body">';
+  html += '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
+  html += '</tbody></table></div>';
+
+  // 합계
+  html += '<div class="po-order-summary">';
+  html += '<div><span style="color:#5A6070">공급가 합계</span> <span style="font-weight:600;margin-left:6px" id="po-cart-supply-total">0</span></div>';
+  html += '<div><span style="color:#5A6070">원가 합계</span> <span style="font-weight:600;margin-left:6px" id="po-cart-cost-total">0</span></div>';
+  html += '<div><span style="color:#5A6070">부가세(10%)</span> <span style="font-weight:600;margin-left:6px" id="po-cart-vat">0</span></div>';
+  html += '</div>';
+
+  html += '<div style="padding:8px"><button class="po-order-btn" onclick="submitPOOrder()">TTI 발주하기</button></div>';
+  html += '</div>';
+  return html;
+}
+
+// 서브탭 전환
+function switchPOSubTab(tabName) {
+  document.querySelectorAll('.po-tab-content').forEach(function(el) { el.style.display = 'none'; });
+  var content = document.getElementById('po-content-' + tabName);
+  if (content) content.style.display = tabName === 'normal' ? 'grid' : 'block';
+
+  document.querySelectorAll('.po-sub-tab').forEach(function(btn) {
+    var id = btn.getAttribute('data-tab');
+    var tabDef = _poSubTabs.find(function(t) { return t.id === id; });
+    btn.style.background = id === tabName ? (tabDef ? tabDef.activeBg : '#185FA5') : '#1A1D23';
+  });
+
+  localStorage.setItem('mw_po_active_subtab', tabName);
+}
+
+// 누적프로모션 추가
+function addCumulativePromo() {
+  var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [
+    { name: 'GEN4+FQID2', amount: '8,500,000', benefit: '200만당 본품증정', achieved: 4, next: '1,500,000', paletteIdx: 0 },
+    { name: 'CBL2', amount: '2,100,000', benefit: '100만당 본품증정', achieved: 2, next: '900,000', paletteIdx: 1 }
+  ];
+  if (promos.length >= 5) { toast('최대 5개까지 추가할 수 있습니다'); return; }
+  promos.push({ name: '새 프로모션', amount: '0', benefit: '클릭하여 설정', achieved: 0, next: '0', paletteIdx: promos.length });
+  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  renderPOTab();
+}
+
+// 누적프로모션 모달 (B-1b에서 구현)
+function openCumulativePromoModal(index) {
+  console.log('[발주] 누적프로모션 모달 열기:', index);
+  toast('프로모션 설정은 다음 단계에서 구현됩니다');
+}
+
+// 장바구니 추가 (B-1a는 콘솔만)
+function addToCart(productCode) {
+  console.log('[발주] 장바구니 추가:', productCode);
+  toast('장바구니 기능은 다음 단계에서 구현됩니다');
+}
+
+// 장바구니 비우기
+function clearPOCart() {
+  console.log('[발주] 장바구니 비우기');
+}
+
+// 제품등록 검색 추가
+function addPOCartItem() {
+  var input = document.getElementById('po-cart-search');
+  if (input && input.value.trim()) {
+    console.log('[발주] 제품등록 검색:', input.value.trim());
+    toast('제품등록 기능은 다음 단계에서 구현됩니다');
+  }
+}
+
+// 발주하기
+function submitPOOrder() {
+  console.log('[발주] TTI 발주하기');
+  toast('TTI 발주 기능은 다음 단계에서 구현됩니다');
+}
+
+// 제품 목록 필터
+function filterPOProducts() {
+  // B-1a: 기본 필터만 (B-2에서 full 구현)
+  console.log('[발주] 필터 변경');
 }
 
 function renderAllOrders() {

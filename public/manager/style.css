@@ -269,3 +269,82 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 /* Toast */
 .toast { position: fixed; top: 60px; right: 20px; background: #1A1D23; color: white; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 500; z-index: 300; transform: translateX(120%); transition: transform 0.3s; }
 .toast.show { transform: translateX(0); }
+
+/* ========================================
+   발주 탭 리디자인 (Step B-1a)
+   ======================================== */
+
+/* 상단 매출카드 1줄 */
+.po-kpi-row { display:flex; gap:6px; padding:8px 12px; align-items:stretch; overflow-x:auto; }
+.po-sale-card { flex:0 0 auto; min-width:140px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; }
+.po-sale-card .po-card-label { font-size:11px; font-weight:600; margin-bottom:2px; }
+.po-sale-card .po-card-amount { font-size:18px; font-weight:700; color:#1A1D23; line-height:1.2; }
+.po-sale-card .po-card-target { font-size:10px; color:#9BA3B2; margin-top:2px; }
+.po-sale-card .po-progress { height:3px; background:#EAECF2; border-radius:2px; margin-top:4px; overflow:hidden; }
+.po-sale-card .po-progress-fill { height:100%; border-radius:2px; }
+
+.po-divider { width:1px; background:#B0B8CC; margin:4px 2px; opacity:0.4; flex-shrink:0; }
+
+.po-promo-card { flex:1; min-width:130px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; cursor:pointer; transition:box-shadow 0.15s; }
+.po-promo-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+.po-promo-card .po-promo-name { font-size:11px; font-weight:600; display:flex; align-items:center; gap:4px; }
+.po-promo-card .po-promo-amount { font-size:16px; font-weight:700; color:#1A1D23; margin-top:2px; }
+.po-promo-card .po-promo-benefit { font-size:10px; color:#5A6070; margin-top:1px; }
+.po-promo-card .po-promo-next { font-size:10px; color:#9BA3B2; margin-top:2px; }
+
+.po-add-promo-btn { flex:0 0 56px; border:2px dashed #DDE1EB; border-radius:7px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; background:transparent; }
+.po-add-promo-btn:hover { border-color:#185FA5; background:#E6F1FB; }
+.po-add-promo-btn .po-add-icon { font-size:18px; color:#9BA3B2; line-height:1; }
+.po-add-promo-btn .po-add-label { font-size:9px; color:#9BA3B2; margin-top:1px; }
+
+.po-total-card { flex:0 0 auto; min-width:160px; background:#185FA5; border-radius:7px; padding:8px 14px; color:#fff; }
+.po-total-card .po-total-label { font-size:11px; opacity:0.8; }
+.po-total-card .po-total-amount { font-size:20px; font-weight:700; line-height:1.2; }
+.po-total-card .po-total-pct { font-size:10px; opacity:0.7; margin-top:2px; }
+.po-total-card .po-total-halves { display:flex; gap:4px; margin-top:6px; }
+.po-total-card .po-total-half { flex:1; background:rgba(255,255,255,0.15); border-radius:4px; padding:3px 6px; font-size:10px; text-align:center; }
+
+/* 서브탭 7개 */
+.po-subtabs { display:flex; gap:4px; padding:6px 12px; overflow-x:auto; }
+.po-sub-tab { background:#1A1D23; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; font-family:'Pretendard',sans-serif; transition:background 0.15s; }
+.po-sub-tab:hover { opacity:0.85; }
+.po-sub-tab .po-tab-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+/* 패널 */
+.po-panel { background:#fff; border:1px solid #DDE1EB; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
+.po-panel-header { background:#1A1D23; color:#fff; padding:8px 14px; font-size:13px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+.po-panel-header .po-header-count { font-size:12px; font-weight:400; opacity:0.7; margin-left:6px; }
+.po-panel-body { padding:8px; flex:1; overflow-y:auto; }
+
+/* 제품 목록 / 주문 목록 테이블 */
+.po-table { width:100%; border-collapse:collapse; font-size:12px; }
+.po-table th { padding:5px 6px; text-align:left; font-weight:500; font-size:11px; color:#9BA3B2; border-bottom:1px solid #EAECF2; white-space:nowrap; background:#F8F9FB; position:sticky; top:0; z-index:1; }
+.po-table td { padding:4px 6px; border-bottom:1px solid #F0F2F7; white-space:nowrap; }
+.po-table .num { text-align:right; }
+.po-table .center { text-align:center; }
+.po-table tr:hover { background:#F8FBFF; }
+.po-cart-btn { width:24px; height:24px; border-radius:4px; border:1px solid #DDE1EB; background:#fff; cursor:pointer; font-size:12px; display:inline-flex; align-items:center; justify-content:center; }
+.po-cart-btn:hover { background:#E6F1FB; border-color:#185FA5; }
+.po-promo-tag { display:inline-block; font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; margin-left:4px; }
+
+/* 주문 목록 하단 합계 */
+.po-order-summary { padding:8px 14px; border-top:1px solid #DDE1EB; background:#F8F9FB; display:flex; justify-content:space-between; align-items:center; font-size:12px; }
+.po-order-btn { width:100%; padding:10px; background:#185FA5; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer; font-family:'Pretendard',sans-serif; }
+.po-order-btn:hover { background:#0F4C8A; }
+
+/* 필터 행 */
+.po-filter-row { display:flex; gap:6px; padding:6px 8px; align-items:center; border-bottom:1px solid #F0F2F7; }
+.po-filter-row input, .po-filter-row select { height:28px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:11px; font-family:'Pretendard',sans-serif; }
+.po-filter-row input { flex:1; }
+
+/* 제품등록 검색행 */
+.po-register-row { display:flex; gap:6px; padding:8px; align-items:center; border-bottom:1px solid #EAECF2; }
+.po-register-row input { flex:1; height:32px; border:1px solid #DDE1EB; border-radius:6px; padding:0 10px; font-size:12px; font-family:'Pretendard',sans-serif; }
+.po-register-row input:focus { border-color:#185FA5; outline:none; }
+.po-register-btn { height:32px; padding:0 14px; background:#185FA5; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:'Pretendard',sans-serif; }
+
+/* 플레이스홀더 탭 */
+.po-placeholder { text-align:center; padding:60px; color:#9BA3B2; }
+.po-placeholder .po-ph-icon { font-size:40px; margin-bottom:12px; }
+.po-placeholder .po-ph-title { font-size:14px; font-weight:600; }
+.po-placeholder .po-ph-desc { font-size:12px; margin-top:4px; }
