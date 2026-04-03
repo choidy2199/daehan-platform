@@ -1177,6 +1177,16 @@ function renderCatalog() {
     var map = { '파워툴': { bg:'#DBEAFE', color:'#1E40AF' }, '수공구': { bg:'#D1FAE5', color:'#065F46' }, '악세사리': { bg:'#FEF3C7', color:'#92400E' }, '팩아웃': { bg:'#FCE7F3', color:'#9D174D' }, '드릴비트': { bg:'#E0E7FF', color:'#3730A3' } };
     return map[cat] || { bg:'#F3F4F6', color:'#374151' };
   }
+  // TTI 스크래핑 데이터 맵 (본사가용 컬럼용)
+  var _ttiStockMap = {};
+  try {
+    var _ttiRaw = JSON.parse(localStorage.getItem('mw_tti_products') || '{}');
+    var _ttiData = _ttiRaw.data || [];
+    _ttiData.forEach(function(t) {
+      _ttiStockMap[normalizeTtiCode(t.productCode)] = t.stockStatus || '';
+    });
+  } catch(e) {}
+
   function buildRow(p) {
     const idx = DB.products.indexOf(p);
     const stock = findStock(p.code);
@@ -1233,6 +1243,15 @@ function renderCatalog() {
       <td class="num" style="background:${isD ? 'transparent' : '#FEFCF5'}">${fmt(p.priceOpen)}${isD ? '' : marginBadge(p.priceOpen, p.cost, p.category === '파워툴' ? (DB.settings.openElecFee || 0.13) : (DB.settings.openHandFee || 0.176))}</td>
       <td class="center">${stockBadge}</td>
       <td class="center">${(function(){
+        // TTI 스크래핑 데이터 우선, 없으면 기존 ttiStock 폴백
+        var ttiCode = normalizeTtiCode(p.ttiNum);
+        var ttiStatus = ttiCode && _ttiStockMap[ttiCode] !== undefined ? _ttiStockMap[ttiCode] : null;
+        if (ttiStatus !== null) {
+          if (ttiStatus === 'a') return '<svg width="18" height="18" viewBox="0 0 18 18" title="적정"><circle cx="9" cy="9" r="6" fill="#4A90D9"/></svg>';
+          if (ttiStatus === 'b') return '<svg width="18" height="18" viewBox="0 0 18 18" title="임박"><polygon points="9,3 15,14 3,14" fill="#F5A623"/></svg>';
+          if (ttiStatus === 'c') return '<svg width="18" height="18" viewBox="0 0 18 18" title="소진"><line x1="4" y1="4" x2="14" y2="14" stroke="#E24B4A" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="4" x2="4" y2="14" stroke="#E24B4A" stroke-width="2.5" stroke-linecap="round"/></svg>';
+          return '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="4" y="8" width="10" height="2" rx="1" fill="#B4B2A9"/></svg>';
+        }
         var s = p.ttiStock || '';
         if (!s || s === '-') return '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="4" y="8" width="10" height="2" rx="1" fill="#B4B2A9"/></svg>';
         s = s.trim();
