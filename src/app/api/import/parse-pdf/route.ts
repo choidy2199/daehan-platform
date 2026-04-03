@@ -159,31 +159,33 @@ function parseDataLine(line: string): { ttiNum: string; orderNum: string; model:
 function splitModelDescription(text: string): { model: string; description: string } {
   if (!text) return { model: '', description: '' };
 
-  // 패턴1: M12, M18, C12, C18, L4, IR, MXF 등으로 시작
-  const milwaukeeMatch = text.match(/^((?:M|C)(?:12|18)\s+[A-Z0-9][A-Z0-9\-\/().+\s]*?)(?=\s+[가-힣\d])/i);
-  if (milwaukeeMatch) {
-    return { model: milwaukeeMatch[1].trim(), description: text.substring(milwaukeeMatch[0].length).trim() };
+  // 패턴1: M12/M18/C12/C18 + 공백 + 모델코드(영숫자+하이픈, 하이픈 포함 필수)
+  // 예: "M12 CHZ-0", "M18 FPD3-502X", "C18 HAG-502C"
+  const mwMatch = text.match(/^((?:M|C)(?:12|18)\s+[A-Z0-9]+[A-Z0-9]*-[A-Z0-9]+)\s+(.*)/i);
+  if (mwMatch) {
+    return { model: mwMatch[1].trim(), description: mwMatch[2].trim() };
   }
 
-  // 패턴2: 숫자-숫자 패턴 (48-22-5507 등)
-  const codeMatch = text.match(/^(\d{2}-\d{2}-\d{3,5}[A-Z]*)/);
+  // 패턴1b: M12/M18 + 공백 + 모델코드(하이픈 없는 경우, 예: "M18 FUEL")
+  // 이 경우 첫 두 토큰만 모델명
+  const mwSimple = text.match(/^((?:M|C)(?:12|18)\s+\S+)\s+(.*)/i);
+  if (mwSimple) {
+    return { model: mwSimple[1].trim(), description: mwSimple[2].trim() };
+  }
+
+  // 패턴2: 숫자-숫자 패턴 (48-22-5507, 49-16-2953 등)
+  const codeMatch = text.match(/^(\d{2}-\d{2}-\d{3,5}\S*)\s*(.*)/);
   if (codeMatch) {
-    return { model: codeMatch[1].trim(), description: text.substring(codeMatch[0].length).trim() };
+    return { model: codeMatch[1].trim(), description: (codeMatch[2] || '').trim() };
   }
 
-  // 패턴3: L4, IR, MXF 등
-  const prefixMatch = text.match(/^((?:L4|IR|MXF|MXFC|MX)\s+[A-Z0-9][A-Z0-9\-\/().+\s]*?)(?=\s+[가-힣\d])/i);
+  // 패턴3: L4/IR/MXF + 모델코드
+  const prefixMatch = text.match(/^((?:L4|IR|MXF|MXFC|MX)\s+\S+)\s+(.*)/i);
   if (prefixMatch) {
-    return { model: prefixMatch[1].trim(), description: text.substring(prefixMatch[0].length).trim() };
+    return { model: prefixMatch[1].trim(), description: prefixMatch[2].trim() };
   }
 
-  // 패턴4: 영문으로 시작하고 한글이 나오기 전까지
-  const genericMatch = text.match(/^([A-Z0-9][A-Z0-9\s\-\/().+]*?)(?=\s+[가-힣])/i);
-  if (genericMatch && genericMatch[1].trim().length >= 2) {
-    return { model: genericMatch[1].trim(), description: text.substring(genericMatch[0].length).trim() };
-  }
-
-  // 폴백: 첫 공백 기준 분리
+  // 폴백: 첫 토큰이 모델명
   const spaceIdx = text.indexOf(' ');
   if (spaceIdx > 1) {
     return { model: text.substring(0, spaceIdx), description: text.substring(spaceIdx + 1) };
