@@ -7179,15 +7179,20 @@ function handleTtiPromoResult(data) {
   }));
 }
 
+// TTI 코드 정규화 (앞자리 0 제거)
+function normalizeTtiCode(code) {
+  return String(code || '').replace(/^0+/, '');
+}
+
 // TTI vs 대한플랫폼 제품 비교
 function showProductSyncReport(ttiProducts) {
   // 기존 mw_products 로드
   var mwProducts = JSON.parse(localStorage.getItem('mw_products') || '[]');
 
-  // 제품번호(CODE2) 기준 매핑
+  // ttiNum 기준 매핑 (앞자리 0 제거 후 비교)
   var mwMap = {};
   mwProducts.forEach(function(p) {
-    var code = p.관리코드 || p.code2 || p.CODE2 || p.productCode || '';
+    var code = normalizeTtiCode(p.ttiNum);
     if (code) mwMap[code] = p;
   });
 
@@ -7198,8 +7203,9 @@ function showProductSyncReport(ttiProducts) {
   var ttiMap = {};           // TTI 제품 맵 (단종 체크용)
 
   ttiProducts.forEach(function(tti) {
-    ttiMap[tti.productCode] = tti;
-    var mw = mwMap[tti.productCode];
+    var ttiCode = normalizeTtiCode(tti.productCode);
+    ttiMap[ttiCode] = tti;
+    var mw = mwMap[ttiCode];
 
     if (!mw) {
       newProducts.push(tti);
@@ -7207,7 +7213,7 @@ function showProductSyncReport(ttiProducts) {
     }
 
     // 공급가 비교
-    var mwPrice = parseInt(String(mw.공급가 || mw.supplyPrice || 0).replace(/,/g, '')) || 0;
+    var mwPrice = parseInt(String(mw.supplyPrice || 0).replace(/,/g, '')) || 0;
     if (mwPrice > 0 && tti.supplyPrice > 0 && mwPrice !== tti.supplyPrice) {
       priceChanged.push({
         tti: tti,
@@ -7224,7 +7230,7 @@ function showProductSyncReport(ttiProducts) {
   // 단종 의심: mw에 있지만 TTI에 없는 제품
   var discontinued = [];
   mwProducts.forEach(function(mw) {
-    var code = mw.관리코드 || mw.code2 || mw.CODE2 || mw.productCode || '';
+    var code = normalizeTtiCode(mw.ttiNum);
     if (code && !ttiMap[code]) {
       discontinued.push(mw);
     }
@@ -7386,10 +7392,10 @@ function buildSyncTable(tab, report) {
 
     report.discontinued.forEach(function(p) {
       html += '<tr style="background:#fff5f5;">';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + (p.코드 || p.code || '') + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + (p.모델명 || p.model || '') + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + (p.제품설명 || p.description || '') + '</td>';
-      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">' + (parseInt(String(p.공급가 || 0).replace(/,/g, '')) || 0).toLocaleString() + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;">' + (p.code || '') + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + (p.model || '') + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;font-size:11px;">' + (p.detail || '') + '</td>';
+      html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">' + (parseInt(String(p.supplyPrice || 0).replace(/,/g, '')) || 0).toLocaleString() + '</td>';
       html += '<td style="padding:6px 8px;border-bottom:1px solid #eee;"><span style="background:#fcebeb;color:#a32d2d;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:500;">단종의심</span></td>';
       html += '</tr>';
     });
@@ -7463,17 +7469,26 @@ function applySyncItems() {
     var tti = report.newProducts[idx];
     if (tti) {
       mwProducts.push({
-        코드: '',
-        관리코드: tti.productCode,
-        대분류: '파워툴',
-        중분류: tti.category || '',
-        소분류: tti.subCategory || '',
-        순번: tti.promoNo || '',
-        'TTI#': '',
-        모델명: tti.modelName || '',
-        제품설명: '',
-        공급가: tti.supplyPrice || 0,
-        본사: tti.available ? '●' : '✕'
+        code: '',
+        ttiNum: normalizeTtiCode(tti.productCode),
+        manageCode: '',
+        model: tti.modelName || '',
+        detail: '',
+        category: '',
+        subcategory: tti.subCategory || '',
+        orderNum: tti.promoNo || '',
+        supplyPrice: tti.supplyPrice || 0,
+        cost: 0,
+        priceA: 0,
+        priceRetail: 0,
+        priceNaver: 0,
+        priceOpen: 0,
+        ttiStock: tti.available ? '●' : '✕',
+        inDate: '',
+        productDC: 0,
+        raiseRate: 0,
+        raisedPrice: 0,
+        discontinued: 0
       });
       applied.new++;
     }
@@ -7485,9 +7500,9 @@ function applySyncItems() {
     var item = report.priceChanged[idx];
     if (item) {
       for (var i = 0; i < mwProducts.length; i++) {
-        var code = mwProducts[i].관리코드 || mwProducts[i].code2 || mwProducts[i].CODE2 || '';
-        if (code === item.tti.productCode) {
-          mwProducts[i].공급가 = item.newPrice;
+        var code = normalizeTtiCode(mwProducts[i].ttiNum);
+        if (code === normalizeTtiCode(item.tti.productCode)) {
+          mwProducts[i].supplyPrice = item.newPrice;
           applied.price++;
           break;
         }
@@ -7497,12 +7512,12 @@ function applySyncItems() {
 
   // 본사재고 업데이트 (전체 TTI 제품에 대해)
   var ttiMap = {};
-  ttiProducts.forEach(function(t) { ttiMap[t.productCode] = t; });
+  ttiProducts.forEach(function(t) { ttiMap[normalizeTtiCode(t.productCode)] = t; });
 
   mwProducts.forEach(function(mw) {
-    var code = mw.관리코드 || mw.code2 || mw.CODE2 || '';
+    var code = normalizeTtiCode(mw.ttiNum);
     if (code && ttiMap[code]) {
-      mw.본사 = ttiMap[code].available ? '●' : '✕';
+      mw.ttiStock = ttiMap[code].available ? '●' : '✕';
       applied.stock++;
     }
   });
