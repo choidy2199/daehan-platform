@@ -1884,60 +1884,110 @@ function renderPOTab() {
   html += '</div>'; // #po-tab-contents
 
   container.innerHTML = html;
+
+  // 초기 제품 행 렌더링 + 스크롤 이벤트
+  renderPOProductRows();
+  var scrollEl = document.getElementById('po-prod-scroll');
+  if (scrollEl) scrollEl.addEventListener('scroll', onPOProductScroll);
 }
 
-// 왼쪽 패널 — 제품 목록
-function buildPOProductPanel() {
-  var products = DB.products || [];
-  var first50 = products.filter(function(p) { return !p.discontinued; }).slice(0, 50);
+// 왼쪽 패널 — 제품 목록 (가상 스크롤)
+var _poFilteredProducts = [];
+var _poRenderedCount = 0;
+var _poTtiStockMap = {};
 
-  // TTI 재고 맵
-  var ttiStockMap = {};
+function buildPOProductPanel() {
+  // TTI 재고 맵 (1회 빌드)
+  _poTtiStockMap = {};
   try {
     var ttiRaw = JSON.parse(localStorage.getItem('mw_tti_products') || '{}');
-    (ttiRaw.data || []).forEach(function(t) { ttiStockMap[normalizeTtiCode(t.productCode)] = t.stockStatus || ''; });
+    (ttiRaw.data || []).forEach(function(t) { _poTtiStockMap[normalizeTtiCode(t.productCode)] = t.stockStatus || ''; });
   } catch(e) {}
 
+  // 전체 제품 (단종 제외) → 모델명 정렬
+  _poFilteredProducts = (DB.products || []).filter(function(p) { return !p.discontinued; });
+  _poFilteredProducts.sort(function(a, b) { return (a.model || '').localeCompare(b.model || '', 'ko'); });
+
   var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
-  html += '<div class="po-panel-header"><span>제품 목록<span class="po-header-count">' + first50.length + '건</span></span></div>';
+  html += '<div class="po-panel-header"><span>제품 목록<span class="po-header-count" id="po-prod-count">' + _poFilteredProducts.length + '건</span></span></div>';
 
   // 필터 행
   html += '<div class="po-filter-row">';
   html += '<input type="search" placeholder="코드, 모델명 검색" id="po-prod-search" oninput="filterPOProducts()">';
-  html += '<select id="po-prod-cat" onchange="filterPOProducts()" style="min-width:80px"><option value="">전체</option><option value="파워툴">파워툴</option><option value="수공구">수공구</option><option value="악세사리">악세사리</option><option value="팩아웃">팩아웃</option></select>';
+
+  // 카테고리 select — 실제 카테고리에서 동적 생성
+  var cats = {};
+  (DB.products || []).forEach(function(p) { if (p.category) cats[p.category] = true; });
+  html += '<select id="po-prod-cat" onchange="filterPOProducts()" style="min-width:80px"><option value="">전체</option>';
+  Object.keys(cats).sort().forEach(function(c) { html += '<option value="' + c + '">' + c + '</option>'; });
+  html += '</select>';
+
   html += '<select id="po-prod-stock" onchange="filterPOProducts()" style="min-width:80px"><option value="">본사전체</option><option value="a">적정</option><option value="b">임박</option><option value="c">소진</option></select>';
   html += '</div>';
 
   // 테이블
-  html += '<div class="po-panel-body">';
+  html += '<div class="po-panel-body" id="po-prod-scroll">';
   html += '<table class="po-table"><thead><tr>';
   html += '<th>분류</th><th style="min-width:180px">모델명</th><th class="num">공급가</th><th class="num">원가</th><th class="center">본사</th><th class="center" style="width:50px">수량</th><th class="center" style="width:30px">🛒</th>';
   html += '</tr></thead><tbody id="po-prod-body">';
-
-  first50.forEach(function(p) {
-    var code = normalizeTtiCode(p.ttiNum);
-    var stockStatus = code && ttiStockMap[code] !== undefined ? ttiStockMap[code] : null;
-    var stockIcon;
-    if (stockStatus === 'a') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="#4A90D9"/></svg>';
-    else if (stockStatus === 'b') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,2 12,11 2,11" fill="#F5A623"/></svg>';
-    else if (stockStatus === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
-    else stockIcon = '<span style="color:#B4B2A9">-</span>';
-
-    var catColor = { '파워툴': '#185FA5', '수공구': '#1D9E75', '악세사리': '#EF9F27', '팩아웃': '#D4537E' }[p.category] || '#5A6070';
-
-    html += '<tr>';
-    html += '<td><span style="font-size:10px;color:' + catColor + ';font-weight:600">' + (p.category || '-') + '</span></td>';
-    html += '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
-    html += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
-    html += '<td class="num">-</td>';
-    html += '<td class="center">' + stockIcon + '</td>';
-    html += '<td class="center"><input type="number" min="1" value="1" style="width:40px;height:24px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:11px;font-family:Pretendard,sans-serif" data-code="' + (p.ttiNum || '') + '"></td>';
-    html += '<td class="center"><button class="po-cart-btn" onclick="addToCart(\'' + (p.ttiNum || '') + '\')">🛒</button></td>';
-    html += '</tr>';
-  });
-
   html += '</tbody></table></div></div>';
   return html;
+}
+
+// 제품 행 빌드 (1행)
+function buildPOProductRow(p) {
+  var code = normalizeTtiCode(p.ttiNum);
+  var stockStatus = code && _poTtiStockMap[code] !== undefined ? _poTtiStockMap[code] : null;
+  var stockIcon;
+  if (stockStatus === 'a') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="#4A90D9"/></svg>';
+  else if (stockStatus === 'b') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,2 12,11 2,11" fill="#F5A623"/></svg>';
+  else if (stockStatus === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
+  else stockIcon = '<span style="color:#B4B2A9">-</span>';
+
+  var catColor = { '파워툴': '#185FA5', '수공구': '#1D9E75', '악세사리': '#EF9F27', '팩아웃': '#D4537E' }[p.category] || '#5A6070';
+
+  var tr = '<tr>';
+  tr += '<td><span style="font-size:10px;color:' + catColor + ';font-weight:600">' + (p.category || '-') + '</span></td>';
+  tr += '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
+  tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
+  tr += '<td class="num">-</td>';
+  tr += '<td class="center">' + stockIcon + '</td>';
+  tr += '<td class="center"><input type="number" min="1" value="1" style="width:40px;height:24px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:11px;font-family:Pretendard,sans-serif" data-code="' + (p.ttiNum || '') + '"></td>';
+  tr += '<td class="center"><button class="po-cart-btn" onclick="addToCart(\'' + (p.ttiNum || '') + '\')">🛒</button></td>';
+  tr += '</tr>';
+  return tr;
+}
+
+// 제품 목록 초기 렌더링 (첫 50행)
+function renderPOProductRows() {
+  var body = document.getElementById('po-prod-body');
+  if (!body) return;
+  _poRenderedCount = Math.min(50, _poFilteredProducts.length);
+  var html = '';
+  for (var i = 0; i < _poRenderedCount; i++) { html += buildPOProductRow(_poFilteredProducts[i]); }
+  if (_poFilteredProducts.length === 0) {
+    html = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">검색 결과가 없습니다</td></tr>';
+  }
+  body.innerHTML = html;
+  // 건수 업데이트
+  var countEl = document.getElementById('po-prod-count');
+  if (countEl) countEl.textContent = _poFilteredProducts.length + '건';
+}
+
+// 스크롤 시 추가 로드 (100행씩)
+function onPOProductScroll() {
+  var el = document.getElementById('po-prod-scroll');
+  if (!el) return;
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
+    if (_poRenderedCount >= _poFilteredProducts.length) return;
+    var body = document.getElementById('po-prod-body');
+    if (!body) return;
+    var end = Math.min(_poRenderedCount + 100, _poFilteredProducts.length);
+    var html = '';
+    for (var i = _poRenderedCount; i < end; i++) { html += buildPOProductRow(_poFilteredProducts[i]); }
+    body.insertAdjacentHTML('beforeend', html);
+    _poRenderedCount = end;
+  }
 }
 
 // 오른쪽 패널 — 주문 목록
@@ -2035,8 +2085,27 @@ function submitPOOrder() {
 
 // 제품 목록 필터
 function filterPOProducts() {
-  // B-1a: 기본 필터만 (B-2에서 full 구현)
-  console.log('[발주] 필터 변경');
+  var search = (document.getElementById('po-prod-search') || {}).value || '';
+  var cat = (document.getElementById('po-prod-cat') || {}).value || '';
+  var stock = (document.getElementById('po-prod-stock') || {}).value || '';
+  search = search.toLowerCase().trim();
+
+  _poFilteredProducts = (DB.products || []).filter(function(p) {
+    if (p.discontinued) return false;
+    if (cat && p.category !== cat) return false;
+    if (stock) {
+      var code = normalizeTtiCode(p.ttiNum);
+      var s = code && _poTtiStockMap[code] !== undefined ? _poTtiStockMap[code] : '';
+      if (s !== stock) return false;
+    }
+    if (search) {
+      var text = ((p.code || '') + ' ' + (p.ttiNum || '') + ' ' + (p.model || '') + ' ' + (p.detail || '') + ' ' + (p.category || '') + ' ' + (p.orderNum || '')).toLowerCase();
+      if (!text.includes(search)) return false;
+    }
+    return true;
+  });
+  _poFilteredProducts.sort(function(a, b) { return (a.model || '').localeCompare(b.model || '', 'ko'); });
+  renderPOProductRows();
 }
 
 function renderAllOrders() {
