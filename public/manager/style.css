@@ -277,9 +277,9 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 /* 상단 매출카드 1줄 */
 .po-kpi-row { display:flex; gap:6px; padding:8px 12px; align-items:stretch; overflow-x:auto; }
 .po-sale-card { flex:0 0 auto; min-width:140px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; }
-.po-sale-card .po-card-label { font-size:11px; font-weight:600; margin-bottom:2px; }
-.po-sale-card .po-card-amount { font-size:18px; font-weight:700; color:#1A1D23; line-height:1.2; }
-.po-sale-card .po-card-target { font-size:10px; color:#9BA3B2; margin-top:2px; }
+.po-sale-card .po-card-label { font-size:13px; font-weight:600; margin-bottom:2px; }
+.po-sale-card .po-card-amount { font-size:20px; font-weight:700; color:#1A1D23; line-height:1.2; }
+.po-sale-card .po-card-target { font-size:11px; color:#9BA3B2; margin-top:2px; }
 .po-sale-card .po-progress { height:3px; background:#EAECF2; border-radius:2px; margin-top:4px; overflow:hidden; }
 .po-sale-card .po-progress-fill { height:100%; border-radius:2px; }
 
@@ -287,9 +287,9 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 .po-promo-card { flex:1; min-width:130px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; cursor:pointer; transition:box-shadow 0.15s; }
 .po-promo-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
-.po-promo-card .po-promo-name { font-size:11px; font-weight:600; display:flex; align-items:center; gap:4px; }
-.po-promo-card .po-promo-amount { font-size:16px; font-weight:700; color:#1A1D23; margin-top:2px; }
-.po-promo-card .po-promo-benefit { font-size:10px; color:#5A6070; margin-top:1px; }
+.po-promo-card .po-promo-name { font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px; }
+.po-promo-card .po-promo-amount { font-size:19px; font-weight:700; color:#1A1D23; margin-top:2px; }
+.po-promo-card .po-promo-benefit { font-size:11px; color:#5A6070; margin-top:1px; }
 .po-promo-card .po-promo-next { font-size:10px; color:#9BA3B2; margin-top:2px; }
 
 .po-add-promo-btn { flex:0 0 56px; border:2px dashed #DDE1EB; border-radius:7px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; background:transparent; }
@@ -298,11 +298,11 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-add-promo-btn .po-add-label { font-size:9px; color:#9BA3B2; margin-top:1px; }
 
 .po-total-card { flex:0 0 auto; min-width:160px; background:#185FA5; border-radius:7px; padding:8px 14px; color:#fff; }
-.po-total-card .po-total-label { font-size:11px; opacity:0.8; }
-.po-total-card .po-total-amount { font-size:20px; font-weight:700; line-height:1.2; }
-.po-total-card .po-total-pct { font-size:10px; opacity:0.7; margin-top:2px; }
+.po-total-card .po-total-label { font-size:13px; opacity:0.8; }
+.po-total-card .po-total-amount { font-size:22px; font-weight:700; line-height:1.2; }
+.po-total-card .po-total-pct { font-size:11px; opacity:0.7; margin-top:2px; }
 .po-total-card .po-total-halves { display:flex; gap:4px; margin-top:6px; }
-.po-total-card .po-total-half { flex:1; background:rgba(255,255,255,0.15); border-radius:4px; padding:3px 6px; font-size:10px; text-align:center; }
+.po-total-card .po-total-half { flex:1; background:rgba(255,255,255,0.15); border-radius:4px; padding:3px 6px; font-size:11px; text-align:center; }
 
 /* 서브탭 7개 */
 .po-subtabs { display:flex; gap:4px; padding:6px 12px; overflow-x:auto; }
@@ -328,9 +328,9 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-cart-btn-dark { width:26px; height:26px; border-radius:4px; border:none; background:#1A1D23; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; }
 .po-cart-btn-dark:hover { background:#333; }
 
-/* 제품 목록 큰 글씨 */
-.po-table-lg th { font-size:13px !important; }
-.po-table-lg td { font-size:14px !important; }
+/* 제품 목록 글씨 */
+.po-table-lg th { font-size:12px !important; }
+.po-table-lg td { font-size:13px !important; }
 .po-promo-tag { display:inline-block; font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; margin-left:4px; }
 
 /* 주문 목록 하단 합계 */
@@ -340,7 +340,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 /* 필터 행 */
 .po-filter-row { display:flex; gap:6px; padding:6px 8px; align-items:center; border-bottom:1px solid #F0F2F7; }
-.po-filter-row input, .po-filter-row select { height:30px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:14px; font-family:'Pretendard',sans-serif; }
+.po-filter-row input, .po-filter-row select { height:30px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:13px; font-family:'Pretendard',sans-serif; }
 .po-filter-row input { flex:1; }
 
 /* 제품등록 검색행 */
