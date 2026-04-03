@@ -3757,8 +3757,10 @@ async function handleImportPdf(file) {
     }
 
     console.log('[PDF Import] 파싱 완료:', data.rows.length + '행, ' + (data.pageCount || '?') + '페이지');
+    if (data.debug) console.log('[PDF Import Debug]', data.debug);
     _importParsedRows = data.rows;
     _importCompareResult = compareWithExisting(data.rows);
+    if (data.debug) _importCompareResult.debug = data.debug;
     renderImportComparison(_importCompareResult);
   } catch (err) {
     console.error('PDF 파싱 오류:', err);
@@ -3925,6 +3927,10 @@ function compareWithExisting(parsedRows) {
 // 비교 결과 UI 렌더링 (Part B에서 상세 구현, 여기선 요약만)
 function renderImportComparison(result) {
   document.getElementById('import-compare-area').style.display = 'block';
+
+  // 디버그 정보 콘솔 출력
+  if (result.debug) { console.log('[Import Debug]', result.debug); }
+
   // 요약 카드
   var summary = document.getElementById('import-summary');
   summary.innerHTML =
@@ -3932,40 +3938,77 @@ function renderImportComparison(result) {
     '<div style="flex:1;text-align:center;padding:10px;background:#d1fae5;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#065f46">' + result.added.length + '</div><div style="font-size:11px;color:#10b981">신규</div></div>' +
     '<div style="flex:1;text-align:center;padding:10px;background:#f3f4f6;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#6b7280">' + result.same.length + '</div><div style="font-size:11px;color:#9ca3af">동일</div></div>';
 
-  // 변경/신규 섹션 (Part B에서 상세 테이블 구현)
+  var fieldLabel = { ttiNum:'TTI#', orderNum:'순번', model:'모델명', description:'제품설명', supplyPrice:'공급가' };
+
+  // 변경 항목 (카드 형태)
   var changedEl = document.getElementById('import-changed-section');
   if (result.changed.length > 0) {
     changedEl.style.display = 'block';
-    changedEl.innerHTML = '<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:#1d4ed8">변경 항목 (' + result.changed.length + '건)</div>' +
-      '<div style="font-size:11px;color:#64748b;margin-bottom:8px">공급가, 순번, TTI#, 모델명, 제품설명 중 변경된 항목입니다.</div>' +
-      '<div style="max-height:200px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;padding:8px;font-size:11px">' +
-      result.changed.map(function(c, i) {
-        return '<label style="display:flex;gap:6px;align-items:flex-start;padding:4px 0;border-bottom:1px solid #f1f5f9;cursor:pointer">' +
-          '<input type="checkbox" checked data-type="changed" data-idx="' + i + '" onchange="updateImportApplyBtn()" style="margin-top:2px">' +
-          '<div><span style="font-weight:600">' + (c.oldData.model || c.newData.model) + '</span> — ' +
-          c.diffs.map(function(d) {
-            if (d === 'supplyPrice') return '공급가 ' + comma(c.oldData.supplyPrice) + '→' + comma(c.newData.supplyPrice);
-            return d + ' 변경';
-          }).join(', ') + '</div></label>';
-      }).join('') + '</div>';
+    var changedHeader = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<span style="font-size:12px;font-weight:600;color:#1d4ed8">변경 항목 (' + result.changed.length + '건)</span>' +
+      '<span onclick="toggleAllImportChecks(\'changed\',true)" style="font-size:11px;color:#3b82f6;cursor:pointer">전체 선택</span></div>';
+    var changedCards = '<div style="max-height:350px;overflow-y:auto">' + result.changed.map(function(c, i) {
+      var diffRows = c.diffs.map(function(d) {
+        var label = fieldLabel[d] || d;
+        var oldVal = c.oldData[d] != null ? c.oldData[d] : '';
+        var newVal = c.newData[d] != null ? c.newData[d] : '';
+        var isPrice = d === 'supplyPrice';
+        var oldD = isPrice ? '₩' + Number(oldVal).toLocaleString() : oldVal;
+        var newD = isPrice ? '₩' + Number(newVal).toLocaleString() : newVal;
+        return '<tr style="border-top:1px solid #f3f4f6">' +
+          '<td style="padding:5px 12px;color:#9ca3af;font-size:11px">' + label + '</td>' +
+          '<td style="padding:5px 12px;color:#9ca3af;text-decoration:line-through;font-size:11px">' + oldD + '</td>' +
+          '<td style="padding:5px 12px;text-align:center;color:#d1d5db;font-size:11px">→</td>' +
+          '<td style="padding:5px 12px;font-weight:500;color:#92400e;background:#fef3c7;font-size:11px">' + newD + '</td></tr>';
+      }).join('');
+      return '<div style="border:1px solid #e5e7eb;border-radius:6px;margin-bottom:8px;overflow:hidden">' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb">' +
+        '<input type="checkbox" ' + (c.checked ? 'checked' : '') + ' data-type="changed" data-idx="' + i + '" onchange="_importCompareResult.changed[' + i + '].checked=this.checked;updateImportApplyBtn()">' +
+        '<span style="font-weight:600;font-size:12px">' + (c.newData.model || c.oldData.model) + '</span>' +
+        '<span style="font-size:11px;color:#9ca3af">순번 ' + (c.oldData.orderNum || '') + '</span></div>' +
+        '<table style="width:100%;border-collapse:collapse">' +
+        '<tr style="background:#f9fafb"><th style="padding:4px 12px;text-align:left;color:#9ca3af;width:70px;font-weight:500;font-size:10px">필드</th>' +
+        '<th style="padding:4px 12px;text-align:left;color:#9ca3af;font-weight:500;font-size:10px">이전 자료</th>' +
+        '<th style="padding:4px 12px;text-align:center;color:#9ca3af;width:24px;font-weight:500;font-size:10px">→</th>' +
+        '<th style="padding:4px 12px;text-align:left;color:#9ca3af;font-weight:500;font-size:10px">변경 자료</th></tr>' +
+        diffRows + '</table></div>';
+    }).join('') + '</div>';
+    changedEl.innerHTML = changedHeader + changedCards;
   } else { changedEl.style.display = 'none'; }
 
+  // 신규 항목 (초록 카드)
   var newEl = document.getElementById('import-new-section');
   if (result.added.length > 0) {
     newEl.style.display = 'block';
-    newEl.innerHTML = '<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:#065f46">신규 항목 (' + result.added.length + '건)</div>' +
-      '<div style="max-height:150px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;padding:8px;font-size:11px">' +
-      result.added.map(function(a, i) {
-        return '<label style="display:flex;gap:6px;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;cursor:pointer">' +
-          '<input type="checkbox" checked data-type="added" data-idx="' + i + '" onchange="updateImportApplyBtn()">' +
-          '<span>' + (a.data.model || a.data.code || '-') + ' — ' + (a.data.description || '').slice(0, 40) + ' / ' + comma(a.data.supplyPrice || 0) + '</span></label>';
-      }).join('') + '</div>';
+    var newHeader = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<span style="font-size:12px;font-weight:600;color:#065f46">신규 항목 (' + result.added.length + '건)</span>' +
+      '<span onclick="toggleAllImportChecks(\'added\',true)" style="font-size:11px;color:#10b981;cursor:pointer">전체 선택</span></div>';
+    var newCards = '<div style="max-height:250px;overflow-y:auto">' + result.added.map(function(a, i) {
+      return '<div style="border:1px solid #bbf7d0;border-radius:6px;margin-bottom:8px;background:#f0fdf4">' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px">' +
+        '<input type="checkbox" ' + (a.checked ? 'checked' : '') + ' data-type="added" data-idx="' + i + '" onchange="_importCompareResult.added[' + i + '].checked=this.checked;updateImportApplyBtn()">' +
+        '<span style="font-weight:600;font-size:12px;color:#166534">' + (a.data.model || '-') + '</span>' +
+        '<span style="font-size:11px;color:#15803d">TTI# ' + (a.data.ttiNum || '-') + '</span>' +
+        '<span style="font-size:11px;color:#15803d;margin-left:auto">₩' + Number(a.data.supplyPrice || 0).toLocaleString() + '</span></div></div>';
+    }).join('') + '</div>';
+    newEl.innerHTML = newHeader + newCards;
   } else { newEl.style.display = 'none'; }
 
+  // 동일 항목
   var sameEl = document.getElementById('import-same-section');
   sameEl.style.display = result.same.length > 0 ? 'block' : 'none';
   sameEl.innerHTML = '<div style="font-size:11px;color:#94a3b8">동일 항목 ' + result.same.length + '건 — 변경 없음</div>';
 
+  updateImportApplyBtn();
+}
+
+function toggleAllImportChecks(type, state) {
+  var section = type === 'changed' ? '#import-changed-section' : '#import-new-section';
+  document.querySelectorAll(section + ' input[type=checkbox]').forEach(function(cb) { cb.checked = state; });
+  if (_importCompareResult) {
+    var arr = type === 'changed' ? _importCompareResult.changed : _importCompareResult.added;
+    arr.forEach(function(item) { item.checked = state; });
+  }
   updateImportApplyBtn();
 }
 
