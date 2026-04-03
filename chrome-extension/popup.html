@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { width: 280px; padding: 16px; font-family: 'Pretendard', -apple-system, sans-serif; font-size: 13px; color: #1A1D23; }
+    h3 { margin: 0 0 12px; font-size: 15px; font-weight: 700; }
+    .status { padding: 8px 10px; border-radius: 6px; margin-bottom: 12px; font-weight: 500; font-size: 12px; }
+    .status.ok { background: #E1F5EE; color: #085041; }
+    .status.error { background: #FCEBEB; color: #791F1F; }
+    .status.pending { background: #FAEEDA; color: #633806; }
+    label { display: block; margin: 10px 0 4px; color: #5A6070; font-size: 11px; font-weight: 500; }
+    input { width: 100%; padding: 8px 10px; border: 1px solid #DDE1EB; border-radius: 6px; font-size: 12px; box-sizing: border-box; font-family: 'Pretendard', sans-serif; color: #1A1D23; }
+    input:focus { border-color: #185FA5; outline: none; box-shadow: 0 0 0 3px #E6F1FB; }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: 'Pretendard', sans-serif; margin-top: 12px; }
+    .btn-primary { background: #185FA5; color: white; }
+    .btn-primary:hover { background: #0C447C; }
+    .divider { height: 1px; background: #DDE1EB; margin: 12px 0; }
+    .info { font-size: 10px; color: #9BA3B2; margin-top: 8px; text-align: center; }
+    .order-info { font-size: 11px; color: #5A6070; background: #F4F6FA; padding: 8px; border-radius: 4px; margin-top: 8px; }
+    .order-info strong { color: #1A1D23; }
+  </style>
+</head>
+<body>
+  <h3>🔴 대한종합상사 자동발주</h3>
+  <div class="status ok" id="status">확장 프로그램 정상 작동 중</div>
+
+  <div id="pending-order" style="display:none">
+    <div class="order-info">
+      <strong>대기 중인 주문</strong><br>
+      <span id="pending-info"></span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <label>TTI 로그인 ID</label>
+  <input type="text" id="ttiId" placeholder="P6168701106" autocomplete="off">
+
+  <label>TTI 비밀번호</label>
+  <input type="password" id="ttiPw" placeholder="비밀번호" autocomplete="off">
+
+  <button class="btn btn-primary" id="saveBtn">저장</button>
+
+  <div class="info">v1.0.0 · daehantool.dev 전용</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "대한종합상사 자동발주",
+  "version": "1.0.0",
+  "description": "TTI 밀워키 B2B 자동 발주 시스템",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.ttimilwaukeetool.co.kr/*",
+    "https://daehantool.dev/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.ttimilwaukeetool.co.kr/*"],
+      "js": ["content-tti.js"]
+    },
+    {
+      "matches": ["https://daehantool.dev/*"],
+      "js": ["content-daehan.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "externally_connectable": {
+    "matches": ["https://daehantool.dev/*"]
+  }
+}
