@@ -3674,8 +3674,331 @@ function importPdfPromos() {
 }
 
 // ======================== EXCEL IMPORT ========================
-function showImportModal() { document.getElementById('import-modal').classList.add('show'); }
+var _importParsedRows = [];
+var _importCompareResult = null;
+var _importParsedWb = null;
+
+function showImportModal() {
+  document.getElementById('import-modal').classList.add('show');
+  resetImportFile();
+  document.getElementById('import-replace-section').style.display = 'none';
+  document.getElementById('import-replace-arrow').style.transform = 'rotate(0deg)';
+  var agreeEl = document.getElementById('import-replace-agree');
+  if (agreeEl) agreeEl.checked = false;
+  updateReplaceBtn();
+}
 function closeModal() { document.getElementById('import-modal').classList.remove('show'); }
+
+function resetImportFile() {
+  var fi = document.getElementById('import-file-input');
+  if (fi) fi.value = '';
+  var info = document.getElementById('import-file-info');
+  if (info) info.style.display = 'none';
+  var area = document.getElementById('import-compare-area');
+  if (area) area.style.display = 'none';
+  _importParsedRows = [];
+  _importCompareResult = null;
+  _importParsedWb = null;
+}
+
+function handleImportFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  document.getElementById('import-file-info').style.display = 'block';
+  document.getElementById('import-file-name').textContent = '📄 ' + file.name;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      _importParsedWb = wb;
+      var rows = parseImportWorkbook(wb);
+      if (!rows || rows.length === 0) {
+        alert('파싱 가능한 데이터가 없습니다. 시트 형식을 확인해주세요.');
+        resetImportFile();
+        return;
+      }
+      _importParsedRows = rows;
+      _importCompareResult = compareWithExisting(rows);
+      renderImportComparison(_importCompareResult);
+    } catch (err) {
+      console.error('엑셀 파싱 오류:', err);
+      alert('파일 파싱 중 오류: ' + err.message);
+      resetImportFile();
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function toggleFullReplace() {
+  var section = document.getElementById('import-replace-section');
+  var arrow = document.getElementById('import-replace-arrow');
+  if (section.style.display === 'none') {
+    section.style.display = 'block';
+    arrow.style.transform = 'rotate(90deg)';
+  } else {
+    section.style.display = 'none';
+    arrow.style.transform = 'rotate(0deg)';
+  }
+}
+
+function updateReplaceBtn() {
+  var agreed = document.getElementById('import-replace-agree');
+  var btn = document.getElementById('import-replace-btn');
+  if (!btn) return;
+  if (agreed && agreed.checked && _importParsedRows.length > 0) {
+    btn.disabled = false;
+    btn.style.background = '#dc2626'; btn.style.color = '#fff'; btn.style.cursor = 'pointer';
+    btn.textContent = '전체 교체 실행 (' + _importParsedRows.length + '건)';
+  } else {
+    btn.disabled = true;
+    btn.style.background = '#e5e7eb'; btn.style.color = '#9ca3af'; btn.style.cursor = 'not-allowed';
+    btn.textContent = '전체 교체 실행 (동의 필요)';
+  }
+}
+
+// 워크북에서 전체가격표 시트를 파싱하여 mw_products 형태 배열 반환
+function parseImportWorkbook(wb) {
+  var sheets = wb.SheetNames;
+  var priceSheet = sheets.find(function(s) { return s === '전체가격표(26.04 인상)'; }) ||
+    sheets.find(function(s) { return s === '전체가격표(25)'; }) ||
+    sheets.find(function(s) { return s.indexOf('가격표') !== -1 && s.indexOf('26') !== -1; }) ||
+    sheets.find(function(s) { return s.indexOf('가격표') !== -1 && s.indexOf('25') !== -1; }) ||
+    sheets.find(function(s) { return s.indexOf('가격표') !== -1; }) ||
+    null;
+  if (!priceSheet) return [];
+
+  var ws = wb.Sheets[priceSheet];
+  var data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+  var is26 = priceSheet.indexOf('26') !== -1;
+
+  var headerRow = -1;
+  var col = {};
+  for (var r = 0; r < Math.min(10, data.length); r++) {
+    var row = data[r];
+    if (!row) continue;
+    var cells = row.map(function(v) { return String(v || '').trim(); });
+    if (cells.indexOf('코드') !== -1 && cells.indexOf('모델명') !== -1) {
+      headerRow = r;
+      cells.forEach(function(v, i) {
+        if (v === '단종') col.단종 = i;
+        if (v === '코드') col.코드 = i;
+        if (v === '관리코드') col.관리코드 = i;
+        if (v === '대분류') col.대분류 = i;
+        if (v === '중분류') col.중분류 = i;
+        if (v === '소분류') col.소분류 = i;
+        if (v === '순번') col.순번 = i;
+        if (v.indexOf('TTI') !== -1) col.TTI = i;
+        if (v === '모델명') col.모델명 = i;
+        if (v === '제품설명') col.제품설명 = i;
+        if (v === '공급가') col.공급가 = i;
+        if (v === '원가') col.원가 = i;
+        if (v === '인상가') col.인상가 = i;
+        if (v === '인상률') col.인상률 = i;
+        if (v === '재고') col.재고 = i;
+        if (v === '입고날짜' || v === '입고일') col.입고날짜 = i;
+        if (v === '본사가용' || v === '가용수량' || v === '본사') col.본사가용 = i;
+      });
+      break;
+    }
+  }
+  if (headerRow < 0) return [];
+
+  var rows = [];
+  var dataStart = headerRow + 2;
+  for (var i = dataStart; i < data.length; i++) {
+    var row = data[i];
+    var code = row && row[col.코드 != null ? col.코드 : 2];
+    if (!code && !(row && row[col.모델명 != null ? col.모델명 : 8])) continue;
+    var supplyPrice = row[col.공급가 != null ? col.공급가 : 10] || 0;
+    var importCategory = row[col.대분류 != null ? col.대분류 : 3] || '';
+    var costVal = row[col.원가 != null ? col.원가 : (is26 ? 14 : 12)] || 0;
+    var cost = costVal || calcCost(supplyPrice, importCategory);
+    rows.push({
+      discontinued: (String(row[col.단종 != null ? col.단종 : 1] || '').trim() === '단종') ? '단종' : '',
+      code: String(code || ''),
+      manageCode: col.관리코드 != null ? String(row[col.관리코드] || '') : '',
+      category: importCategory,
+      subcategory: row[col.중분류 != null ? col.중분류 : 4] || '',
+      detail: row[col.소분류 != null ? col.소분류 : 5] || '',
+      orderNum: row[col.순번 != null ? col.순번 : 6] || '',
+      ttiNum: String(row[col.TTI != null ? col.TTI : 7] || ''),
+      model: row[col.모델명 != null ? col.모델명 : 8] || '',
+      description: row[col.제품설명 != null ? col.제품설명 : 9] || '',
+      supplyPrice: supplyPrice,
+      productDC: 0,
+      cost: Math.round(cost || 0),
+      priceA: 0, priceRetail: 0, priceNaver: 0, priceOpen: 0,
+      raisedPrice: is26 ? (row[col.인상가 != null ? col.인상가 : 11] || 0) : 0,
+      raiseRate: is26 ? (row[col.인상률 != null ? col.인상률 : 12] || 0) : 0,
+      ttiStock: col.본사가용 != null ? String(row[col.본사가용] || '') : '',
+      inDate: col.입고날짜 != null ? String(row[col.입고날짜] || '') : ''
+    });
+  }
+  return rows;
+}
+
+// 기존 mw_products와 비교
+function compareWithExisting(parsedRows) {
+  var existing = DB.products || [];
+  var result = { changed: [], added: [], same: [] };
+  var byTti = {};
+  var byOrder = {};
+  var byModel = {};
+  existing.forEach(function(p, idx) {
+    if (p.ttiNum) byTti[String(p.ttiNum).trim()] = idx;
+    if (p.orderNum) byOrder[String(p.orderNum).trim()] = idx;
+    if (p.model) byModel[String(p.model).trim().toLowerCase()] = idx;
+  });
+  var matchedIndices = {};
+
+  parsedRows.forEach(function(newRow) {
+    var matchIdx = -1;
+    var tti = String(newRow.ttiNum || '').trim();
+    var order = String(newRow.orderNum || '').trim();
+    var model = String(newRow.model || '').trim().toLowerCase();
+    var matchedBy = '';
+
+    if (tti && byTti[tti] != null) { matchIdx = byTti[tti]; matchedBy = 'ttiNum'; }
+    else if (order && byOrder[order] != null) { matchIdx = byOrder[order]; matchedBy = 'orderNum'; }
+    else if (model && byModel[model] != null) { matchIdx = byModel[model]; matchedBy = 'model'; }
+
+    if (matchIdx >= 0) {
+      matchedIndices[matchIdx] = true;
+      var old = existing[matchIdx];
+      var diffs = [];
+      if (String(old.ttiNum || '') !== String(newRow.ttiNum || '')) diffs.push('ttiNum');
+      if (String(old.orderNum || '') !== String(newRow.orderNum || '')) diffs.push('orderNum');
+      if (String(old.model || '') !== String(newRow.model || '')) diffs.push('model');
+      if (String(old.description || '') !== String(newRow.description || '')) diffs.push('description');
+      if (Number(old.supplyPrice || 0) !== Number(newRow.supplyPrice || 0)) diffs.push('supplyPrice');
+
+      if (diffs.length > 0) {
+        result.changed.push({ oldData: old, newData: newRow, diffs: diffs, matchedBy: matchedBy, checked: true });
+      } else {
+        result.same.push(old);
+      }
+    } else {
+      result.added.push({ data: newRow, checked: true });
+    }
+  });
+  return result;
+}
+
+// 비교 결과 UI 렌더링 (Part B에서 상세 구현, 여기선 요약만)
+function renderImportComparison(result) {
+  document.getElementById('import-compare-area').style.display = 'block';
+  // 요약 카드
+  var summary = document.getElementById('import-summary');
+  summary.innerHTML =
+    '<div style="flex:1;text-align:center;padding:10px;background:#dbeafe;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#1d4ed8">' + result.changed.length + '</div><div style="font-size:11px;color:#3b82f6">변경</div></div>' +
+    '<div style="flex:1;text-align:center;padding:10px;background:#d1fae5;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#065f46">' + result.added.length + '</div><div style="font-size:11px;color:#10b981">신규</div></div>' +
+    '<div style="flex:1;text-align:center;padding:10px;background:#f3f4f6;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#6b7280">' + result.same.length + '</div><div style="font-size:11px;color:#9ca3af">동일</div></div>';
+
+  // 변경/신규 섹션 (Part B에서 상세 테이블 구현)
+  var changedEl = document.getElementById('import-changed-section');
+  if (result.changed.length > 0) {
+    changedEl.style.display = 'block';
+    changedEl.innerHTML = '<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:#1d4ed8">변경 항목 (' + result.changed.length + '건)</div>' +
+      '<div style="font-size:11px;color:#64748b;margin-bottom:8px">공급가, 순번, TTI#, 모델명, 제품설명 중 변경된 항목입니다.</div>' +
+      '<div style="max-height:200px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;padding:8px;font-size:11px">' +
+      result.changed.map(function(c, i) {
+        return '<label style="display:flex;gap:6px;align-items:flex-start;padding:4px 0;border-bottom:1px solid #f1f5f9;cursor:pointer">' +
+          '<input type="checkbox" checked data-type="changed" data-idx="' + i + '" onchange="updateImportApplyBtn()" style="margin-top:2px">' +
+          '<div><span style="font-weight:600">' + (c.oldData.model || c.newData.model) + '</span> — ' +
+          c.diffs.map(function(d) {
+            if (d === 'supplyPrice') return '공급가 ' + comma(c.oldData.supplyPrice) + '→' + comma(c.newData.supplyPrice);
+            return d + ' 변경';
+          }).join(', ') + '</div></label>';
+      }).join('') + '</div>';
+  } else { changedEl.style.display = 'none'; }
+
+  var newEl = document.getElementById('import-new-section');
+  if (result.added.length > 0) {
+    newEl.style.display = 'block';
+    newEl.innerHTML = '<div style="font-size:12px;font-weight:600;margin-bottom:8px;color:#065f46">신규 항목 (' + result.added.length + '건)</div>' +
+      '<div style="max-height:150px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px;padding:8px;font-size:11px">' +
+      result.added.map(function(a, i) {
+        return '<label style="display:flex;gap:6px;align-items:center;padding:3px 0;border-bottom:1px solid #f1f5f9;cursor:pointer">' +
+          '<input type="checkbox" checked data-type="added" data-idx="' + i + '" onchange="updateImportApplyBtn()">' +
+          '<span>' + (a.data.model || a.data.code || '-') + ' — ' + (a.data.description || '').slice(0, 40) + ' / ' + comma(a.data.supplyPrice || 0) + '</span></label>';
+      }).join('') + '</div>';
+  } else { newEl.style.display = 'none'; }
+
+  var sameEl = document.getElementById('import-same-section');
+  sameEl.style.display = result.same.length > 0 ? 'block' : 'none';
+  sameEl.innerHTML = '<div style="font-size:11px;color:#94a3b8">동일 항목 ' + result.same.length + '건 — 변경 없음</div>';
+
+  updateImportApplyBtn();
+}
+
+function updateImportApplyBtn() {
+  var checks = document.querySelectorAll('#import-compare-area input[type=checkbox]:checked');
+  var btn = document.getElementById('import-apply-btn');
+  if (btn) btn.textContent = '선택 항목 적용 (' + checks.length + '건)';
+}
+
+// 선택 항목 적용
+function applyImportChanges() {
+  if (!_importCompareResult) return;
+  var applied = 0;
+
+  // 변경 항목 적용
+  var changedChecks = document.querySelectorAll('#import-changed-section input[data-type="changed"]:checked');
+  changedChecks.forEach(function(cb) {
+    var idx = parseInt(cb.dataset.idx);
+    var item = _importCompareResult.changed[idx];
+    if (!item) return;
+    // 기존 제품 찾아서 변경 필드만 업데이트
+    var existIdx = DB.products.indexOf(item.oldData);
+    if (existIdx >= 0) {
+      item.diffs.forEach(function(key) { DB.products[existIdx][key] = item.newData[key]; });
+      // 공급가 변경 시 원가 재계산
+      if (item.diffs.indexOf('supplyPrice') !== -1) {
+        DB.products[existIdx].supplyPrice = item.newData.supplyPrice;
+        DB.products[existIdx].cost = Math.round(calcCost(item.newData.supplyPrice, DB.products[existIdx].category || ''));
+      }
+      applied++;
+    }
+  });
+
+  // 신규 항목 추가
+  var addedChecks = document.querySelectorAll('#import-new-section input[data-type="added"]:checked');
+  addedChecks.forEach(function(cb) {
+    var idx = parseInt(cb.dataset.idx);
+    var item = _importCompareResult.added[idx];
+    if (!item) return;
+    DB.products.push(item.data);
+    applied++;
+  });
+
+  if (applied > 0) {
+    recalcAll();
+    saveAll();
+    renderCatalog();
+    populateCatalogFilters();
+    toast('가져오기 완료: ' + applied + '건 적용');
+    saveActionHistory('코드매칭', '밀워키', applied, null);
+  } else {
+    toast('적용할 항목이 없습니다');
+  }
+  closeModal();
+}
+
+// 전체 교체 실행
+function executeImportFullReplace() {
+  if (!_importParsedRows.length) { alert('파싱된 데이터가 없습니다'); return; }
+  if (!confirm('정말 전체 교체를 실행하시겠습니까?\n기존 ' + DB.products.length + '건이 삭제되고 ' + _importParsedRows.length + '건으로 교체됩니다.')) return;
+
+  DB.products = _importParsedRows.slice();
+  recalcAll();
+  saveAll();
+  renderCatalog();
+  populateCatalogFilters();
+  saveActionHistory('전체교체', '밀워키', _importParsedRows.length, null);
+  toast('전체 교체 완료: ' + _importParsedRows.length + '건');
+  closeModal();
+}
 
 // ======================== SETTINGS ========================
 function showSettingsModal() {
@@ -4258,7 +4581,7 @@ function clearAllPromos() {
 }
 
 function importExcel() {
-  const file = document.getElementById('excel-file').files[0];
+  const file = document.getElementById('import-file-input').files[0];
   if (!file) { toast('파일을 선택해주세요'); return; }
 
   const status = document.getElementById('import-status');
