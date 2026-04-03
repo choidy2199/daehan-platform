@@ -1195,8 +1195,7 @@ function renderCatalog() {
       <td>${p.detail || '-'}</td>
       <td class="center">${p.orderNum || '-'}</td>
       <td>${p.ttiNum || '-'}</td>
-      <td style="font-weight:500">${p.model || '-'}</td>
-      <td title="${p.description || ''}">${p.description || '-'}</td>
+      <td style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.model || ''}">${(function(){ var m=p.model||''; var si=m.indexOf(' / '); if(si<0) return '<span style="font-weight:500">'+m+'</span>'; return '<span style="font-weight:500">'+m.substring(0,si)+'</span> <span style="color:#888">'+m.substring(si)+'</span>'; })()}</td>
       <td class="num">${fmt(p.supplyPrice)}</td>
       <td class="num">${fmt(p.cost)}</td>
       ${(function() {
@@ -3219,10 +3218,10 @@ function downloadTemplate() {
   const wb = XLSX.utils.book_new();
 
   const priceHeaders = [
-    [null, '코드', '관리코드', '대분류', '중분류', '소분류', '순번', 'TTI#', '모델명', '제품설명', '공급가', '원가', '원가P', 'A(도매)', '소매', '스토어팜', '오픈마켓', '재고', '본사가용', '입고날짜'],
-    [null, '', '', '', '', '', '', '', '', '', '', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '', '적정/임박/소진', '← 메모용'],
-    [null, 21815, '', '파워툴', '12V FUEL', '드릴 드라이버', 1093, 1093, 'M12 FDD2-0X', '12V FUEL 드릴 드라이버(GEN3) 베어툴', 139000, '', '', '', '', '', '', 5, '적정', '4월 중순 입고예정'],
-    [null, 21817, '', '파워툴', '12V FUEL', '해머드릴 드라이버', 1126, 18622019, 'M12 FPD2-0X', '12V FUEL 해머드릴 드라이버(GEN3) 베어툴', 153000, '', '', '', '', '', '', 3, '소진', '']
+    [null, '코드', '관리코드', '대분류', '제품군', '제품구성', '프로모션No.', '제품번호', '모델명', '공급가', '원가', '원가P', 'A(도매)', '소매', '스토어팜', '오픈마켓', '재고', '본사가용', '입고날짜'],
+    [null, '', '', '', '', '', '', '', '', '', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '', '적정/임박/소진', '← 메모용'],
+    [null, 21815, '', '파워툴', '12V FUEL', '드릴 드라이버', 1093, 1093, 'M12 FDD2-0X / 12V FUEL 드릴 드라이버(GEN3) 베어툴', 139000, '', '', '', '', '', '', 5, '적정', '4월 중순 입고예정'],
+    [null, 21817, '', '파워툴', '12V FUEL', '해머드릴 드라이버', 1126, 18622019, 'M12 FPD2-0X / 12V FUEL 해머드릴 드라이버(GEN3) 베어툴', 153000, '', '', '', '', '', '', 3, '소진', '']
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(priceHeaders);
   ws1['!cols'] = [{wch:2},{wch:10},{wch:14},{wch:10},{wch:15},{wch:15},{wch:8},{wch:12},{wch:25},{wch:40},{wch:12},{wch:8},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:15}];
@@ -3249,12 +3248,11 @@ function showProductModal(idx) {
     document.getElementById('prod-ttiNum').value = p.ttiNum || '';
     document.getElementById('prod-model').value = p.model || '';
     document.getElementById('prod-supplyPrice').value = p.supplyPrice || '';
-    document.getElementById('prod-description').value = p.description || '';
     // prod-productDC 제거됨 (카테고리 기반 DC로 변경)
     document.getElementById('prod-discontinued').value = p.discontinued || '';
     document.getElementById('prod-inDate').value = p.inDate || '';
   } else {
-    ['prod-code','prod-manageCode','prod-category','prod-subcategory','prod-detail','prod-orderNum','prod-ttiNum','prod-model','prod-supplyPrice','prod-description','prod-inDate'].forEach(id => document.getElementById(id).value = '');
+    ['prod-code','prod-manageCode','prod-category','prod-subcategory','prod-detail','prod-orderNum','prod-ttiNum','prod-model','prod-supplyPrice','prod-inDate'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('prod-discontinued').value = '';
   }
   document.getElementById('product-modal').classList.add('show');
@@ -3298,7 +3296,6 @@ function saveProduct() {
     orderNum: document.getElementById('prod-orderNum').value.trim(),
     ttiNum: document.getElementById('prod-ttiNum').value.trim(),
     model: model,
-    description: document.getElementById('prod-description').value.trim(),
     supplyPrice: supplyPrice,
     productDC: 0,
     discontinued: document.getElementById('prod-discontinued').value,
@@ -3862,8 +3859,7 @@ function parseImportWorkbook(wb) {
       detail: row[col.소분류 != null ? col.소분류 : 5] || '',
       orderNum: row[col.순번 != null ? col.순번 : 6] || '',
       ttiNum: String(row[col.TTI != null ? col.TTI : 7] || ''),
-      model: row[col.모델명 != null ? col.모델명 : 8] || '',
-      description: row[col.제품설명 != null ? col.제품설명 : 9] || '',
+      model: (function(){ var m = row[col.모델명 != null ? col.모델명 : 8] || ''; var d = row[col.제품설명 != null ? col.제품설명 : 9] || ''; return d ? m + ' / ' + d : m; })(),
       supplyPrice: supplyPrice,
       productDC: 0,
       cost: Math.round(cost || 0),
@@ -3909,7 +3905,7 @@ function compareWithExisting(parsedRows) {
       if (String(old.ttiNum || '') !== String(newRow.ttiNum || '')) diffs.push('ttiNum');
       if (String(old.orderNum || '') !== String(newRow.orderNum || '')) diffs.push('orderNum');
       if (String(old.model || '') !== String(newRow.model || '')) diffs.push('model');
-      if (String(old.description || '') !== String(newRow.description || '')) diffs.push('description');
+      // description은 model에 통합됨
       if (Number(old.supplyPrice || 0) !== Number(newRow.supplyPrice || 0)) diffs.push('supplyPrice');
 
       if (diffs.length > 0) {
@@ -4793,8 +4789,7 @@ function importExcel() {
             detail: row[col.소분류 ?? 5] || '',
             orderNum: row[col.순번 ?? 6] || '',
             ttiNum: String(row[col.TTI ?? 7] || ''),
-            model: row[col.모델명 ?? 8] || '',
-            description: row[col.제품설명 ?? 9] || '',
+            model: (function(){ var m = row[col.모델명 ?? 8] || ''; var d = row[col.제품설명 ?? 9] || ''; return d ? m + ' / ' + d : m; })(),
             supplyPrice: supplyPrice,
             productDC: 0,
             cost: Math.round(cost || 0),
@@ -4966,8 +4961,8 @@ function exportAll() {
 
   // Products
   if (DB.products.length) {
-    const pData = [['단종', '코드', '관리코드', '대분류', '중분류', '소분류', '순번', 'TTI#', '모델명', '제품설명', '공급가', '원가', 'A(도매)', '소매', '스토어팜', '오픈마켓']];
-    DB.products.forEach(p => pData.push([p.discontinued, p.code, p.manageCode || '', p.category, p.subcategory, p.detail, p.orderNum, p.ttiNum, p.model, p.description, p.supplyPrice, p.cost, p.priceA, p.priceRetail, p.priceNaver, p.priceOpen]));
+    const pData = [['단종', '코드', '관리코드', '대분류', '제품군', '제품구성', '프로모션No.', '제품번호', '모델명', '공급가', '원가', 'A(도매)', '소매', '스토어팜', '오픈마켓']];
+    DB.products.forEach(p => pData.push([p.discontinued, p.code, p.manageCode || '', p.category, p.subcategory, p.detail, p.orderNum, p.ttiNum, p.model, p.supplyPrice, p.cost, p.priceA, p.priceRetail, p.priceNaver, p.priceOpen]));
     const ws = XLSX.utils.aoa_to_sheet(pData);
     ws['!cols'] = [{ wch: 6 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 25 }, { wch: 40 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws, '전체가격표');
@@ -7580,6 +7575,27 @@ async function init() {
       console.log('[마이그레이션] PDF 파싱 오류 항목 삭제: ' + removed + '건 (남은: ' + cleaned.length + '건)');
     }
     localStorage.setItem('_migration_remove_bad_pdf_v1', '1');
+  })();
+
+  // 1회성 마이그레이션: model + description 통합
+  (function migrateMergeModelDesc() {
+    if (localStorage.getItem('_migration_merge_model_desc_v1')) return;
+    var products = load('mw_products');
+    if (!products || !products.length) { localStorage.setItem('_migration_merge_model_desc_v1', '1'); return; }
+    var changed = 0;
+    products.forEach(function(p) {
+      if (p.description && String(p.description).trim()) {
+        p.model = (p.model || '') + ' / ' + p.description;
+        changed++;
+      }
+      delete p.description;
+    });
+    if (changed > 0) {
+      save('mw_products', products);
+      DB.products = products;
+      console.log('[마이그레이션] model+description 통합: ' + changed + '건');
+    }
+    localStorage.setItem('_migration_merge_model_desc_v1', String(Date.now()));
   })();
 
   // 마지막 활성 탭 즉시 복원 (딜레이 없이)
