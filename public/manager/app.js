@@ -1918,12 +1918,18 @@ function renderPOTab() {
   ];
   promos.forEach(function(p, i) {
     var pal = _poPromoPalette[p.paletteIdx || i] || _poPromoPalette[0];
+    var _sales = p.currentSales || 0;
+    var _target = p.targetAmount || 0;
+    var _cardAchieve = _target > 0 ? Math.floor(_sales / _target) : 0;
+    var _cardRemainder = _target > 0 ? _sales % _target : 0;
+    var _cardShortage = _target > 0 ? _target - _cardRemainder : _target;
+    var _cardPct = _target > 0 ? Math.min(100, Math.round(_sales / _target * 100)) : 0;
     html += '<div class="po-promo-card" style="border-left:3px solid ' + pal.main + '" onclick="openCumulativePromoModal(' + i + ')">';
     html += '<div class="po-promo-name"><span style="width:6px;height:6px;border-radius:50%;background:' + pal.main + ';display:inline-block"></span> ' + p.name + '</div>';
-    html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + p.amount + '</div>';
-    html += '<div class="po-promo-benefit">' + p.benefit + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">달성 ' + p.achieved + '회</span></div>';
-    html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:0%;background:' + pal.main + '"></div></div>';
-    html += '<div class="po-promo-next">다음까지 ' + p.next + '원</div>';
+    html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + fmtPO(_sales) + '</div>';
+    html += '<div class="po-promo-benefit">' + (p.benefit || '-') + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">' + _cardAchieve + '회 달성</span></div>';
+    html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:' + _cardPct + '%;background:' + pal.main + '"></div></div>';
+    html += '<div class="po-promo-next">다음까지 <span style="color:#CC2222;font-weight:600">' + fmtPO(_cardShortage) + '원</span></div>';
     html += '</div>';
   });
 
@@ -2282,6 +2288,10 @@ function openCumulativePromoModal(index) {
   var _defEnd = promo.periodEnd || (_y + '-' + String(_m + 1).padStart(2, '0') + '-' + String(_lastDay).padStart(2, '0'));
   var products = promo.products || [];
   var pct = promo.targetAmount > 0 ? Math.min(100, Math.round((promo.currentSales || 0) / promo.targetAmount * 100)) : 0;
+  // 달성 자동 계산
+  var _autoAchieve = promo.targetAmount > 0 ? Math.floor((promo.currentSales || 0) / promo.targetAmount) : 0;
+  var _remainder = promo.targetAmount > 0 ? (promo.currentSales || 0) % promo.targetAmount : 0;
+  var _nextShortage = promo.targetAmount > 0 ? promo.targetAmount - _remainder : promo.targetAmount || 0;
 
   var existing = document.getElementById('po-cumul-modal');
   if (existing) existing.remove();
@@ -2290,10 +2300,12 @@ function openCumulativePromoModal(index) {
   modal.id = 'po-cumul-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
 
+  // 헤더 텍스트: 새 프로모션이면 "누적 프로모션 설정", 기존이면 "이름 누적 프로모션"
+  var _headerTitle = (promo.name && promo.name !== '새 프로모션') ? promo.name + ' 누적 프로모션' : '누적 프로모션 설정';
   var h = '<div style="background:#fff;border-radius:10px;width:680px;max-width:95vw;max-height:80vh;overflow:hidden;border:1px solid #DDE1EB;display:flex;flex-direction:column">';
   // 헤더
   h += '<div style="background:#1A1D23;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">';
-  h += '<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:' + pal.main + '"></span><span style="font-size:14px;font-weight:600">' + (promo.name || '새 프로모션') + ' 누적 프로모션</span></div>';
+  h += '<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:' + pal.main + '"></span><span style="font-size:14px;font-weight:600">' + _headerTitle + '</span></div>';
   h += '<button onclick="document.getElementById(\'po-cumul-modal\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">✕</button></div>';
 
   // 바디
@@ -2306,13 +2318,13 @@ function openCumulativePromoModal(index) {
   h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">';
   h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">기준금액</div><div id="cumul-info-target" style="font-size:15px;font-weight:700;color:#CC2222">' + (promo.targetAmount ? fmtPO(promo.targetAmount) + '원 당' : '-') + '</div></div>';
   h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">현재 누적매출</div><div style="font-size:15px;font-weight:700;color:' + pal.text + '">' + fmtPO(promo.currentSales || 0) + '원</div></div>';
-  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">혜택 / 달성</div><div style="display:flex;align-items:center;gap:4px"><span id="cumul-info-benefit" style="font-size:13px;font-weight:600">' + (promo.benefit || '-') + '</span><input id="cumul-achieve" type="number" min="0" value="' + (promo.achieveCount || promo.achieved || 0) + '" style="width:36px;height:22px;border:1px solid ' + pal.bg + ';border-radius:3px;text-align:center;font-size:11px;font-weight:600;color:' + pal.text + ';background:' + pal.bg + ';font-family:Pretendard,sans-serif" title="달성 횟수"><span style="font-size:10px;color:' + pal.text + '">회</span></div></div>';
+  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">혜택 / 달성</div><div style="display:flex;align-items:center;gap:4px"><span id="cumul-info-benefit" style="font-size:13px;font-weight:600">' + (promo.benefit || '-') + '</span><span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600">' + _autoAchieve + '회 달성</span></div></div>';
   h += '</div>';
 
   // 프로그레스
   h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="flex:1;height:5px;background:#EAECF2;border-radius:3px;overflow:hidden"><div id="cumul-progress-bar" style="width:' + pct + '%;height:100%;background:' + pal.main + ';border-radius:3px"></div></div><span id="cumul-progress-pct" style="font-size:11px;font-weight:600;color:' + pal.text + '">' + pct + '%</span></div>';
   var _periodDisplay = _defStart && _defEnd ? _defStart.replace(/-/g, '.') + '~' + _defEnd.replace(/-/g, '.') : '기간 미설정';
-  h += '<div style="font-size:10px;color:#9BA3B2;margin-bottom:16px">다음 달성까지 ' + fmtPO(promo.next || 0) + '원 · ' + _periodDisplay + ' · ' + (promo.unlimited ? '제한없음' : '') + '</div>';
+  h += '<div style="font-size:10px;color:#9BA3B2;margin-bottom:16px">' + _autoAchieve + '회 달성 · 잔여 ' + fmtPO(_remainder) + '원 · 다음까지 <span style="color:#CC2222;font-weight:600">' + fmtPO(_nextShortage) + '원 부족</span> · ' + _periodDisplay + '</div>';
 
   // 설정 필드 (3칸 → 2행)
   h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
@@ -2343,12 +2355,17 @@ function openCumulativePromoModal(index) {
     h += '<tr><td colspan="6" style="text-align:center;padding:20px;color:#9BA3B2;font-size:11px">제품을 검색하여 추가하세요</td></tr>';
   } else {
     products.forEach(function(pr, pi) {
+      // 빈 할인율이면 자동 DC 적용
+      var _rate = pr.discountRate || '';
+      var _isAuto = false;
+      if (!_rate && _autoDC > 0) { _rate = _autoDC.toFixed(2); _isAuto = true; }
+      var _rateStyle = _isAuto ? 'width:50px;height:24px;border:1px solid #B8D4F0;border-radius:3px;text-align:center;font-size:11px;font-family:Pretendard,sans-serif;background:#E6F1FB;color:#185FA5;font-weight:600' : 'width:50px;height:24px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:11px;font-family:Pretendard,sans-serif';
       h += '<tr>';
       h += '<td style="font-size:10px;color:#5A6070">' + (pr.ttiNum || '-') + '</td>';
       h += '<td>' + (pr.orderNum || '-') + '</td>';
       h += '<td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (pr.model || '').replace(/"/g, '&quot;') + '">' + (pr.model || '-') + '</td>';
       h += '<td class="num">' + (pr.supplyPrice ? parseInt(pr.supplyPrice).toLocaleString() : '-') + '</td>';
-      h += '<td class="center"><input type="text" value="' + (pr.discountRate || '') + '" placeholder="%" style="width:50px;height:24px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:11px;font-family:Pretendard,sans-serif" data-pidx="' + pi + '" onchange="updatePromoProductDiscount(' + index + ',' + pi + ',this.value)"></td>';
+      h += '<td class="center"><input type="text" value="' + _rate + '" placeholder="%" style="' + _rateStyle + '" data-pidx="' + pi + '" onchange="updatePromoProductDiscount(' + index + ',' + pi + ',this.value)"></td>';
       h += '<td class="center"><button onclick="removePromoProduct(' + index + ',' + pi + ')" style="width:22px;height:22px;border-radius:4px;border:none;background:#FCEBEB;color:#CC2222;font-size:12px;cursor:pointer">✕</button></td>';
       h += '</tr>';
     });
@@ -2411,7 +2428,7 @@ function saveCumulativePromo(index) {
   promo.benefit = (document.getElementById('cumul-benefit') || {}).value || promo.benefit;
   promo.benefitAmount = parseInt(((document.getElementById('cumul-benefit-amount') || {}).value || '0').replace(/,/g, '')) || 0;
   promo.targetAmount = parseInt(((document.getElementById('cumul-target') || {}).value || '0').replace(/,/g, '')) || 0;
-  promo.achieveCount = parseInt((document.getElementById('cumul-achieve') || {}).value) || 0;
+  promo.achieveCount = promo.targetAmount > 0 ? Math.floor((promo.currentSales || 0) / promo.targetAmount) : 0;
   promo.achieved = promo.achieveCount;
   promo.autoDiscountRate = promo.targetAmount > 0 && promo.benefitAmount > 0 ? (promo.benefitAmount / promo.targetAmount * 100) : 0;
   promo.periodStart = (document.getElementById('cumul-period-start') || {}).value || '';
@@ -2423,10 +2440,27 @@ function saveCumulativePromo(index) {
   toast('프로모션 설정이 저장되었습니다');
 }
 
+// 모달 입력값을 localStorage에 중간 저장 (모달 재오픈 시 값 보존)
+function _saveCurrentCumulInputs(promoIndex) {
+  var promos = _getCumulPromos();
+  var promo = promos[promoIndex];
+  if (!promo) return promos;
+  var el = function(id) { return (document.getElementById(id) || {}); };
+  promo.name = el('cumul-name').value || promo.name;
+  promo.benefit = el('cumul-benefit').value || promo.benefit;
+  promo.benefitAmount = parseInt((el('cumul-benefit-amount').value || '0').replace(/,/g, '')) || 0;
+  promo.targetAmount = parseInt((el('cumul-target').value || '0').replace(/,/g, '')) || 0;
+  promo.autoDiscountRate = promo.targetAmount > 0 && promo.benefitAmount > 0 ? (promo.benefitAmount / promo.targetAmount * 100) : 0;
+  promo.periodStart = el('cumul-period-start').value || promo.periodStart || '';
+  promo.periodEnd = el('cumul-period-end').value || promo.periodEnd || '';
+  promo.period = promo.periodStart && promo.periodEnd ? promo.periodStart.replace(/-/g, '.') + '~' + promo.periodEnd.replace(/-/g, '.') : promo.period || '';
+  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  return promos;
+}
+
 function addPromoProduct(promoIndex, product) {
   var found = product;
   if (!found) {
-    // 검색 input에서 직접 찾기 (+ 추가 버튼 클릭 시)
     var searchVal = (document.getElementById('cumul-prod-search') || {}).value.trim();
     if (!searchVal) return;
     var products = DB.products || [];
@@ -2435,11 +2469,12 @@ function addPromoProduct(promoIndex, product) {
     });
     if (!found) { toast('제품을 찾을 수 없습니다: ' + searchVal); return; }
   }
-  var promos = _getCumulPromos();
+  // 먼저 현재 입력값 저장
+  var promos = _saveCurrentCumulInputs(promoIndex);
   var promo = promos[promoIndex];
   if (!promo.products) promo.products = [];
   if (promo.products.some(function(pr) { return pr.ttiNum === found.ttiNum; })) { toast('이미 추가된 제품입니다'); return; }
-  // 자동 할인율 채우기 (물량지원 DC)
+  // 자동 할인율 (물량지원 DC)
   var _autoRate = '';
   if (promo.targetAmount > 0 && promo.benefitAmount > 0) {
     _autoRate = (promo.benefitAmount / promo.targetAmount * 100).toFixed(2);
@@ -2451,7 +2486,8 @@ function addPromoProduct(promoIndex, product) {
 }
 
 function removePromoProduct(promoIndex, productIndex) {
-  var promos = _getCumulPromos();
+  // 먼저 현재 입력값 저장
+  var promos = _saveCurrentCumulInputs(promoIndex);
   var promo = promos[promoIndex];
   if (!promo || !promo.products) return;
   promo.products.splice(productIndex, 1);
