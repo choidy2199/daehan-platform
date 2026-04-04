@@ -283,6 +283,14 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-sale-card .po-progress { height:3px; background:#EAECF2; border-radius:2px; margin-top:4px; overflow:hidden; }
 .po-sale-card .po-progress-fill { height:100%; border-radius:2px; }
 
+.tier-row { display:flex; gap:3px; margin-bottom:4px; }
+.tier { font-size:8px; padding:2px 5px; border-radius:3px; font-weight:600; white-space:nowrap; }
+.tier.done { background:#E1F5EE; color:#085041; }
+.tier.current { background:#185FA5; color:#fff; }
+.tier.next { background:#EAECF2; color:#9BA3B2; }
+.period-badge { font-size:8px; font-weight:500; padding:1px 5px; border-radius:2px; background:#F4F6FA; color:#5A6070; }
+.short { font-size:9px; font-weight:600; color:#CC2222; margin-top:2px; }
+
 .po-divider { width:1px; background:#B0B8CC; margin:4px 2px; opacity:0.4; flex-shrink:0; }
 
 .po-promo-card { flex:1; min-width:130px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; cursor:pointer; transition:box-shadow 0.15s; }

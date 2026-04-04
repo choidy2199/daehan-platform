@@ -1776,6 +1776,104 @@ function fmtCommaInput(el) {
   el.value = raw ? parseInt(raw).toLocaleString('ko-KR') : '';
 }
 
+// 티어 상수
+var HANDTOOL_TIERS = [
+  { amount: 1000000, rate: 8 },
+  { amount: 4000000, rate: 10 },
+  { amount: 12000000, rate: 12 }
+];
+var PACKOUT_TIERS = [
+  { amount: 1000000, rate: 5 },
+  { amount: 3000000, rate: 8 },
+  { amount: 6000000, rate: 10 },
+  { amount: 12000000, rate: 13 }
+];
+
+function getCurrentTier(amount, tiers) {
+  var current = { amount: 0, rate: 0 };
+  for (var i = 0; i < tiers.length; i++) { if (amount >= tiers[i].amount) current = tiers[i]; }
+  return current;
+}
+function getNextTier(amount, tiers) {
+  for (var i = 0; i < tiers.length; i++) { if (amount < tiers[i].amount) return tiers[i]; }
+  return null;
+}
+
+function getQuarterRange(date) {
+  var y = date.getFullYear(), m = date.getMonth();
+  var q = Math.floor(m / 3);
+  return { start: new Date(y, q * 3, 1), end: new Date(y, q * 3 + 3, 0, 23, 59, 59) };
+}
+function getMonthRange(date) {
+  var y = date.getFullYear(), m = date.getMonth();
+  return { start: new Date(y, m, 1), end: new Date(y, m + 1, 0, 23, 59, 59) };
+}
+
+// 발주 이력 집계
+function calcPOSalesData() {
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var now = new Date();
+  var monthRange = getMonthRange(now);
+  var quarterRange = getQuarterRange(now);
+
+  // 제품 → 카테고리 맵
+  var catMap = {};
+  (DB.products || []).forEach(function(p) {
+    if (p.ttiNum) catMap[p.ttiNum] = p.category || '';
+    if (p.code) catMap[p.code] = p.category || '';
+  });
+
+  var powerTool = 0, handTool = 0, packout = 0, totalMonth = 0, first15 = 0, last15 = 0;
+
+  history.forEach(function(item) {
+    var d = new Date(item.date);
+    var amt = item.amount || 0;
+    var cat = catMap[item.ttiNum] || catMap[item.manageCode] || '';
+
+    // 파워툴: 이번 달
+    if (cat === '파워툴' && d >= monthRange.start && d <= monthRange.end) powerTool += amt;
+    // 수공구+액세서리: 분기
+    if ((cat === '수공구' || cat === '악세사리' || cat === '액세서리') && d >= quarterRange.start && d <= quarterRange.end) handTool += amt;
+    // 팩아웃: 이번 달
+    if (cat === '팩아웃' && d >= monthRange.start && d <= monthRange.end) packout += amt;
+
+    // 이번 달 전체 (합계용)
+    if (d >= monthRange.start && d <= monthRange.end) {
+      totalMonth += amt;
+      if (d.getDate() <= 15) first15 += amt; else last15 += amt;
+    }
+  });
+
+  // 누적프로모션 집계
+  var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [];
+  var cumulData = promos.map(function(promo, idx) {
+    if (!promo.products || promo.products.length === 0) return { idx: idx, amount: 0, achieveCount: 0, shortage: promo.targetAmount || 0 };
+    var productCodes = promo.products.map(function(pr) { return pr.ttiNum; });
+    var pStart = promo.periodStart ? new Date(promo.periodStart) : monthRange.start;
+    var pEnd = promo.periodEnd ? new Date(promo.periodEnd + 'T23:59:59') : monthRange.end;
+    var sales = 0;
+    history.forEach(function(item) {
+      var d = new Date(item.date);
+      if (d >= pStart && d <= pEnd && productCodes.indexOf(item.ttiNum) !== -1) sales += (item.amount || 0);
+    });
+    var target = promo.targetAmount || 0;
+    var achieve = target > 0 ? Math.floor(sales / target) : 0;
+    var remainder = target > 0 ? sales % target : 0;
+    var shortage = target > 0 ? target - remainder : target;
+    return { idx: idx, amount: sales, achieveCount: achieve, shortage: shortage, remainder: remainder };
+  });
+
+  return {
+    powerTool: powerTool,
+    handTool: handTool,
+    packout: packout,
+    totalMonth: totalMonth,
+    first15: first15,
+    last15: last15,
+    cumulative: cumulData
+  };
+}
+
 // 검색 자동완성 초기화
 function initPOAutocomplete(inputId, onSelect) {
   var input = document.getElementById(inputId);
@@ -1891,45 +1989,71 @@ function renderPOTab() {
   var now = new Date();
   var month = now.getMonth() + 1;
 
+  // 집계 데이터
+  var salesData = calcPOSalesData();
+
   // 상단 KPI 카드
   var html = '<div class="po-kpi-row">';
 
-  // 매출 카드 3개
-  var saleCards = [
-    { label: '파워툴', color: '#185FA5', amount: '0', target: '목표 - · 0%', pct: 0 },
-    { label: '수공구', color: '#1D9E75', amount: '0', target: '목표 - · 0%', pct: 0 },
-    { label: '팩아웃', color: '#EF9F27', amount: '0', target: '목표 - · 0%', pct: 0 }
-  ];
-  saleCards.forEach(function(c) {
-    html += '<div class="po-sale-card">';
-    html += '<div class="po-card-label" style="color:' + c.color + '">' + c.label + '</div>';
-    html += '<div class="po-card-amount">' + c.amount + '</div>';
-    html += '<div class="po-card-target">' + c.target + '</div>';
-    html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + c.pct + '%;background:' + c.color + '"></div></div>';
-    html += '</div>';
+  // 파워툴 카드 (이번 달)
+  html += '<div class="po-sale-card">';
+  html += '<div class="po-card-label" style="color:#185FA5">파워툴 <span class="period-badge">월</span></div>';
+  html += '<div class="po-card-amount">' + fmtPO(salesData.powerTool) + '</div>';
+  html += '<div class="po-card-target">목표 - · 0%</div>';
+  html += '<div class="po-progress"><div class="po-progress-fill" style="width:0%;background:#185FA5"></div></div>';
+  html += '</div>';
+
+  // 수공구 카드 (분기, 티어)
+  var _htCur = getCurrentTier(salesData.handTool, HANDTOOL_TIERS);
+  var _htNext = getNextTier(salesData.handTool, HANDTOOL_TIERS);
+  var _htPct = HANDTOOL_TIERS[HANDTOOL_TIERS.length - 1].amount > 0 ? Math.min(100, Math.round(salesData.handTool / HANDTOOL_TIERS[HANDTOOL_TIERS.length - 1].amount * 100)) : 0;
+  html += '<div class="po-sale-card">';
+  html += '<div class="po-card-label" style="color:#1D9E75">수공구 <span class="period-badge">분기</span></div>';
+  html += '<div class="po-card-amount">' + fmtPO(salesData.handTool) + '</div>';
+  html += '<div class="tier-row">';
+  HANDTOOL_TIERS.forEach(function(t) {
+    var cls = salesData.handTool >= t.amount ? (t === _htCur ? 'current' : 'done') : 'next';
+    html += '<span class="tier ' + cls + '">' + fmtPO(t.amount / 10000) + '만 ' + t.rate + '%</span>';
   });
+  html += '</div>';
+  html += '<div class="po-card-target">현재 ' + _htCur.rate + '%' + (_htNext ? '' : ' (최고)') + '</div>';
+  html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + _htPct + '%;background:#1D9E75"></div></div>';
+  if (_htNext) html += '<div class="short">다음 ' + _htNext.rate + '%까지 ' + fmtPO(_htNext.amount - salesData.handTool) + '원 부족</div>';
+  html += '</div>';
+
+  // 팩아웃 카드 (월, 티어)
+  var _pkCur = getCurrentTier(salesData.packout, PACKOUT_TIERS);
+  var _pkNext = getNextTier(salesData.packout, PACKOUT_TIERS);
+  var _pkPct = PACKOUT_TIERS[PACKOUT_TIERS.length - 1].amount > 0 ? Math.min(100, Math.round(salesData.packout / PACKOUT_TIERS[PACKOUT_TIERS.length - 1].amount * 100)) : 0;
+  html += '<div class="po-sale-card">';
+  html += '<div class="po-card-label" style="color:#EF9F27">팩아웃 <span class="period-badge">월</span></div>';
+  html += '<div class="po-card-amount">' + fmtPO(salesData.packout) + '</div>';
+  html += '<div class="tier-row">';
+  PACKOUT_TIERS.forEach(function(t) {
+    var cls = salesData.packout >= t.amount ? (t === _pkCur ? 'current' : 'done') : 'next';
+    html += '<span class="tier ' + cls + '">' + fmtPO(t.amount / 10000) + '만 ' + t.rate + '%</span>';
+  });
+  html += '</div>';
+  html += '<div class="po-card-target">현재 ' + _pkCur.rate + '%' + (_pkNext ? '' : ' (최고)') + '</div>';
+  html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + _pkPct + '%;background:#EF9F27"></div></div>';
+  if (_pkNext) html += '<div class="short">다음 ' + _pkNext.rate + '%까지 ' + fmtPO(_pkNext.amount - salesData.packout) + '원 부족</div>';
+  html += '</div>';
 
   html += '<div class="po-divider"></div>';
 
-  // 누적프로모션 카드 (더미 2개)
-  var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [
-    { name: 'GEN4+FQID2', amount: '0', benefit: '200만당 본품증정', achieved: 0, next: '0', paletteIdx: 0 },
-    { name: 'CBL2', amount: '0', benefit: '100만당 본품증정', achieved: 0, next: '0', paletteIdx: 1 }
-  ];
+  // 누적프로모션 카드 (실제 집계)
+  var promos = _getCumulPromos();
   promos.forEach(function(p, i) {
     var pal = _poPromoPalette[p.paletteIdx || i] || _poPromoPalette[0];
-    var _sales = p.currentSales || 0;
+    var cd = salesData.cumulative[i] || { amount: 0, achieveCount: 0, shortage: p.targetAmount || 0 };
     var _target = p.targetAmount || 0;
-    var _cardAchieve = _target > 0 ? Math.floor(_sales / _target) : 0;
-    var _cardRemainder = _target > 0 ? _sales % _target : 0;
-    var _cardShortage = _target > 0 ? _target - _cardRemainder : _target;
-    var _cardPct = _target > 0 ? Math.min(100, Math.round(_sales / _target * 100)) : 0;
+    var _cardPct = _target > 0 ? Math.min(100, Math.round((cd.remainder || 0) / _target * 100)) : 0;
     html += '<div class="po-promo-card" style="border-left:3px solid ' + pal.main + '" onclick="openCumulativePromoModal(' + i + ')">';
     html += '<div class="po-promo-name"><span style="width:6px;height:6px;border-radius:50%;background:' + pal.main + ';display:inline-block"></span> ' + p.name + '</div>';
-    html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + fmtPO(_sales) + '</div>';
-    html += '<div class="po-promo-benefit">' + (p.benefit || '-') + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">' + _cardAchieve + '회 달성</span></div>';
+    html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + fmtPO(cd.amount) + '</div>';
+    html += '<div class="po-promo-benefit">' + (p.benefit || '-') + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">' + cd.achieveCount + '회 달성</span></div>';
     html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:' + _cardPct + '%;background:' + pal.main + '"></div></div>';
-    html += '<div class="po-promo-next">다음까지 <span style="color:#CC2222;font-weight:600">' + fmtPO(_cardShortage) + '원</span></div>';
+    html += '<div class="po-promo-next">다음까지 <span style="color:#CC2222;font-weight:600">' + fmtPO(cd.shortage) + '원</span></div>';
     html += '</div>';
   });
 
@@ -1940,12 +2064,12 @@ function renderPOTab() {
   // 합계 카드
   html += '<div class="po-total-card">';
   html += '<div class="po-total-label">합계 · ' + month + '월</div>';
-  html += '<div class="po-total-amount">0</div>';
+  html += '<div class="po-total-amount">' + fmtPO(salesData.totalMonth) + '</div>';
   html += '<div class="po-total-pct">전체 목표 대비 0%</div>';
   html += '<div class="po-progress" style="margin-top:4px;background:rgba(255,255,255,0.2)"><div class="po-progress-fill" style="width:0%;background:#fff"></div></div>';
   html += '<div class="po-total-halves">';
-  html += '<div class="po-total-half">1~15일 0</div>';
-  html += '<div class="po-total-half">16~30일 0</div>';
+  html += '<div class="po-total-half">1~15일 ' + fmtPO(salesData.first15) + '</div>';
+  html += '<div class="po-total-half">16~' + new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() + '일 ' + fmtPO(salesData.last15) + '</div>';
   html += '</div>';
   html += '</div>';
 
