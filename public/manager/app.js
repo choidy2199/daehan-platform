@@ -2029,7 +2029,12 @@ function buildPOProductPanel() {
 
   // 전체 제품 (단종 제외) → 모델명 정렬
   _poFilteredProducts = (DB.products || []).filter(function(p) { return !p.discontinued; });
-  _poFilteredProducts.sort(function(a, b) { return (a.model || '').localeCompare(b.model || '', 'ko'); });
+  var _catOrder = { '파워툴': 1, '수공구': 2, '팩아웃': 3, '악세사리': 4, '액세서리': 4, '드릴비트': 5 };
+  _poFilteredProducts.sort(function(a, b) {
+    var ca = _catOrder[a.category] || 6, cb = _catOrder[b.category] || 6;
+    if (ca !== cb) return ca - cb;
+    return (a.model || '').localeCompare(b.model || '', 'ko');
+  });
 
   var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
   html += '<div class="po-panel-header"><span>제품 목록<span class="po-header-count" id="po-prod-count">' + _poFilteredProducts.length + '건</span></span></div>';
@@ -2154,7 +2159,7 @@ function buildPOOrderPanel() {
   // 테이블
   html += '<div class="po-panel-body">';
   html += '<table class="po-table"><thead><tr>';
-  html += '<th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="num">원가</th><th class="center" style="width:30px">✕</th>';
+  html += '<th>프로모션번호</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
   html += '</tr></thead><tbody id="po-cart-body">';
   html += '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   html += '</tbody></table></div>';
@@ -2162,7 +2167,6 @@ function buildPOOrderPanel() {
   // 합계
   html += '<div class="po-order-summary">';
   html += '<div><span style="color:#5A6070">공급가 합계</span> <span style="font-weight:600;margin-left:6px" id="po-cart-supply-total">0</span></div>';
-  html += '<div><span style="color:#5A6070">원가 합계</span> <span style="font-weight:600;margin-left:6px" id="po-cart-cost-total">0</span></div>';
   html += '<div><span style="color:#5A6070">부가세(10%)</span> <span style="font-weight:600;margin-left:6px" id="po-cart-vat">0</span></div>';
   html += '</div>';
 
@@ -2184,6 +2188,12 @@ function switchPOSubTab(tabName) {
   });
 
   localStorage.setItem('mw_po_active_subtab', tabName);
+
+  // 발주 리스트 탭 전환 시 재렌더링
+  if (tabName === 'list') {
+    var listContent = document.getElementById('po-content-list');
+    if (listContent) listContent.innerHTML = buildPOListPanel();
+  }
 }
 
 // ========================================
@@ -2195,15 +2205,19 @@ function buildPOListPanel() {
 
   // 날짜 필터
   var now = new Date();
-  var todayStr = now.toISOString().slice(0, 10);
+  // KST 기준 날짜 (UTC+9)
+  var todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   var weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
-  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var weekStartStr = weekStart.getFullYear() + '-' + String(weekStart.getMonth() + 1).padStart(2, '0') + '-' + String(weekStart.getDate()).padStart(2, '0');
+  var monthStartStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
 
   var filtered = history.filter(function(item) {
-    var d = (item.date || '').slice(0, 10);
+    // item.date를 KST 날짜로 변환
+    var itemDate = new Date(item.date);
+    var d = itemDate.getFullYear() + '-' + String(itemDate.getMonth() + 1).padStart(2, '0') + '-' + String(itemDate.getDate()).padStart(2, '0');
     if (filterEl === 'today') return d === todayStr;
-    if (filterEl === 'week') return new Date(d) >= weekStart;
-    if (filterEl === 'month') return new Date(d) >= monthStart;
+    if (filterEl === 'week') return d >= weekStartStr;
+    if (filterEl === 'month') return d >= monthStartStr;
     return true;
   });
 
@@ -2703,11 +2717,11 @@ function renderPOCartTable() {
       var amt = (c.supplyPrice || 0) * (c.qty || 0);
       var promoTag = c.promoName ? ' <span class="po-promo-tag" style="background:#EEEDFE;color:' + (c.promoColor || '#3C3489') + '">' + c.promoName + '</span>' : '';
       h += '<tr>';
+      h += '<td style="font-size:11px;color:#5A6070">' + (c.orderNum || '-') + '</td>';
       h += '<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (c.model || '').replace(/"/g, '&quot;') + '">' + (c.model || '-') + promoTag + '</td>';
       h += '<td class="num">' + fmtPO(c.supplyPrice) + '</td>';
       h += '<td class="center"><input type="number" min="1" value="' + c.qty + '" style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif" onchange="updateCartQty(' + i + ',this.value)"></td>';
       h += '<td class="num" style="font-weight:600">' + fmtPO(amt) + '</td>';
-      h += '<td class="num" style="color:#9BA3B2">-</td>';
       h += '<td class="center"><button onclick="removeCartItem(' + i + ')" style="width:22px;height:22px;border-radius:4px;border:none;background:#FCEBEB;color:#CC2222;font-size:12px;cursor:pointer">✕</button></td>';
       h += '</tr>';
     });
@@ -2722,8 +2736,6 @@ function renderPOCartTable() {
 
   var supplyEl = document.getElementById('po-cart-supply-total');
   if (supplyEl) supplyEl.innerHTML = '(' + totalItems + '건, ' + totalQty + '개) ' + fmtPO(totalSupply) + '원';
-  var costEl = document.getElementById('po-cart-cost-total');
-  if (costEl) costEl.textContent = '-';
   var vatEl = document.getElementById('po-cart-vat');
   if (vatEl) vatEl.textContent = fmtPO(vat) + '원';
 
@@ -2794,7 +2806,12 @@ function filterPOProducts() {
     }
     return true;
   });
-  _poFilteredProducts.sort(function(a, b) { return (a.model || '').localeCompare(b.model || '', 'ko'); });
+  var _catOrder = { '파워툴': 1, '수공구': 2, '팩아웃': 3, '악세사리': 4, '액세서리': 4, '드릴비트': 5 };
+  _poFilteredProducts.sort(function(a, b) {
+    var ca = _catOrder[a.category] || 6, cb = _catOrder[b.category] || 6;
+    if (ca !== cb) return ca - cb;
+    return (a.model || '').localeCompare(b.model || '', 'ko');
+  });
   renderPOProductRows();
 }
 
