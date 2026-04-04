@@ -2068,46 +2068,38 @@ function renderPOTab() {
   html += '<div class="po-progress"><div class="po-progress-fill" style="width:0%;background:#185FA5"></div></div>';
   html += '</div>';
 
-  // 수공구 카드 (분기, 티어)
+  // 수공구 카드 (분기, 최고 구간만)
   var _htCur = getCurrentTier(salesData.handTool, HANDTOOL_TIERS);
-  var _htNext = getNextTier(salesData.handTool, HANDTOOL_TIERS);
-  var _htPct = HANDTOOL_TIERS[HANDTOOL_TIERS.length - 1].amount > 0 ? Math.min(100, Math.round(salesData.handTool / HANDTOOL_TIERS[HANDTOOL_TIERS.length - 1].amount * 100)) : 0;
+  var _htMax = HANDTOOL_TIERS[HANDTOOL_TIERS.length - 1];
+  var _htPct = _htMax.amount > 0 ? Math.min(100, Math.round(salesData.handTool / _htMax.amount * 100)) : 0;
+  var _htShortage = Math.max(0, _htMax.amount - salesData.handTool);
+  var _htDone = salesData.handTool >= _htMax.amount;
   html += '<div class="po-sale-card">';
   html += '<div class="po-card-label" style="color:#1D9E75">수공구 <span class="period-badge">분기</span></div>';
   html += '<div class="po-card-amount">' + fmtPO(salesData.handTool) + '</div>';
-  html += '<div class="tier-row">';
-  HANDTOOL_TIERS.forEach(function(t) {
-    var cls = salesData.handTool >= t.amount ? (t === _htCur ? 'current' : 'done') : 'next';
-    var icon = cls === 'done' ? '✓ ' : '';
-    html += '<span class="tier ' + cls + '">' + icon + fmtPO(t.amount / 10000) + '만 ' + t.rate + '%</span>';
-  });
-  html += '</div>';
-  var _htColor = _htCur.rate === 0 ? '#9BA3B2' : (_htNext ? '#185FA5' : '#1D9E75');
+  html += '<div style="font-size:11px;color:#5A6070;margin-top:2px">목표 ' + _htMax.rate + '% (' + fmtPO(_htMax.amount) + '원)</div>';
+  var _htColor = _htCur.rate === 0 ? '#9BA3B2' : (_htDone ? '#1D9E75' : '#185FA5');
   var _htDot = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + _htColor + ';margin-right:4px;vertical-align:middle"></span>';
-  html += '<div class="po-card-target" style="font-size:13px;font-weight:600;color:' + _htColor + '">' + _htDot + '현재 ' + _htCur.rate + '%' + (_htNext ? '' : ' (최고)') + '</div>';
+  html += '<div class="po-card-target" style="font-size:13px;font-weight:600;color:' + _htColor + '">' + _htDot + '현재 ' + _htCur.rate + '%' + (_htDone ? ' (최고 달성)' : '') + '</div>';
   html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + _htPct + '%;background:#1D9E75"></div></div>';
-  if (_htNext) html += '<div class="short" style="font-size:12px;font-weight:500">다음 ' + _htNext.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_htNext.amount - salesData.handTool) + '원 부족</span></div>';
+  if (!_htDone) html += '<div class="short" style="font-size:12px;font-weight:500">목표 ' + _htMax.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_htShortage) + '원 부족</span></div>';
   html += '</div>';
 
-  // 팩아웃 카드 (월, 티어)
+  // 팩아웃 카드 (월, 최고 구간만)
   var _pkCur = getCurrentTier(salesData.packout, PACKOUT_TIERS);
-  var _pkNext = getNextTier(salesData.packout, PACKOUT_TIERS);
-  var _pkPct = PACKOUT_TIERS[PACKOUT_TIERS.length - 1].amount > 0 ? Math.min(100, Math.round(salesData.packout / PACKOUT_TIERS[PACKOUT_TIERS.length - 1].amount * 100)) : 0;
+  var _pkMax = PACKOUT_TIERS[PACKOUT_TIERS.length - 1];
+  var _pkPct = _pkMax.amount > 0 ? Math.min(100, Math.round(salesData.packout / _pkMax.amount * 100)) : 0;
+  var _pkShortage = Math.max(0, _pkMax.amount - salesData.packout);
+  var _pkDone = salesData.packout >= _pkMax.amount;
   html += '<div class="po-sale-card">';
   html += '<div class="po-card-label" style="color:#EF9F27">팩아웃 <span class="period-badge">월</span></div>';
   html += '<div class="po-card-amount">' + fmtPO(salesData.packout) + '</div>';
-  html += '<div class="tier-row">';
-  PACKOUT_TIERS.forEach(function(t) {
-    var cls = salesData.packout >= t.amount ? (t === _pkCur ? 'current' : 'done') : 'next';
-    var icon = cls === 'done' ? '✓ ' : '';
-    html += '<span class="tier ' + cls + '">' + icon + fmtPO(t.amount / 10000) + '만 ' + t.rate + '%</span>';
-  });
-  html += '</div>';
-  var _pkColor = _pkCur.rate === 0 ? '#9BA3B2' : (_pkNext ? '#185FA5' : '#1D9E75');
+  html += '<div style="font-size:11px;color:#5A6070;margin-top:2px">목표 ' + _pkMax.rate + '% (' + fmtPO(_pkMax.amount) + '원)</div>';
+  var _pkColor = _pkCur.rate === 0 ? '#9BA3B2' : (_pkDone ? '#1D9E75' : '#185FA5');
   var _pkDot = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + _pkColor + ';margin-right:4px;vertical-align:middle"></span>';
-  html += '<div class="po-card-target" style="font-size:13px;font-weight:600;color:' + _pkColor + '">' + _pkDot + '현재 ' + _pkCur.rate + '%' + (_pkNext ? '' : ' (최고)') + '</div>';
+  html += '<div class="po-card-target" style="font-size:13px;font-weight:600;color:' + _pkColor + '">' + _pkDot + '현재 ' + _pkCur.rate + '%' + (_pkDone ? ' (최고 달성)' : '') + '</div>';
   html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + _pkPct + '%;background:#EF9F27"></div></div>';
-  if (_pkNext) html += '<div class="short" style="font-size:12px;font-weight:500">다음 ' + _pkNext.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_pkNext.amount - salesData.packout) + '원 부족</span></div>';
+  if (!_pkDone) html += '<div class="short" style="font-size:12px;font-weight:500">목표 ' + _pkMax.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_pkShortage) + '원 부족</span></div>';
   html += '</div>';
 
   html += '<div class="po-divider"></div>';
