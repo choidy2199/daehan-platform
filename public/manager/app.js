@@ -2845,20 +2845,45 @@ function _buildPromoLeftPanel(subtab, title, discountPct, items) {
   h += '</tbody></table></div></div>';
   return h;
 }
+var PO_PROMO_LIMIT = { t5: 5, t6: 5 };
+function _getPromoOrdered(subtab, productCode) {
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var total = 0;
+  history.forEach(function(h) { if (h.subtab === subtab && (h.ttiNum === productCode || h.manageCode === productCode)) total += (h.qty || 0); });
+  // 장바구니에 담긴 수량도 합산
+  poCart.forEach(function(c) { if (c.subtab === subtab && c.ttiNum === productCode) total += (c.qty || 0); });
+  return total;
+}
 function _buildPromoRow(item, i, subtab, discountPct) {
   var discounted = Math.round(item.supplyPrice * (1 - discountPct / 100));
-  var stockIcon = item.stockStatus === 'a' ? '🟢' : item.stockStatus === 'b' ? '🟡' : item.stockStatus === 'c' ? '🔴' : '⚪';
-  var disabled = item.stockStatus === 'c' ? ' disabled' : '';
-  var disabledStyle = item.stockStatus === 'c' ? 'opacity:0.4;' : '';
-  var h = '<tr style="' + disabledStyle + '">';
+  // 재고 아이콘 — 일반주문과 동일 SVG
+  var stockIcon = '';
+  var ss = item.stockStatus || '';
+  if (ss === 'a') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="#4A90D9"/></svg>';
+  else if (ss === 'b') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,2 12,11 2,11" fill="#F5A623"/></svg>';
+  else if (ss === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
+  else stockIcon = '<span style="color:#B4B2A9">-</span>';
+  // 5개 제한 계산
+  var limit = PO_PROMO_LIMIT[subtab] || 99;
+  var ordered = _getPromoOrdered(subtab, item.productCode);
+  var remaining = Math.max(0, limit - ordered);
+  var isSoldOut = ss === 'c';
+  var isLimitReached = remaining <= 0;
+  var rowDisabled = isSoldOut || isLimitReached;
+  var disabledAttr = rowDisabled ? ' disabled' : '';
+  var rowStyle = rowDisabled ? 'opacity:0.4;' : '';
+  var maxQty = isSoldOut ? 0 : remaining;
+  var statusText = '';
+  if (isLimitReached && !isSoldOut) statusText = '<span style="font-size:9px;color:#9BA3B2;font-weight:600">발주완료</span>';
+  var h = '<tr style="' + rowStyle + '">';
   h += '<td>' + (i + 1) + '</td>';
   h += '<td style="font-size:11px">' + (item.productCode || '') + '</td>';
   h += '<td>' + (item.modelName || '') + '</td>';
   h += '<td style="text-align:right;text-decoration:line-through;color:#9BA3B2;font-size:11px">' + fmtPO(item.supplyPrice) + '</td>';
   h += '<td style="text-align:right;font-weight:700;color:#CC2222">' + fmtPO(discounted) + '</td>';
-  h += '<td style="text-align:center">' + stockIcon + '</td>';
-  h += '<td><input type="number" min="1" value="1" class="po-qty-input" data-code="' + item.productCode + '" style="width:45px;text-align:center;font-size:12px;padding:2px;border:1px solid #DDE1EB;border-radius:3px"' + disabled + '></td>';
-  h += '<td><button onclick="_addPromoToCart(\'' + subtab + '\',' + discountPct + ',\'' + (item.productCode || '').replace(/'/g, "\\'") + '\',\'' + (item.modelName || '').replace(/'/g, "\\'") + '\',' + item.supplyPrice + ',\'' + (item.stockStatus || '') + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:3px;padding:3px 6px;cursor:pointer;font-size:11px"' + disabled + '>🛒</button></td>';
+  h += '<td class="center">' + stockIcon + '</td>';
+  h += '<td>' + (statusText || '<input type="number" min="1" max="' + maxQty + '" value="1" class="po-qty-input" data-code="' + item.productCode + '" style="width:45px;text-align:center;font-size:12px;padding:2px;border:1px solid #DDE1EB;border-radius:3px"' + disabledAttr + '>') + '</td>';
+  h += '<td class="center">' + (rowDisabled ? '' : '<button class="po-cart-btn-dark" onclick="_addPromoToCart(\'' + subtab + '\',' + discountPct + ',\'' + (item.productCode || '').replace(/'/g, "\\'") + '\',\'' + (item.modelName || '').replace(/'/g, "\\'") + '\',' + item.supplyPrice + ',\'' + ss + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button>') + '</td>';
   h += '</tr>';
   return h;
 }
@@ -2901,6 +2926,18 @@ function _addPromoToCart(subtab, discountPct, productCode, modelName, supplyPric
   if (stockStatus === 'c') { toast('소진 제품은 주문할 수 없습니다'); return; }
   var qtyInput = document.querySelector('#po-content-' + subtab + ' input[data-code="' + productCode + '"]');
   var qty = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
+  // 5개 제한 체크 (T5/T6)
+  var limit = PO_PROMO_LIMIT[subtab] || 99;
+  if (limit < 99) {
+    var historyOrdered = 0;
+    JSON.parse(localStorage.getItem('mw_po_history') || '[]').forEach(function(h) { if (h.subtab === subtab && (h.ttiNum === productCode || h.manageCode === productCode)) historyOrdered += (h.qty || 0); });
+    var cartOrdered = 0;
+    poCart.forEach(function(c) { if (c.subtab === subtab && c.ttiNum === productCode) cartOrdered += (c.qty || 0); });
+    if (historyOrdered + cartOrdered + qty > limit) {
+      toast('발주 제한 수량(' + limit + '개)을 초과합니다. 잔여: ' + Math.max(0, limit - historyOrdered - cartOrdered) + '개');
+      return;
+    }
+  }
   var discounted = Math.round(supplyPrice * (1 - discountPct / 100));
   var existing = poCart.find(function(c) { return c.ttiNum === productCode && c.subtab === subtab; });
   if (existing) { existing.qty += qty; } else {
@@ -2948,8 +2985,9 @@ function _buildPackageLeftPanel(items) {
 }
 function _buildPackageRow(item, i) {
   var hasPromo = item.promoPrice && item.promoPrice > 0 && item.promoPrice !== item.supplyPrice;
-  var disabled = item.available <= 0 ? ' disabled' : '';
-  var disabledStyle = item.available <= 0 ? 'opacity:0.4;' : '';
+  var rowDisabled = item.available <= 0;
+  var disabledAttr = rowDisabled ? ' disabled' : '';
+  var disabledStyle = rowDisabled ? 'opacity:0.4;' : '';
   var h = '<tr style="' + disabledStyle + '">';
   h += '<td>' + (i + 1) + '</td>';
   h += '<td style="font-size:11px;font-weight:600">' + (item.mCode || '') + '</td>';
@@ -2962,9 +3000,9 @@ function _buildPackageRow(item, i) {
     h += '<td style="text-align:right">' + fmtPO(item.supplyPrice) + '</td>';
     h += '<td style="text-align:right">-</td>';
   }
-  h += '<td style="text-align:center">' + (item.qty || 0) + '</td>';
+  h += '<td><input type="number" min="1" value="1" class="po-qty-input" data-code="' + item.productCode + '" style="width:45px;text-align:center;font-size:12px;padding:2px;border:1px solid #DDE1EB;border-radius:3px"' + disabledAttr + '></td>';
   h += '<td style="text-align:center">' + (item.available > 0 ? '<span style="color:#1D9E75;font-weight:600">' + item.available + '</span>' : '<span style="color:#CC2222">불가</span>') + '</td>';
-  h += '<td><button onclick="_addPackageToCart(\'' + (item.productCode || '').replace(/'/g, "\\'") + '\',\'' + (item.modelName || '').replace(/'/g, "\\'") + '\',' + (hasPromo ? item.promoPrice : item.supplyPrice) + ',' + item.supplyPrice + ',' + item.available + ',\'' + (item.mCode || '') + '\',\'' + (item.promoName || '').replace(/'/g, "\\'") + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:3px;padding:3px 6px;cursor:pointer;font-size:11px"' + disabled + '>🛒</button></td>';
+  h += '<td class="center">' + (rowDisabled ? '' : '<button class="po-cart-btn-dark" onclick="_addPackageToCart(\'' + (item.productCode || '').replace(/'/g, "\\'") + '\',\'' + (item.modelName || '').replace(/'/g, "\\'") + '\',' + (hasPromo ? item.promoPrice : item.supplyPrice) + ',' + item.supplyPrice + ',' + item.available + ',\'' + (item.mCode || '') + '\',\'' + (item.promoName || '').replace(/'/g, "\\'") + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button>') + '</td>';
   h += '</tr>';
   return h;
 }
@@ -2981,13 +3019,15 @@ function _filterPackageTab() {
 }
 function _addPackageToCart(productCode, modelName, price, costPrice, available, mCode, promoName) {
   if (available <= 0) { toast('구매 불가 제품입니다'); return; }
+  var qtyInput = document.querySelector('#po-content-package input[data-code="' + productCode + '"]');
+  var qty = qtyInput ? parseInt(qtyInput.value) || 1 : 1;
   var existing = poCart.find(function(c) { return c.ttiNum === productCode && c.subtab === 'package'; });
-  if (existing) { existing.qty += 1; } else {
-    poCart.push({ code: productCode, ttiNum: productCode, model: modelName, supplyPrice: price, costPrice: costPrice, qty: 1, subtab: 'package', promoName: promoName || '패키지 프로모션' });
+  if (existing) { existing.qty += qty; } else {
+    poCart.push({ code: productCode, ttiNum: productCode, model: modelName, supplyPrice: price, costPrice: costPrice, qty: qty, subtab: 'package', promoName: promoName || '패키지 프로모션' });
   }
   _savePoCart();
   _refreshPromoRightPanel('package');
-  toast(modelName + ' 추가');
+  toast(modelName + ' ' + qty + '개 추가');
 }
 
 // ========================================
