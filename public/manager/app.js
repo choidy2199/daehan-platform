@@ -8714,11 +8714,11 @@ function handleTtiScrapeResult(data) {
 
   // TTI 데이터를 localStorage에 임시 저장
   var ttiProducts = data.data || [];
-  localStorage.setItem('mw_tti_products', JSON.stringify({
+  save('mw_tti_products', {
     data: ttiProducts,
     count: ttiProducts.length,
     scrapedAt: new Date().toISOString()
-  }));
+  });
 
   // 비교 실행 → 결과 팝업 표시
   showProductSyncReport(ttiProducts);
@@ -8795,7 +8795,7 @@ function showProductSyncReport(ttiProducts) {
   console.log('[TTI연동] 비교 결과: 신규', newProducts.length, '가격변경', priceChanged.length, '단종의심', discontinued.length, '일치', matched.length);
 
   // 결과를 localStorage에 저장 (팝업에서 사용)
-  localStorage.setItem('mw_tti_sync_report', JSON.stringify({
+  save('mw_tti_sync_report', {
     newProducts: newProducts,
     priceChanged: priceChanged,
     infoChanged: infoChanged,
@@ -8804,7 +8804,7 @@ function showProductSyncReport(ttiProducts) {
     ttiTotal: ttiProducts.length,
     mwTotal: mwProducts.length,
     generatedAt: new Date().toISOString()
-  }));
+  });
 
   // 팝업 표시
   showSyncReportPopup();
