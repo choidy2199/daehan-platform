@@ -2081,7 +2081,7 @@ function renderPOTab() {
 
   // 파워툴 카드 (이번 달)
   html += '<div class="po-sale-card">';
-  html += '<div class="po-card-label" style="color:#185FA5">파워툴 <span class="period-badge">월</span></div>';
+  html += '<div class="po-card-label" style="color:#185FA5">파워툴 <span class="period-badge" style="background:#E6F1FB;color:#0C447C">월</span></div>';
   html += '<div class="po-card-amount">' + fmtPO(salesData.powerTool) + '</div>';
   html += '<div class="po-card-target">목표 - · 0%</div>';
   html += '<div class="po-progress"><div class="po-progress-fill" style="width:0%;background:#185FA5"></div></div>';
@@ -2094,7 +2094,7 @@ function renderPOTab() {
   var _htShortage = Math.max(0, _htMax.amount - salesData.handTool);
   var _htDone = salesData.handTool >= _htMax.amount;
   html += '<div class="po-sale-card">';
-  html += '<div class="po-card-label" style="color:#1D9E75">수공구 <span class="period-badge">분기</span></div>';
+  html += '<div class="po-card-label" style="color:#1D9E75">수공구 <span class="period-badge" style="background:#E1F5EE;color:#085041">분기</span></div>';
   html += '<div class="po-card-amount">' + fmtPO(salesData.handTool) + '</div>';
   html += '<div style="font-size:11px;color:#5A6070;margin-top:2px">목표 ' + _htMax.rate + '% (' + fmtPO(_htMax.amount) + '원)</div>';
   var _htColor = _htCur.rate === 0 ? '#9BA3B2' : (_htDone ? '#1D9E75' : '#185FA5');
@@ -2115,7 +2115,7 @@ function renderPOTab() {
   var _pkShortage = Math.max(0, _pkMax.amount - salesData.packout);
   var _pkDone = salesData.packout >= _pkMax.amount;
   html += '<div class="po-sale-card">';
-  html += '<div class="po-card-label" style="color:#EF9F27">팩아웃 <span class="period-badge">월</span></div>';
+  html += '<div class="po-card-label" style="color:#EF9F27">팩아웃 <span class="period-badge" style="background:#FAEEDA;color:#854F0B">월</span></div>';
   html += '<div class="po-card-amount">' + fmtPO(salesData.packout) + '</div>';
   html += '<div style="font-size:11px;color:#5A6070;margin-top:2px">목표 ' + _pkMax.rate + '% (' + fmtPO(_pkMax.amount) + '원)</div>';
   var _pkColor = _pkCur.rate === 0 ? '#9BA3B2' : (_pkDone ? '#1D9E75' : '#185FA5');
@@ -2139,7 +2139,16 @@ function renderPOTab() {
     var _target = p.targetAmount || 0;
     var _cardPct = _target > 0 ? Math.min(100, Math.round((cd.remainder || 0) / _target * 100)) : 0;
     html += '<div class="po-promo-card" style="border-left:3px solid ' + pal.main + '" onclick="openCumulativePromoModal(' + i + ')">';
-    html += '<div class="po-promo-name"><span style="width:6px;height:6px;border-radius:50%;background:' + pal.main + ';display:inline-block"></span> ' + p.name + '</div>';
+    var _periodBadge = '';
+    if (p.periodStart && p.periodEnd) {
+      var _ps = new Date(p.periodStart), _pe = new Date(p.periodEnd);
+      var _months = (_pe.getFullYear() - _ps.getFullYear()) * 12 + _pe.getMonth() - _ps.getMonth() + 1;
+      if (_months <= 1) _periodBadge = '<span class="period-badge">월</span>';
+      else if (_months === 2) _periodBadge = '<span class="period-badge">2월</span>';
+      else if (_months === 3) _periodBadge = '<span class="period-badge">분기</span>';
+      else _periodBadge = '<span class="period-badge">' + _months + '월</span>';
+    }
+    html += '<div class="po-promo-name"><span style="width:6px;height:6px;border-radius:50%;background:' + pal.main + ';display:inline-block"></span> ' + p.name + ' ' + _periodBadge + '</div>';
     html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + fmtPO(cd.amount) + '</div>';
     html += '<div class="po-promo-benefit">' + (p.benefit || '-') + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">' + cd.achieveCount + '회 달성</span></div>';
     html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:' + _cardPct + '%;background:' + pal.main + '"></div></div>';
