@@ -2082,7 +2082,11 @@ function renderPOTab() {
   var _htDot = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + _htColor + ';margin-right:4px;vertical-align:middle"></span>';
   html += '<div class="po-card-target" style="font-size:13px;font-weight:600;color:' + _htColor + '">' + _htDot + '현재 ' + _htCur.rate + '%' + (_htDone ? ' (최고 달성)' : '') + '</div>';
   html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + _htPct + '%;background:#1D9E75"></div></div>';
-  if (!_htDone) html += '<div class="short" style="font-size:12px;font-weight:500">목표 ' + _htMax.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_htShortage) + '원 부족</span></div>';
+  html += '<div style="flex:1"></div>';
+  if (!_htDone) {
+    html += '<div style="border-top:1px solid #EAECF2;margin:6px 0 5px"></div>';
+    html += '<div style="font-size:12px;font-weight:500">목표 ' + _htMax.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_htShortage) + '원 부족</span></div>';
+  }
   html += '</div>';
 
   // 팩아웃 카드 (월, 최고 구간만)
@@ -2099,7 +2103,11 @@ function renderPOTab() {
   var _pkDot = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + _pkColor + ';margin-right:4px;vertical-align:middle"></span>';
   html += '<div class="po-card-target" style="font-size:13px;font-weight:600;color:' + _pkColor + '">' + _pkDot + '현재 ' + _pkCur.rate + '%' + (_pkDone ? ' (최고 달성)' : '') + '</div>';
   html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + _pkPct + '%;background:#EF9F27"></div></div>';
-  if (!_pkDone) html += '<div class="short" style="font-size:12px;font-weight:500">목표 ' + _pkMax.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_pkShortage) + '원 부족</span></div>';
+  html += '<div style="flex:1"></div>';
+  if (!_pkDone) {
+    html += '<div style="border-top:1px solid #EAECF2;margin:6px 0 5px"></div>';
+    html += '<div style="font-size:12px;font-weight:500">목표 ' + _pkMax.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_pkShortage) + '원 부족</span></div>';
+  }
   html += '</div>';
 
   html += '<div class="po-divider"></div>';
@@ -2116,6 +2124,8 @@ function renderPOTab() {
     html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + fmtPO(cd.amount) + '</div>';
     html += '<div class="po-promo-benefit">' + (p.benefit || '-') + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">' + cd.achieveCount + '회 달성</span></div>';
     html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:' + _cardPct + '%;background:' + pal.main + '"></div></div>';
+    html += '<div style="flex:1"></div>';
+    html += '<div style="border-top:1px solid #EAECF2;margin:6px 0 5px"></div>';
     html += '<div class="po-promo-next" style="font-size:12px;font-weight:500">다음까지 <span style="color:#CC2222;font-weight:700">' + fmtPO(cd.shortage) + '원 부족</span></div>';
     html += '</div>';
   });

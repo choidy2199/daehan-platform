@@ -276,7 +276,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 /* 상단 매출카드 1줄 */
 .po-kpi-row { display:flex; gap:6px; padding:8px 12px; align-items:stretch; overflow-x:auto; }
-.po-sale-card { flex:0 0 auto; min-width:140px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; }
+.po-sale-card { flex:0 0 auto; min-width:140px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; display:flex; flex-direction:column; }
 .po-sale-card .po-card-label { font-size:13px; font-weight:600; margin-bottom:2px; }
 .po-sale-card .po-card-amount { font-size:20px; font-weight:700; color:#1A1D23; line-height:1.2; }
 .po-sale-card .po-card-target { font-size:11px; color:#9BA3B2; margin-top:2px; }
@@ -293,7 +293,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 .po-divider { width:1px; background:#B0B8CC; margin:4px 2px; opacity:0.4; flex-shrink:0; }
 
-.po-promo-card { flex:1; min-width:130px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; cursor:pointer; transition:box-shadow 0.15s; }
+.po-promo-card { flex:1; min-width:130px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; cursor:pointer; transition:box-shadow 0.15s; display:flex; flex-direction:column; }
 .po-promo-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
 .po-promo-card .po-promo-name { font-size:13px; font-weight:600; display:flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .po-promo-card .po-promo-amount { font-size:20px; font-weight:700; color:#1A1D23; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
