@@ -312,14 +312,14 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 /* 패널 */
 .po-panel { background:#fff; border:1px solid #DDE1EB; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
-.po-panel-header { background:#1A1D23; color:#fff; padding:8px 14px; font-size:13px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+.po-panel-header { background:#1A1D23; color:#fff; padding:8px 14px; font-size:14px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
 .po-panel-header .po-header-count { font-size:12px; font-weight:400; opacity:0.7; margin-left:6px; }
 .po-panel-body { padding:8px; flex:1; overflow-y:auto; }
 
 /* 제품 목록 / 주문 목록 테이블 */
 .po-table { width:100%; border-collapse:collapse; font-size:12px; }
-.po-table th { padding:5px 6px; text-align:left; font-weight:500; font-size:11px; color:#9BA3B2; border-bottom:1px solid #EAECF2; white-space:nowrap; background:#F8F9FB; position:sticky; top:0; z-index:1; }
-.po-table td { padding:4px 6px; border-bottom:1px solid #F0F2F7; white-space:nowrap; }
+.po-table th { padding:5px 6px; text-align:left; font-weight:500; font-size:12px; color:#9BA3B2; border-bottom:1px solid #EAECF2; white-space:nowrap; background:#F8F9FB; position:sticky; top:0; z-index:1; }
+.po-table td { padding:4px 6px; border-bottom:1px solid #F0F2F7; white-space:nowrap; font-size:13px; }
 .po-table .num { text-align:right; }
 .po-table .center { text-align:center; }
 .po-table tr:hover { background:#F8FBFF; }
@@ -328,9 +328,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-cart-btn-dark { width:26px; height:26px; border-radius:4px; border:none; background:#1A1D23; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; }
 .po-cart-btn-dark:hover { background:#333; }
 
-/* 제품 목록 글씨 */
-.po-table-lg th { font-size:12px !important; }
-.po-table-lg td { font-size:13px !important; }
+/* po-table-lg: 기본 po-table과 동일 (확장용 예비) */
 .po-promo-tag { display:inline-block; font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; margin-left:4px; }
 
 /* 주문 목록 하단 합계 */
@@ -340,7 +338,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 /* 필터 행 */
 .po-filter-row { display:flex; gap:6px; padding:6px 8px; align-items:center; border-bottom:1px solid #F0F2F7; }
-.po-filter-row input, .po-filter-row select { height:30px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:13px; font-family:'Pretendard',sans-serif; }
+.po-filter-row input, .po-filter-row select { height:32px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:13px; font-family:'Pretendard',sans-serif; }
 .po-filter-row input { flex:1; }
 
 /* 제품등록 검색행 */
