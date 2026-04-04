@@ -1864,14 +1864,23 @@ function renderPOTab() {
   html += buildPOOrderPanel();
   html += '</div>';
 
-  // 나머지 6개 탭 placeholder
+  // 발주 리스트 탭
+  html += '<div id="po-content-list" class="po-tab-content" style="display:' + (activeSubTab === 'list' ? 'block' : 'none') + '">';
+  html += buildPOListPanel();
+  html += '</div>';
+
+  // FOC 발주 탭
+  html += '<div id="po-content-foc" class="po-tab-content" style="display:' + (activeSubTab === 'foc' ? 'grid' : 'none') + ';grid-template-columns:1fr 1fr;gap:10px;">';
+  html += buildPOFocLeftPanel();
+  html += buildPOFocRightPanel();
+  html += '</div>';
+
+  // 나머지 4개 탭 placeholder
   var placeholders = [
     { id: 'kit', name: '키트구성 패키지' },
     { id: 't5', name: 'T5 이달의특가 5%' },
     { id: 't6', name: 'T6 아웃도어 8%' },
-    { id: 'package', name: '패키지 프로모션' },
-    { id: 'list', name: '발주 리스트' },
-    { id: 'foc', name: 'FOC 발주' }
+    { id: 'package', name: '패키지 프로모션' }
   ];
   placeholders.forEach(function(p) {
     html += '<div id="po-content-' + p.id + '" class="po-tab-content" style="display:' + (activeSubTab === p.id ? 'block' : 'none') + '">';
@@ -2052,7 +2061,7 @@ function buildPOOrderPanel() {
 function switchPOSubTab(tabName) {
   document.querySelectorAll('.po-tab-content').forEach(function(el) { el.style.display = 'none'; });
   var content = document.getElementById('po-content-' + tabName);
-  if (content) content.style.display = tabName === 'normal' ? 'grid' : 'block';
+  if (content) content.style.display = (tabName === 'normal' || tabName === 'foc') ? 'grid' : 'block';
 
   document.querySelectorAll('.po-sub-tab').forEach(function(btn) {
     var id = btn.getAttribute('data-tab');
@@ -2063,22 +2072,236 @@ function switchPOSubTab(tabName) {
   localStorage.setItem('mw_po_active_subtab', tabName);
 }
 
-// 누적프로모션 추가
-function addCumulativePromo() {
-  var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [
-    { name: 'GEN4+FQID2', amount: '0', benefit: '200만당 본품증정', achieved: 0, next: '0', paletteIdx: 0 },
-    { name: 'CBL2', amount: '0', benefit: '100만당 본품증정', achieved: 0, next: '0', paletteIdx: 1 }
+// ========================================
+// 발주 리스트 탭 (6-A)
+// ========================================
+function buildPOListPanel() {
+  var h = '';
+  // 상단 요약 카드 5칸
+  h += '<div style="display:flex;gap:6px;margin-bottom:10px">';
+  var cards = [
+    { label: '오늘 발주', val: '0', sub: '건' },
+    { label: '일반주문', val: '0', sub: '건' },
+    { label: '프로모션', val: '0', sub: '건' },
+    { label: 'FOC', val: '0', sub: '건' },
+    { label: '경영박사 등록', val: '0/0', sub: '', border: '#1D9E75' }
   ];
-  if (promos.length >= 5) { toast('최대 5개까지 추가할 수 있습니다'); return; }
-  promos.push({ name: '새 프로모션', amount: '0', benefit: '클릭하여 설정', achieved: 0, next: '0', paletteIdx: promos.length });
-  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
-  renderPOTab();
+  cards.forEach(function(c) {
+    h += '<div style="flex:1;background:#fff;border-radius:6px;padding:8px 12px;border:1px solid ' + (c.border || '#DDE1EB') + ';text-align:center">';
+    h += '<div style="font-size:10px;color:#5A6070">' + c.label + '</div>';
+    h += '<div style="font-size:18px;font-weight:700;color:#1A1D23">' + c.val + '</div>';
+    if (c.sub) h += '<div style="font-size:9px;color:#9BA3B2">' + c.sub + '</div>';
+    h += '</div>';
+  });
+  h += '</div>';
+
+  // 메인 패널
+  h += '<div class="po-panel" style="max-height:calc(100vh - 320px)">';
+  h += '<div class="po-panel-header"><span>발주 리스트</span><div style="display:flex;gap:6px;align-items:center">';
+  h += '<select style="height:28px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff;font-size:10px;border-radius:4px;padding:0 6px;font-family:Pretendard,sans-serif"><option>오늘</option><option>이번 주</option><option>이번 달</option><option>기간 선택</option></select>';
+  h += '<button onclick="console.log(\'경영박사 매입전표 등록\')" style="background:#1D9E75;color:#fff;border:none;border-radius:5px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">경영박사 매입전표 등록</button>';
+  h += '</div></div>';
+
+  // 테이블
+  h += '<div class="po-panel-body">';
+  h += '<table class="po-table"><thead><tr>';
+  h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
+  h += '<th>날짜</th><th>구분</th><th>관리코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">경영박사</th>';
+  h += '</tr></thead><tbody id="po-list-body">';
+  h += '<tr><td colspan="10" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
+  h += '</tbody></table></div></div>';
+  return h;
 }
 
-// 누적프로모션 모달 (B-1b에서 구현)
+function togglePOListAll(el) {
+  document.querySelectorAll('#po-list-body input[type="checkbox"]').forEach(function(cb) { cb.checked = el.checked; });
+}
+
+// ========================================
+// FOC 발주 탭 (6-B)
+// ========================================
+function buildPOFocLeftPanel() {
+  var h = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
+  h += '<div class="po-panel-header"><span>FOC 대상 제품</span></div>';
+  h += '<div class="po-filter-row"><input type="search" placeholder="FOC 제품 검색..." id="po-foc-search"></div>';
+  h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
+  h += '<th>프로모션</th><th style="min-width:180px">모델명</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
+  h += '</tr></thead><tbody id="po-foc-prod-body">';
+  h += '<tr><td colspan="4" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">달성된 프로모션이 없습니다</td></tr>';
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+function buildPOFocRightPanel() {
+  var h = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
+  h += '<div class="po-panel-header"><span>FOC 주문 목록 <span class="po-header-count">0건</span></span>';
+  h += '<button style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="clearFOCCart()">비우기</button></div>';
+  h += '<div class="po-register-row"><span style="font-size:12px;font-weight:600;color:#5A6070;white-space:nowrap">FOC 등록 :</span>';
+  h += '<input type="search" placeholder="FOC 제품 검색 → Enter" id="po-foc-cart-search" onkeydown="if(event.key===\'Enter\')addFOCCartItem()">';
+  h += '<button class="po-register-btn" onclick="addFOCCartItem()">+ 등록</button></div>';
+  h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
+  h += '<th>프로모션</th><th style="min-width:150px">모델명</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
+  h += '</tr></thead><tbody id="po-foc-cart-body">';
+  h += '<tr><td colspan="5" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">왼쪽에서 FOC 제품을 추가하세요</td></tr>';
+  h += '</tbody></table></div>';
+  h += '<div class="po-order-summary"><div>FOC 합계 (0건, 0개) <span style="background:#FBEAF0;color:#72243E;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;margin-left:6px">0원 (무상 증정)</span></div></div>';
+  h += '<div style="padding:8px"><button class="po-order-btn" onclick="submitFOCOrder()">FOC 발주하기</button></div></div>';
+  return h;
+}
+
+function clearFOCCart() { console.log('[발주] FOC 장바구니 비우기'); }
+function addFOCCartItem() { console.log('[발주] FOC 제품등록'); toast('FOC 기능은 다음 단계에서 구현됩니다'); }
+function submitFOCOrder() { console.log('[발주] FOC 발주하기'); toast('FOC 발주 기능은 다음 단계에서 구현됩니다'); }
+
+// ========================================
+// 누적프로모션 모달 (6-C)
+// ========================================
+function _getCumulPromos() {
+  return JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [
+    { name: 'GEN4+FQID2', amount: '0', benefit: 'FOC 쿠폰 24만', achieved: 0, next: '0', paletteIdx: 0, targetAmount: 3000000, period: '', unlimited: true, currentSales: 0, products: [] },
+    { name: 'CBL2', amount: '0', benefit: 'FOC 쿠폰 10만', achieved: 0, next: '0', paletteIdx: 1, targetAmount: 1000000, period: '', unlimited: true, currentSales: 0, products: [] }
+  ];
+}
+
 function openCumulativePromoModal(index) {
-  console.log('[발주] 누적프로모션 모달 열기:', index);
-  toast('프로모션 설정은 다음 단계에서 구현됩니다');
+  var promos = _getCumulPromos();
+  var promo = promos[index];
+  if (!promo) return;
+  var pal = _poPromoPalette[promo.paletteIdx || index] || _poPromoPalette[0];
+  var products = promo.products || [];
+  var pct = promo.targetAmount > 0 ? Math.min(100, Math.round((promo.currentSales || 0) / promo.targetAmount * 100)) : 0;
+
+  var existing = document.getElementById('po-cumul-modal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'po-cumul-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
+
+  var h = '<div style="background:#fff;border-radius:10px;width:680px;max-width:95vw;max-height:80vh;overflow:hidden;border:1px solid #DDE1EB;display:flex;flex-direction:column">';
+  // 헤더
+  h += '<div style="background:#1A1D23;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">';
+  h += '<div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:' + pal.main + '"></span><span style="font-size:14px;font-weight:600">' + (promo.name || '새 프로모션') + ' 누적 프로모션</span></div>';
+  h += '<button onclick="document.getElementById(\'po-cumul-modal\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">✕</button></div>';
+
+  // 바디
+  h += '<div style="padding:16px;overflow-y:auto;flex:1">';
+  // 정보 3칸
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">';
+  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">기준금액</div><div style="font-size:15px;font-weight:700;color:#CC2222">' + (promo.targetAmount ? parseInt(promo.targetAmount).toLocaleString() + '원 당' : '-') + '</div></div>';
+  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">현재 누적매출</div><div style="font-size:15px;font-weight:700;color:' + pal.text + '">' + (promo.currentSales || 0).toLocaleString() + '원</div></div>';
+  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">혜택 / 달성</div><div style="font-size:13px;font-weight:600">' + (promo.benefit || '-') + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600">' + (promo.achieved || 0) + '회</span></div></div>';
+  h += '</div>';
+
+  // 프로그레스
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="flex:1;height:5px;background:#EAECF2;border-radius:3px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + pal.main + ';border-radius:3px"></div></div><span style="font-size:11px;font-weight:600;color:' + pal.text + '">' + pct + '%</span></div>';
+  h += '<div style="font-size:10px;color:#9BA3B2;margin-bottom:16px">다음 달성까지 ' + (promo.next || '0') + '원 · ' + (promo.period || '기간 미설정') + ' · ' + (promo.unlimited ? '제한없음' : '') + '</div>';
+
+  // 설정 필드
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">프로모션명</label><input id="cumul-name" value="' + (promo.name || '').replace(/"/g, '&quot;') + '" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">혜택 설명</label><input id="cumul-benefit" value="' + (promo.benefit || '').replace(/"/g, '&quot;') + '" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">기준금액 (원)</label><input id="cumul-target" type="number" value="' + (promo.targetAmount || 0) + '" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif;text-align:right"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">기간</label><input id="cumul-period" value="' + (promo.period || '').replace(/"/g, '&quot;') + '" placeholder="2026.4.1~4.29" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
+  h += '</div>';
+
+  // 대상 제품 리스트
+  h += '<div style="font-size:13px;font-weight:600;margin-bottom:6px">대상 제품 리스트 (' + products.length + '건)</div>';
+  h += '<div style="display:flex;gap:6px;margin-bottom:8px"><input id="cumul-prod-search" placeholder="TTI#, 모델명으로 제품 검색 후 추가..." style="flex:1;height:30px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:12px;font-family:Pretendard,sans-serif"><button onclick="addPromoProduct(' + index + ')" style="height:30px;padding:0 14px;background:#185FA5;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">+ 추가</button></div>';
+
+  h += '<div style="border:1px solid #DDE1EB;border-radius:6px;overflow:hidden;max-height:200px;overflow-y:auto">';
+  h += '<table class="po-table" style="margin:0"><thead><tr><th>TTI#</th><th>순번</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">할인율</th><th class="center" style="width:30px">✕</th></tr></thead>';
+  h += '<tbody id="cumul-prod-body">';
+  if (products.length === 0) {
+    h += '<tr><td colspan="6" style="text-align:center;padding:20px;color:#9BA3B2;font-size:11px">제품을 검색하여 추가하세요</td></tr>';
+  } else {
+    products.forEach(function(pr, pi) {
+      h += '<tr>';
+      h += '<td style="font-size:10px;color:#5A6070">' + (pr.ttiNum || '-') + '</td>';
+      h += '<td>' + (pr.orderNum || '-') + '</td>';
+      h += '<td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (pr.model || '').replace(/"/g, '&quot;') + '">' + (pr.model || '-') + '</td>';
+      h += '<td class="num">' + (pr.supplyPrice ? parseInt(pr.supplyPrice).toLocaleString() : '-') + '</td>';
+      h += '<td class="center"><input type="text" value="' + (pr.discountRate || '') + '" placeholder="%" style="width:50px;height:24px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:11px;font-family:Pretendard,sans-serif" data-pidx="' + pi + '" onchange="updatePromoProductDiscount(' + index + ',' + pi + ',this.value)"></td>';
+      h += '<td class="center"><button onclick="removePromoProduct(' + index + ',' + pi + ')" style="width:22px;height:22px;border-radius:4px;border:none;background:#FCEBEB;color:#CC2222;font-size:12px;cursor:pointer">✕</button></td>';
+      h += '</tr>';
+    });
+  }
+  h += '</tbody></table></div>';
+
+  h += '</div>'; // 바디 끝
+
+  // 푸터
+  h += '<div style="border-top:1px solid #DDE1EB;padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">';
+  h += '<button onclick="document.getElementById(\'po-cumul-modal\').remove()" style="background:#fff;color:#5A6070;border:1px solid #DDE1EB;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;font-family:Pretendard,sans-serif">닫기</button>';
+  h += '<button onclick="saveCumulativePromo(' + index + ')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">저장</button>';
+  h += '</div>';
+
+  h += '</div>';
+  modal.innerHTML = h;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+}
+
+function saveCumulativePromo(index) {
+  var promos = _getCumulPromos();
+  var promo = promos[index];
+  if (!promo) return;
+  promo.name = (document.getElementById('cumul-name') || {}).value || promo.name;
+  promo.benefit = (document.getElementById('cumul-benefit') || {}).value || promo.benefit;
+  promo.targetAmount = parseInt((document.getElementById('cumul-target') || {}).value) || 0;
+  promo.period = (document.getElementById('cumul-period') || {}).value || '';
+  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  document.getElementById('po-cumul-modal').remove();
+  renderPOTab();
+  toast('프로모션 설정이 저장되었습니다');
+}
+
+function addPromoProduct(promoIndex) {
+  var searchVal = (document.getElementById('cumul-prod-search') || {}).value.trim();
+  if (!searchVal) return;
+  var products = DB.products || [];
+  var found = products.find(function(p) {
+    return (p.ttiNum && p.ttiNum.indexOf(searchVal) !== -1) || (p.model && p.model.toLowerCase().indexOf(searchVal.toLowerCase()) !== -1) || (p.orderNum && p.orderNum === searchVal);
+  });
+  if (!found) { toast('제품을 찾을 수 없습니다: ' + searchVal); return; }
+  var promos = _getCumulPromos();
+  var promo = promos[promoIndex];
+  if (!promo.products) promo.products = [];
+  if (promo.products.some(function(pr) { return pr.ttiNum === found.ttiNum; })) { toast('이미 추가된 제품입니다'); return; }
+  promo.products.push({ ttiNum: found.ttiNum || '', orderNum: found.orderNum || '', model: found.model || '', supplyPrice: found.supplyPrice || 0, discountRate: '' });
+  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  document.getElementById('po-cumul-modal').remove();
+  openCumulativePromoModal(promoIndex);
+}
+
+function removePromoProduct(promoIndex, productIndex) {
+  var promos = _getCumulPromos();
+  var promo = promos[promoIndex];
+  if (!promo || !promo.products) return;
+  promo.products.splice(productIndex, 1);
+  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  document.getElementById('po-cumul-modal').remove();
+  openCumulativePromoModal(promoIndex);
+}
+
+function updatePromoProductDiscount(promoIndex, productIndex, value) {
+  var promos = _getCumulPromos();
+  var promo = promos[promoIndex];
+  if (!promo || !promo.products || !promo.products[productIndex]) return;
+  promo.products[productIndex].discountRate = value;
+  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+}
+
+// 누적프로모션 추가 (6-D)
+function addCumulativePromo() {
+  var promos = _getCumulPromos();
+  if (promos.length >= 5) { toast('최대 5개까지 추가할 수 있습니다'); return; }
+  var idx = promos.length;
+  promos.push({ name: '새 프로모션', amount: '0', benefit: '클릭하여 설정', achieved: 0, next: '0', paletteIdx: idx, targetAmount: 0, period: '', unlimited: true, currentSales: 0, products: [] });
+  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  renderPOTab();
+  // 바로 모달 열기
+  setTimeout(function() { openCumulativePromoModal(idx); }, 100);
 }
 
 // 장바구니 추가 (B-1a는 콘솔만)
