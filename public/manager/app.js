@@ -2175,7 +2175,7 @@ function buildPOProductPanel() {
 
   // 필터 행
   html += '<div class="po-filter-row">';
-  html += '<input type="search" placeholder="코드, 모델명 검색" id="po-prod-search" oninput="filterPOProducts()">';
+  html += '<input type="search" placeholder="코드, 모델명 검색" id="po-prod-search" autocomplete="off" oninput="filterPOProducts()">';
 
   // 카테고리 select — 실제 카테고리에서 동적 생성
   var cats = {};
@@ -2190,7 +2190,7 @@ function buildPOProductPanel() {
   // 테이블
   html += '<div class="po-panel-body" id="po-prod-scroll">';
   html += '<table class="po-table po-table-lg"><thead><tr>';
-  html += '<th class="center" style="width:36px">No</th><th>프로모션번호</th><th>제품번호</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
+  html += '<th class="center" style="width:36px">No</th><th class="center" style="width:36px">누적</th><th>프로모션번호</th><th>제품번호</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
   html += '</tr></thead><tbody id="po-prod-body">';
   html += '</tbody></table></div></div>';
   return html;
@@ -2216,8 +2216,7 @@ function buildPOProductRow(p, rowIndex) {
   else stockIcon = '<span style="color:#B4B2A9">-</span>';
 
   // 누적프로모션 매칭 확인 (normalizeTtiCode로 앞자리0 해결)
-  var promoTag = '';
-  var rowBg = '';
+  var promoBadge = '';
   var _pCode = normalizeTtiCode(p.ttiNum);
   var cumulPromos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null');
   if (cumulPromos && Array.isArray(cumulPromos)) {
@@ -2229,23 +2228,28 @@ function buildPOProductRow(p, rowIndex) {
         });
         if (_matched) {
           var rs = _poCumulPromoRowStyles[pi] || _poCumulPromoRowStyles[0];
-          rowBg = rs.bg;
-          promoTag = ' <span class="po-promo-tag" style="background:' + rs.tagBg + ';color:' + rs.tagColor + '">' + cp.name + '</span>';
+          promoBadge = '<span style="background:' + rs.tagBg + ';color:' + rs.tagColor + ';font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px">누적</span>';
           break;
         }
       }
     }
   }
 
-  var tr = '<tr' + (rowBg ? ' style="background:' + rowBg + '"' : '') + '>';
+  // 소진(stock_c) 제품 비활성화
+  var _isSoldOut = stockStatus === 'c';
+  var _qtyDisabled = _isSoldOut ? ' disabled style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif;background:#EAECF2;color:#9BA3B2"' : ' style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif"';
+  var _btnDisabled = _isSoldOut ? ' disabled style="opacity:0.3;cursor:not-allowed"' : '';
+
+  var tr = '<tr>';
   tr += '<td class="center" style="color:#9BA3B2">' + (rowIndex + 1) + '</td>';
+  tr += '<td class="center">' + promoBadge + '</td>';
   tr += '<td>' + (p.orderNum || '-') + '</td>';
   tr += '<td style="font-family:monospace;font-size:12px">' + (p.ttiNum || p.code || '-') + '</td>';
-  tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + promoTag + '</td>';
+  tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
   tr += '<td class="center">' + stockIcon + '</td>';
-  tr += '<td class="center"><input type="number" min="0" value="0" style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif" data-code="' + (p.ttiNum || '') + '"></td>';
-  tr += '<td class="center"><button class="po-cart-btn-dark" onclick="addToCart(\'' + (p.ttiNum || '') + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button></td>';
+  tr += '<td class="center"><input type="number" min="0" value="0"' + _qtyDisabled + ' data-code="' + (p.ttiNum || '') + '"></td>';
+  tr += '<td class="center"><button class="po-cart-btn-dark"' + _btnDisabled + ' onclick="addToCart(\'' + (p.ttiNum || '') + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button></td>';
   tr += '</tr>';
   return tr;
 }
@@ -2258,7 +2262,7 @@ function renderPOProductRows() {
   var html = '';
   for (var i = 0; i < _poRenderedCount; i++) { html += buildPOProductRow(_poFilteredProducts[i], i); }
   if (_poFilteredProducts.length === 0) {
-    html = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">검색 결과가 없습니다</td></tr>';
+    html = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#9BA3B2">검색 결과가 없습니다</td></tr>';
   }
   body.innerHTML = html;
   // 건수 업데이트
@@ -2292,16 +2296,16 @@ function buildPOOrderPanel() {
   // 제품등록 검색행
   html += '<div class="po-register-row">';
   html += '<span style="font-size:12px;font-weight:600;color:#5A6070;white-space:nowrap">제품등록 :</span>';
-  html += '<input type="search" placeholder="상품번호, 모델명, 제품명 검색 → Enter" id="po-cart-search" onkeydown="if(event.key===\'Enter\')addPOCartItem()">';
+  html += '<input type="search" placeholder="상품번호, 모델명, 제품명 검색 → Enter" id="po-cart-search" autocomplete="off" onkeydown="if(event.key===\'Enter\')addPOCartItem()">';
   html += '<button class="po-register-btn" onclick="addPOCartItem()">+ 등록</button>';
   html += '</div>';
 
   // 테이블
   html += '<div class="po-panel-body">';
   html += '<table class="po-table"><thead><tr>';
-  html += '<th>프로모션번호</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
+  html += '<th class="center" style="width:36px">누적</th><th>프로모션번호</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
   html += '</tr></thead><tbody id="po-cart-body">';
-  html += '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
+  html += '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   html += '</tbody></table></div>';
 
   // 합계
@@ -2459,7 +2463,7 @@ function togglePOListAll(el) {
 function buildPOFocLeftPanel() {
   var h = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
   h += '<div class="po-panel-header"><span>FOC 대상 제품</span></div>';
-  h += '<div class="po-filter-row"><input type="search" placeholder="FOC 제품 검색..." id="po-foc-search"></div>';
+  h += '<div class="po-filter-row"><input type="search" placeholder="FOC 제품 검색..." id="po-foc-search" autocomplete="off"></div>';
   h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
   h += '<th>프로모션</th><th style="min-width:180px">모델명</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
   h += '</tr></thead><tbody id="po-foc-prod-body">';
@@ -2473,7 +2477,7 @@ function buildPOFocRightPanel() {
   h += '<div class="po-panel-header"><span>FOC 주문 목록 <span class="po-header-count">0건</span></span>';
   h += '<button style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="clearFOCCart()">비우기</button></div>';
   h += '<div class="po-register-row"><span style="font-size:12px;font-weight:600;color:#5A6070;white-space:nowrap">FOC 등록 :</span>';
-  h += '<input type="search" placeholder="FOC 제품 검색 → Enter" id="po-foc-cart-search" onkeydown="if(event.key===\'Enter\')addFOCCartItem()">';
+  h += '<input type="search" placeholder="FOC 제품 검색 → Enter" id="po-foc-cart-search" autocomplete="off" onkeydown="if(event.key===\'Enter\')addFOCCartItem()">';
   h += '<button class="po-register-btn" onclick="addFOCCartItem()">+ 등록</button></div>';
   h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
   h += '<th>프로모션</th><th style="min-width:150px">모델명</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
@@ -2570,7 +2574,7 @@ function openCumulativePromoModal(index) {
 
   // 대상 제품 리스트
   h += '<div style="font-size:13px;font-weight:600;margin-bottom:6px">대상 제품 리스트 (' + products.length + '건)</div>';
-  h += '<div style="display:flex;gap:6px;margin-bottom:8px"><input id="cumul-prod-search" placeholder="TTI#, 모델명으로 제품 검색 후 추가..." style="flex:1;height:30px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:12px;font-family:Pretendard,sans-serif"><button onclick="addPromoProduct(' + index + ')" style="height:30px;padding:0 14px;background:#185FA5;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">+ 추가</button></div>';
+  h += '<div style="display:flex;gap:6px;margin-bottom:8px"><input id="cumul-prod-search" autocomplete="off" placeholder="TTI#, 모델명으로 제품 검색 후 추가..." style="flex:1;height:30px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:12px;font-family:Pretendard,sans-serif"><button onclick="addPromoProduct(' + index + ')" style="height:30px;padding:0 14px;background:#185FA5;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">+ 추가</button></div>';
 
   h += '<div style="border:1px solid #DDE1EB;border-radius:6px;overflow:hidden;max-height:200px;overflow-y:auto">';
   h += '<table class="po-table" style="margin:0"><thead><tr><th>TTI#</th><th>순번</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">할인율</th><th class="center" style="width:30px">✕</th></tr></thead>';
@@ -2852,15 +2856,16 @@ function renderPOCartTable() {
   if (!body) return;
 
   if (poCart.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   } else {
     var h = '';
     poCart.forEach(function(c, i) {
       var amt = (c.supplyPrice || 0) * (c.qty || 0);
-      var promoTag = c.promoName ? ' <span class="po-promo-tag" style="background:#EEEDFE;color:' + (c.promoColor || '#3C3489') + '">' + c.promoName + '</span>' : '';
+      var _cumulBadge = c.promoName ? '<span style="background:#EEEDFE;color:' + (c.promoColor || '#3C3489') + ';font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px">누적</span>' : '';
       h += '<tr>';
+      h += '<td class="center">' + _cumulBadge + '</td>';
       h += '<td>' + (c.orderNum || '-') + '</td>';
-      h += '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (c.model || '').replace(/"/g, '&quot;') + '">' + (c.model || '-') + promoTag + '</td>';
+      h += '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (c.model || '').replace(/"/g, '&quot;') + '">' + (c.model || '-') + '</td>';
       h += '<td class="num">' + fmtPO(c.supplyPrice) + '</td>';
       h += '<td class="center"><input type="number" min="1" value="' + c.qty + '" style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif" onchange="updateCartQty(' + i + ',this.value)"></td>';
       h += '<td class="num" style="font-weight:600">' + fmtPO(amt) + '</td>';
