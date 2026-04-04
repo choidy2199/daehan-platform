@@ -295,10 +295,10 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 .po-promo-card { flex:1; min-width:130px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; cursor:pointer; transition:box-shadow 0.15s; }
 .po-promo-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
-.po-promo-card .po-promo-name { font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px; }
-.po-promo-card .po-promo-amount { font-size:19px; font-weight:700; color:#1A1D23; margin-top:2px; }
-.po-promo-card .po-promo-benefit { font-size:11px; color:#5A6070; margin-top:1px; }
-.po-promo-card .po-promo-next { font-size:11px; color:#9BA3B2; margin-top:2px; }
+.po-promo-card .po-promo-name { font-size:13px; font-weight:600; display:flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.po-promo-card .po-promo-amount { font-size:20px; font-weight:700; color:#1A1D23; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.po-promo-card .po-promo-benefit { font-size:11px; color:#5A6070; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.po-promo-card .po-promo-next { font-size:11px; color:#9BA3B2; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 .po-add-promo-btn { flex:0 0 56px; border:2px dashed #DDE1EB; border-radius:7px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; background:transparent; }
 .po-add-promo-btn:hover { border-color:#185FA5; background:#E6F1FB; }

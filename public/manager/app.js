@@ -2907,19 +2907,22 @@ function openCommercialPromoModal() {
       this.setSelectionRange(pos + (newLen - oldLen), pos + (newLen - oldLen));
     });
   });
-  // 구간 금액 칩 클릭
-  modal.querySelectorAll('.comm-target-chip').forEach(function(chip) {
-    chip.addEventListener('click', function() {
+  // 구간 타겟 아이콘 클릭 → 목표금액 자동 입력
+  modal.querySelectorAll('.comm-target-icon').forEach(function(icon) {
+    icon.addEventListener('click', function() {
       var amt = parseInt(this.getAttribute('data-amount'), 10);
       var promoIdx = this.getAttribute('data-idx');
       var targetInput = document.getElementById('comm-target-' + promoIdx);
       if (targetInput) { targetInput.value = amt > 0 ? amt.toLocaleString() : ''; }
-      // 칩 활성 표시 업데이트
-      this.parentElement.querySelectorAll('.comm-target-chip').forEach(function(c) {
-        if (parseInt(c.getAttribute('data-amount'), 10) === amt) {
-          c.style.background = '#185FA5'; c.style.color = '#fff'; c.style.borderColor = '#185FA5';
+      // 모든 행 초기화 후 선택 행 하이라이트
+      modal.querySelectorAll('.comm-target-icon[data-idx="' + promoIdx + '"]').forEach(function(ic) {
+        var row = ic.closest('tr');
+        if (parseInt(ic.getAttribute('data-amount'), 10) === amt && amt > 0) {
+          ic.style.opacity = '1'; ic.style.color = '#185FA5';
+          if (row) row.style.background = '#E6F1FB';
         } else {
-          c.style.background = '#F4F6FA'; c.style.color = '#5A6070'; c.style.borderColor = '#DDE1EB';
+          ic.style.opacity = '0.3'; ic.style.color = '#9BA3B2';
+          if (row) row.style.background = '';
         }
       });
     });
@@ -2975,19 +2978,7 @@ function _buildCommPromoAccordion(promo, idx, history) {
   h += '</div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">적용조건</label><input type="text" class="comm-input" data-field="condition" data-idx="' + idx + '" value="' + (promo.condition || '') + '" placeholder="예: 디스플레이 제외" style="width:100%;padding:6px 10px;border:1px solid #DDE1EB;border-radius:4px;font-size:14px"></div>';
-  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">목표금액</label><input type="text" class="comm-input comm-money" id="comm-target-' + idx + '" data-field="targetAmount" data-idx="' + idx + '" value="' + fmtPO(promo.targetAmount || 0) + '" style="width:100%;padding:8px 12px;border:1px solid #DDE1EB;border-radius:4px;font-size:16px;font-weight:600;text-align:right">';
-  // 구간 금액 칩
-  var _tierAmounts = (promo.tiers || []).map(function(t) { return t.minAmount || 0; }).filter(function(a) { return a > 0; });
-  if (_tierAmounts.length > 0) {
-    h += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">';
-    _tierAmounts.forEach(function(amt) {
-      var isSelected = (promo.targetAmount || 0) === amt;
-      var chipStyle = isSelected ? 'background:#185FA5;color:#fff;border-color:#185FA5' : 'background:#F4F6FA;color:#5A6070;border-color:#DDE1EB';
-      h += '<span class="comm-target-chip" data-amount="' + amt + '" data-idx="' + idx + '" style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;border:1px solid;' + chipStyle + '">' + fmtPO(amt) + '</span>';
-    });
-    h += '</div>';
-  }
-  h += '</div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">목표금액</label><input type="text" class="comm-input comm-money" id="comm-target-' + idx + '" data-field="targetAmount" data-idx="' + idx + '" value="' + fmtPO(promo.targetAmount || 0) + '" style="width:100%;padding:8px 12px;border:1px solid #DDE1EB;border-radius:4px;font-size:16px;font-weight:600;text-align:right"></div>';
   h += '</div>';
 
   // 현재 상태 박스
@@ -3000,7 +2991,7 @@ function _buildCommPromoAccordion(promo, idx, history) {
 
   // 구간별 혜택 테이블
   h += '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:6px">';
-  h += '<thead><tr style="background:#F4F6FA"><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2">No</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (이상)</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (미만)</th><th style="padding:5px 6px;text-align:left;font-size:12px;border:1px solid #EAECF2">지급품목</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">할인율(%)</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2;min-width:50px">상태</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2"></th></tr></thead>';
+  h += '<thead><tr style="background:#F4F6FA"><th style="padding:5px 4px;text-align:center;font-size:12px;border:1px solid #EAECF2;width:24px"></th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2">No</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (이상)</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (미만)</th><th style="padding:5px 6px;text-align:left;font-size:12px;border:1px solid #EAECF2">지급품목</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">할인율(%)</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2;min-width:50px">상태</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2"></th></tr></thead>';
   h += '<tbody id="comm-tiers-' + idx + '">';
   (promo.tiers || []).forEach(function(tier, ti) {
     var tierStatus = '';
@@ -3008,9 +2999,12 @@ function _buildCommPromoAccordion(promo, idx, history) {
     else if (tierInfo.currentIdx > ti) tierStatus = '<span style="background:#1D9E75;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;white-space:nowrap">달성</span>';
     else tierStatus = '<span style="background:#EAECF2;color:#5A6070;padding:2px 8px;border-radius:3px;font-size:10px;white-space:nowrap">미달</span>';
 
-    h += '<tr>';
+    var _isTarget = (promo.targetAmount || 0) === (tier.minAmount || 0) && tier.minAmount > 0;
+    var _targetBg = _isTarget ? 'background:#E6F1FB;' : '';
+    h += '<tr style="' + _targetBg + '">';
+    h += '<td style="padding:4px 4px;text-align:center;border:1px solid #EAECF2"><span class="comm-target-icon" data-amount="' + (tier.minAmount || 0) + '" data-idx="' + idx + '" style="cursor:pointer;font-size:14px;opacity:' + (_isTarget ? '1' : '0.3') + ';color:' + (_isTarget ? '#185FA5' : '#9BA3B2') + '" title="이 금액을 목표금액으로 설정">🎯</span></td>';
     h += '<td style="padding:4px 6px;text-align:center;border:1px solid #EAECF2">' + (ti + 1) + '</td>';
-    h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="minAmount" value="' + fmtPO(tier.minAmount || 0) + '" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0"></td>';
+    h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="minAmount" value="' + fmtPO(tier.minAmount || 0) + '" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0;background:transparent"></td>';
     h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="maxAmount" value="' + (tier.maxAmount !== null ? fmtPO(tier.maxAmount) : '') + '" placeholder="무제한" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0"></td>';
     h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="benefit" value="' + (tier.benefit || '') + '" style="width:100%;border:none;font-size:13px;padding:2px 0"></td>';
     h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-rate" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="rate" value="' + (tier.rate !== null && tier.rate !== undefined ? tier.rate + '%' : '') + '" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0"></td>';
