@@ -1761,6 +1761,96 @@ function calcOrderTotals() {
 }
 
 // ========================================
+// 발주 탭 — 공통 유틸리티
+// ========================================
+
+// 숫자 콤마 포맷 (발주 탭 전용, 0도 표시)
+function fmtPO(n) {
+  if (n == null || isNaN(n)) return '-';
+  return Number(n).toLocaleString('ko-KR');
+}
+
+// input 실시간 콤마 포맷
+function fmtCommaInput(el) {
+  var raw = el.value.replace(/[^0-9]/g, '');
+  el.value = raw ? parseInt(raw).toLocaleString('ko-KR') : '';
+}
+
+// 검색 자동완성 초기화
+function initPOAutocomplete(inputId, onSelect) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  // wrap with relative container
+  var parent = input.parentElement;
+  if (parent && !parent.classList.contains('po-ac-wrap')) parent.classList.add('po-ac-wrap');
+
+  var dropdown = document.createElement('div');
+  dropdown.className = 'po-autocomplete';
+  dropdown.id = inputId + '-ac';
+  input.parentElement.appendChild(dropdown);
+
+  var selectedIdx = -1;
+  var items = [];
+
+  function render(matches) {
+    items = matches;
+    selectedIdx = -1;
+    if (matches.length === 0) { dropdown.classList.remove('show'); return; }
+    var h = '';
+    matches.forEach(function(p, i) {
+      h += '<div class="po-autocomplete-item" data-idx="' + i + '">';
+      h += '<span class="ac-code">' + (p.ttiNum || p.code || '') + '</span>';
+      h += '<span class="ac-model">' + (p.model || '-') + '</span>';
+      h += '<span class="ac-price">' + fmtPO(p.supplyPrice) + '</span>';
+      h += '</div>';
+    });
+    dropdown.innerHTML = h;
+    dropdown.classList.add('show');
+  }
+
+  function close() { dropdown.classList.remove('show'); selectedIdx = -1; }
+
+  input.addEventListener('input', function() {
+    var val = input.value.trim().toLowerCase();
+    if (val.length < 2) { close(); return; }
+    var products = DB.products || [];
+    var matches = products.filter(function(p) {
+      var text = ((p.model || '') + ' ' + (p.detail || '') + ' ' + (p.code || '') + ' ' + (p.ttiNum || '') + ' ' + (p.orderNum || '')).toLowerCase();
+      return text.indexOf(val) !== -1;
+    }).slice(0, 10);
+    render(matches);
+  });
+
+  input.addEventListener('keydown', function(e) {
+    if (!dropdown.classList.contains('show')) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); selectedIdx = Math.min(selectedIdx + 1, items.length - 1); highlight(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); selectedIdx = Math.max(selectedIdx - 1, 0); highlight(); }
+    else if (e.key === 'Enter' && selectedIdx >= 0) { e.preventDefault(); onSelect(items[selectedIdx]); close(); input.value = ''; }
+    else if (e.key === 'Escape') { close(); }
+  });
+
+  dropdown.addEventListener('click', function(e) {
+    var item = e.target.closest('.po-autocomplete-item');
+    if (item) {
+      var idx = parseInt(item.getAttribute('data-idx'));
+      if (items[idx]) { onSelect(items[idx]); close(); input.value = ''; }
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!input.contains(e.target) && !dropdown.contains(e.target)) close();
+  });
+
+  function highlight() {
+    dropdown.querySelectorAll('.po-autocomplete-item').forEach(function(el, i) {
+      el.classList.toggle('selected', i === selectedIdx);
+    });
+    var sel = dropdown.querySelector('.selected');
+    if (sel) sel.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+// ========================================
 // 발주 탭 리디자인 (Step B-1a)
 // ========================================
 
@@ -1898,6 +1988,11 @@ function renderPOTab() {
   renderPOProductRows();
   var scrollEl = document.getElementById('po-prod-scroll');
   if (scrollEl) scrollEl.addEventListener('scroll', onPOProductScroll);
+
+  // 자동완성 초기화
+  initPOAutocomplete('po-cart-search', function(p) { console.log('[발주] 주문목록 추가:', p.model); toast('제품등록 기능은 다음 단계에서 구현됩니다'); });
+  initPOAutocomplete('po-foc-search', function(p) { console.log('[발주] FOC 검색 선택:', p.model); });
+  initPOAutocomplete('po-foc-cart-search', function(p) { console.log('[발주] FOC 등록:', p.model); toast('FOC 기능은 다음 단계에서 구현됩니다'); });
 }
 
 // 왼쪽 패널 — 제품 목록 (가상 스크롤)
@@ -2201,7 +2296,7 @@ function openCumulativePromoModal(index) {
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">';
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">프로모션명</label><input id="cumul-name" value="' + (promo.name || '').replace(/"/g, '&quot;') + '" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">혜택 설명</label><input id="cumul-benefit" value="' + (promo.benefit || '').replace(/"/g, '&quot;') + '" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
-  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">기준금액 (원)</label><input id="cumul-target" type="number" value="' + (promo.targetAmount || 0) + '" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif;text-align:right"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">기준금액 (원)</label><input id="cumul-target" type="text" value="' + fmtPO(promo.targetAmount || 0) + '" oninput="fmtCommaInput(this)" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif;text-align:right"></div>';
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">기간</label><input id="cumul-period" value="' + (promo.period || '').replace(/"/g, '&quot;') + '" placeholder="2026.4.1~4.29" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
   h += '</div>';
 
@@ -2248,7 +2343,7 @@ function saveCumulativePromo(index) {
   if (!promo) return;
   promo.name = (document.getElementById('cumul-name') || {}).value || promo.name;
   promo.benefit = (document.getElementById('cumul-benefit') || {}).value || promo.benefit;
-  promo.targetAmount = parseInt((document.getElementById('cumul-target') || {}).value) || 0;
+  promo.targetAmount = parseInt(((document.getElementById('cumul-target') || {}).value || '0').replace(/,/g, '')) || 0;
   promo.period = (document.getElementById('cumul-period') || {}).value || '';
   localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
   document.getElementById('po-cumul-modal').remove();

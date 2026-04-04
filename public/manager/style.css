@@ -352,3 +352,13 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-placeholder .po-ph-icon { font-size:40px; margin-bottom:12px; }
 .po-placeholder .po-ph-title { font-size:14px; font-weight:600; }
 .po-placeholder .po-ph-desc { font-size:12px; margin-top:4px; }
+
+/* 검색 자동완성 */
+.po-ac-wrap { position:relative; }
+.po-autocomplete { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #DDE1EB; border-top:none; border-radius:0 0 6px 6px; max-height:240px; overflow-y:auto; z-index:100; box-shadow:0 4px 12px rgba(0,0,0,0.1); display:none; }
+.po-autocomplete.show { display:block; }
+.po-autocomplete-item { padding:8px 12px; font-size:13px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #F0F2F7; }
+.po-autocomplete-item:hover, .po-autocomplete-item.selected { background:#E6F1FB; }
+.po-autocomplete-item .ac-model { font-weight:500; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:8px; }
+.po-autocomplete-item .ac-price { color:#5A6070; font-size:12px; white-space:nowrap; }
+.po-autocomplete-item .ac-code { font-size:10px; color:#9BA3B2; margin-right:8px; min-width:60px; }

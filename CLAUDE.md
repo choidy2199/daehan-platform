@@ -78,6 +78,13 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 - Naver Npay 주문관리 수수료: 3.63%
 - 가격 반올림: 소매가 1,000원 단위, 기타 채널 100원 단위 올림
 
+### 공통 UI 규칙 (모든 개발에 적용)
+- 숫자 표시: 모든 금액/숫자에 콤마 포맷 필수 (fmtPO 함수 사용)
+- 검색 자동완성: 모든 검색 input에 자동완성 드롭다운 적용 (initPOAutocomplete 함수)
+  - 2글자 이상 입력 시 매칭 목록 표시 (최대 10건)
+  - 키보드 ↑↓ + Enter, 마우스 클릭 선택
+  - ESC 또는 외부 클릭으로 닫힘
+
 ## 로컬 개발 주의
 - 한글 경로 이슈: Turbopack이 한글 폴더명에서 크래시
 - 빌드 테스트: /tmp에 복사 후 next build
