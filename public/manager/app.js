@@ -2040,7 +2040,10 @@ function _buildPoSubTabs() {
   var _tBgs = ['#A32D2D', '#993556', '#8B2020', '#7A2A4A'];
   tList.forEach(function(t, i) {
     if (t.promoNo) {
-      tabs.push({ id: 'promo-' + t.promoNo.toLowerCase(), label: t.promoNo + ' ' + (t.discountRate || 0) + '%', dot: _tDots[i % _tDots.length], activeBg: _tBgs[i % _tBgs.length], promoNo: t.promoNo, discountRate: t.discountRate || 0, maxOrders: t.maxOrders || 5 });
+      var _defNames = { T5: '이달의특가', T6: '아웃도어', T7: '신제품', T8: '프로모션' };
+      var _pName = t.promoName || _defNames[t.promoNo] || '';
+      var _label = t.promoNo + (_pName ? ' ' + _pName : '') + ' ' + (t.discountRate || 0) + '%';
+      tabs.push({ id: 'promo-' + t.promoNo.toLowerCase(), label: _label, dot: _tDots[i % _tDots.length], activeBg: _tBgs[i % _tBgs.length], promoNo: t.promoNo, discountRate: t.discountRate || 0, maxOrders: t.maxOrders || 5 });
     }
   });
   tabs.push({ id: 'package', label: '패키지 프로모션', dot: '#FAC775', activeBg: '#854F0B' });
@@ -2536,11 +2539,14 @@ function buildPOListPanel() {
       else typeBadge = '<span style="background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">' + item.type + '</span>';
       var erpBadge = item.erpStatus === 'done' ? '<span style="background:#E1F5EE;color:#085041;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">등록완료</span>' : '<span style="background:#FAEEDA;color:#633806;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">미등록</span>';
 
-      // mw_products에서 코드/관리코드 매칭
+      // mw_products에서 코드/관리코드 매칭 (ttiNum 기준)
       var _pCode = item.ttiNum || item.manageCode || '';
-      var _matched = (DB.products || []).find(function(pr) { return pr.ttiNum && normalizeTtiCode(pr.ttiNum) === normalizeTtiCode(_pCode) || pr.code === _pCode; });
+      var _normCode = normalizeTtiCode(_pCode);
+      var _matched = (DB.products || []).find(function(pr) {
+        return (pr.ttiNum && normalizeTtiCode(pr.ttiNum) === _normCode) || (pr.code && pr.code === _pCode);
+      });
+      var _dispManage = _matched ? (_matched.manageCode || '-') : '-';
       var _dispCode = _matched ? (_matched.code || '-') : '-';
-      var _dispManage = item.manageCode || (_matched ? (_matched.manageCode || '-') : '-');
       // 금액 = 매입원가 × 수량
       var _costAmt = item.costPrice && item.costPrice > 0 ? item.costPrice * (item.qty || 0) : 0;
 
