@@ -2737,7 +2737,7 @@ function saveCumulativePromo(index) {
   promo.periodStart = (document.getElementById('cumul-period-start') || {}).value || '';
   promo.periodEnd = (document.getElementById('cumul-period-end') || {}).value || '';
   promo.period = promo.periodStart && promo.periodEnd ? promo.periodStart.replace(/-/g, '.') + '~' + promo.periodEnd.replace(/-/g, '.') : '';
-  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  save('mw_cumulative_promos', promos);
   document.getElementById('po-cumul-modal').remove();
   renderPOTab();
   toast('프로모션 설정이 저장되었습니다');
@@ -2757,7 +2757,7 @@ function _saveCurrentCumulInputs(promoIndex) {
   promo.periodStart = el('cumul-period-start').value || promo.periodStart || '';
   promo.periodEnd = el('cumul-period-end').value || promo.periodEnd || '';
   promo.period = promo.periodStart && promo.periodEnd ? promo.periodStart.replace(/-/g, '.') + '~' + promo.periodEnd.replace(/-/g, '.') : promo.period || '';
-  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  save('mw_cumulative_promos', promos);
   return promos;
 }
 
@@ -2783,7 +2783,7 @@ function addPromoProduct(promoIndex, product) {
     _autoRate = (promo.benefitAmount / promo.targetAmount * 100).toFixed(2);
   }
   promo.products.push({ ttiNum: found.ttiNum || '', orderNum: found.orderNum || '', model: found.model || '', supplyPrice: found.supplyPrice || 0, discountRate: _autoRate });
-  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  save('mw_cumulative_promos', promos);
   document.getElementById('po-cumul-modal').remove();
   openCumulativePromoModal(promoIndex);
 }
@@ -2794,7 +2794,7 @@ function removePromoProduct(promoIndex, productIndex) {
   var promo = promos[promoIndex];
   if (!promo || !promo.products) return;
   promo.products.splice(productIndex, 1);
-  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  save('mw_cumulative_promos', promos);
   document.getElementById('po-cumul-modal').remove();
   openCumulativePromoModal(promoIndex);
 }
@@ -2804,7 +2804,7 @@ function updatePromoProductDiscount(promoIndex, productIndex, value) {
   var promo = promos[promoIndex];
   if (!promo || !promo.products || !promo.products[productIndex]) return;
   promo.products[productIndex].discountRate = value;
-  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  save('mw_cumulative_promos', promos);
 }
 
 // 누적프로모션 추가 (6-D)
@@ -2813,7 +2813,7 @@ function addCumulativePromo() {
   if (promos.length >= 5) { toast('최대 5개까지 추가할 수 있습니다'); return; }
   var idx = promos.length;
   promos.push({ name: '새 프로모션', amount: '0', benefit: '클릭하여 설정', achieved: 0, next: '0', paletteIdx: idx, targetAmount: 0, period: '', unlimited: true, currentSales: 0, products: [] });
-  localStorage.setItem('mw_cumulative_promos', JSON.stringify(promos));
+  save('mw_cumulative_promos', promos);
   renderPOTab();
   // 바로 모달 열기
   setTimeout(function() { openCumulativePromoModal(idx); }, 100);
@@ -3083,7 +3083,7 @@ function _saveCommercialPromoModal() {
 var poCart = JSON.parse(localStorage.getItem('mw_po_cart') || '[]');
 
 function _savePoCart() {
-  localStorage.setItem('mw_po_cart', JSON.stringify(poCart));
+  save('mw_po_cart', poCart);
 }
 
 // 장바구니에 제품 추가

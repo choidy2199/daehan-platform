@@ -70,6 +70,13 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 
 ## 이 프로젝트 고유 규칙
 - localStorage 16개+ 키 보존 필수 (절대 초기화 금지)
+
+### localStorage 동기화 규칙
+- 새로운 mw_ 접두사 localStorage 키를 추가할 때, 반드시 save() 함수를 사용할 것 (localStorage.setItem 직접 사용 금지)
+- save() 사용 시 autoSyncToSupabase가 자동 호출되어 Supabase에 동기화됨
+- 새 키 추가 시 동기화 대상 목록에 포함되었는지 반드시 확인
+- 모든 사용자(admin/hwon/jyoung)와 모든 브라우저/기기에서 항상 동일한 데이터가 유지되어야 함
+- Supabase Realtime을 통해 실시간 동기화되므로, 한쪽에서 저장하면 다른 쪽에서도 즉시 반영
 - 코드는 JavaScript로 작성 (app.js)
 - public/manager/ 파일 수정 시 기존 UI/기능 깨뜨리지 않을 것
 - curl 테스트 시 반드시 더미 키(test_xxx) 사용 — 실제 키 사용 금지
