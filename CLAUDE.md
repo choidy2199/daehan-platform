@@ -93,6 +93,11 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 6. 동기화: 새로운 mw_ localStorage 키 추가 시 반드시 save() 함수 사용, 동기화 대상 확인.
 7. 디자인: 모든 UI 작업 시 디자인 스킬(SKILL.md) 먼저 참조할 것.
 
+### 검증 규칙
+- UI 스타일(font-size, color, padding 등) 변경 시, 수정 전/후 값을 grep으로 확인하고 체크리스트에 기록
+- inline style(app.js)과 CSS(style.css) 양쪽 모두 확인할 것 — inline style이 CSS를 덮어씀
+- 같은 수정을 2번 이상 요청받으면 안 됨 — 한 번에 확실히 적용할 것
+
 ### 기존 UI 규칙 (호환 유지)
 - 숫자 표시: 모든 금액/숫자에 콤마 포맷 필수 (fmtPO 함수 사용)
 - 검색 자동완성: 모든 검색 input에 자동완성 드롭다운 적용 (initPOAutocomplete 함수)
