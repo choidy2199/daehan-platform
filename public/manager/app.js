@@ -2207,7 +2207,12 @@ function renderPOTab() {
     html += '</button>';
   });
   html += '<div style="flex:1"></div>';
+  var _scrapeTs = ''; try { _scrapeTs = JSON.parse(localStorage.getItem('mw_promo_scrape_time') || '""') || ''; } catch(e) { _scrapeTs = localStorage.getItem('mw_promo_scrape_time') || ''; }
+  var _scrapeTsText = _scrapeTs ? (function(d) { return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })(new Date(_scrapeTs)) : '-';
+  html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">';
   html += '<button onclick="startTtiPromoScrape()" style="background:#CC2222;color:#fff;border:none;border-radius:16px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;font-family:Pretendard,-apple-system,sans-serif" onmouseover="this.style.background=\'#A31B1B\'" onmouseout="this.style.background=\'#CC2222\'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>프로모션 새로고침</button>';
+  html += '<span id="po-scrape-timestamp" style="font-size:9px;color:#9BA3B2">최근 완료: ' + _scrapeTsText + '</span>';
+  html += '</div>';
   html += '</div>';
 
   // 탭 콘텐츠 영역
@@ -9143,6 +9148,9 @@ function handleTtiPromoResult(data) {
     data: data.data,
     scrapedAt: new Date().toISOString()
   });
+
+  // 타임스탬프 저장
+  save('mw_promo_scrape_time', new Date().toISOString());
 
   // T탭 동적 재생성 + 완료 알림
   renderPOTab();
