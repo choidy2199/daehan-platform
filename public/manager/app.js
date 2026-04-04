@@ -2116,7 +2116,7 @@ function renderPOTab() {
     html += '<div class="po-promo-amount" style="color:' + pal.text + '">' + fmtPO(cd.amount) + '</div>';
     html += '<div class="po-promo-benefit">' + (p.benefit || '-') + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">' + cd.achieveCount + '회 달성</span></div>';
     html += '<div class="po-progress" style="margin-top:3px"><div class="po-progress-fill" style="width:' + _cardPct + '%;background:' + pal.main + '"></div></div>';
-    html += '<div class="po-promo-next">다음까지 <span style="color:#CC2222;font-weight:600">' + fmtPO(cd.shortage) + '원</span></div>';
+    html += '<div class="po-promo-next" style="font-size:12px;font-weight:500">다음까지 <span style="color:#CC2222;font-weight:700">' + fmtPO(cd.shortage) + '원 부족</span></div>';
     html += '</div>';
   });
 
