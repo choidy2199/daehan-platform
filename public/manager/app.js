@@ -2364,7 +2364,7 @@ function buildPOProductRow(p, rowIndex) {
   tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
   tr += '<td class="center">' + stockIcon + '</td>';
-  tr += '<td class="center"><input type="number" min="1" placeholder="수량"' + _qtyDisabled + ' data-code="' + (p.ttiNum || '') + '"></td>';
+  tr += '<td class="center"><input type="number" min="1" placeholder=""' + _qtyDisabled + ' data-code="' + (p.ttiNum || '') + '"></td>';
   tr += '<td class="center"><button class="po-cart-btn-dark"' + _btnDisabled + ' onclick="addToCart(\'' + (p.ttiNum || '') + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button></td>';
   tr += '</tr>';
   return tr;
@@ -2868,7 +2868,7 @@ function _buildPromoTabContent(subtab, title, discountPct) {
 function _buildPromoLeftPanel(subtab, title, discountPct, items) {
   var h = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
   var _lim = PO_PROMO_LIMIT[subtab] || 99;
-  h += '<div class="po-panel-header"><span>' + title + ' · ' + discountPct + '% 할인 · <span id="po-' + subtab + '-count">' + items.length + '</span>건 · <span style="cursor:pointer;color:#FFCC66;font-size:11px" onclick="_changePromoLimit(\'' + subtab + '\')" title="클릭하여 수정">제한: ' + _lim + '개</span></span></div>';
+  h += '<div class="po-panel-header"><span>' + title + ' · ' + discountPct + '% 할인 · <span id="po-' + subtab + '-count">' + items.length + '</span>건 · <span class="po-limit-btn" onclick="_changePromoLimit(\'' + subtab + '\')" title="클릭하여 수정">제한: ' + _lim + '개</span></span></div>';
   h += '<div class="po-filter-row"><input type="search" placeholder="코드, 모델명 검색" id="po-' + subtab + '-search" autocomplete="off" oninput="_filterPromoTab(\'' + subtab + '\',' + discountPct + ')"></div>';
   h += '<div class="po-table-wrap"><table class="po-table"><thead><tr><th>No</th><th>제품번호</th><th>모델명</th><th style="text-align:right">공급가</th><th style="text-align:right">할인가</th><th>재고</th><th style="width:50px">수량</th><th></th></tr></thead>';
   h += '<tbody id="po-' + subtab + '-tbody">';
@@ -2948,7 +2948,7 @@ function _buildPromoRow(item, i, subtab, discountPct) {
   h += '<td style="text-align:right;text-decoration:line-through;color:#9BA3B2;font-size:11px">' + fmtPO(item.supplyPrice) + '</td>';
   h += '<td style="text-align:right;font-weight:700;color:#CC2222">' + fmtPO(discounted) + '</td>';
   h += '<td class="center">' + stockIcon + '</td>';
-  h += '<td>' + (statusText || '<input type="number" min="1" max="' + maxQty + '" placeholder="수량" class="po-qty-input" data-code="' + item.productCode + '" style="width:45px;text-align:center;font-size:12px;padding:2px;border:1px solid #DDE1EB;border-radius:3px"' + disabledAttr + '>') + '</td>';
+  h += '<td>' + (statusText || '<input type="number" min="1" max="' + maxQty + '" placeholder="" class="po-qty-input" data-code="' + item.productCode + '" style="width:45px;text-align:center;font-size:12px;padding:2px;border:1px solid #DDE1EB;border-radius:3px"' + disabledAttr + '>') + '</td>';
   h += '<td class="center">' + (rowDisabled ? '' : '<button class="po-cart-btn-dark" onclick="_addPromoToCart(\'' + subtab + '\',' + discountPct + ',\'' + (item.productCode || '').replace(/'/g, "\\'") + '\',\'' + (item.modelName || '').replace(/'/g, "\\'") + '\',' + item.supplyPrice + ',\'' + ss + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button>') + '</td>';
   h += '</tr>';
   return h;
@@ -3068,7 +3068,7 @@ function _buildPackageRow(item, i) {
     h += '<td style="text-align:right">-</td>';
   }
   h += '<td style="text-align:center">' + (item.available > 0 ? '<span style="color:#1D9E75;font-weight:600">' + item.available + '</span>' : '<span style="color:#CC2222">불가</span>') + '</td>';
-  h += '<td><input type="number" min="1" max="' + Math.max(1, item.available || 0) + '" placeholder="수량" class="po-qty-input" data-code="' + item.productCode + '" style="width:45px;text-align:center;font-size:12px;padding:2px;border:1px solid #DDE1EB;border-radius:3px"' + disabledAttr + '></td>';
+  h += '<td><input type="number" min="1" max="' + Math.max(1, item.available || 0) + '" placeholder="" class="po-qty-input" data-code="' + item.productCode + '" style="width:45px;text-align:center;font-size:12px;padding:2px;border:1px solid #DDE1EB;border-radius:3px"' + disabledAttr + '></td>';
   h += '<td class="center">' + (rowDisabled ? '' : '<button class="po-cart-btn-dark" onclick="_addPackageToCart(\'' + (item.productCode || '').replace(/'/g, "\\'") + '\',\'' + (item.modelName || '').replace(/'/g, "\\'") + '\',' + (hasPromo ? item.promoPrice : item.supplyPrice) + ',' + item.supplyPrice + ',' + item.available + ',\'' + (item.mCode || '') + '\',\'' + (item.promoName || '').replace(/'/g, "\\'") + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button>') + '</td>';
   h += '</tr>';
   return h;
