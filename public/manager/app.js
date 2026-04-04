@@ -1848,13 +1848,23 @@ function calcPOSalesData() {
   var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [];
   var cumulData = promos.map(function(promo, idx) {
     if (!promo.products || promo.products.length === 0) return { idx: idx, amount: 0, achieveCount: 0, shortage: promo.targetAmount || 0 };
-    var productCodes = promo.products.map(function(pr) { return pr.ttiNum; });
+    // 정규화된 코드 맵 (ttiNum + model)
+    var promoCodeMap = {};
+    promo.products.forEach(function(pr) {
+      if (pr.ttiNum) promoCodeMap[normalizeTtiCode(pr.ttiNum)] = true;
+      if (pr.model) promoCodeMap['_model_' + pr.model.toLowerCase()] = true;
+    });
     var pStart = promo.periodStart ? new Date(promo.periodStart) : monthRange.start;
     var pEnd = promo.periodEnd ? new Date(promo.periodEnd + 'T23:59:59') : monthRange.end;
     var sales = 0;
     history.forEach(function(item) {
       var d = new Date(item.date);
-      if (d >= pStart && d <= pEnd && productCodes.indexOf(item.ttiNum) !== -1) sales += (item.amount || 0);
+      if (d < pStart || d > pEnd) return;
+      var matched = false;
+      if (item.ttiNum && promoCodeMap[normalizeTtiCode(item.ttiNum)]) matched = true;
+      if (!matched && item.manageCode && promoCodeMap[normalizeTtiCode(item.manageCode)]) matched = true;
+      if (!matched && item.model && promoCodeMap['_model_' + item.model.toLowerCase()]) matched = true;
+      if (matched) sales += (item.amount || 0);
     });
     var target = promo.targetAmount || 0;
     var achieve = target > 0 ? Math.floor(sales / target) : 0;
@@ -2205,18 +2215,24 @@ function buildPOProductRow(p, rowIndex) {
   else if (stockStatus === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
   else stockIcon = '<span style="color:#B4B2A9">-</span>';
 
-  // 누적프로모션 매칭 확인
+  // 누적프로모션 매칭 확인 (normalizeTtiCode로 앞자리0 해결)
   var promoTag = '';
   var rowBg = '';
+  var _pCode = normalizeTtiCode(p.ttiNum);
   var cumulPromos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null');
   if (cumulPromos && Array.isArray(cumulPromos)) {
     for (var pi = 0; pi < cumulPromos.length; pi++) {
       var cp = cumulPromos[pi];
-      if (cp.products && Array.isArray(cp.products) && cp.products.indexOf(p.ttiNum) !== -1) {
-        var rs = _poCumulPromoRowStyles[pi] || _poCumulPromoRowStyles[0];
-        rowBg = rs.bg;
-        promoTag = ' <span class="po-promo-tag" style="background:' + rs.tagBg + ';color:' + rs.tagColor + '">' + cp.name + '</span>';
-        break;
+      if (cp.products && Array.isArray(cp.products)) {
+        var _matched = cp.products.some(function(pr) {
+          return (_pCode && normalizeTtiCode(pr.ttiNum) === _pCode) || (p.code && pr.ttiNum === p.code);
+        });
+        if (_matched) {
+          var rs = _poCumulPromoRowStyles[pi] || _poCumulPromoRowStyles[0];
+          rowBg = rs.bg;
+          promoTag = ' <span class="po-promo-tag" style="background:' + rs.tagBg + ';color:' + rs.tagColor + '">' + cp.name + '</span>';
+          break;
+        }
       }
     }
   }
@@ -2753,7 +2769,8 @@ function addToCart(productCode) {
     var promoName = '', promoColor = '';
     var cumulPromos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [];
     for (var i = 0; i < cumulPromos.length; i++) {
-      if (cumulPromos[i].products && cumulPromos[i].products.some(function(pr) { return pr.ttiNum === p.ttiNum; })) {
+      var _nc = normalizeTtiCode(p.ttiNum);
+      if (cumulPromos[i].products && cumulPromos[i].products.some(function(pr) { return normalizeTtiCode(pr.ttiNum) === _nc || (p.code && pr.ttiNum === p.code); })) {
         promoName = cumulPromos[i].name;
         var pal = _poPromoPalette[cumulPromos[i].paletteIdx || i] || _poPromoPalette[0];
         promoColor = pal.text;
@@ -2783,7 +2800,8 @@ function addToCartDirect(product) {
     var promoName = '', promoColor = '';
     var cumulPromos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [];
     for (var i = 0; i < cumulPromos.length; i++) {
-      if (cumulPromos[i].products && cumulPromos[i].products.some(function(pr) { return pr.ttiNum === product.ttiNum; })) {
+      var _nc2 = normalizeTtiCode(product.ttiNum);
+      if (cumulPromos[i].products && cumulPromos[i].products.some(function(pr) { return normalizeTtiCode(pr.ttiNum) === _nc2 || (product.code && pr.ttiNum === product.code); })) {
         promoName = cumulPromos[i].name;
         var pal = _poPromoPalette[cumulPromos[i].paletteIdx || i] || _poPromoPalette[0];
         promoColor = pal.text;
