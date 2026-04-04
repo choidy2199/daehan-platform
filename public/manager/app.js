@@ -2194,6 +2194,8 @@ function renderPOTab() {
     html += '</div>';
   }
   html += '</div>';
+  // 프로모션 새로고침 버튼 (합계 카드 아래)
+  html += '<button onclick="startTtiPromoScrape()" style="width:100%;margin-top:4px;background:#CC2222;color:#fff;border:none;border-radius:6px;padding:8px 0;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;font-family:Pretendard,-apple-system,sans-serif" onmouseover="this.style.background=\'#A31B1B\'" onmouseout="this.style.background=\'#CC2222\'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>프로모션 새로고침</button>';
 
   html += '</div>'; // .po-kpi-row
 
@@ -9141,6 +9143,10 @@ function handleTtiPromoResult(data) {
     data: data.data,
     scrapedAt: new Date().toISOString()
   });
+
+  // T탭 동적 재생성 + 완료 알림
+  renderPOTab();
+  toast('프로모션 스크래핑 완료');
 }
 
 // TTI 코드 정규화 (앞자리 0 제거)
