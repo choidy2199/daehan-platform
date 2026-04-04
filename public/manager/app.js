@@ -2297,7 +2297,7 @@ function openCumulativePromoModal(index) {
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">프로모션명</label><input id="cumul-name" value="' + (promo.name || '').replace(/"/g, '&quot;') + '" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">혜택 설명</label><input id="cumul-benefit" value="' + (promo.benefit || '').replace(/"/g, '&quot;') + '" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">기준금액 (원)</label><input id="cumul-target" type="text" value="' + fmtPO(promo.targetAmount || 0) + '" oninput="fmtCommaInput(this)" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif;text-align:right"></div>';
-  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">기간</label><input id="cumul-period" value="' + (promo.period || '').replace(/"/g, '&quot;') + '" placeholder="2026.4.1~4.29" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">기간</label><input id="cumul-period" value="' + (promo.period || '').replace(/"/g, '&quot;') + '" placeholder="예: 2026.4.1~5.31" style="width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif"></div>';
   h += '</div>';
 
   // 대상 제품 리스트
@@ -2335,6 +2335,11 @@ function openCumulativePromoModal(index) {
   modal.innerHTML = h;
   document.body.appendChild(modal);
   modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+
+  // 자동완성 바인딩 (모달 DOM 삽입 후)
+  initPOAutocomplete('cumul-prod-search', function(product) {
+    addPromoProduct(index, product);
+  });
 }
 
 function saveCumulativePromo(index) {
@@ -2351,14 +2356,18 @@ function saveCumulativePromo(index) {
   toast('프로모션 설정이 저장되었습니다');
 }
 
-function addPromoProduct(promoIndex) {
-  var searchVal = (document.getElementById('cumul-prod-search') || {}).value.trim();
-  if (!searchVal) return;
-  var products = DB.products || [];
-  var found = products.find(function(p) {
-    return (p.ttiNum && p.ttiNum.indexOf(searchVal) !== -1) || (p.model && p.model.toLowerCase().indexOf(searchVal.toLowerCase()) !== -1) || (p.orderNum && p.orderNum === searchVal);
-  });
-  if (!found) { toast('제품을 찾을 수 없습니다: ' + searchVal); return; }
+function addPromoProduct(promoIndex, product) {
+  var found = product;
+  if (!found) {
+    // 검색 input에서 직접 찾기 (+ 추가 버튼 클릭 시)
+    var searchVal = (document.getElementById('cumul-prod-search') || {}).value.trim();
+    if (!searchVal) return;
+    var products = DB.products || [];
+    found = products.find(function(p) {
+      return (p.ttiNum && p.ttiNum.indexOf(searchVal) !== -1) || (p.model && p.model.toLowerCase().indexOf(searchVal.toLowerCase()) !== -1) || (p.orderNum && p.orderNum === searchVal);
+    });
+    if (!found) { toast('제품을 찾을 수 없습니다: ' + searchVal); return; }
+  }
   var promos = _getCumulPromos();
   var promo = promos[promoIndex];
   if (!promo.products) promo.products = [];
