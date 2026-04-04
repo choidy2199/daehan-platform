@@ -2710,15 +2710,15 @@ function renderPOCartTable() {
   if (!body) return;
 
   if (poCart.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   } else {
     var h = '';
     poCart.forEach(function(c, i) {
       var amt = (c.supplyPrice || 0) * (c.qty || 0);
       var promoTag = c.promoName ? ' <span class="po-promo-tag" style="background:#EEEDFE;color:' + (c.promoColor || '#3C3489') + '">' + c.promoName + '</span>' : '';
       h += '<tr>';
-      h += '<td style="font-size:11px;color:#5A6070">' + (c.orderNum || '-') + '</td>';
-      h += '<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (c.model || '').replace(/"/g, '&quot;') + '">' + (c.model || '-') + promoTag + '</td>';
+      h += '<td>' + (c.orderNum || '-') + '</td>';
+      h += '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (c.model || '').replace(/"/g, '&quot;') + '">' + (c.model || '-') + promoTag + '</td>';
       h += '<td class="num">' + fmtPO(c.supplyPrice) + '</td>';
       h += '<td class="center"><input type="number" min="1" value="' + c.qty + '" style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif" onchange="updateCartQty(' + i + ',this.value)"></td>';
       h += '<td class="num" style="font-weight:600">' + fmtPO(amt) + '</td>';
