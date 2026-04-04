@@ -319,6 +319,8 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .comm-period { font-size:9px; color:rgba(255,255,255,.5); }
 .comm-next b { color:#FFCC66; }
 .comm-arrow { font-size:9px; color:rgba(255,255,255,.4); margin-left:auto; }
+/* 커머셜 모달 폰트 상속 */
+#commercial-promo-modal input, #commercial-promo-modal button, #commercial-promo-modal select { font-family:inherit; }
 
 /* 서브탭 7개 */
 .po-subtabs { display:flex; gap:4px; padding:6px 12px; overflow-x:auto; }

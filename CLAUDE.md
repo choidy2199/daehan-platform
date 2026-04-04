@@ -84,6 +84,12 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 - Naver Npay 주문관리 수수료: 3.63%
 - 가격 반올림: 소매가 1,000원 단위, 기타 채널 100원 단위 올림
 
+### UI/디자인 규칙
+- 모든 UI 작업 시 디자인 스킬(SKILL.md) 먼저 참조할 것
+- 폰트: 'Pretendard', -apple-system, sans-serif (모든 UI 요소, 모달, input 포함)
+- 모든 금액/숫자: 콤마 구분자 필수, K/M/B 축약 금지
+- input에 숫자 표시 시에도 콤마 포맷 적용
+
 ### 공통 UI 규칙 (모든 개발에 적용)
 - 숫자 표시: 모든 금액/숫자에 콤마 포맷 필수 (fmtPO 함수 사용)
 - 검색 자동완성: 모든 검색 input에 자동완성 드롭다운 적용 (initPOAutocomplete 함수)
