@@ -1,4 +1,5 @@
 # 대한종합상사 관리시스템 (daehan-platform)
+> 상위 폴더 CLAUDE.md의 공통 규칙이 자동 적용됩니다.
 
 ## 프로젝트 정보
 - 사이트: https://daehantool.dev
@@ -70,12 +71,7 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 
 ## 이 프로젝트 고유 규칙
 - localStorage 16개+ 키 보존 필수 (절대 초기화 금지)
-
-### localStorage 동기화 규칙
-- 새로운 mw_ 접두사 localStorage 키를 추가할 때, 반드시 save() 함수를 사용할 것 (localStorage.setItem 직접 사용 금지)
 - save() 사용 시 autoSyncToSupabase가 자동 호출되어 Supabase에 동기화됨
-- 새 키 추가 시 동기화 대상 목록에 포함되었는지 반드시 확인
-- 모든 사용자(admin/hwon/jyoung)와 모든 브라우저/기기에서 항상 동일한 데이터가 유지되어야 함
 - 코드는 JavaScript로 작성 (app.js)
 - public/manager/ 파일 수정 시 기존 UI/기능 깨뜨리지 않을 것
 - curl 테스트 시 반드시 더미 키(test_xxx) 사용 — 실제 키 사용 금지
@@ -84,23 +80,9 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 - Naver Npay 주문관리 수수료: 3.63%
 - 가격 반올림: 소매가 1,000원 단위, 기타 채널 100원 단위 올림
 
-### 공통 UI 규칙 (모든 작업에 적용)
-1. 숫자 표시: 모든 금액/숫자는 K/M/B 축약 금지, 항상 전체 숫자 + 콤마 (예: 12,800,000원). input에 숫자 입력 시에도 콤마 자동 적용.
-2. 검색창: 검색 input 생성 시 항상 실시간 검색(keyup/input 이벤트) 적용. 검색 결과는 목록 형태로 즉시 표시. autocomplete="off" 적용.
-3. 삭제 기능: 리스트에서 항목 삭제 시 해당 항목 1개만 삭제. 절대 전체 삭제하지 않음. splice(index, 1) 정확히 사용.
-4. 줄바꿈 방지: 뱃지, 상태표시, 버튼 텍스트에는 white-space: nowrap 적용.
-5. 폰트: 모든 UI 요소 font-family: 'Pretendard', -apple-system, sans-serif. input/button/select도 동일.
-6. 동기화: 새로운 mw_ localStorage 키 추가 시 반드시 save() 함수 사용, 동기화 대상 확인.
-7. 디자인: 모든 UI 작업 시 디자인 스킬(SKILL.md) 먼저 참조할 것.
-
-### 검증 규칙
-- UI 스타일(font-size, color, padding 등) 변경 시, 수정 전/후 값을 grep으로 확인하고 체크리스트에 기록
-- inline style(app.js)과 CSS(style.css) 양쪽 모두 확인할 것 — inline style이 CSS를 덮어씀
-- 같은 수정을 2번 이상 요청받으면 안 됨 — 한 번에 확실히 적용할 것
-
-### 기존 UI 규칙 (호환 유지)
-- 숫자 표시: 모든 금액/숫자에 콤마 포맷 필수 (fmtPO 함수 사용)
-- 검색 자동완성: 모든 검색 input에 자동완성 드롭다운 적용 (initPOAutocomplete 함수)
+### 프로젝트 UI 규칙
+- 숫자 포맷: fmtPO 함수 사용
+- 검색 자동완성: initPOAutocomplete 함수 사용
   - 2글자 이상 입력 시 매칭 목록 표시 (최대 10건)
   - 키보드 ↑↓ + Enter, 마우스 클릭 선택
   - ESC 또는 외부 클릭으로 닫힘
@@ -108,7 +90,6 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - 절대 AR차감 방식(공급가 × (1 - %)) 사용 금지
 - 텍스트 크기 통일: 모든 테이블 th 12px, td 13px
   - 좌측 패널과 우측 패널의 테이블 텍스트 크기 반드시 동일
-  - 메뉴, 목록, 패널 간 이질감 없도록 통일
   - 새로운 탭/기능 추가 시에도 po-table 기본 스타일 적용
   - 인라인 font-size로 개별 축소/확대 금지 (디자인 토큰 우선)
 
@@ -133,16 +114,3 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 3. git status 로 커밋 안 된 변경사항 확인
 4. git log --oneline -3 으로 최근 커밋 3개 출력
 5. 위 결과를 요약해서 현재 상태 브리핑
-
-## 마무리 루틴 (사용자가 "마무리"라고 입력하면 실행)
-1. node -c 로 수정된 .js 파일 문법 검사
-2. git add -A && git commit -m "변경 요약"
-3. git remote -v 로 원격 저장소 확인
-   - origin이 없으면 → 사용자에게 알리고 중단 (절대 스킵 금지)
-   - origin이 있으면 → git push origin main
-4. push 실패 시 에러 메시지 그대로 출력하고 중단 (무시하지 않음)
-5. 변경 체크리스트 출력 (파일명, 함수명, 변경내용)
-6. 체크리스트 마지막 항목으로 push 성공 여부 명시 (✅ 또는 ❌)
-
-⚠️ push 성공 없이는 작업 완료로 간주하지 않음
-⚠️ remote가 없는 로컬 전용 git인 경우 반드시 사용자에게 알릴 것
