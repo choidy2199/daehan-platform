@@ -305,7 +305,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-add-promo-btn .po-add-icon { font-size:18px; color:#9BA3B2; line-height:1; }
 .po-add-promo-btn .po-add-label { font-size:9px; color:#9BA3B2; margin-top:1px; }
 
-.po-total-card { background:#185FA5; border-radius:7px; padding:8px 14px; color:#fff; }
+.po-total-card { flex:0 0 auto; min-width:160px; background:#185FA5; border-radius:7px; padding:8px 14px; color:#fff; }
 .po-total-card .po-total-label { font-size:13px; opacity:0.8; }
 .po-total-card .po-total-amount { font-size:22px; font-weight:700; line-height:1.2; }
 .po-total-card .po-total-pct { font-size:11px; opacity:0.7; margin-top:2px; }
@@ -323,7 +323,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 #commercial-promo-modal input, #commercial-promo-modal button, #commercial-promo-modal select { font-family:inherit; }
 
 /* 서브탭 7개 */
-.po-subtabs { display:flex; gap:4px; padding:6px 12px; overflow-x:auto; }
+.po-subtabs { display:flex; gap:4px; padding:6px 12px; overflow-x:auto; align-items:center; }
 .po-sub-tab { background:#1A1D23; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; font-family:'Pretendard',sans-serif; transition:background 0.15s; }
 .po-sub-tab:hover { opacity:0.85; }
 .po-sub-tab .po-tab-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
