@@ -2162,7 +2162,8 @@ function renderPOTab() {
 
   html += '<div class="po-divider"></div>';
 
-  // 합계 카드
+  // 합계 카드 + 프로모션 새로고침 컨테이너
+  html += '<div style="display:flex;flex-direction:column;gap:4px;flex:0 0 auto;min-width:160px">';
   html += '<div class="po-total-card">';
   html += '<div class="po-total-label">합계 · ' + month + '월</div>';
   html += '<div class="po-total-amount">' + fmtPO(salesData.totalMonth) + '</div>';
@@ -2195,7 +2196,8 @@ function renderPOTab() {
   }
   html += '</div>';
   // 프로모션 새로고침 버튼 (합계 카드 아래)
-  html += '<button onclick="startTtiPromoScrape()" style="width:100%;margin-top:4px;background:#CC2222;color:#fff;border:none;border-radius:6px;padding:8px 0;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;font-family:Pretendard,-apple-system,sans-serif" onmouseover="this.style.background=\'#A31B1B\'" onmouseout="this.style.background=\'#CC2222\'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>프로모션 새로고침</button>';
+  html += '<button onclick="startTtiPromoScrape()" style="width:100%;background:#CC2222;color:#fff;border:none;border-radius:6px;padding:8px 0;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;font-family:Pretendard,-apple-system,sans-serif" onmouseover="this.style.background=\'#A31B1B\'" onmouseout="this.style.background=\'#CC2222\'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>프로모션 새로고침</button>';
+  html += '</div>'; // 합계+버튼 컨테이너
 
   html += '</div>'; // .po-kpi-row
 
