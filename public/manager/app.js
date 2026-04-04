@@ -2007,7 +2007,9 @@ function renderPOTab() {
   if (scrollEl) scrollEl.addEventListener('scroll', onPOProductScroll);
 
   // 자동완성 초기화
-  initPOAutocomplete('po-cart-search', function(p) { console.log('[발주] 주문목록 추가:', p.model); toast('제품등록 기능은 다음 단계에서 구현됩니다'); });
+  initPOAutocomplete('po-cart-search', function(p) { addToCartDirect(p); });
+  // 장바구니 복원 (localStorage에서)
+  renderPOCartTable();
   initPOAutocomplete('po-foc-search', function(p) { console.log('[발주] FOC 검색 선택:', p.model); });
   initPOAutocomplete('po-foc-cart-search', function(p) { console.log('[발주] FOC 등록:', p.model); toast('FOC 기능은 다음 단계에서 구현됩니다'); });
 }
@@ -2188,15 +2190,38 @@ function switchPOSubTab(tabName) {
 // 발주 리스트 탭 (6-A)
 // ========================================
 function buildPOListPanel() {
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var filterEl = localStorage.getItem('mw_po_list_filter') || 'today';
+
+  // 날짜 필터
+  var now = new Date();
+  var todayStr = now.toISOString().slice(0, 10);
+  var weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  var filtered = history.filter(function(item) {
+    var d = (item.date || '').slice(0, 10);
+    if (filterEl === 'today') return d === todayStr;
+    if (filterEl === 'week') return new Date(d) >= weekStart;
+    if (filterEl === 'month') return new Date(d) >= monthStart;
+    return true;
+  });
+
+  // 요약 카드 계산
+  var todayCount = history.filter(function(i) { return (i.date || '').slice(0, 10) === todayStr; }).length;
+  var normalCount = filtered.filter(function(i) { return i.type === 'normal'; }).length;
+  var promoCount = filtered.filter(function(i) { return i.type !== 'normal' && i.type !== 'foc'; }).length;
+  var focCount = filtered.filter(function(i) { return i.type === 'foc'; }).length;
+  var erpDone = filtered.filter(function(i) { return i.erpStatus === 'done'; }).length;
+
   var h = '';
-  // 상단 요약 카드 5칸
   h += '<div style="display:flex;gap:6px;margin-bottom:10px">';
   var cards = [
-    { label: '오늘 발주', val: '0', sub: '건' },
-    { label: '일반주문', val: '0', sub: '건' },
-    { label: '프로모션', val: '0', sub: '건' },
-    { label: 'FOC', val: '0', sub: '건' },
-    { label: '경영박사 등록', val: '0/0', sub: '', border: '#1D9E75' }
+    { label: '오늘 발주', val: String(todayCount), sub: '건' },
+    { label: '일반주문', val: String(normalCount), sub: '건' },
+    { label: '프로모션', val: String(promoCount), sub: '건' },
+    { label: 'FOC', val: String(focCount), sub: '건' },
+    { label: '경영박사 등록', val: erpDone + '/' + filtered.length, sub: '', border: '#1D9E75' }
   ];
   cards.forEach(function(c) {
     h += '<div style="flex:1;background:#fff;border-radius:6px;padding:8px 12px;border:1px solid ' + (c.border || '#DDE1EB') + ';text-align:center">';
@@ -2207,22 +2232,67 @@ function buildPOListPanel() {
   });
   h += '</div>';
 
-  // 메인 패널
   h += '<div class="po-panel" style="max-height:calc(100vh - 320px)">';
   h += '<div class="po-panel-header"><span>발주 리스트</span><div style="display:flex;gap:6px;align-items:center">';
-  h += '<select style="height:28px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff;font-size:10px;border-radius:4px;padding:0 6px;font-family:Pretendard,sans-serif"><option>오늘</option><option>이번 주</option><option>이번 달</option><option>기간 선택</option></select>';
-  h += '<button onclick="console.log(\'경영박사 매입전표 등록\')" style="background:#1D9E75;color:#fff;border:none;border-radius:5px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">경영박사 매입전표 등록</button>';
+  h += '<select id="po-list-filter" onchange="changePOListFilter(this.value)" style="height:28px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff;font-size:10px;border-radius:4px;padding:0 6px;font-family:Pretendard,sans-serif">';
+  h += '<option value="today"' + (filterEl === 'today' ? ' selected' : '') + '>오늘</option>';
+  h += '<option value="week"' + (filterEl === 'week' ? ' selected' : '') + '>이번 주</option>';
+  h += '<option value="month"' + (filterEl === 'month' ? ' selected' : '') + '>이번 달</option>';
+  h += '</select>';
+  h += '<button onclick="registerErpFromList()" style="background:#1D9E75;color:#fff;border:none;border-radius:5px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">경영박사 매입전표 등록</button>';
   h += '</div></div>';
 
-  // 테이블
-  h += '<div class="po-panel-body">';
-  h += '<table class="po-table"><thead><tr>';
+  h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
   h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
   h += '<th>날짜</th><th>구분</th><th>관리코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">경영박사</th>';
   h += '</tr></thead><tbody id="po-list-body">';
-  h += '<tr><td colspan="10" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
+
+  if (filtered.length === 0) {
+    h += '<tr><td colspan="10" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
+  } else {
+    filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+    filtered.forEach(function(item) {
+      var d = new Date(item.date);
+      var dateStr = String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      var typeBadge;
+      if (item.type === 'normal') typeBadge = '<span style="background:#EAECF2;color:#5A6070;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">일반</span>';
+      else if (item.type === 'foc') typeBadge = '<span style="background:#FBEAF0;color:#72243E;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">FOC</span>';
+      else typeBadge = '<span style="background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">' + item.type + '</span>';
+      var erpBadge = item.erpStatus === 'done' ? '<span style="background:#E1F5EE;color:#085041;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">등록완료</span>' : '<span style="background:#FAEEDA;color:#633806;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">미등록</span>';
+
+      h += '<tr>';
+      h += '<td class="center"><input type="checkbox" data-id="' + item.id + '"></td>';
+      h += '<td style="font-size:10px;white-space:nowrap">' + dateStr + '</td>';
+      h += '<td>' + typeBadge + '</td>';
+      h += '<td style="font-size:10px;color:#5A6070">' + (item.manageCode || '-') + '</td>';
+      h += '<td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
+      h += '<td class="num">' + (item.qty || 0) + '</td>';
+      h += '<td class="num">' + fmtPO(item.supplyPrice) + '</td>';
+      h += '<td class="num">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
+      h += '<td class="num" style="font-weight:600">' + fmtPO(item.amount) + '</td>';
+      h += '<td class="center">' + erpBadge + '</td>';
+      h += '</tr>';
+    });
+  }
+
   h += '</tbody></table></div></div>';
   return h;
+}
+
+function changePOListFilter(val) {
+  localStorage.setItem('mw_po_list_filter', val);
+  // 발주 리스트 영역만 재렌더링
+  var listContent = document.getElementById('po-content-list');
+  if (listContent) listContent.innerHTML = buildPOListPanel();
+}
+
+function registerErpFromList() {
+  var checked = document.querySelectorAll('#po-list-body input[type="checkbox"]:checked');
+  if (checked.length === 0) { toast('등록할 항목을 선택하세요'); return; }
+  var ids = [];
+  checked.forEach(function(cb) { ids.push(cb.getAttribute('data-id')); });
+  console.log('[발주] 경영박사 매입전표 등록 — 선택 항목:', ids);
+  toast('경영박사 API 연결은 추후 구현됩니다 (' + ids.length + '건)');
 }
 
 function togglePOListAll(el) {
@@ -2516,30 +2586,191 @@ function addCumulativePromo() {
   setTimeout(function() { openCumulativePromoModal(idx); }, 100);
 }
 
-// 장바구니 추가 (B-1a는 콘솔만)
+// ========================================
+// 장바구니 (Step B-2a)
+// ========================================
+var poCart = JSON.parse(localStorage.getItem('mw_po_cart') || '[]');
+
+function _savePoCart() {
+  localStorage.setItem('mw_po_cart', JSON.stringify(poCart));
+}
+
+// 장바구니에 제품 추가
 function addToCart(productCode) {
-  console.log('[발주] 장바구니 추가:', productCode);
-  toast('장바구니 기능은 다음 단계에서 구현됩니다');
+  // 수량 확인
+  var qtyInput = document.querySelector('input[data-code="' + productCode + '"]');
+  var qty = qtyInput ? parseInt(qtyInput.value) || 0 : 0;
+  if (qty <= 0) { toast('수량을 입력하세요'); return; }
+
+  // 제품 정보 찾기
+  var p = (DB.products || []).find(function(prod) { return prod.ttiNum === productCode || prod.code === productCode; });
+  if (!p) { toast('제품을 찾을 수 없습니다'); return; }
+
+  // 중복 확인 → 수량 합산
+  var existing = poCart.find(function(c) { return c.ttiNum === (p.ttiNum || '') || (c.code && c.code === p.code); });
+  if (existing) {
+    existing.qty += qty;
+  } else {
+    // 누적프로모션 확인
+    var promoName = '', promoColor = '';
+    var cumulPromos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [];
+    for (var i = 0; i < cumulPromos.length; i++) {
+      if (cumulPromos[i].products && cumulPromos[i].products.some(function(pr) { return pr.ttiNum === p.ttiNum; })) {
+        promoName = cumulPromos[i].name;
+        var pal = _poPromoPalette[cumulPromos[i].paletteIdx || i] || _poPromoPalette[0];
+        promoColor = pal.text;
+        break;
+      }
+    }
+    poCart.push({
+      code: p.code || '', ttiNum: p.ttiNum || '', orderNum: p.orderNum || '',
+      model: p.model || '', detail: p.detail || '',
+      supplyPrice: parseInt(p.supplyPrice) || 0, costPrice: 0,
+      qty: qty, category: p.category || '',
+      promoName: promoName, promoColor: promoColor
+    });
+  }
+  _savePoCart();
+  if (qtyInput) qtyInput.value = '0';
+  renderPOCartTable();
+  toast((p.model || '제품') + ' ' + qty + '개 추가');
+}
+
+// 장바구니에 제품 직접 추가 (자동완성에서)
+function addToCartDirect(product) {
+  if (!product) return;
+  var existing = poCart.find(function(c) { return c.ttiNum === (product.ttiNum || ''); });
+  if (existing) { existing.qty += 1; }
+  else {
+    var promoName = '', promoColor = '';
+    var cumulPromos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null') || [];
+    for (var i = 0; i < cumulPromos.length; i++) {
+      if (cumulPromos[i].products && cumulPromos[i].products.some(function(pr) { return pr.ttiNum === product.ttiNum; })) {
+        promoName = cumulPromos[i].name;
+        var pal = _poPromoPalette[cumulPromos[i].paletteIdx || i] || _poPromoPalette[0];
+        promoColor = pal.text;
+        break;
+      }
+    }
+    poCart.push({
+      code: product.code || '', ttiNum: product.ttiNum || '', orderNum: product.orderNum || '',
+      model: product.model || '', detail: product.detail || '',
+      supplyPrice: parseInt(product.supplyPrice) || 0, costPrice: 0,
+      qty: 1, category: product.category || '',
+      promoName: promoName, promoColor: promoColor
+    });
+  }
+  _savePoCart();
+  renderPOCartTable();
+  toast((product.model || '제품') + ' 추가');
+}
+
+// 장바구니 수량 변경
+function updateCartQty(idx, val) {
+  var qty = parseInt(val) || 0;
+  if (qty <= 0) { poCart.splice(idx, 1); }
+  else { poCart[idx].qty = qty; }
+  _savePoCart();
+  renderPOCartTable();
+}
+
+// 장바구니 항목 삭제
+function removeCartItem(idx) {
+  poCart.splice(idx, 1);
+  _savePoCart();
+  renderPOCartTable();
 }
 
 // 장바구니 비우기
 function clearPOCart() {
-  console.log('[발주] 장바구니 비우기');
+  if (poCart.length === 0) return;
+  if (!confirm('주문 목록을 비우시겠습니까?')) return;
+  poCart = [];
+  _savePoCart();
+  renderPOCartTable();
 }
 
-// 제품등록 검색 추가
-function addPOCartItem() {
-  var input = document.getElementById('po-cart-search');
-  if (input && input.value.trim()) {
-    console.log('[발주] 제품등록 검색:', input.value.trim());
-    toast('제품등록 기능은 다음 단계에서 구현됩니다');
+// 장바구니 테이블 렌더링
+function renderPOCartTable() {
+  var body = document.getElementById('po-cart-body');
+  if (!body) return;
+
+  if (poCart.length === 0) {
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
+  } else {
+    var h = '';
+    poCart.forEach(function(c, i) {
+      var amt = (c.supplyPrice || 0) * (c.qty || 0);
+      var promoTag = c.promoName ? ' <span class="po-promo-tag" style="background:#EEEDFE;color:' + (c.promoColor || '#3C3489') + '">' + c.promoName + '</span>' : '';
+      h += '<tr>';
+      h += '<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (c.model || '').replace(/"/g, '&quot;') + '">' + (c.model || '-') + promoTag + '</td>';
+      h += '<td class="num">' + fmtPO(c.supplyPrice) + '</td>';
+      h += '<td class="center"><input type="number" min="1" value="' + c.qty + '" style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif" onchange="updateCartQty(' + i + ',this.value)"></td>';
+      h += '<td class="num" style="font-weight:600">' + fmtPO(amt) + '</td>';
+      h += '<td class="num" style="color:#9BA3B2">-</td>';
+      h += '<td class="center"><button onclick="removeCartItem(' + i + ')" style="width:22px;height:22px;border-radius:4px;border:none;background:#FCEBEB;color:#CC2222;font-size:12px;cursor:pointer">✕</button></td>';
+      h += '</tr>';
+    });
+    body.innerHTML = h;
   }
+
+  // 합계 업데이트
+  var totalItems = poCart.length;
+  var totalQty = poCart.reduce(function(s, c) { return s + (c.qty || 0); }, 0);
+  var totalSupply = poCart.reduce(function(s, c) { return s + (c.supplyPrice || 0) * (c.qty || 0); }, 0);
+  var vat = Math.round(totalSupply * 0.1);
+
+  var supplyEl = document.getElementById('po-cart-supply-total');
+  if (supplyEl) supplyEl.innerHTML = '(' + totalItems + '건, ' + totalQty + '개) ' + fmtPO(totalSupply) + '원';
+  var costEl = document.getElementById('po-cart-cost-total');
+  if (costEl) costEl.textContent = '-';
+  var vatEl = document.getElementById('po-cart-vat');
+  if (vatEl) vatEl.textContent = fmtPO(vat) + '원';
+
+  // 헤더 건수
+  var headerCount = document.querySelector('#po-content-normal .po-panel:last-child .po-header-count');
+  if (headerCount) headerCount.textContent = totalItems + '건';
 }
 
-// 발주하기
+// 제품등록 검색에서 추가
+function addPOCartItem() {
+  // 자동완성에서 선택되지 않은 경우 — 무시
+  toast('자동완성 목록에서 제품을 선택하세요');
+}
+
+// TTI 발주하기
 function submitPOOrder() {
-  console.log('[발주] TTI 발주하기');
-  toast('TTI 발주 기능은 다음 단계에서 구현됩니다');
+  if (poCart.length === 0) { toast('주문할 제품이 없습니다'); return; }
+  var totalQty = poCart.reduce(function(s, c) { return s + (c.qty || 0); }, 0);
+  var totalSupply = poCart.reduce(function(s, c) { return s + (c.supplyPrice || 0) * (c.qty || 0); }, 0);
+  if (!confirm(poCart.length + '건 ' + totalQty + '개를 발주하시겠습니까?\n공급가 합계: ' + fmtPO(totalSupply) + '원')) return;
+
+  // mw_po_history에 저장
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var now = new Date().toISOString();
+  poCart.forEach(function(c, idx) {
+    history.push({
+      id: Date.now() + '_' + idx,
+      date: now,
+      type: c.promoName ? c.promoName : 'normal',
+      promoName: c.promoName || '',
+      manageCode: c.code,
+      ttiNum: c.ttiNum,
+      model: c.model,
+      qty: c.qty,
+      supplyPrice: c.supplyPrice,
+      costPrice: c.costPrice,
+      amount: c.supplyPrice * c.qty,
+      erpStatus: 'pending'
+    });
+  });
+  save('mw_po_history', history);
+
+  // 장바구니 비우기
+  poCart = [];
+  _savePoCart();
+  renderPOCartTable();
+  toast('발주 완료! 발주 리스트에서 확인하세요');
 }
 
 // 제품 목록 필터
