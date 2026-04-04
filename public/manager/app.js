@@ -2960,13 +2960,13 @@ function _buildCommPromoAccordion(promo, idx, history) {
 
   // 구간별 혜택 테이블
   h += '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:6px">';
-  h += '<thead><tr style="background:#F4F6FA"><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2">No</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (이상)</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (미만)</th><th style="padding:5px 6px;text-align:left;font-size:12px;border:1px solid #EAECF2">지급품목</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">할인율(%)</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2">상태</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2"></th></tr></thead>';
+  h += '<thead><tr style="background:#F4F6FA"><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2">No</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (이상)</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (미만)</th><th style="padding:5px 6px;text-align:left;font-size:12px;border:1px solid #EAECF2">지급품목</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">할인율(%)</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2;min-width:50px">상태</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2"></th></tr></thead>';
   h += '<tbody id="comm-tiers-' + idx + '">';
   (promo.tiers || []).forEach(function(tier, ti) {
     var tierStatus = '';
-    if (tierInfo.currentIdx === ti) tierStatus = '<span style="background:#185FA5;color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">현재</span>';
-    else if (tierInfo.currentIdx > ti) tierStatus = '<span style="background:#1D9E75;color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">달성</span>';
-    else tierStatus = '<span style="background:#EAECF2;color:#5A6070;padding:1px 5px;border-radius:3px;font-size:9px">미달</span>';
+    if (tierInfo.currentIdx === ti) tierStatus = '<span style="background:#185FA5;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;white-space:nowrap">현재</span>';
+    else if (tierInfo.currentIdx > ti) tierStatus = '<span style="background:#1D9E75;color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600;white-space:nowrap">달성</span>';
+    else tierStatus = '<span style="background:#EAECF2;color:#5A6070;padding:2px 8px;border-radius:3px;font-size:10px;white-space:nowrap">미달</span>';
 
     h += '<tr>';
     h += '<td style="padding:4px 6px;text-align:center;border:1px solid #EAECF2">' + (ti + 1) + '</td>';
@@ -3031,7 +3031,8 @@ function _deleteCommPromo(idx) {
 }
 
 function _addCommTier(promoIdx) {
-  var promos = _getCommercialPromos();
+  // 현재 모달 입력값 먼저 수집 후 추가
+  var promos = _collectCommModalInputs();
   var promo = promos[promoIdx];
   if (!promo) return;
   if (!promo.tiers) promo.tiers = [];
@@ -3044,7 +3045,8 @@ function _addCommTier(promoIdx) {
 }
 
 function _deleteCommTier(promoIdx, tierIdx) {
-  var promos = _getCommercialPromos();
+  // 현재 모달 입력값 먼저 수집 후 삭제
+  var promos = _collectCommModalInputs();
   if (!promos[promoIdx] || !promos[promoIdx].tiers) return;
   promos[promoIdx].tiers.splice(tierIdx, 1);
   _saveCommercialPromos(promos);
@@ -3057,10 +3059,9 @@ function _parseMoneyInput(val) {
   return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0;
 }
 
-function _saveCommercialPromoModal() {
+// 모달 입력값 수집 (공통)
+function _collectCommModalInputs() {
   var promos = _getCommercialPromos();
-
-  // 기본 필드 수집
   document.querySelectorAll('.comm-input').forEach(function(inp) {
     var idx = parseInt(inp.getAttribute('data-idx'));
     var field = inp.getAttribute('data-field');
@@ -3071,8 +3072,6 @@ function _saveCommercialPromoModal() {
       promos[idx][field] = inp.value;
     }
   });
-
-  // 구간 필드 수집
   document.querySelectorAll('.comm-tier-input').forEach(function(inp) {
     var pi = parseInt(inp.getAttribute('data-promo'));
     var ti = parseInt(inp.getAttribute('data-tier'));
@@ -3090,7 +3089,11 @@ function _saveCommercialPromoModal() {
       promos[pi].tiers[ti].benefit = inp.value;
     }
   });
+  return promos;
+}
 
+function _saveCommercialPromoModal() {
+  var promos = _collectCommModalInputs();
   _saveCommercialPromos(promos);
   document.getElementById('commercial-promo-modal').remove();
   renderPOTab();

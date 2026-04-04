@@ -84,13 +84,16 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 - Naver Npay 주문관리 수수료: 3.63%
 - 가격 반올림: 소매가 1,000원 단위, 기타 채널 100원 단위 올림
 
-### UI/디자인 규칙
-- 모든 UI 작업 시 디자인 스킬(SKILL.md) 먼저 참조할 것
-- 폰트: 'Pretendard', -apple-system, sans-serif (모든 UI 요소, 모달, input 포함)
-- 모든 금액/숫자: 콤마 구분자 필수, K/M/B 축약 금지
-- input에 숫자 표시 시에도 콤마 포맷 적용
+### 공통 UI 규칙 (모든 작업에 적용)
+1. 숫자 표시: 모든 금액/숫자는 K/M/B 축약 금지, 항상 전체 숫자 + 콤마 (예: 12,800,000원). input에 숫자 입력 시에도 콤마 자동 적용.
+2. 검색창: 검색 input 생성 시 항상 실시간 검색(keyup/input 이벤트) 적용. 검색 결과는 목록 형태로 즉시 표시. autocomplete="off" 적용.
+3. 삭제 기능: 리스트에서 항목 삭제 시 해당 항목 1개만 삭제. 절대 전체 삭제하지 않음. splice(index, 1) 정확히 사용.
+4. 줄바꿈 방지: 뱃지, 상태표시, 버튼 텍스트에는 white-space: nowrap 적용.
+5. 폰트: 모든 UI 요소 font-family: 'Pretendard', -apple-system, sans-serif. input/button/select도 동일.
+6. 동기화: 새로운 mw_ localStorage 키 추가 시 반드시 save() 함수 사용, 동기화 대상 확인.
+7. 디자인: 모든 UI 작업 시 디자인 스킬(SKILL.md) 먼저 참조할 것.
 
-### 공통 UI 규칙 (모든 개발에 적용)
+### 기존 UI 규칙 (호환 유지)
 - 숫자 표시: 모든 금액/숫자에 콤마 포맷 필수 (fmtPO 함수 사용)
 - 검색 자동완성: 모든 검색 input에 자동완성 드롭다운 적용 (initPOAutocomplete 함수)
   - 2글자 이상 입력 시 매칭 목록 표시 (최대 10건)
