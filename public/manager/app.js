@@ -2221,6 +2221,19 @@ function renderPOTab() {
 
   container.innerHTML = html;
 
+  // 수량 input Enter → 같은 행의 🛒 버튼 클릭 (이벤트 위임)
+  var _poContents = document.getElementById('po-tab-contents');
+  if (_poContents) _poContents.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    var inp = e.target;
+    if (!inp || inp.tagName !== 'INPUT' || inp.type === 'search') return;
+    if (inp.disabled) return;
+    var row = inp.closest('tr');
+    if (!row) return;
+    var btn = row.querySelector('.po-cart-btn-dark');
+    if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+  });
+
   // 초기 제품 행 렌더링 + 스크롤 이벤트
   renderPOProductRows();
   var scrollEl = document.getElementById('po-prod-scroll');
