@@ -2529,6 +2529,7 @@ function buildPOListPanel() {
 
   h += '<div class="po-panel" style="max-height:calc(100vh - 320px)">';
   h += '<div class="po-panel-header"><span>발주 리스트</span><div style="display:flex;gap:6px;align-items:center">';
+  h += '<button onclick="deleteSelectedPOHistory()" style="padding:5px 12px;font-size:11px;color:#791F1F;background:#FCEBEB;border:0.5px solid #F09595;border-radius:6px;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500">선택 삭제</button>';
   h += '<select id="po-list-filter" onchange="changePOListFilter(this.value)" style="height:28px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff;font-size:10px;border-radius:4px;padding:0 6px;font-family:Pretendard,sans-serif">';
   h += '<option value="today"' + (filterEl === 'today' ? ' selected' : '') + '>오늘</option>';
   h += '<option value="week"' + (filterEl === 'week' ? ' selected' : '') + '>이번 주</option>';
@@ -2567,7 +2568,7 @@ function buildPOListPanel() {
       var _costAmt = item.costPrice && item.costPrice > 0 ? item.costPrice * (item.qty || 0) : 0;
 
       h += '<tr>';
-      h += '<td class="center"><input type="checkbox" data-id="' + item.id + '"></td>';
+      h += '<td class="center"><input type="checkbox" class="po-history-checkbox" data-id="' + item.id + '" onchange="this.closest(\'tr\').style.background=this.checked?\'#E6F1FB\':\'\'"></td>';
       h += '<td style="font-size:10px;white-space:nowrap">' + dateStr + '</td>';
       h += '<td>' + typeBadge + '</td>';
       h += '<td style="font-size:10px;color:#5A6070">' + _dispManage + '</td>';
@@ -2603,7 +2604,24 @@ function registerErpFromList() {
 }
 
 function togglePOListAll(el) {
-  document.querySelectorAll('#po-list-body input[type="checkbox"]').forEach(function(cb) { cb.checked = el.checked; });
+  document.querySelectorAll('#po-list-body input[type="checkbox"]').forEach(function(cb) {
+    cb.checked = el.checked;
+    var tr = cb.closest('tr');
+    if (tr) tr.style.background = el.checked ? '#E6F1FB' : '';
+  });
+}
+
+function deleteSelectedPOHistory() {
+  var checkboxes = document.querySelectorAll('.po-history-checkbox:checked');
+  if (checkboxes.length === 0) { toast('삭제할 항목을 선택해주세요'); return; }
+  if (!confirm('선택한 ' + checkboxes.length + '건을 삭제하시겠습니까?\n삭제하면 매출 집계에서도 제외됩니다.')) return;
+  var idsToDelete = {};
+  checkboxes.forEach(function(cb) { idsToDelete[cb.getAttribute('data-id')] = true; });
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  history = history.filter(function(entry) { return !idsToDelete[entry.id]; });
+  save('mw_po_history', history);
+  renderPOTab();
+  toast(checkboxes.length + '건 삭제 완료');
 }
 
 // ========================================
@@ -3064,8 +3082,13 @@ function _removePromoCart(subtab, cartIndex) {
 function _refreshPromoRightPanel(subtab) {
   var container = document.getElementById('po-content-' + subtab);
   if (!container) return;
-  var panels = container.querySelectorAll('.po-panel');
-  if (panels.length >= 2) panels[1].outerHTML = _buildPromoRightPanel(subtab);
+  var panels = container.querySelectorAll(':scope > .po-panel');
+  if (panels.length >= 2) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = _buildPromoRightPanel(subtab);
+    var newPanel = tmp.firstElementChild;
+    if (newPanel) panels[1].replaceWith(newPanel);
+  }
 }
 
 // ========================================
