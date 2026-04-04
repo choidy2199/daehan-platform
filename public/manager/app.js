@@ -2425,12 +2425,12 @@ function buildPOOrderPanel() {
   html += '</tbody></table></div>';
 
   // 합계
-  html += '<div class="po-order-summary">';
-  html += '<div><span style="color:#5A6070">공급가 합계</span> <span style="font-weight:600;margin-left:6px" id="po-cart-supply-total">0</span></div>';
-  html += '<div><span style="color:#5A6070">부가세(10%)</span> <span style="font-weight:600;margin-left:6px" id="po-cart-vat">0</span></div>';
+  html += '<div class="po-summary">';
+  html += '<div class="po-summary-row"><span class="po-summary-label">공급가 합계 <span class="po-summary-count" id="po-cart-count-label"></span></span><span class="po-summary-value" id="po-cart-supply-total">0원</span></div>';
+  html += '<div class="po-summary-row po-summary-tax"><span class="po-summary-label">부가세 (10%)</span><span class="po-summary-value" id="po-cart-vat">0원</span></div>';
+  html += '<div class="po-summary-row po-summary-total"><span class="po-summary-label">총 합계</span><span class="po-summary-value" id="po-cart-grand-total">0원</span></div>';
+  html += '<button class="po-order-btn" onclick="submitPOOrder()">TTI 발주하기</button>';
   html += '</div>';
-
-  html += '<div style="padding:8px"><button class="po-order-btn" onclick="submitPOOrder()">TTI 발주하기</button></div>';
   html += '</div>';
   return html;
 }
@@ -2520,11 +2520,11 @@ function buildPOListPanel() {
 
   h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
   h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
-  h += '<th>날짜</th><th>구분</th><th>관리코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">경영박사</th>';
+  h += '<th>날짜</th><th>구분</th><th>관리코드</th><th>코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">경영박사</th>';
   h += '</tr></thead><tbody id="po-list-body">';
 
   if (filtered.length === 0) {
-    h += '<tr><td colspan="10" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
+    h += '<tr><td colspan="11" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
   } else {
     filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
     filtered.forEach(function(item) {
@@ -2536,16 +2536,25 @@ function buildPOListPanel() {
       else typeBadge = '<span style="background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">' + item.type + '</span>';
       var erpBadge = item.erpStatus === 'done' ? '<span style="background:#E1F5EE;color:#085041;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">등록완료</span>' : '<span style="background:#FAEEDA;color:#633806;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">미등록</span>';
 
+      // mw_products에서 코드/관리코드 매칭
+      var _pCode = item.ttiNum || item.manageCode || '';
+      var _matched = (DB.products || []).find(function(pr) { return pr.ttiNum && normalizeTtiCode(pr.ttiNum) === normalizeTtiCode(_pCode) || pr.code === _pCode; });
+      var _dispCode = _matched ? (_matched.code || '-') : '-';
+      var _dispManage = item.manageCode || (_matched ? (_matched.manageCode || '-') : '-');
+      // 금액 = 매입원가 × 수량
+      var _costAmt = item.costPrice && item.costPrice > 0 ? item.costPrice * (item.qty || 0) : 0;
+
       h += '<tr>';
       h += '<td class="center"><input type="checkbox" data-id="' + item.id + '"></td>';
       h += '<td style="font-size:10px;white-space:nowrap">' + dateStr + '</td>';
       h += '<td>' + typeBadge + '</td>';
-      h += '<td style="font-size:10px;color:#5A6070">' + (item.manageCode || '-') + '</td>';
+      h += '<td style="font-size:10px;color:#5A6070">' + _dispManage + '</td>';
+      h += '<td style="font-size:10px;color:#5A6070">' + _dispCode + '</td>';
       h += '<td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
       h += '<td class="num">' + (item.qty || 0) + '</td>';
       h += '<td class="num">' + fmtPO(item.supplyPrice) + '</td>';
       h += '<td class="num">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
-      h += '<td class="num" style="font-weight:600">' + fmtPO(item.amount) + '</td>';
+      h += '<td class="num" style="font-weight:600">' + (_costAmt > 0 ? fmtPO(_costAmt) : '-') + '</td>';
       h += '<td class="center">' + erpBadge + '</td>';
       h += '</tr>';
     });
@@ -2602,8 +2611,11 @@ function buildPOFocRightPanel() {
   h += '</tr></thead><tbody id="po-foc-cart-body">';
   h += '<tr><td colspan="5" style="text-align:center;padding:30px;color:#9BA3B2;font-size:12px">왼쪽에서 FOC 제품을 추가하세요</td></tr>';
   h += '</tbody></table></div>';
-  h += '<div class="po-order-summary"><div>FOC 합계 (0건, 0개) <span style="background:#FBEAF0;color:#72243E;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;margin-left:6px">0원 (무상 증정)</span></div></div>';
-  h += '<div style="padding:8px"><button class="po-order-btn" onclick="submitFOCOrder()">FOC 발주하기</button></div></div>';
+  h += '<div class="po-summary">';
+  h += '<div class="po-summary-row"><span class="po-summary-label">FOC 합계 <span class="po-summary-count">(0건, 0개)</span></span><span class="po-summary-value">0원</span></div>';
+  h += '<div class="po-summary-row po-summary-total"><span class="po-summary-label">총 합계</span><span class="po-summary-value" style="color:#72243E">0원 (무상 증정)</span></div>';
+  h += '<button class="po-order-btn" onclick="submitFOCOrder()">FOC 발주하기</button>';
+  h += '</div></div>';
   return h;
 }
 
@@ -2970,9 +2982,13 @@ function _buildPromoRightPanel(subtab) {
     h += '<td><button onclick="_removePromoCart(\'' + subtab + '\',' + i + ')" style="background:none;border:none;color:#CC2222;cursor:pointer">✕</button></td></tr>';
   });
   h += '</tbody></table></div>';
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #EAECF2;margin-top:6px">';
-  h += '<span style="font-size:13px;font-weight:700">합계 ' + fmtPO(totalAmt) + '원 (' + cartItems.length + '건)</span>';
-  h += '<button onclick="submitPOOrder()" style="background:#185FA5;color:#fff;border:none;border-radius:4px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer">TTI 발주하기</button>';
+  var _totalQty = cartItems.reduce(function(s, c) { return s + (c.qty || 0); }, 0);
+  var _vat = Math.round(totalAmt * 0.1);
+  h += '<div class="po-summary">';
+  h += '<div class="po-summary-row"><span class="po-summary-label">공급가 합계 <span class="po-summary-count">(' + cartItems.length + '건, ' + _totalQty + '개)</span></span><span class="po-summary-value">' + fmtPO(totalAmt) + '원</span></div>';
+  h += '<div class="po-summary-row po-summary-tax"><span class="po-summary-label">부가세 (10%)</span><span class="po-summary-value">' + fmtPO(_vat) + '원</span></div>';
+  h += '<div class="po-summary-row po-summary-total"><span class="po-summary-label">총 합계</span><span class="po-summary-value">' + fmtPO(totalAmt + _vat) + '원</span></div>';
+  h += '<button class="po-order-btn" onclick="submitPOOrder()">TTI 발주하기</button>';
   h += '</div></div>';
   return h;
 }
@@ -3588,9 +3604,13 @@ function renderPOCartTable() {
   var vat = Math.round(totalSupply * 0.1);
 
   var supplyEl = document.getElementById('po-cart-supply-total');
-  if (supplyEl) supplyEl.innerHTML = '(' + totalItems + '건, ' + totalQty + '개) ' + fmtPO(totalSupply) + '원';
+  if (supplyEl) supplyEl.textContent = fmtPO(totalSupply) + '원';
+  var countLabel = document.getElementById('po-cart-count-label');
+  if (countLabel) countLabel.textContent = '(' + totalItems + '건, ' + totalQty + '개)';
   var vatEl = document.getElementById('po-cart-vat');
   if (vatEl) vatEl.textContent = fmtPO(vat) + '원';
+  var grandEl = document.getElementById('po-cart-grand-total');
+  if (grandEl) grandEl.textContent = fmtPO(totalSupply + vat) + '원';
 
   // 헤더 건수
   var headerCount = document.querySelector('#po-content-normal .po-panel:last-child .po-header-count');
