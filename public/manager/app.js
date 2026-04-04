@@ -1799,7 +1799,7 @@ function initPOAutocomplete(inputId, onSelect) {
     var h = '';
     matches.forEach(function(p, i) {
       h += '<div class="po-autocomplete-item" data-idx="' + i + '">';
-      h += '<span class="ac-code">' + (p.ttiNum || p.code || '') + '</span>';
+      h += '<span class="ac-code">' + (p.orderNum ? p.orderNum + ' · ' : '') + (p.ttiNum || p.code || '') + '</span>';
       h += '<span class="ac-model">' + (p.model || '-') + '</span>';
       h += '<span class="ac-price">' + fmtPO(p.supplyPrice) + '</span>';
       h += '</div>';
@@ -1818,8 +1818,18 @@ function initPOAutocomplete(inputId, onSelect) {
     var matches = products.filter(function(p) {
       var text = ((p.model || '') + ' ' + (p.detail || '') + ' ' + (p.code || '') + ' ' + (p.ttiNum || '') + ' ' + (p.orderNum || '') + ' ' + (p.manageCode || '')).toLowerCase();
       return keywords.every(function(kw) { return text.indexOf(kw) !== -1; });
-    }).slice(0, 10);
-    render(matches);
+    });
+    // 정렬: orderNum 정확일치 → model 시작일치 → 나머지
+    var rawVal = val;
+    matches.sort(function(a, b) {
+      var aExact = (a.orderNum || '') === rawVal ? 0 : 1;
+      var bExact = (b.orderNum || '') === rawVal ? 0 : 1;
+      if (aExact !== bExact) return aExact - bExact;
+      var aStart = (a.model || '').toLowerCase().indexOf(rawVal) === 0 ? 0 : 1;
+      var bStart = (b.model || '').toLowerCase().indexOf(rawVal) === 0 ? 0 : 1;
+      return aStart - bStart;
+    });
+    render(matches.slice(0, 10));
   });
 
   input.addEventListener('keydown', function(e) {
@@ -2342,10 +2352,13 @@ function openCumulativePromoModal(index) {
   h += '</div>';
   modal.innerHTML = h;
   document.body.appendChild(modal);
-  // 오버레이 클릭으로만 닫기 (모달 내부 클릭 전파 차단)
+  // 오버레이 mousedown으로만 닫기 (모달 내부 클릭/드래그 시 닫힘 방지)
   var modalContainer = modal.querySelector(':scope > div');
-  if (modalContainer) modalContainer.addEventListener('click', function(e) { e.stopPropagation(); });
-  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+  if (modalContainer) {
+    modalContainer.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    modalContainer.addEventListener('click', function(e) { e.stopPropagation(); });
+  }
+  modal.addEventListener('mousedown', function(e) { if (e.target === modal) modal.remove(); });
 
   // 자동완성 바인딩 (모달 DOM 삽입 후)
   initPOAutocomplete('cumul-prod-search', function(product) {
