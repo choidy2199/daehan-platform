@@ -1810,6 +1810,59 @@ function getMonthRange(date) {
 }
 
 // 발주 이력 집계
+// ========================================
+// 커머셜 프로모션 헬퍼
+// ========================================
+function _getCommercialPromos() {
+  return JSON.parse(localStorage.getItem('mw_commercial_promos') || '[]');
+}
+function _saveCommercialPromos(arr) {
+  save('mw_commercial_promos', arr);
+}
+function _getActiveCommercialPromo() {
+  var promos = _getCommercialPromos();
+  var today = new Date(); today.setHours(0,0,0,0);
+  for (var i = 0; i < promos.length; i++) {
+    var s = new Date(promos[i].startDate); s.setHours(0,0,0,0);
+    var e = new Date(promos[i].endDate); e.setHours(23,59,59,999);
+    if (today >= s && today <= e) return promos[i];
+  }
+  return null;
+}
+function _calcCommercialSales(promo) {
+  if (!promo) return 0;
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var pStart = new Date(promo.startDate); pStart.setHours(0,0,0,0);
+  var pEnd = new Date(promo.endDate); pEnd.setHours(23,59,59,999);
+  var total = 0;
+  history.forEach(function(item) {
+    var d = new Date(item.date);
+    if (d >= pStart && d <= pEnd) total += (item.amount || 0);
+  });
+  return total;
+}
+function _findCommercialTier(promo, sales) {
+  if (!promo || !promo.tiers || promo.tiers.length === 0) return { current: null, currentIdx: -1, next: null };
+  var currentIdx = -1;
+  for (var i = 0; i < promo.tiers.length; i++) {
+    var t = promo.tiers[i];
+    if (sales >= t.minAmount && (t.maxAmount === null || sales < t.maxAmount)) { currentIdx = i; break; }
+  }
+  if (currentIdx === -1 && sales < promo.tiers[0].minAmount) {
+    return { current: null, currentIdx: -1, next: promo.tiers[0], shortage: promo.tiers[0].minAmount - sales };
+  }
+  var current = currentIdx >= 0 ? promo.tiers[currentIdx] : null;
+  var next = currentIdx >= 0 && currentIdx + 1 < promo.tiers.length ? promo.tiers[currentIdx + 1] : null;
+  var shortage = next ? next.minAmount - sales : 0;
+  return { current: current, currentIdx: currentIdx, next: next, shortage: shortage };
+}
+function _commPeriodLabel(promo) {
+  if (!promo) return '';
+  var sm = parseInt(promo.startDate.split('-')[1], 10);
+  var em = parseInt(promo.endDate.split('-')[1], 10);
+  return sm === em ? sm + '월' : sm + '~' + em + '월';
+}
+
 function calcPOSalesData() {
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   var now = new Date();
@@ -1829,15 +1882,17 @@ function calcPOSalesData() {
     var d = new Date(item.date);
     var amt = item.amount || 0;
     var cat = catMap[item.ttiNum] || catMap[item.manageCode] || '';
+    // 일반주문 여부: subtab 필드 있으면 사용, 없으면 type으로 판별 (레거시 호환)
+    var isNormal = item.subtab ? item.subtab === 'normal' : item.type === 'normal';
 
-    // 파워툴: 이번 달
-    if (cat === '파워툴' && d >= monthRange.start && d <= monthRange.end) powerTool += amt;
-    // 수공구+액세서리: 분기
-    if ((cat === '수공구' || cat === '악세사리' || cat === '액세서리') && d >= quarterRange.start && d <= quarterRange.end) handTool += amt;
-    // 팩아웃: 이번 달
-    if (cat === '팩아웃' && d >= monthRange.start && d <= monthRange.end) packout += amt;
+    // 파워툴: 이번 달 (일반주문만)
+    if (isNormal && cat === '파워툴' && d >= monthRange.start && d <= monthRange.end) powerTool += amt;
+    // 수공구+액세서리: 분기 (일반주문만)
+    if (isNormal && (cat === '수공구' || cat === '악세사리' || cat === '액세서리') && d >= quarterRange.start && d <= quarterRange.end) handTool += amt;
+    // 팩아웃: 이번 달 (일반주문만)
+    if (isNormal && cat === '팩아웃' && d >= monthRange.start && d <= monthRange.end) packout += amt;
 
-    // 이번 달 전체 (합계용)
+    // 이번 달 전체 (합계용 — 모든 subtab 합산)
     if (d >= monthRange.start && d <= monthRange.end) {
       totalMonth += amt;
       if (d.getDate() <= 15) first15 += amt; else last15 += amt;
@@ -2081,6 +2136,26 @@ function renderPOTab() {
   html += '<div class="po-total-half">1~15일 ' + fmtPO(salesData.first15) + '</div>';
   html += '<div class="po-total-half">16~' + new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() + '일 ' + fmtPO(salesData.last15) + '</div>';
   html += '</div>';
+  // 커머셜P 힌트
+  var _commPromo = _getActiveCommercialPromo();
+  if (_commPromo) {
+    var _commSales = _calcCommercialSales(_commPromo);
+    var _commTier = _findCommercialTier(_commPromo, _commSales);
+    var _commRate = _commTier.current ? _commTier.current.rate + '%' : '미달';
+    html += '<div class="po-commercial-hint" onclick="openCommercialPromoModal()">';
+    html += '<span class="comm-tag">커머셜P</span> ';
+    html += '<span class="comm-period">(' + _commPeriodLabel(_commPromo) + ')</span> ';
+    html += '<span>현재 ' + _commRate + '</span>';
+    if (_commTier.next) {
+      html += ' <span class="comm-next">다음 ' + _commTier.next.rate + '% 까지 <b>' + fmtPO(_commTier.shortage) + '원</b></span>';
+    }
+    html += ' <span class="comm-arrow">▶</span>';
+    html += '</div>';
+  } else {
+    html += '<div class="po-commercial-hint" onclick="openCommercialPromoModal()" style="opacity:0.5">';
+    html += '<span class="comm-tag">커머셜P</span> <span>미등록 — 클릭하여 설정</span> <span class="comm-arrow">▶</span>';
+    html += '</div>';
+  }
   html += '</div>';
 
   html += '</div>'; // .po-kpi-row
@@ -2745,6 +2820,264 @@ function addCumulativePromo() {
 }
 
 // ========================================
+// 커머셜 프로모션 모달 (D)
+// ========================================
+function openCommercialPromoModal() {
+  var promos = _getCommercialPromos();
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var now = new Date();
+
+  // 기존 모달 제거
+  var existing = document.getElementById('commercial-promo-modal');
+  if (existing) existing.remove();
+
+  var modal = document.createElement('div');
+  modal.id = 'commercial-promo-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
+
+  // 전체 매출 합계 (이번 달)
+  var mRange = getMonthRange(now);
+  var totalSalesMonth = 0;
+  history.forEach(function(item) {
+    var d = new Date(item.date);
+    if (d >= mRange.start && d <= mRange.end) totalSalesMonth += (item.amount || 0);
+  });
+  // 진행 중 프로모션 수
+  var activeCount = 0;
+  promos.forEach(function(p) {
+    var s = new Date(p.startDate); s.setHours(0,0,0,0);
+    var e = new Date(p.endDate); e.setHours(23,59,59,999);
+    var today = new Date(); today.setHours(0,0,0,0);
+    if (today >= s && today <= e) activeCount++;
+  });
+
+  var h = '<div style="background:#fff;border-radius:10px;width:720px;max-width:95vw;max-height:85vh;overflow:hidden;border:1px solid #DDE1EB;display:flex;flex-direction:column">';
+  // 헤더
+  h += '<div style="background:#1A1D23;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">';
+  h += '<span style="font-size:14px;font-weight:600">커머셜 프로모션 관리</span>';
+  h += '<button onclick="document.getElementById(\'commercial-promo-modal\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">✕</button></div>';
+
+  // 바디
+  h += '<div style="padding:16px;overflow-y:auto;flex:1">';
+  // 상단 요약 3칸
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">';
+  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">이번 달 총 매출</div><div style="font-size:15px;font-weight:700;color:#185FA5">' + fmtPO(totalSalesMonth) + '원</div></div>';
+  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">진행 중 프로모션</div><div style="font-size:15px;font-weight:700;color:#1D9E75">' + activeCount + '개</div></div>';
+  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">등록 프로모션</div><div style="font-size:15px;font-weight:700;color:#5A6070">' + promos.length + '개</div></div>';
+  h += '</div>';
+
+  // 아코디언 리스트
+  h += '<div id="comm-promo-list">';
+  promos.forEach(function(promo, idx) {
+    h += _buildCommPromoAccordion(promo, idx, history);
+  });
+  h += '</div>';
+
+  // 새 프로모션 추가 버튼
+  h += '<button onclick="_addNewCommercialPromo()" style="width:100%;padding:10px;margin-top:8px;border:2px dashed #DDE1EB;border-radius:6px;background:none;color:#5A6070;font-size:12px;cursor:pointer">+ 새 프로모션 추가</button>';
+
+  h += '</div>'; // 바디 끝
+
+  // 하단 버튼
+  h += '<div style="padding:12px 16px;border-top:1px solid #EAECF2;display:flex;justify-content:flex-end;gap:8px">';
+  h += '<button onclick="document.getElementById(\'commercial-promo-modal\').remove()" style="padding:6px 16px;border:1px solid #DDE1EB;border-radius:4px;background:#fff;color:#5A6070;font-size:12px;cursor:pointer">취소</button>';
+  h += '<button onclick="_saveCommercialPromoModal()" style="padding:6px 16px;border:none;border-radius:4px;background:#185FA5;color:#fff;font-size:12px;cursor:pointer;font-weight:600">저장</button>';
+  h += '</div>';
+
+  h += '</div>';
+  modal.innerHTML = h;
+  document.body.appendChild(modal);
+}
+
+function _buildCommPromoAccordion(promo, idx, history) {
+  var today = new Date(); today.setHours(0,0,0,0);
+  var s = new Date(promo.startDate); s.setHours(0,0,0,0);
+  var e = new Date(promo.endDate); e.setHours(23,59,59,999);
+  var isActive = today >= s && today <= e;
+  var isEnded = today > e;
+  var collapsed = isEnded; // 종료된 것은 접힘
+
+  // 프로모션 기간 내 매출 합산
+  var sales = 0;
+  (history || []).forEach(function(item) {
+    var d = new Date(item.date);
+    if (d >= s && d <= e) sales += (item.amount || 0);
+  });
+  var tierInfo = _findCommercialTier(promo, sales);
+
+  var h = '<div class="comm-accordion" data-idx="' + idx + '" style="border:1px solid #DDE1EB;border-radius:6px;margin-bottom:8px;overflow:hidden">';
+  // 아코디언 헤더
+  h += '<div class="comm-accordion-header" onclick="_toggleCommAccordion(' + idx + ')" style="padding:8px 12px;background:#F4F6FA;cursor:pointer;display:flex;align-items:center;gap:8px">';
+  h += '<span class="comm-acc-arrow" id="comm-arrow-' + idx + '" style="font-size:10px;transition:transform 0.2s;transform:rotate(' + (collapsed ? '0' : '90') + 'deg)">▶</span>';
+  h += '<span style="font-weight:600;font-size:12px;flex:1">' + (promo.name || '프로모션 ' + (idx + 1)) + '</span>';
+  h += '<span style="font-size:10px;color:#5A6070;background:#EAECF2;padding:1px 6px;border-radius:3px">' + _commPeriodLabel(promo) + '</span>';
+  if (isActive) h += '<span style="font-size:10px;color:#fff;background:#1D9E75;padding:1px 6px;border-radius:3px;font-weight:600">진행중</span>';
+  if (isEnded) h += '<span style="font-size:10px;color:#fff;background:#8B8FA0;padding:1px 6px;border-radius:3px">종료</span>';
+  h += '<button onclick="event.stopPropagation();_deleteCommPromo(' + idx + ')" style="background:none;border:none;color:#CC2222;font-size:14px;cursor:pointer;padding:0 4px" title="삭제">✕</button>';
+  h += '</div>';
+
+  // 아코디언 바디
+  h += '<div id="comm-body-' + idx + '" style="padding:12px;display:' + (collapsed ? 'none' : 'block') + '">';
+
+  // 기본 정보 입력
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">프로모션명</label><input type="text" class="comm-input" data-field="name" data-idx="' + idx + '" value="' + (promo.name || '') + '" style="width:100%;padding:4px 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:12px"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">시작일</label><input type="date" class="comm-input" data-field="startDate" data-idx="' + idx + '" value="' + (promo.startDate || '') + '" style="width:100%;padding:4px 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:12px"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">종료일</label><input type="date" class="comm-input" data-field="endDate" data-idx="' + idx + '" value="' + (promo.endDate || '') + '" style="width:100%;padding:4px 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:12px"></div>';
+  h += '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">적용조건</label><input type="text" class="comm-input" data-field="condition" data-idx="' + idx + '" value="' + (promo.condition || '') + '" placeholder="예: 디스플레이 제외" style="width:100%;padding:4px 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:12px"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">목표금액</label><input type="text" class="comm-input comm-money" data-field="targetAmount" data-idx="' + idx + '" value="' + fmtPO(promo.targetAmount || 0) + '" style="width:100%;padding:4px 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:12px;text-align:right"></div>';
+  h += '</div>';
+
+  // 현재 상태 박스
+  h += '<div style="background:#EBF3FC;border-radius:6px;padding:8px 10px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">';
+  h += '<div><div style="font-size:9px;color:#3D6DA6">현재 매출</div><div style="font-size:13px;font-weight:700;color:#185FA5">' + fmtPO(sales) + '원</div></div>';
+  h += '<div><div style="font-size:9px;color:#3D6DA6">현재 할인율</div><div style="font-size:13px;font-weight:700;color:#185FA5">' + (tierInfo.current ? tierInfo.current.rate + '%' : '-') + '</div></div>';
+  h += '<div><div style="font-size:9px;color:#3D6DA6">현재 구간</div><div style="font-size:13px;font-weight:700;color:#185FA5">' + (tierInfo.current ? fmtPO(tierInfo.current.minAmount) + '~' + (tierInfo.current.maxAmount ? fmtPO(tierInfo.current.maxAmount) : '∞') : '-') + '</div></div>';
+  h += '<div><div style="font-size:9px;color:#3D6DA6">다음 구간까지</div><div style="font-size:13px;font-weight:700;color:#CC2222">' + (tierInfo.next ? fmtPO(tierInfo.shortage) + '원' : '최고 구간') + '</div></div>';
+  h += '</div>';
+
+  // 구간별 혜택 테이블
+  h += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px">';
+  h += '<thead><tr style="background:#F4F6FA"><th style="padding:4px 6px;text-align:center;font-size:10px;border:1px solid #EAECF2">No</th><th style="padding:4px 6px;text-align:right;font-size:10px;border:1px solid #EAECF2">매출기준 (이상)</th><th style="padding:4px 6px;text-align:right;font-size:10px;border:1px solid #EAECF2">매출기준 (미만)</th><th style="padding:4px 6px;text-align:left;font-size:10px;border:1px solid #EAECF2">지급품목</th><th style="padding:4px 6px;text-align:right;font-size:10px;border:1px solid #EAECF2">할인율(%)</th><th style="padding:4px 6px;text-align:center;font-size:10px;border:1px solid #EAECF2">상태</th><th style="padding:4px 6px;text-align:center;font-size:10px;border:1px solid #EAECF2"></th></tr></thead>';
+  h += '<tbody id="comm-tiers-' + idx + '">';
+  (promo.tiers || []).forEach(function(tier, ti) {
+    var tierStatus = '';
+    if (tierInfo.currentIdx === ti) tierStatus = '<span style="background:#185FA5;color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">현재</span>';
+    else if (tierInfo.currentIdx > ti) tierStatus = '<span style="background:#1D9E75;color:#fff;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600">달성</span>';
+    else tierStatus = '<span style="background:#EAECF2;color:#5A6070;padding:1px 5px;border-radius:3px;font-size:9px">미달</span>';
+
+    h += '<tr>';
+    h += '<td style="padding:3px 6px;text-align:center;border:1px solid #EAECF2">' + (ti + 1) + '</td>';
+    h += '<td style="padding:3px 4px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="minAmount" value="' + fmtPO(tier.minAmount || 0) + '" style="width:100%;border:none;font-size:11px;text-align:right;padding:0"></td>';
+    h += '<td style="padding:3px 4px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="maxAmount" value="' + (tier.maxAmount !== null ? fmtPO(tier.maxAmount) : '') + '" placeholder="무제한" style="width:100%;border:none;font-size:11px;text-align:right;padding:0"></td>';
+    h += '<td style="padding:3px 4px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="benefit" value="' + (tier.benefit || '') + '" style="width:100%;border:none;font-size:11px;padding:0"></td>';
+    h += '<td style="padding:3px 4px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="rate" value="' + (tier.rate !== null && tier.rate !== undefined ? tier.rate : '') + '" style="width:100%;border:none;font-size:11px;text-align:right;padding:0"></td>';
+    h += '<td style="padding:3px 6px;text-align:center;border:1px solid #EAECF2">' + tierStatus + '</td>';
+    h += '<td style="padding:3px 4px;text-align:center;border:1px solid #EAECF2"><button onclick="_deleteCommTier(' + idx + ',' + ti + ')" style="background:none;border:none;color:#CC2222;cursor:pointer;font-size:12px;padding:0">✕</button></td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  h += '<button onclick="_addCommTier(' + idx + ')" style="font-size:10px;color:#185FA5;background:none;border:1px dashed #B8C5D6;border-radius:4px;padding:3px 10px;cursor:pointer">+ 구간 추가</button>';
+
+  h += '</div>'; // 바디 끝
+  h += '</div>'; // 아코디언 끝
+  return h;
+}
+
+function _toggleCommAccordion(idx) {
+  var body = document.getElementById('comm-body-' + idx);
+  var arrow = document.getElementById('comm-arrow-' + idx);
+  if (!body) return;
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    if (arrow) arrow.style.transform = 'rotate(90deg)';
+  } else {
+    body.style.display = 'none';
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
+  }
+}
+
+function _addNewCommercialPromo() {
+  var promos = _getCommercialPromos();
+  var now = new Date();
+  var y = now.getFullYear(), m = now.getMonth();
+  var lastDay = new Date(y, m + 1, 0).getDate();
+  promos.push({
+    id: 'comm_' + Date.now(),
+    name: '새 프로모션',
+    startDate: y + '-' + String(m + 1).padStart(2, '0') + '-01',
+    endDate: y + '-' + String(m + 1).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0'),
+    condition: '',
+    targetAmount: 0,
+    tiers: [{ minAmount: 0, maxAmount: null, benefit: '', rate: null }]
+  });
+  _saveCommercialPromos(promos);
+  // 모달 재렌더링
+  document.getElementById('commercial-promo-modal').remove();
+  openCommercialPromoModal();
+  // 마지막 아코디언 펼치기
+  setTimeout(function() { var lastIdx = promos.length - 1; var body = document.getElementById('comm-body-' + lastIdx); if (body) body.style.display = 'block'; var arrow = document.getElementById('comm-arrow-' + lastIdx); if (arrow) arrow.style.transform = 'rotate(90deg)'; }, 50);
+}
+
+function _deleteCommPromo(idx) {
+  if (!confirm('이 프로모션을 삭제하시겠습니까?')) return;
+  var promos = _getCommercialPromos();
+  promos.splice(idx, 1);
+  _saveCommercialPromos(promos);
+  document.getElementById('commercial-promo-modal').remove();
+  openCommercialPromoModal();
+}
+
+function _addCommTier(promoIdx) {
+  var promos = _getCommercialPromos();
+  var promo = promos[promoIdx];
+  if (!promo) return;
+  if (!promo.tiers) promo.tiers = [];
+  var lastMax = promo.tiers.length > 0 ? (promo.tiers[promo.tiers.length - 1].maxAmount || 0) : 0;
+  promo.tiers.push({ minAmount: lastMax, maxAmount: null, benefit: '', rate: null });
+  _saveCommercialPromos(promos);
+  document.getElementById('commercial-promo-modal').remove();
+  openCommercialPromoModal();
+  setTimeout(function() { var body = document.getElementById('comm-body-' + promoIdx); if (body) body.style.display = 'block'; var arrow = document.getElementById('comm-arrow-' + promoIdx); if (arrow) arrow.style.transform = 'rotate(90deg)'; }, 50);
+}
+
+function _deleteCommTier(promoIdx, tierIdx) {
+  var promos = _getCommercialPromos();
+  if (!promos[promoIdx] || !promos[promoIdx].tiers) return;
+  promos[promoIdx].tiers.splice(tierIdx, 1);
+  _saveCommercialPromos(promos);
+  document.getElementById('commercial-promo-modal').remove();
+  openCommercialPromoModal();
+  setTimeout(function() { var body = document.getElementById('comm-body-' + promoIdx); if (body) body.style.display = 'block'; var arrow = document.getElementById('comm-arrow-' + promoIdx); if (arrow) arrow.style.transform = 'rotate(90deg)'; }, 50);
+}
+
+function _parseMoneyInput(val) {
+  return parseInt(String(val).replace(/[^0-9]/g, ''), 10) || 0;
+}
+
+function _saveCommercialPromoModal() {
+  var promos = _getCommercialPromos();
+
+  // 기본 필드 수집
+  document.querySelectorAll('.comm-input').forEach(function(inp) {
+    var idx = parseInt(inp.getAttribute('data-idx'));
+    var field = inp.getAttribute('data-field');
+    if (isNaN(idx) || !promos[idx]) return;
+    if (field === 'targetAmount') {
+      promos[idx][field] = _parseMoneyInput(inp.value);
+    } else {
+      promos[idx][field] = inp.value;
+    }
+  });
+
+  // 구간 필드 수집
+  document.querySelectorAll('.comm-tier-input').forEach(function(inp) {
+    var pi = parseInt(inp.getAttribute('data-promo'));
+    var ti = parseInt(inp.getAttribute('data-tier'));
+    var tfield = inp.getAttribute('data-tfield');
+    if (isNaN(pi) || isNaN(ti) || !promos[pi] || !promos[pi].tiers || !promos[pi].tiers[ti]) return;
+    if (tfield === 'minAmount') {
+      promos[pi].tiers[ti].minAmount = _parseMoneyInput(inp.value);
+    } else if (tfield === 'maxAmount') {
+      var v = inp.value.trim();
+      promos[pi].tiers[ti].maxAmount = v === '' ? null : _parseMoneyInput(v);
+    } else if (tfield === 'rate') {
+      var rv = inp.value.trim();
+      promos[pi].tiers[ti].rate = rv === '' ? null : parseFloat(rv);
+    } else if (tfield === 'benefit') {
+      promos[pi].tiers[ti].benefit = inp.value;
+    }
+  });
+
+  _saveCommercialPromos(promos);
+  document.getElementById('commercial-promo-modal').remove();
+  renderPOTab();
+  toast('커머셜 프로모션 저장 완료');
+}
+
+// ========================================
 // 장바구니 (Step B-2a)
 // ========================================
 var poCart = JSON.parse(localStorage.getItem('mw_po_cart') || '[]');
@@ -2907,11 +3240,13 @@ function submitPOOrder() {
   // mw_po_history에 저장
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   var now = new Date().toISOString();
+  var activeSubtab = localStorage.getItem('mw_po_active_subtab') || 'normal';
   poCart.forEach(function(c, idx) {
     history.push({
       id: Date.now() + '_' + idx,
       date: now,
       type: c.promoName ? c.promoName : 'normal',
+      subtab: activeSubtab,
       promoName: c.promoName || '',
       manageCode: c.code,
       ttiNum: c.ttiNum,

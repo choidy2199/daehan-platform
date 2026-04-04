@@ -312,6 +312,14 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-total-card .po-total-halves { display:flex; gap:4px; margin-top:6px; }
 .po-total-card .po-total-half { flex:1; background:rgba(255,255,255,0.15); border-radius:4px; padding:3px 6px; font-size:11px; text-align:center; }
 
+/* 커머셜P 힌트 */
+.po-commercial-hint { background:rgba(255,255,255,.15); border-radius:4px; padding:4px 8px; font-size:10px; color:rgba(255,255,255,.85); cursor:pointer; line-height:1.5; margin-top:4px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.po-commercial-hint:hover { background:rgba(255,255,255,.25); }
+.comm-tag { font-weight:700; color:#fff; }
+.comm-period { font-size:9px; color:rgba(255,255,255,.5); }
+.comm-next b { color:#FFCC66; }
+.comm-arrow { font-size:9px; color:rgba(255,255,255,.4); margin-left:auto; }
+
 /* 서브탭 7개 */
 .po-subtabs { display:flex; gap:4px; padding:6px 12px; overflow-x:auto; }
 .po-sub-tab { background:#1A1D23; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; font-family:'Pretendard',sans-serif; transition:background 0.15s; }
