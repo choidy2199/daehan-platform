@@ -27,11 +27,13 @@ chrome.runtime.onMessage.addListener(
       // 주문 완료 처리
       chrome.storage.local.remove('pendingOrder');
       console.log('[자동발주] 주문 완료:', request.result);
+      notifyDaehan({ type: 'DAEHAN_ORDER_COMPLETE', result: request.result });
       sendResponse({ success: true });
     }
 
     if (request.action === 'orderError') {
       console.error('[자동발주] 주문 실패:', request.error);
+      notifyDaehan({ type: 'DAEHAN_ORDER_ERROR', error: request.error });
       sendResponse({ success: false, error: request.error });
     }
 

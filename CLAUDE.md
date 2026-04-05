@@ -80,6 +80,17 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 - Naver Npay 주문관리 수수료: 3.63%
 - 가격 반올림: 소매가 1,000원 단위, 기타 채널 100원 단위 올림
 
+### CSS 우선순위 (IMPORTANT)
+- inline style(app.js) > CSS class(style.css) > tag selector
+- CSS만 수정하고 "완료"라고 하지 말 것 — app.js inline style이 덮어쓰면 CSS 수정은 무의미
+- 스타일 변경 시 반드시 양쪽(app.js + style.css) grep 확인
+- 같은 스타일 수정 2번째 요청 → inline style 덮어쓰기가 원인인지 먼저 확인
+
+### 동기화 필수 확인
+- save() 사용 확인 + Supabase 동기화 대상 목록 포함 확인
+- 동기화 방식: per-key upsert 필수, full-replace 금지
+- 동기화 누락 → 3명 사용자 데이터 불일치. 절대 빠뜨리지 말 것
+
 ### 프로젝트 UI 규칙
 - 숫자 포맷: fmtPO 함수 사용
 - 검색 자동완성: initPOAutocomplete 함수 사용

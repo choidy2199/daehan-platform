@@ -1879,6 +1879,7 @@ function calcPOSalesData() {
   var powerTool = 0, handTool = 0, packout = 0, totalMonth = 0, first15 = 0, last15 = 0;
 
   history.forEach(function(item) {
+    if (item.dryRun) return;
     var d = new Date(item.date);
     var amt = item.amount || 0;
     var cat = catMap[item.ttiNum] || catMap[item.manageCode] || '';
@@ -3668,42 +3669,399 @@ function addPOCartItem() {
   toast('자동완성 목록에서 제품을 선택하세요');
 }
 
-// TTI 발주하기
+// TTI 발주하기 → 자동발주 모달 열기
 function submitPOOrder() {
   if (poCart.length === 0) { toast('주문할 제품이 없습니다'); return; }
+  openAutoOrderModal();
+}
+
+// ========================================
+// 자동발주 모달 + 실행 엔진
+// ========================================
+var _autoOrderState = { running: false, dryRun: true, groups: [], currentGroup: -1, results: [], cancelled: false };
+
+function openAutoOrderModal() {
+  // 기존 모달 제거
+  var existing = document.getElementById('auto-order-modal');
+  if (existing) existing.remove();
+
+  // 장바구니 아이템을 주문유형별 그룹핑
+  var groups = _groupCartByOrderType(poCart);
   var totalQty = poCart.reduce(function(s, c) { return s + (c.qty || 0); }, 0);
   var totalSupply = poCart.reduce(function(s, c) { return s + (c.supplyPrice || 0) * (c.qty || 0); }, 0);
-  if (!confirm(poCart.length + '건 ' + totalQty + '개를 발주하시겠습니까?\n공급가 합계: ' + fmtPO(totalSupply) + '원')) return;
+  var vat = Math.round(totalSupply * 0.1);
 
-  // mw_po_history에 저장
+  _autoOrderState = { running: false, dryRun: true, groups: groups, currentGroup: -1, results: [], cancelled: false };
+
+  var modal = document.createElement('div');
+  modal.id = 'auto-order-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
+
+  var h = '<div style="background:#fff;border-radius:10px;width:760px;max-width:95vw;max-height:90vh;overflow:hidden;border:1px solid #DDE1EB;display:flex;flex-direction:column;font-family:Pretendard,-apple-system,sans-serif">';
+
+  // 헤더
+  h += '<div style="background:#1A1D23;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">';
+  h += '<div style="display:flex;align-items:center;gap:10px">';
+  h += '<span style="font-size:14px;font-weight:600">TTI 자동발주</span>';
+  h += '<span style="background:#185FA5;color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">' + poCart.length + '건</span>';
+  h += '</div>';
+  h += '<div style="display:flex;align-items:center;gap:12px">';
+  // dry-run 토글
+  h += '<div style="display:flex;align-items:center;gap:6px">';
+  h += '<label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer">';
+  h += '<input type="checkbox" id="ao-dryrun-toggle" checked onchange="_toggleDryRun(this.checked)" style="opacity:0;width:0;height:0">';
+  h += '<span id="ao-dryrun-track" style="position:absolute;inset:0;background:#185FA5;border-radius:10px;transition:background 0.2s"></span>';
+  h += '<span id="ao-dryrun-thumb" style="position:absolute;top:2px;left:18px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left 0.2s"></span>';
+  h += '</label>';
+  h += '<span id="ao-dryrun-label" style="font-size:11px;font-weight:600;color:#6CB4EE">연습모드</span>';
+  h += '</div>';
+  h += '<button onclick="_closeAutoOrderModal()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">✕</button>';
+  h += '</div></div>';
+
+  // 바디
+  h += '<div style="padding:16px;overflow-y:auto;flex:1">';
+
+  // 프로그레스 바
+  h += '<div style="margin-bottom:12px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+  h += '<span id="ao-progress-text" style="font-size:11px;color:#5A6070">대기 중</span>';
+  h += '<span id="ao-progress-count" style="font-size:11px;font-weight:600;color:#185FA5">0 / ' + poCart.length + '</span>';
+  h += '</div>';
+  h += '<div style="height:6px;background:#F0F2F5;border-radius:3px;overflow:hidden">';
+  h += '<div id="ao-progress-bar" style="height:100%;width:0%;background:#185FA5;border-radius:3px;transition:width 0.3s"></div>';
+  h += '</div></div>';
+
+  // 주문 테이블
+  h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  h += '<thead><tr style="background:#F4F6FA">';
+  h += '<th style="padding:6px 8px;text-align:left;font-size:11px;font-weight:600;color:#5A6070;border-bottom:1px solid #E5E8EB">주문유형</th>';
+  h += '<th style="padding:6px 8px;text-align:left;font-size:11px;font-weight:600;color:#5A6070;border-bottom:1px solid #E5E8EB;min-width:180px">모델명</th>';
+  h += '<th style="padding:6px 8px;text-align:center;font-size:11px;font-weight:600;color:#5A6070;border-bottom:1px solid #E5E8EB;width:50px">수량</th>';
+  h += '<th style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:#5A6070;border-bottom:1px solid #E5E8EB;width:100px">금액</th>';
+  h += '<th style="padding:6px 8px;text-align:center;font-size:11px;font-weight:600;color:#5A6070;border-bottom:1px solid #E5E8EB;width:70px">상태</th>';
+  h += '<th style="padding:6px 8px;text-align:center;font-size:11px;font-weight:600;color:#5A6070;border-bottom:1px solid #E5E8EB;width:110px">주문번호</th>';
+  h += '</tr></thead><tbody id="ao-table-body">';
+
+  poCart.forEach(function(c, idx) {
+    var badge = _aoSubtabBadge(c.subtab);
+    h += '<tr id="ao-row-' + idx + '" style="border-bottom:1px solid #F0F2F5">';
+    h += '<td style="padding:6px 8px">' + badge + '</td>';
+    h += '<td style="padding:6px 8px;font-weight:500">' + (c.model || c.ttiNum || '') + '</td>';
+    h += '<td style="padding:6px 8px;text-align:center;font-weight:600">' + (c.qty || 0) + '</td>';
+    h += '<td style="padding:6px 8px;text-align:right">' + fmtPO((c.supplyPrice || 0) * (c.qty || 0)) + '원</td>';
+    h += '<td style="padding:6px 8px;text-align:center" id="ao-status-' + idx + '"><span style="color:#9BA3B2">⏳ 대기</span></td>';
+    h += '<td style="padding:6px 8px;text-align:center;font-size:11px;color:#9BA3B2" id="ao-orderno-' + idx + '">-</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+
+  // 합계 영역
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;padding:10px;background:#F4F6FA;border-radius:6px">';
+  h += '<div><div style="font-size:10px;color:#5A6070">공급가 합계</div><div style="font-size:14px;font-weight:700">' + fmtPO(totalSupply) + '원</div></div>';
+  h += '<div><div style="font-size:10px;color:#5A6070">부가세 (10%)</div><div style="font-size:14px;font-weight:700">' + fmtPO(vat) + '원</div></div>';
+  h += '<div><div style="font-size:10px;color:#5A6070">총합계</div><div style="font-size:14px;font-weight:700;color:#185FA5">' + fmtPO(totalSupply + vat) + '원</div></div>';
+  h += '</div>';
+
+  h += '</div>'; // 바디 끝
+
+  // 상태 메시지 바
+  h += '<div id="ao-status-bar" style="padding:8px 16px;background:#E6F1FB;font-size:12px;color:#185FA5;display:none"></div>';
+
+  // 하단 버튼
+  h += '<div style="padding:12px 16px;border-top:1px solid #E5E8EB;display:flex;justify-content:flex-end;gap:8px">';
+  h += '<button id="ao-btn-cancel" onclick="_closeAutoOrderModal()" style="padding:8px 20px;border:1px solid #DDE1EB;border-radius:6px;background:#fff;color:#5A6070;font-size:12px;font-weight:600;cursor:pointer">취소</button>';
+  h += '<button id="ao-btn-start" onclick="_startAutoOrder()" style="padding:8px 20px;border:none;border-radius:6px;background:#185FA5;color:#fff;font-size:12px;font-weight:600;cursor:pointer">발주 시작</button>';
+  h += '</div>';
+
+  h += '</div>'; // 모달 컨테이너 끝
+  modal.innerHTML = h;
+
+  // 오버레이 클릭으로 닫기 방지 (진행 중)
+  modal.addEventListener('click', function(e) {
+    if (e.target === modal && !_autoOrderState.running) _closeAutoOrderModal();
+  });
+
+  document.body.appendChild(modal);
+}
+
+function _aoSubtabBadge(subtab) {
+  if (!subtab || subtab === 'normal') return '<span style="background:#E6F1FB;color:#185FA5;font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;white-space:nowrap">일반</span>';
+  if (subtab.indexOf('promo-t') === 0) return '<span style="background:#FFF3E0;color:#E67700;font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;white-space:nowrap">' + subtab.replace('promo-', '').toUpperCase() + '</span>';
+  if (subtab === 'package') return '<span style="background:#F3E8FF;color:#7C3AED;font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;white-space:nowrap">패키지</span>';
+  return '<span style="background:#F0F2F5;color:#5A6070;font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;white-space:nowrap">' + subtab + '</span>';
+}
+
+function _toggleDryRun(checked) {
+  _autoOrderState.dryRun = checked;
+  var label = document.getElementById('ao-dryrun-label');
+  var track = document.getElementById('ao-dryrun-track');
+  var thumb = document.getElementById('ao-dryrun-thumb');
+  if (checked) {
+    if (label) { label.textContent = '연습모드'; label.style.color = '#6CB4EE'; }
+    if (track) track.style.background = '#185FA5';
+    if (thumb) thumb.style.left = '18px';
+  } else {
+    if (label) { label.textContent = '실제주문'; label.style.color = '#EF4444'; }
+    if (track) track.style.background = '#EF4444';
+    if (thumb) thumb.style.left = '2px';
+  }
+}
+
+function _closeAutoOrderModal() {
+  if (_autoOrderState.running) {
+    if (!confirm('발주가 진행 중입니다. 중단하시겠습니까?')) return;
+    _autoOrderState.cancelled = true;
+    _autoOrderState.running = false;
+  }
+  var modal = document.getElementById('auto-order-modal');
+  if (modal) modal.remove();
+}
+
+function _aoSetStatus(msg, isError) {
+  var bar = document.getElementById('ao-status-bar');
+  if (!bar) return;
+  bar.style.display = 'block';
+  bar.textContent = msg;
+  bar.style.background = isError ? '#FCEBEB' : '#E6F1FB';
+  bar.style.color = isError ? '#CC2222' : '#185FA5';
+}
+
+function _aoUpdateRow(idx, status, orderNo) {
+  var statusEl = document.getElementById('ao-status-' + idx);
+  var orderEl = document.getElementById('ao-orderno-' + idx);
+  var rowEl = document.getElementById('ao-row-' + idx);
+  if (statusEl) statusEl.innerHTML = status;
+  if (orderEl && orderNo !== undefined) orderEl.textContent = orderNo;
+  if (rowEl) {
+    if (status.indexOf('✅') >= 0) rowEl.style.background = '#F0FFF4';
+    else if (status.indexOf('❌') >= 0) rowEl.style.background = '#FFF5F5';
+    else if (status.indexOf('spinner') >= 0) rowEl.style.background = '#FFFBEB';
+  }
+}
+
+function _aoUpdateProgress(done, total) {
+  var bar = document.getElementById('ao-progress-bar');
+  var count = document.getElementById('ao-progress-count');
+  var pct = total > 0 ? Math.round(done / total * 100) : 0;
+  if (bar) bar.style.width = pct + '%';
+  if (count) count.textContent = done + ' / ' + total;
+}
+
+// 장바구니를 주문유형별로 그룹핑
+function _groupCartByOrderType(cart) {
+  var groups = {};
+  cart.forEach(function(c, idx) {
+    var key = c.subtab || 'normal';
+    if (!groups[key]) groups[key] = { subtab: key, items: [], indices: [] };
+    groups[key].items.push(c);
+    groups[key].indices.push(idx);
+  });
+  // 순서: normal → promo-t* → package
+  var order = ['normal'];
+  Object.keys(groups).sort().forEach(function(k) { if (k !== 'normal' && k !== 'package') order.push(k); });
+  if (groups['package']) order.push('package');
+  return order.filter(function(k) { return groups[k]; }).map(function(k) { return groups[k]; });
+}
+
+// 자동발주 시작
+function _startAutoOrder() {
+  if (_autoOrderState.running) return;
+  var btn = document.getElementById('ao-btn-start');
+  if (btn) { btn.disabled = true; btn.style.background = '#9BA3B2'; btn.textContent = '진행 중...'; }
+
+  _autoOrderState.running = true;
+  _autoOrderState.cancelled = false;
+  _autoOrderState.results = [];
+  _aoSetStatus('크롬 확장 프로그램 확인 중...');
+
+  // 확장 프로그램 감지 (3초 타임아웃)
+  var extensionDetected = false;
+  var checkHandler = function(event) {
+    if (event.data && event.data.type === 'DAEHAN_EXTENSION_STATUS') {
+      extensionDetected = true;
+      window.removeEventListener('message', checkHandler);
+      _aoSetStatus('확장 프로그램 감지 완료. 발주 시작...');
+      _executeOrderGroups();
+    }
+  };
+  window.addEventListener('message', checkHandler);
+  window.postMessage({ type: 'DAEHAN_CHECK_EXTENSION' }, '*');
+
+  setTimeout(function() {
+    if (!extensionDetected) {
+      window.removeEventListener('message', checkHandler);
+      // 확장 READY 신호로 재확인
+      if (window._daehanExtensionReady) {
+        _aoSetStatus('확장 프로그램 감지 완료. 발주 시작...');
+        _executeOrderGroups();
+      } else {
+        _autoOrderState.running = false;
+        _aoSetStatus('크롬 확장 프로그램이 감지되지 않습니다. 확장을 설치하고 페이지를 새로고침하세요.', true);
+        if (btn) { btn.disabled = false; btn.style.background = '#185FA5'; btn.textContent = '발주 시작'; }
+      }
+    }
+  }, 3000);
+}
+
+// 확장 READY 신호 저장 (content-daehan.js가 로드 시 보냄)
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'DAEHAN_EXTENSION_READY') {
+    window._daehanExtensionReady = true;
+  }
+});
+
+// 주문 그룹 순차 실행
+async function _executeOrderGroups() {
+  var groups = _autoOrderState.groups;
+  var totalItems = poCart.length;
+  var doneCount = 0;
+
+  for (var g = 0; g < groups.length; g++) {
+    if (_autoOrderState.cancelled) break;
+    _autoOrderState.currentGroup = g;
+    var group = groups[g];
+    var subtabLabel = group.subtab === 'normal' ? '일반주문' : group.subtab === 'package' ? '패키지' : group.subtab.replace('promo-', '').toUpperCase() + ' 프로모션';
+    _aoSetStatus('[' + (g + 1) + '/' + groups.length + '] ' + subtabLabel + ' ' + group.items.length + '건 발주 중...');
+
+    // 해당 그룹 행 상태 → 진행중
+    group.indices.forEach(function(idx) {
+      _aoUpdateRow(idx, '<span style="color:#E67700"><span class="ao-spinner"></span> 진행중</span>');
+    });
+
+    // postMessage로 크롬 확장에 전달
+    var orderItems = group.items.map(function(c) {
+      return { code: c.ttiNum || c.code, qty: c.qty, model: c.model, supplyPrice: c.supplyPrice };
+    });
+
+    try {
+      var result = await _sendOrderToExtension(orderItems, group.subtab, _autoOrderState.dryRun);
+      // 그룹 결과 처리
+      group.indices.forEach(function(idx) {
+        if (result.success) {
+          var orderNo = _autoOrderState.dryRun ? 'DRY-RUN' : (result.orderNumber || result.result && result.result.orderNumber || '-');
+          var statusColor = _autoOrderState.dryRun ? '#E67700' : '#16A34A';
+          var statusIcon = _autoOrderState.dryRun ? '🔸' : '✅';
+          var statusText = _autoOrderState.dryRun ? 'dry-run 완료' : '완료';
+          _aoUpdateRow(idx, '<span style="color:' + statusColor + '">' + statusIcon + ' ' + statusText + '</span>', orderNo);
+          _autoOrderState.results.push({ idx: idx, success: true, dryRun: _autoOrderState.dryRun, orderNumber: orderNo });
+        } else {
+          _aoUpdateRow(idx, '<span style="color:#EF4444">❌ ' + (result.error || '실패') + '</span>', '-');
+          _autoOrderState.results.push({ idx: idx, success: false, error: result.error });
+        }
+        doneCount++;
+        _aoUpdateProgress(doneCount, totalItems);
+      });
+    } catch (err) {
+      group.indices.forEach(function(idx) {
+        _aoUpdateRow(idx, '<span style="color:#EF4444">❌ ' + err.message + '</span>', '-');
+        _autoOrderState.results.push({ idx: idx, success: false, error: err.message });
+        doneCount++;
+        _aoUpdateProgress(doneCount, totalItems);
+      });
+    }
+  }
+
+  // 전체 완료
+  _autoOrderState.running = false;
+  var successCount = _autoOrderState.results.filter(function(r) { return r.success; }).length;
+  var failCount = _autoOrderState.results.filter(function(r) { return !r.success; }).length;
+
+  if (_autoOrderState.dryRun) {
+    _aoSetStatus('dry-run 완료: ' + successCount + '건 성공, ' + failCount + '건 실패. 장바구니는 유지됩니다.');
+    // dryRun → mw_po_history에 dryRun:true로 저장 (매출 집계 제외, 이력 확인용)
+    _saveAutoOrderHistory(true);
+  } else {
+    // 실제 주문 → 성공 건만 mw_po_history에 저장 + 장바구니에서 제거
+    _aoSetStatus('발주 완료: ' + successCount + '건 성공, ' + failCount + '건 실패');
+    _saveAutoOrderHistory(false);
+    _removeSuccessFromCart();
+  }
+
+  var btn = document.getElementById('ao-btn-start');
+  if (btn) { btn.textContent = '완료'; btn.style.background = '#16A34A'; btn.disabled = false; btn.onclick = function() { _closeAutoOrderModal(); }; }
+
+  var progressText = document.getElementById('ao-progress-text');
+  if (progressText) progressText.textContent = '완료';
+}
+
+// 크롬 확장에 주문 전달 (Promise)
+function _sendOrderToExtension(items, orderType, dryRun) {
+  return new Promise(function(resolve) {
+    var timeout;
+    var handler = function(event) {
+      if (event.data && event.data.type === 'DAEHAN_ORDER_RESULT') {
+        clearTimeout(timeout);
+        window.removeEventListener('message', handler);
+        resolve(event.data);
+      }
+    };
+    window.addEventListener('message', handler);
+
+    window.postMessage({
+      type: 'DAEHAN_AUTO_ORDER',
+      items: items,
+      orderType: orderType,
+      dryRun: dryRun
+    }, '*');
+    console.log('[자동발주] postMessage 발신:', { type: 'DAEHAN_AUTO_ORDER', items: items.length, orderType: orderType, dryRun: dryRun });
+
+    // 60초 타임아웃
+    timeout = setTimeout(function() {
+      window.removeEventListener('message', handler);
+      resolve({ success: false, error: '응답 시간 초과 (60초)' });
+    }, 60000);
+  });
+}
+
+// mw_po_history에 저장
+function _saveAutoOrderHistory(isDryRun) {
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   var now = new Date().toISOString();
-  var activeSubtab = localStorage.getItem('mw_po_active_subtab') || 'normal';
-  poCart.forEach(function(c, idx) {
+  var dateStr = now.split('T')[0];
+  _autoOrderState.results.forEach(function(r) {
+    if (!r.success) return;
+    var c = poCart[r.idx];
+    if (!c) return;
     history.push({
-      id: Date.now() + '_' + idx,
+      id: Date.now() + '_' + r.idx,
       date: now,
       type: c.promoName ? c.promoName : 'normal',
-      subtab: activeSubtab,
+      subtab: c.subtab || 'normal',
       promoName: c.promoName || '',
       manageCode: c.code,
       ttiNum: c.ttiNum,
       model: c.model,
+      category: c.category || '',
       qty: c.qty,
       supplyPrice: c.supplyPrice,
       costPrice: c.costPrice,
       amount: c.supplyPrice * c.qty,
-      erpStatus: 'pending'
+      orderNumber: r.orderNumber || '',
+      dryRun: isDryRun,
+      erpStatus: isDryRun ? 'dry-run' : 'pending'
     });
   });
   save('mw_po_history', history);
+}
 
-  // 장바구니 비우기
-  poCart = [];
+// 성공 건 장바구니에서 제거
+function _removeSuccessFromCart() {
+  var successIndices = {};
+  _autoOrderState.results.forEach(function(r) { if (r.success) successIndices[r.idx] = true; });
+  poCart = poCart.filter(function(c, idx) { return !successIndices[idx]; });
   _savePoCart();
   renderPOCartTable();
-  toast('발주 완료! 발주 리스트에서 확인하세요');
+  renderPOTab();
 }
+
+// CSS 스피너 (인라인)
+(function _injectAOSpinnerCSS() {
+  if (document.getElementById('ao-spinner-style')) return;
+  var style = document.createElement('style');
+  style.id = 'ao-spinner-style';
+  style.textContent = '.ao-spinner{display:inline-block;width:12px;height:12px;border:2px solid #E67700;border-top-color:transparent;border-radius:50%;animation:ao-spin 0.6s linear infinite;vertical-align:middle;margin-right:4px}@keyframes ao-spin{to{transform:rotate(360deg)}}';
+  document.head.appendChild(style);
+})();
 
 // 제품 목록 필터
 function filterPOProducts() {

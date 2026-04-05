@@ -80,6 +80,15 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     window.postMessage(message, '*');
     sendResponse({ ok: true });
   }
+  // Phase 4-1: 자동발주 결과 역전파
+  if (message.type === 'DAEHAN_ORDER_COMPLETE') {
+    window.postMessage({ type: 'DAEHAN_ORDER_RESULT', success: true, result: message.result }, '*');
+    sendResponse({ ok: true });
+  }
+  if (message.type === 'DAEHAN_ORDER_ERROR') {
+    window.postMessage({ type: 'DAEHAN_ORDER_RESULT', success: false, error: message.error }, '*');
+    sendResponse({ ok: true });
+  }
 });
 
 // Phase 1-2: 프로모션 스크래핑 요청
