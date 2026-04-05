@@ -1,5 +1,5 @@
 # 대한종합상사 세션 키트
-> 마지막 업데이트: 2026-04-04
+> 마지막 업데이트: 2026-04-05
 
 ## app.js 함수 맵 — 발주 탭 (Step B-1 ~ B-3)
 
@@ -30,7 +30,7 @@
 | updateCartQty(idx, val) | 장바구니 수량 변경 |
 | removeCartItem(idx) | 장바구니 항목 삭제 |
 | clearPOCart() | 장바구니 전체 비우기 (confirm) |
-| submitPOOrder() | TTI 발주하기 → mw_po_history 저장 (subtab 필드 포함) |
+| submitPOOrder() | TTI 발주하기 → openAutoOrderModal() 호출 |
 
 ### T5/T6 프로모션 탭 (tList 기반 동적)
 | 함수 | 설명 |
@@ -94,10 +94,13 @@
 ### 발주 리스트 탭
 | 함수 | 설명 |
 |------|------|
-| buildPOListPanel() | 발주 리스트 패널 (요약카드 + 날짜필터 + 테이블, 11컬럼) |
+| buildPOListPanel() | 발주 리스트 패널 (요약카드 + 날짜필터 + 테이블, 14컬럼 — TTI상태/액션/주문번호 포함) |
 | changePOListFilter(val) | 날짜 필터 변경 (today/week/month) |
 | togglePOListAll(el) | 체크박스 전체 선택/해제 |
 | registerErpFromList() | 경영박사 매입전표 등록 (선택 항목) |
+| syncTtiOrderHistory(ttiOrders) | TTI 주문내역 → mw_po_history 동기화 (ttiOrderNo/날짜+금액 매칭) |
+| ttiCancelOrder(orderNo) | TTI 주문취소 요청 (postMessage → 크롬 확장) |
+| ttiReorder(item) | TTI 재주문 요청 (postMessage → 크롬 확장) |
 
 ### FOC 발주 탭
 | 함수 | 설명 |
@@ -107,6 +110,21 @@
 | clearFOCCart() | FOC 장바구니 비우기 |
 | addFOCCartItem() | FOC 제품등록 |
 | submitFOCOrder() | FOC 발주하기 |
+
+### 자동발주 모달 (Phase 4-1)
+| 함수 | 설명 |
+|------|------|
+| openAutoOrderModal() | 자동발주 진행 모달 (dry-run 토글, 프로그레스 바, 주문 테이블) |
+| _toggleDryRun(checked) | dry-run 토글 ON/OFF + localStorage 저장 |
+| _closeAutoOrderModal() | 모달 닫기 (진행 중이면 confirm) |
+| _startAutoOrder() | 발주 시작 (확장 감지 → _executeOrderGroups) |
+| _executeOrderGroups() | 그룹 순차 실행 → 결과 저장 |
+| _sendOrderToExtension(items, orderType, dryRun) | 크롬 확장에 주문 전달 (TTI_AUTO_ORDER_COMPLETE 대기) |
+| _saveAutoOrderHistory(isDryRun) | mw_po_history에 저장 (category, orderNumber, dryRun 필드) |
+| _removeSuccessFromCart() | 성공 건 장바구니 제거 |
+| _groupCartByOrderType(cart) | subtab별 그룹핑 (normal→promo→package 순) |
+| _aoSubtabBadge(subtab) | 주문유형 뱃지 HTML |
+| _aoUpdateRow/Progress/SetStatus | 모달 UI 업데이트 유틸 |
 
 ### TTI 스크래핑
 | 함수 | 설명 |
@@ -140,7 +158,7 @@ PO_PROMO_LIMIT = _getPromoLimits()  // mw_settings.promoLimits 기반 동적
 | 키 | 용도 | 형식 |
 |----|------|------|
 | mw_po_cart | 장바구니 (탭전환/새로고침 복원) | [{code, ttiNum, model, supplyPrice, qty, subtab, promoName, ...}] |
-| mw_po_history | 발주 이력 (매출집계+발주리스트) | [{id, date, type, subtab, model, qty, supplyPrice, costPrice, amount, erpStatus, ...}] |
+| mw_po_history | 발주 이력 (매출집계+발주리스트) | [{id, date, type, subtab, model, qty, supplyPrice, costPrice, amount, erpStatus, dryRun, category, orderNumber, ttiOrderNo, ttiOrderDate, ttiOrderStatus, ttiManagerConfirm, ttiOrderAmount, ttiVat, ttiTotalAmount, ...}] |
 | mw_cumulative_promos | 누적프로모션 설정 | [{name, targetAmount, benefitAmount, products[], periodStart, periodEnd, ...}] |
 | mw_commercial_promos | 커머셜 프로모션 설정 | [{id, name, startDate, endDate, condition, targetAmount, tiers[{minAmount, maxAmount, benefit, rate}]}] |
 | mw_po_active_subtab | 현재 선택 서브탭 | 'normal' / 'kit' / 'promo-t5' / ... |
@@ -148,8 +166,9 @@ PO_PROMO_LIMIT = _getPromoLimits()  // mw_settings.promoLimits 기반 동적
 | mw_tti_promotions | TTI 프로모션 스크래핑 데이터 | {data: {tList, tOrders, dList, eList}, scrapedAt} |
 | mw_promo_scrape_time | 프로모션 스크래핑 완료 시간 | ISO 8601 문자열 |
 | mw_settings | 설정 (promoLimits 포함) | {promoLimits: {promo-t5: 5, promo-t6: 5, ...}, ...} |
+| mw_auto_order_dryrun | 자동발주 dry-run 토글 상태 | 'true' / 'false' |
 
-## 현재 상태 (2026-04-04)
+## 현재 상태 (2026-04-05)
 
 ### 완료
 - Step B-1a: 기본 구조 (7개 서브탭 + 일반주문 50:50 + 매출카드)
@@ -157,6 +176,8 @@ PO_PROMO_LIMIT = _getPromoLimits()  // mw_settings.promoLimits 기반 동적
 - Step B-2a: 장바구니 + TTI 발주하기 + 발주 리스트 실데이터
 - Step B-2b: 매출 카드 실데이터 + 티어 할인 + 누적프로모션 자동 집계
 - Step B-3: T5/T6/패키지/키트 서브탭 콘텐츠 + 커머셜 프로모션 모달
+- Phase 4-1: TTI 자동발주 (모달 + 크롬 확장 통신 + Debugger API confirm/alert)
+- Phase 4-2: TTI 주문내역 스크래핑 + 발주리스트 동기화 (14컬럼) + 취소/재주문
 - 스크래핑 분리 (제품/프로모션 별도) + 프로모션 새로고침 버튼
 - UI 전면 개선 (합계 디자인, 카드 정렬, 뱃지 통일, 아이콘 통일)
 - localStorage 동기화 대상 추가 (6개 키)

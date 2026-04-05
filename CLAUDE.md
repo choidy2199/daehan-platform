@@ -129,6 +129,25 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - 스크래핑 분리 (제품/프로모션) + 프로모션 새로고침 버튼 + 타임스탬프
   - localStorage 동기화 대상 추가 (6개 키) + 공통 CLAUDE.md 생성
 
+- [2026-04-05] Phase 4-1: TTI 자동발주 모달 + 크롬 확장 통신
+  - submitPOOrder() → openAutoOrderModal() (dry-run 토글, 프로그레스 바, 주문유형별 뱃지)
+  - 장바구니 subtab별 그룹핑 → postMessage → content-daehan.js → background.js 순차 발주
+  - calcPOSalesData()에 dryRun 필터 추가 (dry-run 건 매출 집계 제외)
+  - background.js: autoOrder/loginComplete/orderComplete 메시지 라우팅
+  - content-tti.js: handleOrder() 좌측 테이블 행 매칭 → 수량 입력(td[7]) → 🛒 클릭
+  - all_frames:true + 프레임 판별(_currentFrame) + _waitForTableData(15초 폴링)
+  - inject-main.js (MAIN world, document_start) 플래그 관리
+  - Chrome Debugger API로 confirm/alert 자동처리 (ATTACH_DEBUGGER/DETACH_DEBUGGER)
+  - dry-run 토글 localStorage 저장 (mw_auto_order_dryrun)
+- [2026-04-05] Phase 4-2: TTI 주문내역 스크래핑 + 발주리스트 동기화
+  - scrapeOrderHistory(): order_list.html 15컬럼 파싱
+  - NAVIGATE_AND_SCRAPE_ORDERS: 탭이동→로드대기→스크래핑→daehan 전달
+  - syncTtiOrderHistory(): ttiOrderNo 직접매칭 + 날짜/금액 2차매칭
+  - buildPOListPanel: TTI상태/액션/주문번호 3컬럼 추가 (14컬럼)
+  - 취소행: 빨간배경 + 취소선, 금액: ttiOrderAmount 우선
+  - ttiCancelOrder/ttiReorder: postMessage → 크롬 확장 실행 + debugger
+  - TTI_ACTION_RESULT 수신 → 발주리스트 자동 새로고침
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인
