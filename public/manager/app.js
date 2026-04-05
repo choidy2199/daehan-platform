@@ -2585,27 +2585,28 @@ function buildPOListPanel() {
       else ttiActionBtn = '<span style="color:#9BA3B2;font-size:11px">-</span>';
 
       // 주문번호
-      var orderNoDisp = item.ttiOrderNo ? '<span title="' + item.ttiOrderNo + '" style="font-size:9px;color:#5A6070;cursor:help">' + item.ttiOrderNo.substring(0, 5) + '..' + item.ttiOrderNo.slice(-4) + '</span>' : '<span style="font-size:11px;color:#9BA3B2">-</span>';
+      var orderNoDisp = item.ttiOrderNo ? '<span title="' + item.ttiOrderNo + '" style="font-size:11px;color:#5A6070;cursor:help">' + item.ttiOrderNo.substring(0, 5) + '..' + item.ttiOrderNo.slice(-4) + '</span>' : '<span style="font-size:11px;color:#9BA3B2">-</span>';
 
       // 취소 행 스타일
       var rowStyle = ttiStatus === '주문취소' ? 'background:#fef2f2;' : '';
       var textDeco = ttiStatus === '주문취소' ? 'text-decoration:line-through;color:#9BA3B2;' : '';
 
+      var _tdS = 'font-size:13px;padding:10px 6px;';
       h += '<tr style="' + rowStyle + '">';
-      h += '<td class="center"><input type="checkbox" class="po-history-checkbox" data-id="' + item.id + '" onchange="this.closest(\'tr\').style.background=this.checked?\'#E6F1FB\':\'\'"></td>';
-      h += '<td style="font-size:10px;white-space:nowrap;' + textDeco + '">' + dateStr + '</td>';
-      h += '<td>' + typeBadge + '</td>';
-      h += '<td style="font-size:10px;color:#5A6070;' + textDeco + '">' + _dispManage + '</td>';
-      h += '<td style="font-size:10px;color:#5A6070;' + textDeco + '">' + _dispCode + '</td>';
-      h += '<td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;' + textDeco + '" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
-      h += '<td class="num" style="' + textDeco + '">' + (item.qty || 0) + '</td>';
-      h += '<td class="num" style="' + textDeco + '">' + fmtPO(item.supplyPrice) + '</td>';
-      h += '<td class="num" style="' + textDeco + '">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
-      h += '<td class="num" style="font-weight:600;' + textDeco + '">' + (_displayAmt > 0 ? fmtPO(_displayAmt) : '-') + '</td>';
-      h += '<td class="center">' + ttiStatusBadge + '</td>';
-      h += '<td class="center">' + ttiActionBtn + '</td>';
-      h += '<td class="center">' + orderNoDisp + '</td>';
-      h += '<td class="center">' + erpBadge + '</td>';
+      h += '<td class="center" style="padding:10px 6px"><input type="checkbox" class="po-history-checkbox" data-id="' + item.id + '" onchange="this.closest(\'tr\').style.background=this.checked?\'#E6F1FB\':\'\'"></td>';
+      h += '<td style="' + _tdS + 'white-space:nowrap;' + textDeco + '">' + dateStr + '</td>';
+      h += '<td style="' + _tdS + '">' + typeBadge + '</td>';
+      h += '<td style="' + _tdS + 'color:#5A6070;' + textDeco + '">' + _dispManage + '</td>';
+      h += '<td style="' + _tdS + 'color:#5A6070;' + textDeco + '">' + _dispCode + '</td>';
+      h += '<td style="' + _tdS + 'max-width:180px;overflow:hidden;text-overflow:ellipsis;' + textDeco + '" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
+      h += '<td class="num" style="' + _tdS + textDeco + '">' + (item.qty || 0) + '</td>';
+      h += '<td class="num" style="' + _tdS + textDeco + '">' + fmtPO(item.supplyPrice) + '</td>';
+      h += '<td class="num" style="' + _tdS + textDeco + '">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
+      h += '<td class="num" style="' + _tdS + 'font-weight:600;' + textDeco + '">' + (_displayAmt > 0 ? fmtPO(_displayAmt) : '-') + '</td>';
+      h += '<td class="center" style="padding:10px 6px">' + ttiStatusBadge + '</td>';
+      h += '<td class="center" style="padding:10px 6px">' + ttiActionBtn + '</td>';
+      h += '<td class="center" style="padding:10px 6px">' + orderNoDisp + '</td>';
+      h += '<td class="center" style="padding:10px 6px">' + erpBadge + '</td>';
       h += '</tr>';
     });
   }
