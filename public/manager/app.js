@@ -3988,14 +3988,39 @@ async function _executeOrderGroups() {
 function _sendOrderToExtension(items, orderType, dryRun) {
   return new Promise(function(resolve) {
     var timeout;
-    var handler = function(event) {
-      if (event.data && event.data.type === 'DAEHAN_ORDER_RESULT') {
+    var gotInitial = false;
+
+    // 최종 결과 수신 (AUTO_ORDER_COMPLETE from Phase 4-1a)
+    var completeHandler = function(event) {
+      if (event.data && event.data.type === 'TTI_AUTO_ORDER_COMPLETE') {
         clearTimeout(timeout);
-        window.removeEventListener('message', handler);
-        resolve(event.data);
+        window.removeEventListener('message', completeHandler);
+        window.removeEventListener('message', initialHandler);
+        var r = event.data.result || {};
+        resolve({ success: r.success !== false, result: r, orderNumber: r.orderNumber || '' });
       }
     };
-    window.addEventListener('message', handler);
+
+    // 초기 응답 (레거시 DAEHAN_ORDER_RESULT — "시작됨" 확인용)
+    var initialHandler = function(event) {
+      if (event.data && event.data.type === 'DAEHAN_ORDER_RESULT') {
+        if (!gotInitial) {
+          gotInitial = true;
+          console.log('[자동발주] 초기 응답 수신 (시작 확인):', event.data);
+          // 시작 자체가 실패이면 즉시 종료
+          if (!event.data.success && event.data.error) {
+            clearTimeout(timeout);
+            window.removeEventListener('message', completeHandler);
+            window.removeEventListener('message', initialHandler);
+            resolve({ success: false, error: event.data.error });
+          }
+          // success: true → "진행 중" 상태 유지, 최종 결과 대기
+        }
+      }
+    };
+
+    window.addEventListener('message', completeHandler);
+    window.addEventListener('message', initialHandler);
 
     window.postMessage({
       type: 'DAEHAN_AUTO_ORDER',
@@ -4005,11 +4030,12 @@ function _sendOrderToExtension(items, orderType, dryRun) {
     }, '*');
     console.log('[자동발주] postMessage 발신:', { type: 'DAEHAN_AUTO_ORDER', items: items.length, orderType: orderType, dryRun: dryRun });
 
-    // 60초 타임아웃
+    // 120초 타임아웃 (로그인+주문 포함)
     timeout = setTimeout(function() {
-      window.removeEventListener('message', handler);
-      resolve({ success: false, error: '응답 시간 초과 (60초)' });
-    }, 60000);
+      window.removeEventListener('message', completeHandler);
+      window.removeEventListener('message', initialHandler);
+      resolve({ success: false, error: '응답 시간 초과 (120초)' });
+    }, 120000);
   });
 }
 
