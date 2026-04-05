@@ -3930,7 +3930,7 @@ async function _executeOrderGroups() {
 
     // postMessage로 크롬 확장에 전달
     var orderItems = group.items.map(function(c) {
-      return { code: c.ttiNum || c.code, qty: c.qty, model: c.model, supplyPrice: c.supplyPrice };
+      return { code: c.ttiNum || c.code, orderNum: c.orderNum || '', qty: c.qty, model: c.model, supplyPrice: c.supplyPrice };
     });
 
     try {
