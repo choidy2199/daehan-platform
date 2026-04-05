@@ -2541,11 +2541,11 @@ function buildPOListPanel() {
 
   h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
   h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
-  h += '<th>날짜</th><th>구분</th><th>관리코드</th><th>코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">경영박사</th>';
+  h += '<th>날짜</th><th>구분</th><th>관리코드</th><th>코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">TTI상태</th><th class="center">액션</th><th class="center">주문번호</th><th class="center">경영박사</th>';
   h += '</tr></thead><tbody id="po-list-body">';
 
   if (filtered.length === 0) {
-    h += '<tr><td colspan="11" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
+    h += '<tr><td colspan="14" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
   } else {
     filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
     filtered.forEach(function(item) {
@@ -2565,20 +2565,43 @@ function buildPOListPanel() {
       });
       var _dispManage = _matched ? (_matched.manageCode || '-') : '-';
       var _dispCode = _matched ? (_matched.code || '-') : '-';
-      // 금액 = 매입원가 × 수량
-      var _costAmt = item.costPrice && item.costPrice > 0 ? item.costPrice * (item.qty || 0) : 0;
+      // 금액 = ttiOrderAmount 우선, 없으면 매입원가 × 수량
+      var _displayAmt = item.ttiOrderAmount || (item.costPrice && item.costPrice > 0 ? item.costPrice * (item.qty || 0) : 0);
 
-      h += '<tr>';
+      // TTI 상태
+      var ttiStatus = item.ttiOrderStatus || '';
+      var ttiStatusBadge = '';
+      if (ttiStatus === '주문접수') ttiStatusBadge = '<span style="font-size:10px;padding:2px 8px;background:#dcfce7;color:#166534;border-radius:4px;font-weight:500">주문접수</span>';
+      else if (ttiStatus === '주문취소') ttiStatusBadge = '<span style="font-size:10px;padding:2px 8px;background:#fecaca;color:#991b1b;border-radius:4px;font-weight:500">주문취소</span>';
+      else ttiStatusBadge = '<span style="font-size:10px;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-weight:500">미동기화</span>';
+
+      // TTI 액션
+      var ttiActionBtn = '';
+      if (ttiStatus === '주문접수') ttiActionBtn = '<button onclick="ttiCancelOrder(\'' + (item.ttiOrderNo || '') + '\')" style="font-size:10px;padding:2px 8px;background:#fef2f2;color:#991b1b;border:0.5px solid #fecaca;border-radius:4px;cursor:pointer">주문취소</button>';
+      else if (ttiStatus === '주문취소') ttiActionBtn = '<button onclick="ttiReorder(\'' + encodeURIComponent(JSON.stringify({model:item.model,ttiNum:item.ttiNum,qty:item.qty})) + '\')" style="font-size:10px;padding:2px 8px;background:#dbeafe;color:#1e40af;border:0.5px solid #93c5fd;border-radius:4px;cursor:pointer">재주문</button>';
+      else ttiActionBtn = '<span style="color:#9BA3B2;font-size:11px">-</span>';
+
+      // 주문번호
+      var orderNoDisp = item.ttiOrderNo ? '<span title="' + item.ttiOrderNo + '" style="font-size:9px;color:#5A6070;cursor:help">' + item.ttiOrderNo.substring(0, 5) + '..' + item.ttiOrderNo.slice(-4) + '</span>' : '<span style="font-size:11px;color:#9BA3B2">-</span>';
+
+      // 취소 행 스타일
+      var rowStyle = ttiStatus === '주문취소' ? 'background:#fef2f2;' : '';
+      var textDeco = ttiStatus === '주문취소' ? 'text-decoration:line-through;color:#9BA3B2;' : '';
+
+      h += '<tr style="' + rowStyle + '">';
       h += '<td class="center"><input type="checkbox" class="po-history-checkbox" data-id="' + item.id + '" onchange="this.closest(\'tr\').style.background=this.checked?\'#E6F1FB\':\'\'"></td>';
-      h += '<td style="font-size:10px;white-space:nowrap">' + dateStr + '</td>';
+      h += '<td style="font-size:10px;white-space:nowrap;' + textDeco + '">' + dateStr + '</td>';
       h += '<td>' + typeBadge + '</td>';
-      h += '<td style="font-size:10px;color:#5A6070">' + _dispManage + '</td>';
-      h += '<td style="font-size:10px;color:#5A6070">' + _dispCode + '</td>';
-      h += '<td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
-      h += '<td class="num">' + (item.qty || 0) + '</td>';
-      h += '<td class="num">' + fmtPO(item.supplyPrice) + '</td>';
-      h += '<td class="num">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
-      h += '<td class="num" style="font-weight:600">' + (_costAmt > 0 ? fmtPO(_costAmt) : '-') + '</td>';
+      h += '<td style="font-size:10px;color:#5A6070;' + textDeco + '">' + _dispManage + '</td>';
+      h += '<td style="font-size:10px;color:#5A6070;' + textDeco + '">' + _dispCode + '</td>';
+      h += '<td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;' + textDeco + '" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
+      h += '<td class="num" style="' + textDeco + '">' + (item.qty || 0) + '</td>';
+      h += '<td class="num" style="' + textDeco + '">' + fmtPO(item.supplyPrice) + '</td>';
+      h += '<td class="num" style="' + textDeco + '">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
+      h += '<td class="num" style="font-weight:600;' + textDeco + '">' + (_displayAmt > 0 ? fmtPO(_displayAmt) : '-') + '</td>';
+      h += '<td class="center">' + ttiStatusBadge + '</td>';
+      h += '<td class="center">' + ttiActionBtn + '</td>';
+      h += '<td class="center">' + orderNoDisp + '</td>';
       h += '<td class="center">' + erpBadge + '</td>';
       h += '</tr>';
     });
@@ -2586,6 +2609,68 @@ function buildPOListPanel() {
 
   h += '</tbody></table></div></div>';
   return h;
+}
+
+// TTI 주문내역 동기화
+function syncTtiOrderHistory(ttiOrders) {
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var updated = 0;
+
+  for (var oi = 0; oi < ttiOrders.length; oi++) {
+    var ttiOrder = ttiOrders[oi];
+    // 1차 매칭: ttiOrderNo로 직접 매칭
+    var match = null;
+    for (var hi = 0; hi < history.length; hi++) {
+      if (history[hi].ttiOrderNo === ttiOrder.orderNo) { match = history[hi]; break; }
+    }
+    if (match) {
+      if (match.ttiOrderStatus !== ttiOrder.orderStatus) {
+        match.ttiOrderStatus = ttiOrder.orderStatus;
+        match.ttiManagerConfirm = ttiOrder.managerConfirm;
+        updated++;
+      }
+      continue;
+    }
+    // 2차 매칭: 아직 ttiOrderNo 없는 항목 중 날짜+금액
+    for (var hi2 = 0; hi2 < history.length; hi2++) {
+      if (history[hi2].ttiOrderNo) continue;
+      var hDate = (history[hi2].date || '').substring(0, 10);
+      var oDate = (ttiOrder.orderDate || '').substring(0, 10);
+      if (hDate !== oDate) continue;
+      var hAmount = (history[hi2].supplyPrice || 0) * (history[hi2].qty || 0);
+      if (Math.abs(hAmount - ttiOrder.orderAmount) > 100) continue;
+      match = history[hi2];
+      break;
+    }
+    if (match) {
+      match.ttiOrderNo = ttiOrder.orderNo;
+      match.ttiOrderDate = ttiOrder.orderDate;
+      match.ttiOrderStatus = ttiOrder.orderStatus;
+      match.ttiManagerConfirm = ttiOrder.managerConfirm;
+      match.ttiOrderAmount = ttiOrder.orderAmount;
+      match.ttiVat = ttiOrder.vat;
+      match.ttiTotalAmount = ttiOrder.totalAmount;
+      updated++;
+    }
+  }
+
+  save('mw_po_history', history);
+  console.log('[app] TTI 주문내역 동기화:', updated, '건 업데이트');
+
+  // 발주리스트 탭 활성 상태면 새로고침
+  var listContent = document.getElementById('po-content-list');
+  if (listContent) listContent.innerHTML = buildPOListPanel();
+}
+
+function ttiCancelOrder(orderNo) {
+  if (!confirm('TTI 주문을 취소하시겠습니까?\n주문번호: ' + orderNo)) return;
+  alert('주문취소 기능은 추후 구현 예정입니다.\nTTI 사이트에서 직접 취소해주세요.');
+}
+
+function ttiReorder(itemJson) {
+  var item = typeof itemJson === 'string' ? JSON.parse(itemJson) : itemJson;
+  if (!confirm('이 제품을 재주문하시겠습니까?\n' + (item.model || ''))) return;
+  alert('재주문 기능은 추후 구현 예정입니다.');
 }
 
 function changePOListFilter(val) {
@@ -9472,6 +9557,12 @@ window.addEventListener('message', function(event) {
   // TTI 프로모션 스크래핑 결과 수신
   if (event.data && event.data.type === 'DAEHAN_SCRAPE_PROMO_RESULT') {
     handleTtiPromoResult(event.data);
+  }
+
+  // TTI 주문내역 스크래핑 결과 수신
+  if (event.data && event.data.type === 'TTI_ORDER_HISTORY_DATA') {
+    console.log('[app] TTI 주문내역 수신:', event.data.orders.length, '건');
+    syncTtiOrderHistory(event.data.orders);
   }
 });
 
