@@ -2548,7 +2548,10 @@ function buildPOListPanel() {
     h += '<tr><td colspan="14" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
   } else {
     filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+    window._poListItems = [];
     filtered.forEach(function(item) {
+      window._poListItems.push(item);
+      var _poIdx = window._poListItems.length - 1;
       var d = new Date(item.date);
       var dateStr = String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
       var typeBadge;
@@ -2578,7 +2581,7 @@ function buildPOListPanel() {
       // TTI 액션
       var ttiActionBtn = '';
       if (ttiStatus === '주문접수') ttiActionBtn = '<button onclick="ttiCancelOrder(\'' + (item.ttiOrderNo || '') + '\')" style="font-size:10px;padding:2px 8px;background:#fef2f2;color:#991b1b;border:0.5px solid #fecaca;border-radius:4px;cursor:pointer">주문취소</button>';
-      else if (ttiStatus === '주문취소') ttiActionBtn = '<button onclick="ttiReorder(\'' + encodeURIComponent(JSON.stringify({model:item.model,ttiNum:item.ttiNum,qty:item.qty})) + '\')" style="font-size:10px;padding:2px 8px;background:#dbeafe;color:#1e40af;border:0.5px solid #93c5fd;border-radius:4px;cursor:pointer">재주문</button>';
+      else if (ttiStatus === '주문취소') ttiActionBtn = '<button onclick="ttiReorder(window._poListItems[' + _poIdx + '])" style="font-size:10px;padding:2px 8px;background:#dbeafe;color:#1e40af;border:0.5px solid #93c5fd;border-radius:4px;cursor:pointer">재주문</button>';
       else ttiActionBtn = '<span style="color:#9BA3B2;font-size:11px">-</span>';
 
       // 주문번호
@@ -2664,13 +2667,17 @@ function syncTtiOrderHistory(ttiOrders) {
 
 function ttiCancelOrder(orderNo) {
   if (!confirm('TTI 주문을 취소하시겠습니까?\n주문번호: ' + orderNo)) return;
-  alert('주문취소 기능은 추후 구현 예정입니다.\nTTI 사이트에서 직접 취소해주세요.');
+  var btn = event && event.target;
+  if (btn) { btn.textContent = '처리중...'; btn.disabled = true; btn.style.opacity = '0.5'; }
+  window.postMessage({ type: 'TTI_CANCEL_ORDER', orderNo: orderNo }, '*');
 }
 
-function ttiReorder(itemJson) {
-  var item = typeof itemJson === 'string' ? JSON.parse(itemJson) : itemJson;
-  if (!confirm('이 제품을 재주문하시겠습니까?\n' + (item.model || ''))) return;
-  alert('재주문 기능은 추후 구현 예정입니다.');
+function ttiReorder(item) {
+  if (typeof item === 'string') item = JSON.parse(decodeURIComponent(item));
+  if (!confirm('이 제품을 재주문하시겠습니까?\n' + (item.model || item.productName || ''))) return;
+  var btn = event && event.target;
+  if (btn) { btn.textContent = '처리중...'; btn.disabled = true; btn.style.opacity = '0.5'; }
+  window.postMessage({ type: 'TTI_REORDER', orderNo: item.ttiOrderNo }, '*');
 }
 
 function changePOListFilter(val) {
@@ -9557,6 +9564,24 @@ window.addEventListener('message', function(event) {
   // TTI 프로모션 스크래핑 결과 수신
   if (event.data && event.data.type === 'DAEHAN_SCRAPE_PROMO_RESULT') {
     handleTtiPromoResult(event.data);
+  }
+
+  // TTI 주문취소/재주문 결과 수신
+  if (event.data && event.data.type === 'TTI_ACTION_RESULT') {
+    var actionText = event.data.action === 'TTI_CANCEL_ORDER' ? '주문취소' : '재주문';
+    if (event.data.success) {
+      console.log('[app] TTI', actionText, '성공:', event.data.orderNo);
+      toast(actionText + ' 처리 완료');
+      setTimeout(function() {
+        var listContent = document.getElementById('po-content-list');
+        if (listContent) listContent.innerHTML = buildPOListPanel();
+      }, 3000);
+    } else {
+      console.error('[app] TTI', actionText, '실패:', event.data.error);
+      alert(actionText + ' 처리에 실패했습니다.\n' + (event.data.error || 'TTI 사이트를 확인해주세요.'));
+      var listContent = document.getElementById('po-content-list');
+      if (listContent) listContent.innerHTML = buildPOListPanel();
+    }
   }
 
   // TTI 주문내역 스크래핑 결과 수신
