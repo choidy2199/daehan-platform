@@ -3691,7 +3691,9 @@ function openAutoOrderModal() {
   var totalSupply = poCart.reduce(function(s, c) { return s + (c.supplyPrice || 0) * (c.qty || 0); }, 0);
   var vat = Math.round(totalSupply * 0.1);
 
-  _autoOrderState = { running: false, dryRun: true, groups: groups, currentGroup: -1, results: [], cancelled: false };
+  var savedDryRun = localStorage.getItem('mw_auto_order_dryrun');
+  var initDryRun = savedDryRun === null ? true : savedDryRun === 'true';
+  _autoOrderState = { running: false, dryRun: initDryRun, groups: groups, currentGroup: -1, results: [], cancelled: false };
 
   var modal = document.createElement('div');
   modal.id = 'auto-order-modal';
@@ -3709,11 +3711,11 @@ function openAutoOrderModal() {
   // dry-run 토글
   h += '<div style="display:flex;align-items:center;gap:6px">';
   h += '<label style="position:relative;display:inline-block;width:36px;height:20px;cursor:pointer">';
-  h += '<input type="checkbox" id="ao-dryrun-toggle" checked onchange="_toggleDryRun(this.checked)" style="opacity:0;width:0;height:0">';
-  h += '<span id="ao-dryrun-track" style="position:absolute;inset:0;background:#185FA5;border-radius:10px;transition:background 0.2s"></span>';
-  h += '<span id="ao-dryrun-thumb" style="position:absolute;top:2px;left:18px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left 0.2s"></span>';
+  h += '<input type="checkbox" id="ao-dryrun-toggle" ' + (initDryRun ? 'checked' : '') + ' onchange="_toggleDryRun(this.checked)" style="opacity:0;width:0;height:0">';
+  h += '<span id="ao-dryrun-track" style="position:absolute;inset:0;background:' + (initDryRun ? '#185FA5' : '#EF4444') + ';border-radius:10px;transition:background 0.2s"></span>';
+  h += '<span id="ao-dryrun-thumb" style="position:absolute;top:2px;left:' + (initDryRun ? '18' : '2') + 'px;width:16px;height:16px;background:#fff;border-radius:50%;transition:left 0.2s"></span>';
   h += '</label>';
-  h += '<span id="ao-dryrun-label" style="font-size:11px;font-weight:600;color:#6CB4EE">연습모드</span>';
+  h += '<span id="ao-dryrun-label" style="font-size:11px;font-weight:600;color:' + (initDryRun ? '#6CB4EE' : '#EF4444') + '">' + (initDryRun ? '연습모드' : '실제주문') + '</span>';
   h += '</div>';
   h += '<button onclick="_closeAutoOrderModal()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">✕</button>';
   h += '</div></div>';
@@ -3793,6 +3795,7 @@ function _aoSubtabBadge(subtab) {
 
 function _toggleDryRun(checked) {
   _autoOrderState.dryRun = checked;
+  localStorage.setItem('mw_auto_order_dryrun', String(checked));
   var label = document.getElementById('ao-dryrun-label');
   var track = document.getElementById('ao-dryrun-track');
   var thumb = document.getElementById('ao-dryrun-thumb');
