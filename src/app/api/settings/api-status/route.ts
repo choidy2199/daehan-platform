@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import crypto from 'crypto';
+import { getAccessToken } from '@/lib/naver';
 
 interface PlatformStatus {
   id: string;
@@ -28,7 +28,7 @@ export async function GET() {
     {
       id: 'naver',
       name: '네이버 커머스',
-      status: (process.env.NAVER_CLIENT_ID && (process.env.NAVER_CLIENT_SECRET_B64 || process.env.NAVER_CLIENT_SECRET)) ? 'connected' : 'not_configured',
+      status: checkEnvStatus(['NAVER_CLIENT_ID']) === 'connected' && (process.env.NAVER_CLIENT_SECRET_B64 || process.env.NAVER_CLIENT_SECRET) ? 'connected' : 'not_configured',
     },
     {
       id: 'coupang',
@@ -104,15 +104,20 @@ export async function POST(req: NextRequest) {
       }
 
       case 'naver': {
-        // 디버그: Vercel에서 환경변수 실제 값 확인
-        const _id = process.env.NAVER_CLIENT_ID || '';
-        const _secret = process.env.NAVER_CLIENT_SECRET || '';
-        const _b64 = process.env.NAVER_CLIENT_SECRET_B64 || '';
-        const _b64dec = _b64 ? Buffer.from(_b64, 'base64').toString('utf-8') : '';
-        return NextResponse.json({
-          success: false,
-          message: `DEBUG: ID=${_id.length}자[${_id.substring(0,4)}...${_id.substring(_id.length-4)}], SECRET=${_secret.length}자[${_secret.substring(0,6)}...${_secret.substring(Math.max(0,_secret.length-4))}], B64=${_b64.length}자, B64dec=${_b64dec.length}자[${_b64dec.substring(0,6)}...${_b64dec.substring(Math.max(0,_b64dec.length-4))}]`
-        });
+        // 네이버 토큰 발급 테스트 — naver.ts의 getAccessToken 재사용
+        if (!process.env.NAVER_CLIENT_ID || !(process.env.NAVER_CLIENT_SECRET_B64 || process.env.NAVER_CLIENT_SECRET)) {
+          return NextResponse.json({ success: false, message: '네이버 환경변수 미설정' });
+        }
+        try {
+          const token = await getAccessToken();
+          if (token) {
+            return NextResponse.json({ success: true, message: '네이버 API 연결 성공 (토큰 발급 완료)' });
+          }
+          return NextResponse.json({ success: false, message: '네이버 토큰 발급 실패 (토큰 없음)' });
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          return NextResponse.json({ success: false, message: `네이버 연결 실패: ${msg}` });
+        }
       }
 
       case 'coupang': {

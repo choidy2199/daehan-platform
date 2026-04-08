@@ -1,9 +1,17 @@
 // 네이버 커머스 API 공통 함수
 import crypto from 'crypto';
 
-const CLIENT_ID = process.env.NAVER_CLIENT_ID || '';
-const CLIENT_SECRET = process.env.NAVER_CLIENT_SECRET || '';
 const BASE_URL = 'https://api.commerce.naver.com/external';
+
+// 환경변수를 런타임에 읽음 (Vercel의 $ 문자 이스케이프 문제 방지)
+function getClientId(): string {
+  return process.env.NAVER_CLIENT_ID || '';
+}
+function getClientSecret(): string {
+  const b64 = process.env.NAVER_CLIENT_SECRET_B64;
+  if (b64) return Buffer.from(b64, 'base64').toString('utf-8');
+  return process.env.NAVER_CLIENT_SECRET || '';
+}
 
 // Rate limit: 초당 2회 제한 대응
 let lastCallTime = 0;
@@ -22,12 +30,14 @@ async function rateLimit() {
  * HMAC-SHA256 서명 생성 (네이버 커머스 API 인증용)
  */
 function generateSignature(timestamp: string): string {
-  if (!CLIENT_ID || !CLIENT_SECRET) {
+  const clientId = getClientId();
+  const clientSecret = getClientSecret();
+  if (!clientId || !clientSecret) {
     throw new Error('NAVER_CLIENT_ID 또는 NAVER_CLIENT_SECRET이 설정되지 않았습니다');
   }
-  const message = `${CLIENT_ID}_${timestamp}`;
+  const message = `${clientId}_${timestamp}`;
   return crypto
-    .createHmac('sha256', CLIENT_SECRET)
+    .createHmac('sha256', clientSecret)
     .update(message)
     .digest('base64');
 }
@@ -40,7 +50,7 @@ export async function getAccessToken(): Promise<string> {
   const signature = generateSignature(timestamp);
 
   const params = new URLSearchParams({
-    client_id: CLIENT_ID,
+    client_id: getClientId(),
     timestamp,
     client_secret_sign: signature,
     grant_type: 'client_credentials',
