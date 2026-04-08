@@ -3625,6 +3625,17 @@ function addToCart(productCode) {
   var p = (DB.products || []).find(function(prod) { return prod.ttiNum === productCode || prod.code === productCode; });
   if (!p) { toast('제품을 찾을 수 없습니다'); return; }
 
+  // TTI 재고 체크
+  var _ttiS = p.ttiStock;
+  if (_ttiS === '●') {
+    // 재고 넉넉 — 그대로 진행
+  } else if (_ttiS === '▲') {
+    alert('⚠️ ' + (p.model || '제품') + ' - 재고 여유가 없습니다. 확인 후 주문하세요');
+  } else {
+    alert('❌ ' + (p.model || '제품') + ' - 가용재고가 없습니다. 주문할 수 없습니다.');
+    return;
+  }
+
   // 중복 확인 → 수량 합산
   var existing = poCart.find(function(c) { return c.ttiNum === (p.ttiNum || '') || (c.code && c.code === p.code); });
   if (existing) {
@@ -3659,6 +3670,18 @@ function addToCart(productCode) {
 // 장바구니에 제품 직접 추가 (자동완성에서)
 function addToCartDirect(product) {
   if (!product) return;
+
+  // TTI 재고 체크
+  var _ttiS2 = product.ttiStock;
+  if (_ttiS2 === '●') {
+    // 재고 넉넉 — 그대로 진행
+  } else if (_ttiS2 === '▲') {
+    alert('⚠️ ' + (product.model || '제품') + ' - 재고 여유가 없습니다. 확인 후 주문하세요');
+  } else {
+    alert('❌ ' + (product.model || '제품') + ' - 가용재고가 없습니다. 주문할 수 없습니다.');
+    return;
+  }
+
   var existing = poCart.find(function(c) { return c.ttiNum === (product.ttiNum || ''); });
   if (existing) { existing.qty += 1; }
   else {
