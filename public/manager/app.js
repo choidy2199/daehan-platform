@@ -11521,7 +11521,7 @@ function editApiKeys(platformId) {
       var val = platformRaw[k] || '';
       return '<div class="api-field"><div class="api-field-label">' + k + '</div>' +
         '<input type="text" class="api-field-input" id="api-input-' + platformId + '-' + k + '" value="' + val.replace(/"/g, '&quot;') + '" ' +
-        'style="width:100%;font-size:12px;padding:6px 10px;border:1px solid #185FA5;border-radius:4px;font-family:Courier New,monospace;background:#FAFBFF;outline:none;box-sizing:border-box" ' +
+        'style="width:100%;font-size:12px;padding:6px 10px;border:1px solid #185FA5;border-radius:4px;font-family:Pretendard,sans-serif;background:#FAFBFF;outline:none;box-sizing:border-box" ' +
         'placeholder="' + k + ' 입력"></div>';
     }).join('');
     body.innerHTML = fieldsHtml;
