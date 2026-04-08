@@ -2458,11 +2458,11 @@ function renderPOTab() {
     html += '</button>';
   });
   html += '<div style="flex:1"></div>';
-  var _scrapeTs = ''; try { _scrapeTs = JSON.parse(localStorage.getItem('mw_promo_scrape_time') || '""') || ''; } catch(e) { _scrapeTs = localStorage.getItem('mw_promo_scrape_time') || ''; }
-  var _scrapeTsText = _scrapeTs ? (function(d) { return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })(new Date(_scrapeTs)) : '-';
+  var _orderSyncTs = ''; try { _orderSyncTs = JSON.parse(localStorage.getItem('mw_order_sync_time') || '""') || ''; } catch(e) { _orderSyncTs = localStorage.getItem('mw_order_sync_time') || ''; }
+  var _orderSyncText = _orderSyncTs ? (function(d) { return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })(new Date(_orderSyncTs)) : '-';
   html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">';
-  html += '<button onclick="startTtiPromoScrape()" style="background:#CC2222;color:#fff;border:none;border-radius:16px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;font-family:Pretendard,-apple-system,sans-serif" onmouseover="this.style.background=\'#A31B1B\'" onmouseout="this.style.background=\'#CC2222\'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>프로모션 새로고침</button>';
-  html += '<span id="po-scrape-timestamp" style="font-size:9px;color:#9BA3B2">최근 완료: ' + _scrapeTsText + '</span>';
+  html += '<button onclick="startTtiOrderSync()" style="background:#185FA5;color:#fff;border:none;border-radius:16px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;font-family:Pretendard,-apple-system,sans-serif" onmouseover="this.style.background=\'#0C447C\'" onmouseout="this.style.background=\'#185FA5\'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>주문내역 동기화</button>';
+  html += '<span id="po-scrape-timestamp" style="font-size:9px;color:#9BA3B2">최근 동기화: ' + _orderSyncText + '</span>';
   html += '</div>';
   html += '</div>';
 
@@ -2869,9 +2869,26 @@ function buildPOListPanel() {
 function syncTtiOrderHistory(ttiOrders) {
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   var updated = 0;
+  var created = 0;
+
+  // 제품 → 카테고리 맵 (productName 기반 매칭용)
+  var _prodByModel = {};
+  var _prodByCode = {};
+  (DB.products || []).forEach(function(p) {
+    if (p.model) _prodByModel[p.model.toLowerCase()] = p;
+    if (p.ttiNum) _prodByCode[normalizeTtiCode(p.ttiNum)] = p;
+    if (p.code) _prodByCode[p.code] = p;
+  });
+
+  // 기존 ttiOrderNo 셋 (중복 방지)
+  var existingOrderNos = {};
+  history.forEach(function(h) { if (h.ttiOrderNo) existingOrderNos[h.ttiOrderNo] = true; });
 
   for (var oi = 0; oi < ttiOrders.length; oi++) {
     var ttiOrder = ttiOrders[oi];
+    // 취소된 주문 스킵 (상태가 '주문취소'인 경우)
+    if (ttiOrder.orderStatus && ttiOrder.orderStatus.indexOf('취소') >= 0) continue;
+
     // 1차 매칭: ttiOrderNo로 직접 매칭
     var match = null;
     for (var hi = 0; hi < history.length; hi++) {
@@ -2904,16 +2921,90 @@ function syncTtiOrderHistory(ttiOrders) {
       match.ttiOrderAmount = ttiOrder.orderAmount;
       match.ttiVat = ttiOrder.vat;
       match.ttiTotalAmount = ttiOrder.totalAmount;
+      match.remark = ttiOrder.remark || '';
       updated++;
+      continue;
     }
+
+    // 3차: 미매칭 → 새 엔트리 생성 (TTI 직접 발주)
+    if (existingOrderNos[ttiOrder.orderNo]) continue; // 이미 처리됨
+
+    // Remark 기반 분류
+    var remark = (ttiOrder.remark || '').trim();
+    var subtab = 'normal';
+    var type = 'normal';
+    var promoName = '';
+    if (remark && remark !== 'normal' && remark !== '') {
+      // M코드 (M101, M202, M301 등) 또는 기타 프로모션 코드
+      if (/^[A-Z]\d+/i.test(remark)) {
+        subtab = 'promo-' + remark.toLowerCase();
+        type = remark;
+        promoName = remark;
+      }
+    }
+    // FOC: 금액 0원
+    if (ttiOrder.orderAmount === 0) {
+      subtab = 'foc';
+      type = 'foc';
+    }
+
+    // 제품 매칭으로 카테고리 결정
+    var category = '';
+    var matchedProd = null;
+    var pName = (ttiOrder.productName || '').toLowerCase();
+    // productName에서 모델명 추출 시도
+    Object.keys(_prodByModel).forEach(function(model) {
+      if (!matchedProd && pName.indexOf(model) >= 0) matchedProd = _prodByModel[model];
+    });
+    if (matchedProd) category = matchedProd.category || '';
+
+    // orderDate를 ISO 형식으로 변환 (YYYY-MM-DD → YYYY-MM-DDTHH:MM:SS)
+    var isoDate = ttiOrder.orderDate || '';
+    if (isoDate && isoDate.length === 10) isoDate += 'T00:00:00';
+    // YYYY.MM.DD 형식 → YYYY-MM-DD
+    isoDate = isoDate.replace(/\./g, '-');
+
+    history.push({
+      id: 'tti_' + ttiOrder.orderNo + '_' + Date.now(),
+      date: isoDate,
+      type: type,
+      subtab: subtab,
+      promoName: promoName,
+      manageCode: matchedProd ? (matchedProd.code || '') : '',
+      ttiNum: matchedProd ? (matchedProd.ttiNum || '') : '',
+      model: matchedProd ? (matchedProd.model || '') : ttiOrder.productName,
+      category: category,
+      qty: ttiOrder.orderQty || 0,
+      supplyPrice: ttiOrder.orderQty > 0 ? Math.round(ttiOrder.orderAmount / ttiOrder.orderQty) : 0,
+      costPrice: 0,
+      amount: ttiOrder.orderAmount || 0,
+      orderNumber: '',
+      dryRun: false,
+      erpStatus: 'external',
+      remark: remark,
+      ttiOrderNo: ttiOrder.orderNo,
+      ttiOrderDate: ttiOrder.orderDate,
+      ttiOrderStatus: ttiOrder.orderStatus,
+      ttiManagerConfirm: ttiOrder.managerConfirm,
+      ttiOrderAmount: ttiOrder.orderAmount,
+      ttiVat: ttiOrder.vat,
+      ttiTotalAmount: ttiOrder.totalAmount,
+      source: 'tti-scrape'
+    });
+    existingOrderNos[ttiOrder.orderNo] = true;
+    created++;
   }
 
   save('mw_po_history', history);
-  console.log('[app] TTI 주문내역 동기화:', updated, '건 업데이트');
+  console.log('[app] TTI 주문내역 동기화:', updated, '건 업데이트,', created, '건 신규 생성');
 
-  // 발주리스트 탭 활성 상태면 새로고침
-  var listContent = document.getElementById('po-content-list');
-  if (listContent) listContent.innerHTML = buildPOListPanel();
+  // 매출카드 + 발주리스트 새로고침
+  var kpiRow = document.querySelector('.po-kpi-row');
+  if (kpiRow) renderPOTab();
+  else {
+    var listContent = document.getElementById('po-content-list');
+    if (listContent) listContent.innerHTML = buildPOListPanel();
+  }
 }
 
 function ttiCancelOrder(orderNo) {
@@ -9866,10 +9957,7 @@ window.addEventListener('message', function(event) {
     showTtiSyncProgress(event.data.status || (event.data.current + '/' + event.data.total + ' 페이지 스크래핑 중... (' + event.data.count + '건)'));
   }
 
-  // TTI 프로모션 스크래핑 결과 수신
-  if (event.data && event.data.type === 'DAEHAN_SCRAPE_PROMO_RESULT') {
-    handleTtiPromoResult(event.data);
-  }
+  // (프로모션 스크래핑 결과 수신 제거됨 — 온라인주문내역 Remark로 대체)
 
   // TTI 주문취소/재주문 결과 수신
   if (event.data && event.data.type === 'TTI_ACTION_RESULT') {
@@ -9893,6 +9981,13 @@ window.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'TTI_ORDER_HISTORY_DATA') {
     console.log('[app] TTI 주문내역 수신:', event.data.orders.length, '건');
     syncTtiOrderHistory(event.data.orders);
+    save('mw_order_sync_time', new Date().toISOString());
+    var tsEl = document.getElementById('po-scrape-timestamp');
+    if (tsEl) {
+      var d = new Date();
+      tsEl.textContent = '최근 동기화: ' + (d.getMonth()+1) + '월 ' + d.getDate() + '일 ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }
+    toast('주문내역 동기화 완료: ' + event.data.orders.length + '건');
   }
 });
 
@@ -9921,17 +10016,18 @@ function startTtiProductScrape() {
   showTtiSyncProgress('제품 데이터 수집 중...');
 }
 
-// TTI 프로모션 스크래핑 요청
-function startTtiPromoScrape() {
+// TTI 주문내역 동기화 요청 (이번 달 1일 ~ 오늘)
+function startTtiOrderSync() {
   if (!window._daehanExtensionReady) {
     alert('크롬 확장 프로그램이 설치되어 있지 않습니다.');
     return;
   }
-
-  console.log('[TTI연동] 프로모션 스크래핑 요청');
-  window.postMessage({ type: 'DAEHAN_SCRAPE_PROMOTIONS' }, '*');
-
-  showTtiSyncProgress('프로모션 데이터 수집 중...');
+  var now = new Date();
+  var startDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+  var endDate = now.toISOString().slice(0, 10);
+  console.log('[TTI연동] 주문내역 동기화 요청:', startDate, '~', endDate);
+  window.postMessage({ type: 'DAEHAN_SCRAPE_ORDER_HISTORY', startDate: startDate, endDate: endDate }, '*');
+  showTtiSyncProgress('주문내역 수집 중...');
 }
 
 // 스크래핑 진행 상태 표시
@@ -9970,23 +10066,7 @@ function handleTtiScrapeResult(data) {
   showProductSyncReport(ttiProducts);
 }
 
-// TTI 프로모션 결과 수신 처리
-function handleTtiPromoResult(data) {
-  console.log('[TTI연동] 프로모션 스크래핑 결과:', data);
-  hideTtiSyncProgress();
-
-  save('mw_tti_promotions', {
-    data: data.data,
-    scrapedAt: new Date().toISOString()
-  });
-
-  // 타임스탬프 저장
-  save('mw_promo_scrape_time', new Date().toISOString());
-
-  // T탭 동적 재생성 + 완료 알림
-  renderPOTab();
-  toast('프로모션 스크래핑 완료');
-}
+// (handleTtiPromoResult 제거됨 — 온라인주문내역 Remark로 대체)
 
 // TTI 코드 정규화 (앞자리 0 제거)
 function normalizeTtiCode(code) {
