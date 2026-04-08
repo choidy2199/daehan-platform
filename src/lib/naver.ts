@@ -130,14 +130,19 @@ export async function getNaverProducts(page = 1, size = 100) {
  * 네이버 단건 가격 수정
  */
 export async function updateNaverPrice(originProductNo: string, newPrice: number) {
-  // 1단계: 상품 상세 조회해서 channelProductNo 확인
-  const detail = await naverApi('GET', `/v2/products/origin-products/${originProductNo}`);
+  // 1단계: 검색 API로 해당 상품의 channelProductNo 조회 (응답 구조가 확인된 API 사용)
+  const searchResult = await naverApi('POST', '/v1/products/search', {
+    page: 1,
+    size: 1,
+    originProductNos: [Number(originProductNo)],
+  });
 
-  const channelProductNo = detail?.originProduct?.channelProducts?.[0]?.channelProductNo
-    || detail?.channelProducts?.[0]?.channelProductNo;
+  const product = searchResult?.contents?.[0];
+  const channelProductNo = product?.channelProducts?.[0]?.channelProductNo;
 
   if (!channelProductNo) {
-    throw new Error('channelProductNo를 찾을 수 없습니다');
+    const keys = searchResult ? Object.keys(searchResult) : [];
+    throw new Error(`channelProductNo를 찾을 수 없습니다 (originProductNo: ${originProductNo}, keys: ${keys.join(',')})`);
   }
 
   // 2단계: 채널상품 가격 수정 API 사용
