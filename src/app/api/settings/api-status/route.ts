@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAccessToken } from '@/lib/naver';
+import crypto from 'crypto';
 
 interface PlatformStatus {
   id: string;
@@ -104,13 +104,36 @@ export async function POST(req: NextRequest) {
       }
 
       case 'naver': {
-        // 네이버 토큰 발급 테스트
-        if (!process.env.NAVER_CLIENT_ID || !process.env.NAVER_CLIENT_SECRET) {
+        // 네이버 토큰 발급 테스트 (환경변수를 런타임에 직접 읽음)
+        const naverId = process.env.NAVER_CLIENT_ID;
+        const naverSecret = process.env.NAVER_CLIENT_SECRET;
+        if (!naverId || !naverSecret) {
           return NextResponse.json({ success: false, message: '네이버 환경변수 미설정' });
         }
         try {
-          await getAccessToken();
-          return NextResponse.json({ success: true, message: '네이버 API 연결 성공 (토큰 발급 완료)' });
+          const ts = String(Date.now());
+          const sig = crypto.createHmac('sha256', naverSecret).update(`${naverId}_${ts}`).digest('base64');
+          const params = new URLSearchParams({
+            client_id: naverId,
+            timestamp: ts,
+            client_secret_sign: sig,
+            grant_type: 'client_credentials',
+            type: 'SELF',
+          });
+          const naverResp = await fetch('https://api.commerce.naver.com/external/v1/oauth2/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString(),
+          });
+          if (!naverResp.ok) {
+            const errText = await naverResp.text();
+            return NextResponse.json({ success: false, message: `네이버 토큰 발급 실패: ${naverResp.status} ${errText.substring(0, 200)}` });
+          }
+          const tokenData = await naverResp.json();
+          if (tokenData.access_token) {
+            return NextResponse.json({ success: true, message: '네이버 API 연결 성공 (토큰 발급 완료)' });
+          }
+          return NextResponse.json({ success: false, message: '네이버 토큰 응답 이상' });
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
           return NextResponse.json({ success: false, message: `네이버 연결 실패: ${msg}` });
