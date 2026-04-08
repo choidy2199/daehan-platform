@@ -2300,7 +2300,7 @@ function renderPOTab() {
 
   // ── 일반 매출 섹션 ──
   html += '<div class="po-section-box po-section-normal">';
-  html += '<div class="po-section-title">일반 매출 · 일반주문만 집계</div>';
+  html += '<div class="po-section-title">일반 매출 <span class="po-section-sub">일반주문만 집계</span></div>';
   html += '<div class="po-section-cards">';
 
   // 파워툴
@@ -2344,7 +2344,7 @@ function renderPOTab() {
 
   // ── 누적 프로모션 섹션 ──
   html += '<div class="po-section-box po-section-promo">';
-  html += '<div class="po-section-title">누적 프로모션 · FOC 쿠폰 기반</div>';
+  html += '<div class="po-section-title">누적 프로모션 <span class="po-section-sub">FOC 쿠폰 기반</span></div>';
   html += '<div class="po-section-cards">';
 
   var promos = _getCumulPromos();
