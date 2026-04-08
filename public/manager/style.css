@@ -283,11 +283,11 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-promo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)) 44px; gap:8px; }
 
 /* 일반매출 카드 */
-.po-sale-card { background:#fff; border:1px solid #DDE1EB; border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; }
-.po-sale-card .po-card-label { font-size:13px; font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
-.po-sale-card .po-card-amount { font-size:26px; font-weight:700; color:#1A1D23; line-height:1.2; }
-.po-sale-card .po-card-target { font-size:11px; color:#9BA3B2; margin-top:3px; }
-.po-sale-card .po-progress { height:3px; background:#EAECF2; border-radius:2px; margin-top:6px; overflow:hidden; }
+.po-sale-card { background:#fff; border:1px solid #DDE1EB; border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; }
+.po-sale-card .po-card-label { font-size:11px; font-weight:700; margin-bottom:3px; display:flex; align-items:center; gap:4px; }
+.po-sale-card .po-card-amount { font-size:18px; font-weight:700; color:#1A1D23; line-height:1.2; }
+.po-sale-card .po-card-target { font-size:10px; color:#9BA3B2; margin-top:2px; }
+.po-sale-card .po-progress { height:3px; background:#EAECF2; border-radius:2px; margin-top:4px; overflow:hidden; }
 .po-sale-card .po-progress-fill { height:100%; border-radius:2px; }
 
 .tier-row { display:flex; gap:3px; margin-bottom:4px; }

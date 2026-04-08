@@ -2324,15 +2324,15 @@ function renderPOTab() {
   html += '<div class="po-sale-card">';
   html += '<div class="po-card-label" style="color:#1D9E75">수공구 <span class="period-badge" style="background:#E1F5EE;color:#085041">분기</span></div>';
   html += '<div class="po-card-amount">' + fmtPO(salesData.handTool) + '</div>';
-  html += '<div style="font-size:11px;color:#5A6070;margin-top:2px">목표 ' + _htMax.rate + '% (' + fmtPO(_htMax.amount) + '원)</div>';
+  html += '<div style="font-size:10px;color:#5A6070;margin-top:1px">목표 ' + _htMax.rate + '% (' + fmtPO(_htMax.amount) + '원)</div>';
   var _htColor = _htCur.rate === 0 ? '#9BA3B2' : (_htDone ? '#1D9E75' : '#185FA5');
-  var _htDot = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + _htColor + ';margin-right:4px;vertical-align:middle"></span>';
-  html += '<div class="po-card-target" style="font-size:13px;font-weight:600;color:' + _htColor + '">' + _htDot + '현재 ' + _htCur.rate + '%' + (_htDone ? ' (최고 달성)' : '') + '</div>';
+  var _htDot = '<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:' + _htColor + ';margin-right:3px;vertical-align:middle"></span>';
+  html += '<div class="po-card-target" style="font-size:11px;font-weight:600;color:' + _htColor + '">' + _htDot + '현재 ' + _htCur.rate + '%' + (_htDone ? ' (최고 달성)' : '') + '</div>';
   html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + _htPct + '%;background:#1D9E75"></div></div>';
   html += '<div style="flex:1"></div>';
   if (!_htDone) {
-    html += '<div style="border-top:1px solid #EAECF2;margin:6px 0 5px"></div>';
-    html += '<div style="font-size:12px;font-weight:500">목표 ' + _htMax.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_htShortage) + '원 부족</span></div>';
+    html += '<div style="border-top:1px solid #EAECF2;margin:4px 0 3px"></div>';
+    html += '<div style="font-size:10px;font-weight:500">목표까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_htShortage) + '원 부족</span></div>';
   }
   html += '</div>';
 
@@ -2345,15 +2345,15 @@ function renderPOTab() {
   html += '<div class="po-sale-card">';
   html += '<div class="po-card-label" style="color:#D4537E">팩아웃 <span class="period-badge" style="background:#FCE7F3;color:#9D174D">월</span></div>';
   html += '<div class="po-card-amount">' + fmtPO(salesData.packout) + '</div>';
-  html += '<div style="font-size:11px;color:#5A6070;margin-top:2px">목표 ' + _pkMax.rate + '% (' + fmtPO(_pkMax.amount) + '원)</div>';
+  html += '<div style="font-size:10px;color:#5A6070;margin-top:1px">목표 ' + _pkMax.rate + '% (' + fmtPO(_pkMax.amount) + '원)</div>';
   var _pkColor = _pkCur.rate === 0 ? '#9BA3B2' : (_pkDone ? '#1D9E75' : '#185FA5');
-  var _pkDot = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + _pkColor + ';margin-right:4px;vertical-align:middle"></span>';
-  html += '<div class="po-card-target" style="font-size:13px;font-weight:600;color:' + _pkColor + '">' + _pkDot + '현재 ' + _pkCur.rate + '%' + (_pkDone ? ' (최고 달성)' : '') + '</div>';
+  var _pkDot = '<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:' + _pkColor + ';margin-right:3px;vertical-align:middle"></span>';
+  html += '<div class="po-card-target" style="font-size:11px;font-weight:600;color:' + _pkColor + '">' + _pkDot + '현재 ' + _pkCur.rate + '%' + (_pkDone ? ' (최고 달성)' : '') + '</div>';
   html += '<div class="po-progress"><div class="po-progress-fill" style="width:' + _pkPct + '%;background:#D4537E"></div></div>';
   html += '<div style="flex:1"></div>';
   if (!_pkDone) {
-    html += '<div style="border-top:1px solid #EAECF2;margin:6px 0 5px"></div>';
-    html += '<div style="font-size:12px;font-weight:500">목표 ' + _pkMax.rate + '%까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_pkShortage) + '원 부족</span></div>';
+    html += '<div style="border-top:1px solid #EAECF2;margin:4px 0 3px"></div>';
+    html += '<div style="font-size:10px;font-weight:500">목표까지 <span style="font-weight:700;color:#CC2222">' + fmtPO(_pkShortage) + '원 부족</span></div>';
   }
   html += '</div>';
 
