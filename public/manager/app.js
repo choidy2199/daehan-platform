@@ -2250,24 +2250,8 @@ function initPOAutocomplete(inputId, onSelect) {
 function _buildPoSubTabs() {
   var tabs = [
     { id: 'normal', label: '일반주문', dot: '#4B9FE8', activeBg: '#185FA5' },
-    { id: 'kit', label: '키트구성 패키지', dot: '#5DCAA5', activeBg: '#0F6E56' }
+    { id: 'list', label: '발주 리스트', dot: '#B4B2A9', activeBg: '#444441' }
   ];
-  // T 프로모션 탭 — tList 기반 동적 생성
-  var promo = _getPromoData();
-  var tList = promo.tList || [];
-  var _tDots = ['#F09595', '#ED93B1', '#F5A9A9', '#E8A0B8'];
-  var _tBgs = ['#A32D2D', '#993556', '#8B2020', '#7A2A4A'];
-  tList.forEach(function(t, i) {
-    if (t.promoNo) {
-      var _defNames = { T5: '이달의특가', T6: '아웃도어', T7: '신제품', T8: '프로모션' };
-      var _pName = t.promoName || _defNames[t.promoNo] || '';
-      var _label = t.promoNo + (_pName ? ' ' + _pName : '') + ' ' + (t.discountRate || 0) + '%';
-      tabs.push({ id: 'promo-' + t.promoNo.toLowerCase(), label: _label, dot: _tDots[i % _tDots.length], activeBg: _tBgs[i % _tBgs.length], promoNo: t.promoNo, discountRate: t.discountRate || 0, maxOrders: t.maxOrders || 5 });
-    }
-  });
-  tabs.push({ id: 'package', label: '패키지 프로모션', dot: '#FAC775', activeBg: '#854F0B' });
-  tabs.push({ id: 'list', label: '발주 리스트', dot: '#B4B2A9', activeBg: '#444441' });
-  tabs.push({ id: 'foc', label: 'FOC 발주', dot: '#AFA9EC', activeBg: '#534AB7' });
   return tabs;
 }
 var _poSubTabs = _buildPoSubTabs();
@@ -2455,29 +2439,7 @@ function renderPOTab() {
   html += buildPOListPanel();
   html += '</div>';
 
-  // FOC 발주 탭
-  html += '<div id="po-content-foc" class="po-tab-content" style="display:' + (activeSubTab === 'foc' ? 'grid' : 'none') + ';grid-template-columns:1fr 1fr;gap:10px;">';
-  html += buildPOFocLeftPanel();
-  html += buildPOFocRightPanel();
-  html += '</div>';
-
-  // T 프로모션 탭 — tList 기반 동적 생성
-  var _promoData = _getPromoData();
-  (_promoData.tList || []).forEach(function(t) {
-    if (!t.promoNo) return;
-    var tabId = 'promo-' + t.promoNo.toLowerCase();
-    html += '<div id="po-content-' + tabId + '" class="po-tab-content" style="display:' + (activeSubTab === tabId ? 'grid' : 'none') + ';grid-template-columns:1fr 1fr;gap:10px;">';
-    html += _buildPromoTabContent(tabId, t.promoNo, t.discountRate || 0);
-    html += '</div>';
-  });
-  // 패키지 탭
-  html += '<div id="po-content-package" class="po-tab-content" style="display:' + (activeSubTab === 'package' ? 'grid' : 'none') + ';grid-template-columns:1fr 1fr;gap:10px;">';
-  html += _buildPackageTabContent();
-  html += '</div>';
-  // 키트 탭
-  html += '<div id="po-content-kit" class="po-tab-content" style="display:' + (activeSubTab === 'kit' ? 'grid' : 'none') + ';grid-template-columns:1fr 1fr;gap:10px;">';
-  html += _buildKitTabContent();
-  html += '</div>';
+  // (FOC/T프로모션/패키지/키트 탭 제거됨 — 일반주문 + 발주리스트만 유지)
 
   html += '</div>'; // #po-tab-contents
 
@@ -2736,22 +2698,6 @@ function buildPOListPanel() {
   var erpDone = filtered.filter(function(i) { return i.erpStatus === 'done'; }).length;
 
   var h = '';
-  h += '<div style="display:flex;gap:6px;margin-bottom:10px">';
-  var cards = [
-    { label: '오늘 발주', val: String(todayCount), sub: '건' },
-    { label: '일반주문', val: String(normalCount), sub: '건' },
-    { label: '프로모션', val: String(promoCount), sub: '건' },
-    { label: 'FOC', val: String(focCount), sub: '건' },
-    { label: '경영박사 등록', val: erpDone + '/' + filtered.length, sub: '', border: '#1D9E75' }
-  ];
-  cards.forEach(function(c) {
-    h += '<div style="flex:1;background:#fff;border-radius:6px;padding:8px 12px;border:1px solid ' + (c.border || '#DDE1EB') + ';text-align:center">';
-    h += '<div style="font-size:10px;color:#5A6070">' + c.label + '</div>';
-    h += '<div style="font-size:18px;font-weight:700;color:#1A1D23">' + c.val + '</div>';
-    if (c.sub) h += '<div style="font-size:9px;color:#9BA3B2">' + c.sub + '</div>';
-    h += '</div>';
-  });
-  h += '</div>';
 
   h += '<div class="po-panel" style="max-height:calc(100vh - 320px)">';
   h += '<div class="po-panel-header"><span>발주 리스트</span><div style="display:flex;gap:6px;align-items:center">';
