@@ -164,6 +164,24 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - mw_price_history: recalcAll 시 가격 변동 자동 감지/저장 (1년/10,000건 제한)
   - Supabase 동기화: mw_channel_fees, mw_price_history
 
+- [2026-04-09] 발주 대시보드 매출카드 전면 리디자인
+  - 매출카드 레이아웃: 좌/우 Grid → 1행 섹션박스 (일반매출 3카드 + 누적프로모션 N카드)
+  - 섹션 헤더 다크 배경 (#1A1D23), 금액 22px, 정보 11px
+  - 카드 row1~row5 고정 높이 구조 → 7카드 가로 라인 정렬
+  - 합계 가로 바 → 합계+탭/뱃지 가로 통합 (po-top-row)
+  - 서브탭 7개 → 2개로 축소 (일반주문 + 발주 리스트)
+  - 요약바 제거 → 탭 옆 요약뱃지 5개로 통합
+  - 발주리스트 헤더: ↻ 밀워키 주문내역 동기화(빨간) + ↻ 경영박사 매입전표 등록(파란) 버튼
+
+- [2026-04-09] TTI 주문내역 Remark 기반 자동분류 + 프로모션 크롤링 제거
+  - 크롬 확장: 프로모션 스크래핑 4함수 + background.js 프로모션 블록 160줄 제거
+  - content-tti.js: _setOrderDateRange() 날짜 범위 설정 함수 추가
+  - content-daehan.js: DAEHAN_SCRAPE_ORDER_HISTORY 핸들러 추가
+  - syncTtiOrderHistory(): 미매칭 TTI 주문 → 새 mw_po_history 엔트리 자동 생성
+  - Remark 분류: normal→일반주문, M코드→프로모션, 0원→FOC
+  - startTtiOrderSync(): 이번달 1일~오늘 범위 동기화
+  - 동기화 타임스탬프: mw_order_sync_time
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인
