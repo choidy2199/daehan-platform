@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
           });
           if (!naverResp.ok) {
             const errText = await naverResp.text();
-            return NextResponse.json({ success: false, message: `네이버 토큰 발급 실패: ${naverResp.status} ${errText.substring(0, 200)}` });
+            return NextResponse.json({ success: false, message: `네이버 실패 (S:${naverSecret.length}자,B64:${naverSecretB64?'Y':'N'}): ${errText.substring(0, 150)}` });
           }
           const tokenData = await naverResp.json();
           if (tokenData.access_token) {
