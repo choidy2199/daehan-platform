@@ -3625,11 +3625,12 @@ function addToCart(productCode) {
   var p = (DB.products || []).find(function(prod) { return prod.ttiNum === productCode || prod.code === productCode; });
   if (!p) { toast('제품을 찾을 수 없습니다'); return; }
 
-  // TTI 재고 체크
-  var _ttiS = p.ttiStock;
-  if (_ttiS === '●') {
-    // 재고 넉넉 — 그대로 진행
-  } else if (_ttiS === '▲') {
+  // TTI 재고 체크 (_poTtiStockMap 기준: 'a'=넉넉, 'b'=여유없음, 'c'=없음)
+  var _ttiCode = normalizeTtiCode(p.ttiNum);
+  var _ttiStat = _poTtiStockMap && _ttiCode && _poTtiStockMap[_ttiCode] !== undefined ? _poTtiStockMap[_ttiCode] : null;
+  if (_ttiStat === 'a') {
+    // 넉넉 → 그대로 진행
+  } else if (_ttiStat === 'b') {
     alert('⚠️ ' + (p.model || '제품') + ' - 재고 여유가 없습니다. 확인 후 주문하세요');
   } else {
     alert('❌ ' + (p.model || '제품') + ' - 가용재고가 없습니다. 주문할 수 없습니다.');
@@ -3671,11 +3672,12 @@ function addToCart(productCode) {
 function addToCartDirect(product) {
   if (!product) return;
 
-  // TTI 재고 체크
-  var _ttiS2 = product.ttiStock;
-  if (_ttiS2 === '●') {
-    // 재고 넉넉 — 그대로 진행
-  } else if (_ttiS2 === '▲') {
+  // TTI 재고 체크 (_poTtiStockMap 기준: 'a'=넉넉, 'b'=여유없음, 'c'=없음)
+  var _ttiCode2 = normalizeTtiCode(product.ttiNum);
+  var _ttiStat2 = _poTtiStockMap && _ttiCode2 && _poTtiStockMap[_ttiCode2] !== undefined ? _poTtiStockMap[_ttiCode2] : null;
+  if (_ttiStat2 === 'a') {
+    // 넉넉 → 그대로 진행
+  } else if (_ttiStat2 === 'b') {
     alert('⚠️ ' + (product.model || '제품') + ' - 재고 여유가 없습니다. 확인 후 주문하세요');
   } else {
     alert('❌ ' + (product.model || '제품') + ' - 가용재고가 없습니다. 주문할 수 없습니다.');
