@@ -130,7 +130,7 @@ export async function getNaverProducts(page = 1, size = 100) {
  * 네이버 단건 가격 수정
  */
 export async function updateNaverPrice(originProductNo: string, newPrice: number) {
-  // 1단계: 검색 API로 해당 상품의 channelProductNo 조회 (응답 구조가 확인된 API 사용)
+  // 1단계: 상품 검색으로 channelProductNo 확인
   const searchResult = await naverApi('POST', '/v1/products/search', {
     page: 1,
     size: 1,
@@ -141,14 +141,32 @@ export async function updateNaverPrice(originProductNo: string, newPrice: number
   const channelProductNo = product?.channelProducts?.[0]?.channelProductNo;
 
   if (!channelProductNo) {
-    const keys = searchResult ? Object.keys(searchResult) : [];
-    throw new Error(`channelProductNo를 찾을 수 없습니다 (originProductNo: ${originProductNo}, keys: ${keys.join(',')})`);
+    throw new Error(`channelProductNo를 찾을 수 없습니다. originProductNo: ${originProductNo}`);
   }
 
-  // 2단계: 채널상품 가격 수정 API 사용
-  return naverApi('PUT', `/v1/products/channel-products/${channelProductNo}`, {
-    channelProduct: {
-      salePrice: newPrice,
-    },
-  });
+  // 2단계: 채널상품 전체 정보 조회 (v2)
+  const fullProduct = await naverApi('GET', `/v2/products/channel-products/${channelProductNo}`);
+
+  if (!fullProduct?.originProduct) {
+    throw new Error(`상품 상세 조회 실패. channelProductNo: ${channelProductNo}`);
+  }
+
+  // 3단계: 가격만 변경 (나머지 필드 유지)
+  fullProduct.originProduct.salePrice = newPrice;
+
+  // detailContent는 null로 보내면 기존값 유지됨 (네이버 공식 문서)
+  if (fullProduct.originProduct.detailContent) {
+    fullProduct.originProduct.detailContent = null;
+  }
+
+  // 4단계: 전체 데이터를 PUT으로 전송
+  const result = await naverApi('PUT', `/v2/products/channel-products/${channelProductNo}`, fullProduct);
+
+  return {
+    success: true,
+    channelProductNo,
+    originProductNo,
+    newPrice,
+    result,
+  };
 }
