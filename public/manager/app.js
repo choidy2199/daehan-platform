@@ -10670,45 +10670,413 @@ async function init() {
 }
 
 // ======================== 관리: 수수료 설정 ========================
-function loadFeeSettings() {
-  var s = DB.settings;
-  document.getElementById('fee-naver-sale').value = s.naverSaleRate || 3.0;
-  document.getElementById('fee-naver-pay').value = s.naverPayRate || 3.63;
-  updateNaverTotal();
-  document.getElementById('fee-coupang-mp').value = s.coupangMpFee || 10.8;
-  document.getElementById('fee-coupang-rg').value = s.coupangRgFee || 10.8;
-  document.getElementById('fee-coupang-logi').value = s.coupangLogi || 2800;
-  document.getElementById('fee-open-elec').value = ((s.openElecFee || 0.13) * 100).toFixed(1);
-  document.getElementById('fee-open-hand').value = ((s.openHandFee || 0.176) * 100).toFixed(1);
+// ======================== 온라인 판매채널 수수료 (5카드 UI) ========================
+var _channelFeesDefault = {
+  lastUpdated: new Date().toISOString(),
+  channels: {
+    naver: { name: '네이버 스토어팜', color: '#1D9E75', vatIncluded: true, fees: [
+      { name: '판매수수료', desc: '네이버 카테고리별 판매 수수료', rate: 3, unit: '%', fixed: true },
+      { name: '결제수수료', desc: 'Npay 결제 수수료', rate: 3.63, unit: '%', fixed: true }
+    ], formula: '정산 = 기준금액 - Npay수수료 - 판매수수료' },
+    coupang_mp: { name: '쿠팡 마켓플레이스', color: '#E8344E', vatIncluded: false, vatMultiplier: 1.1,
+      categories: [
+        { name: '전동공구', desc: '파워툴·배터리·충전기', rate: 7.8, unit: '%', fixed: true },
+        { name: '수공구/공구함', desc: '핸드툴·액세서리·팩아웃', rate: 10.8, unit: '%', fixed: true }
+      ],
+      shipping: { name: '배송비', desc: '판매 배송비에 대한 수수료', rate: 3.0, unit: '%' },
+      formula: '수수료 = 판매액 × 율 × 1.1(VAT)' },
+    coupang_growth: { name: '쿠팡 로켓그로스', color: '#E8344E', vatIncluded: false, vatMultiplier: 1.1,
+      categories: [
+        { name: '전동공구', desc: '파워툴·배터리·충전기', rate: 7.8, unit: '%', fixed: true },
+        { name: '수공구/공구함', desc: '핸드툴·액세서리·팩아웃', rate: 10.8, unit: '%', fixed: true }
+      ],
+      logistics: [
+        { size: '극소형', cost: 1650, unit: '원', fixed: true },
+        { size: '소형', cost: 1950, unit: '원', fixed: true },
+        { size: '중형', cost: 2800, unit: '원', fixed: true },
+        { size: '대형', cost: 4000, unit: '원', fixed: true }
+      ],
+      formula: '수수료 = 판매액 × 율, VAT = 수수료 × 10%' },
+    gmarket: { name: 'G마켓 / 옥션', color: '#185FA5', vatIncluded: true,
+      categories: [
+        { name: '전동공구', desc: '파워툴 카테고리', rate: 9, unit: '%', fixed: true },
+        { name: '수공구/악세서리', desc: '수공구·팩아웃', rate: 13, unit: '%', fixed: true }
+      ],
+      shipping: { name: '선결제 배송비', desc: 'G마켓 배송비 수수료', rate: 3.3, unit: '%' },
+      ssgLink: { enabled: true, rate: 1, unit: '%' },
+      formula: '이용료 = 판매가 × 카테고리율 / SSG연동 시 +1%' },
+    ssg: { name: 'SSG 직접입점', color: '#EF9F27', vatIncluded: true,
+      categories: [
+        { name: '공구류 전체', desc: '전동/수공구 동일 수수료', rate: 13, unit: '%', fixed: true }
+      ],
+      stores: ['신세계몰', '이마트몰', 'S.COM몰'],
+      formula: '정산 = 판매단가 - 수수료 - SSG할인' }
+  }
+};
+var _channelFees = null;
+var _feeEditMode = {};
+
+function loadChannelFees() {
+  var stored = loadObj('mw_channel_fees', null);
+  if (stored && stored.channels) {
+    _channelFees = stored;
+  } else {
+    // 마이그레이션: 기존 flat → 새 구조
+    _channelFees = JSON.parse(JSON.stringify(_channelFeesDefault));
+    var s = DB.settings;
+    var ch = _channelFees.channels;
+    if (s.naverSaleRate !== undefined) ch.naver.fees[0].rate = s.naverSaleRate;
+    if (s.naverPayRate !== undefined) ch.naver.fees[1].rate = s.naverPayRate;
+    if (s.coupangMpFee !== undefined) {
+      ch.coupang_mp.categories[0].rate = s.coupangMpFee < 1 ? s.coupangMpFee * 100 : (s.coupangMpFee === 10.8 ? 7.8 : s.coupangMpFee);
+      ch.coupang_mp.categories[1].rate = s.coupangMpFee < 1 ? s.coupangMpFee * 100 : s.coupangMpFee;
+    }
+    if (s.coupangRgFee !== undefined) {
+      ch.coupang_growth.categories[0].rate = s.coupangRgFee < 1 ? s.coupangRgFee * 100 : (s.coupangRgFee === 10.8 ? 7.8 : s.coupangRgFee);
+      ch.coupang_growth.categories[1].rate = s.coupangRgFee < 1 ? s.coupangRgFee * 100 : s.coupangRgFee;
+    }
+    if (s.coupangLogi !== undefined) ch.coupang_growth.logistics[2].cost = s.coupangLogi;
+    // G마켓/옥션, SSG: 기존 flat 구조에 해당 데이터가 없으므로 기본값 유지
+    // openElecFee/openHandFee는 밀워키 단가표 전용이며, G마켓 수수료와 별개
+    _channelFees.lastUpdated = new Date().toISOString();
+    saveChannelFeesRaw();
+  }
+  return _channelFees;
 }
 
-function updateNaverTotal() {
-  var sale = parseFloat(document.getElementById('fee-naver-sale').value) || 0;
-  var pay = parseFloat(document.getElementById('fee-naver-pay').value) || 0;
-  document.getElementById('fee-naver-total').textContent = (sale + pay).toFixed(2) + '%';
+function saveChannelFeesRaw() {
+  localStorage.setItem('mw_channel_fees', JSON.stringify(_channelFees));
+  autoSyncToSupabase('mw_channel_fees');
 }
 
-function applyCoupangPreset(type, val) {
-  if (!val) return;
-  if (type === 'mp') document.getElementById('fee-coupang-mp').value = val;
-  if (type === 'rg') document.getElementById('fee-coupang-rg').value = val;
-}
-
-function saveFeeSettings() {
-  var sale = parseFloat(document.getElementById('fee-naver-sale').value) || 3.0;
-  var pay = parseFloat(document.getElementById('fee-naver-pay').value) || 3.63;
-  DB.settings.naverSaleRate = sale;
-  DB.settings.naverPayRate = pay;
-  DB.settings.naverFee = (sale + pay) / 100;
-  DB.settings.coupangMpFee = parseFloat(document.getElementById('fee-coupang-mp').value) || 10.8;
-  DB.settings.coupangRgFee = parseFloat(document.getElementById('fee-coupang-rg').value) || 10.8;
-  DB.settings.coupangLogi = parseInt(document.getElementById('fee-coupang-logi').value) || 2800;
-  DB.settings.openElecFee = (parseFloat(document.getElementById('fee-open-elec').value) || 13) / 100;
-  DB.settings.openHandFee = (parseFloat(document.getElementById('fee-open-hand').value) || 17.6) / 100;
+// 호환 레이어: 새 구조 → DB.settings 플랫 키 동기화
+function syncChannelFeesToSettings() {
+  var ch = _channelFees.channels;
+  var naverSale = ch.naver.fees[0] ? ch.naver.fees[0].rate : 3;
+  var naverPay = ch.naver.fees[1] ? ch.naver.fees[1].rate : 3.63;
+  DB.settings.naverSaleRate = naverSale;
+  DB.settings.naverPayRate = naverPay;
+  DB.settings.naverFee = (naverSale + naverPay) / 100;
+  // 쿠팡: 기존은 단일값, 새 구조는 카테고리별 → 수공구(높은 값) 기준
+  var mpCats = ch.coupang_mp.categories || [];
+  DB.settings.coupangMpFee = mpCats.length > 1 ? mpCats[1].rate : (mpCats[0] ? mpCats[0].rate : 10.8);
+  var rgCats = ch.coupang_growth.categories || [];
+  DB.settings.coupangRgFee = rgCats.length > 1 ? rgCats[1].rate : (rgCats[0] ? rgCats[0].rate : 10.8);
+  var logi = ch.coupang_growth.logistics || [];
+  DB.settings.coupangLogi = logi.length > 2 ? logi[2].cost : (logi.length > 0 ? logi[logi.length - 1].cost : 2800);
+  // 오픈마켓: openElecFee/openHandFee는 밀워키 단가표 전용 종합수수료.
+  // G마켓 카테고리 수수료(9%/13%)와 다르므로 기존 값을 보존한다.
+  // 기존 설정이 없을 때만 기본값 적용.
+  if (DB.settings.openElecFee === undefined) DB.settings.openElecFee = 0.13;
+  if (DB.settings.openHandFee === undefined) DB.settings.openHandFee = 0.176;
   DB.settings.feeVatMode = 'incl';
   save(KEYS.settings, DB.settings);
+}
+
+function loadFeeSettings() {
+  loadChannelFees();
+  renderChannelFees();
+}
+
+// ======================== 5카드 렌더링 ========================
+function renderChannelFees() {
+  var container = document.getElementById('channel-fees-container');
+  if (!container) return;
+  var ch = _channelFees.channels;
+  var keys = ['naver', 'coupang_mp', 'coupang_growth', 'gmarket', 'ssg'];
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">';
+  keys.forEach(function(key, i) {
+    if (i === 3) html += '</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    html += buildFeeCard(key, ch[key]);
+  });
+  html += '</div>';
+  container.innerHTML = html;
+  // 타임스탬프
+  var tsEl = document.getElementById('channel-fees-timestamp');
+  if (tsEl && _channelFees.lastUpdated) {
+    var d = new Date(_channelFees.lastUpdated);
+    tsEl.textContent = '마지막 수정: ' + d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+}
+
+function buildFeeCard(key, data) {
+  var isEdit = _feeEditMode[key] || false;
+  var disAttr = isEdit ? '' : ' disabled';
+  var inpBg = isEdit ? 'background:#fff;border:1px solid #DDE1EB' : 'background:#F4F6FA;border:1px solid #EAECF2';
+  var vatTag = '';
+  if (data.vatIncluded === false) vatTag = '<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:#FCEBEB;color:#791F1F;font-weight:500;white-space:nowrap">VAT별도</span>';
+  else vatTag = '<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:#E1F5EE;color:#085041;font-weight:500;white-space:nowrap">VAT포함</span>';
+
+  // 네이버 합계
+  var totalHtml = '';
+  if (key === 'naver') {
+    var sum = 0;
+    (data.fees || []).forEach(function(f) { if (f.unit === '%') sum += (f.rate || 0); });
+    totalHtml = '<span style="font-size:13px;font-weight:700;color:#185FA5;white-space:nowrap">합계 ' + sum.toFixed(2) + '%</span>';
+  }
+
+  var btnStyle = isEdit
+    ? 'background:#185FA5;color:#fff;border:1px solid #185FA5;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;white-space:nowrap'
+    : 'background:#fff;color:#5A6070;border:1px solid #DDE1EB;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif;white-space:nowrap';
+  var btnText = isEdit ? '저장' : '수정';
+
+  var h = '<div style="background:#fff;border:1px solid #DDE1EB;border-radius:8px;overflow:hidden">';
+  // 헤더
+  h += '<div style="padding:8px 14px;display:flex;align-items:center;gap:6px">';
+  h += '<span style="width:8px;height:8px;border-radius:50%;background:' + data.color + ';display:inline-block;flex-shrink:0"></span>';
+  h += '<span style="font-size:13px;font-weight:600;color:#1A1D23;white-space:nowrap">' + data.name + '</span>';
+  h += vatTag;
+  h += '<span style="flex:1"></span>';
+  if (totalHtml) h += totalHtml + ' ';
+  h += '<button onclick="toggleFeeEdit(\'' + key + '\')" style="' + btnStyle + '">' + btnText + '</button>';
+  h += '</div>';
+
+  // 바디
+  h += '<div style="padding:6px 14px 12px">';
+
+  // 네이버: fees
+  if (key === 'naver') {
+    h += feeSection('수수료 항목', data.fees, key, 'fees', inpBg, disAttr, isEdit, '%');
+  }
+
+  // 쿠팡 마켓: categories + shipping
+  if (key === 'coupang_mp') {
+    h += feeSection('판매수수료 (카테고리별)', data.categories, key, 'categories', inpBg, disAttr, isEdit, '%');
+    h += feeSingleRow('배송비 수수료', data.shipping, key, 'shipping', inpBg, disAttr);
+  }
+
+  // 쿠팡 로켓: categories + logistics
+  if (key === 'coupang_growth') {
+    h += feeSection('판매수수료', data.categories, key, 'categories', inpBg, disAttr, isEdit, '%');
+    h += feeLogisticsSection('물류비 (사이즈별)', data.logistics, key, inpBg, disAttr, isEdit);
+  }
+
+  // G마켓: categories + shipping + ssgLink
+  if (key === 'gmarket') {
+    h += feeSection('카테고리별 서비스이용료', data.categories, key, 'categories', inpBg, disAttr, isEdit, '%');
+    h += '<div style="margin-top:8px">';
+    h += '<div style="font-size:10px;font-weight:600;color:#9BA3B2;padding-bottom:4px;border-bottom:1px solid #F4F6FA;margin-bottom:4px">배송비·연동</div>';
+    h += feeSingleRow(null, data.shipping, key, 'shipping', inpBg, disAttr);
+    // SSG 제휴연동 토글
+    var ssg = data.ssgLink || { enabled: true, rate: 1 };
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0">';
+    h += '<span style="min-width:100px;font-size:12px;font-weight:500;color:#1A1D23">SSG 제휴연동</span>';
+    h += '<span style="flex:1;font-size:11px;color:#9BA3B2">ON 시 추가 수수료 부과</span>';
+    h += '<label style="position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0">';
+    h += '<input type="checkbox" ' + (ssg.enabled ? 'checked' : '') + disAttr + ' onchange="toggleSsgLink(this.checked)" style="opacity:0;width:0;height:0">';
+    h += '<span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:' + (ssg.enabled ? '#185FA5' : '#DDE1EB') + ';border-radius:10px;transition:0.2s"></span>';
+    h += '<span style="position:absolute;left:' + (ssg.enabled ? '18px' : '2px') + ';top:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>';
+    h += '</label>';
+    h += '<input type="text" value="' + ssg.rate + '" data-fee-key="gmarket" data-fee-field="ssgLink.rate" style="width:70px;height:28px;text-align:right;font-size:13px;font-weight:600;font-family:Pretendard,sans-serif;border-radius:4px;padding:0 8px;' + inpBg + '"' + disAttr + '>';
+    h += '<span style="font-size:12px;color:#5A6070;flex-shrink:0">%</span>';
+    h += '</div></div>';
+  }
+
+  // SSG: categories + stores
+  if (key === 'ssg') {
+    h += feeSection('판매수수료', data.categories, key, 'categories', inpBg, disAttr, isEdit, '%');
+    h += '<div style="margin-top:8px">';
+    h += '<div style="font-size:10px;font-weight:600;color:#9BA3B2;padding-bottom:4px;border-bottom:1px solid #F4F6FA;margin-bottom:6px">노출 점포</div>';
+    h += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    (data.stores || []).forEach(function(s) {
+      h += '<span style="font-size:11px;padding:3px 10px;border-radius:12px;background:#FEF3C7;color:#92400E;font-weight:500">' + s + '</span>';
+    });
+    h += '</div></div>';
+  }
+
+  // 공식 박스
+  if (data.formula) {
+    h += '<div style="margin-top:8px;background:#F4F6FA;border-radius:4px;padding:6px 10px;font-size:10px;color:#5A6070">' + data.formula + '</div>';
+  }
+
+  h += '</div></div>';
+  return h;
+}
+
+function feeSection(label, items, chKey, section, inpBg, disAttr, isEdit, unitLabel) {
+  var h = '<div style="margin-bottom:4px">';
+  h += '<div style="font-size:10px;font-weight:600;color:#9BA3B2;padding-bottom:4px;border-bottom:1px solid #F4F6FA;margin-bottom:2px">' + label + '</div>';
+  (items || []).forEach(function(item, idx) {
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F4F6FA">';
+    if (isEdit && !item.fixed) {
+      h += '<input type="text" value="' + item.name + '" data-fee-key="' + chKey + '" data-fee-section="' + section + '" data-fee-idx="' + idx + '" data-fee-field-name="name" placeholder="명칭" style="min-width:80px;max-width:100px;height:28px;font-size:12px;font-weight:500;font-family:Pretendard,sans-serif;border-radius:4px;padding:0 6px;' + inpBg + '">';
+      h += '<input type="text" value="' + (item.desc || '') + '" data-fee-key="' + chKey + '" data-fee-section="' + section + '" data-fee-idx="' + idx + '" data-fee-field-name="desc" placeholder="설명" style="flex:1;min-width:60px;height:28px;font-size:11px;color:#9BA3B2;font-family:Pretendard,sans-serif;border-radius:4px;padding:0 6px;' + inpBg + '">';
+    } else {
+      h += '<span style="min-width:100px;font-size:12px;font-weight:500;color:#1A1D23;white-space:nowrap">' + item.name + '</span>';
+      h += '<span style="flex:1;font-size:11px;color:#9BA3B2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (item.desc || '') + '</span>';
+    }
+    h += '<input type="text" value="' + item.rate + '" data-fee-key="' + chKey + '" data-fee-section="' + section + '" data-fee-idx="' + idx + '" style="width:70px;height:28px;text-align:right;font-size:13px;font-weight:600;font-family:Pretendard,sans-serif;border-radius:4px;padding:0 8px;' + inpBg + '"' + disAttr + '>';
+    h += '<span style="font-size:12px;color:#5A6070;flex-shrink:0">' + unitLabel + '</span>';
+    if (isEdit && !item.fixed) {
+      h += '<button onclick="removeFeeItem(\'' + chKey + '\',\'' + section + '\',' + idx + ')" style="background:none;border:none;cursor:pointer;color:#CC2222;font-size:14px;padding:0 2px" title="삭제">✕</button>';
+    }
+    h += '</div>';
+  });
+  if (isEdit) {
+    h += '<button onclick="addFeeItem(\'' + chKey + '\',\'' + section + '\')" style="background:none;border:none;color:#185FA5;font-size:11px;font-weight:600;cursor:pointer;padding:4px 0;font-family:Pretendard,sans-serif">+ 항목 추가</button>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function feeSingleRow(label, item, chKey, field, inpBg, disAttr) {
+  if (!item) return '';
+  var h = '';
+  if (label) h += '<div style="margin-top:8px"><div style="font-size:10px;font-weight:600;color:#9BA3B2;padding-bottom:4px;border-bottom:1px solid #F4F6FA;margin-bottom:4px">' + label + '</div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F4F6FA">';
+  h += '<span style="min-width:100px;font-size:12px;font-weight:500;color:#1A1D23;white-space:nowrap">' + item.name + '</span>';
+  h += '<span style="flex:1;font-size:11px;color:#9BA3B2">' + (item.desc || '') + '</span>';
+  h += '<input type="text" value="' + item.rate + '" data-fee-key="' + chKey + '" data-fee-field="' + field + '.rate" style="width:70px;height:28px;text-align:right;font-size:13px;font-weight:600;font-family:Pretendard,sans-serif;border-radius:4px;padding:0 8px;' + inpBg + '"' + disAttr + '>';
+  h += '<span style="font-size:12px;color:#5A6070;flex-shrink:0">' + (item.unit || '%') + '</span>';
+  h += '</div>';
+  if (label) h += '</div>';
+  return h;
+}
+
+function feeLogisticsSection(label, items, chKey, inpBg, disAttr, isEdit) {
+  var h = '<div style="margin-top:8px">';
+  h += '<div style="font-size:10px;font-weight:600;color:#9BA3B2;padding-bottom:4px;border-bottom:1px solid #F4F6FA;margin-bottom:2px">' + label + '</div>';
+  (items || []).forEach(function(item, idx) {
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F4F6FA">';
+    if (isEdit && !item.fixed) {
+      h += '<input type="text" value="' + item.size + '" data-fee-key="' + chKey + '" data-fee-section="logistics" data-fee-idx="' + idx + '" data-fee-field-name="size" placeholder="사이즈명" style="min-width:80px;max-width:100px;height:28px;font-size:12px;font-weight:500;font-family:Pretendard,sans-serif;border-radius:4px;padding:0 6px;' + inpBg + '">';
+    } else {
+      h += '<span style="min-width:100px;font-size:12px;font-weight:500;color:#1A1D23;white-space:nowrap">' + item.size + '</span>';
+    }
+    h += '<span style="flex:1;font-size:11px;color:#9BA3B2"></span>';
+    h += '<input type="text" value="' + item.cost.toLocaleString() + '" data-fee-key="' + chKey + '" data-fee-section="logistics" data-fee-idx="' + idx + '" data-fee-type="cost" style="width:70px;height:28px;text-align:right;font-size:13px;font-weight:600;font-family:Pretendard,sans-serif;border-radius:4px;padding:0 8px;' + inpBg + '"' + disAttr + '>';
+    h += '<span style="font-size:12px;color:#5A6070;flex-shrink:0">원</span>';
+    if (isEdit && !item.fixed) {
+      h += '<button onclick="removeFeeItem(\'' + chKey + '\',\'logistics\',' + idx + ')" style="background:none;border:none;cursor:pointer;color:#CC2222;font-size:14px;padding:0 2px" title="삭제">✕</button>';
+    }
+    h += '</div>';
+  });
+  if (isEdit) {
+    h += '<button onclick="addFeeLogistics(\'' + chKey + '\')" style="background:none;border:none;color:#185FA5;font-size:11px;font-weight:600;cursor:pointer;padding:4px 0;font-family:Pretendard,sans-serif">+ 사이즈 추가</button>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// ======================== 수정/저장 토글 ========================
+function toggleFeeEdit(key) {
+  if (_feeEditMode[key]) {
+    // 저장 모드: input 값 수집 → 저장
+    collectFeeInputs(key);
+    _channelFees.lastUpdated = new Date().toISOString();
+    saveChannelFeesRaw();
+    syncChannelFeesToSettings();
+    _feeEditMode[key] = false;
+    renderChannelFees();
+    toast('저장되었습니다');
+  } else {
+    _feeEditMode[key] = true;
+    renderChannelFees();
+  }
+}
+
+function collectFeeInputs(key) {
+  var inputs = document.querySelectorAll('input[data-fee-key="' + key + '"]');
+  inputs.forEach(function(inp) {
+    var section = inp.getAttribute('data-fee-section');
+    var idx = parseInt(inp.getAttribute('data-fee-idx'));
+    var field = inp.getAttribute('data-fee-field');
+    var feeType = inp.getAttribute('data-fee-type');
+    var fieldName = inp.getAttribute('data-fee-field-name');
+    var ch = _channelFees.channels[key];
+    // name/desc 필드 (추가된 항목)
+    if (fieldName && section && !isNaN(idx)) {
+      var arr = ch[section];
+      if (arr && arr[idx]) arr[idx][fieldName] = inp.value;
+      return;
+    }
+    var rawVal = inp.value.replace(/,/g, '');
+    var val = parseFloat(rawVal) || 0;
+    if (section && !isNaN(idx)) {
+      var arr = ch[section];
+      if (arr && arr[idx]) {
+        if (feeType === 'cost') arr[idx].cost = val;
+        else arr[idx].rate = val;
+      }
+    } else if (field) {
+      var parts = field.split('.');
+      if (parts.length === 2) {
+        if (ch[parts[0]]) ch[parts[0]][parts[1]] = val;
+      }
+    }
+  });
+  // 체크박스 (SSG토글 등)
+  var checks = document.querySelectorAll('input[type="checkbox"][data-fee-key="' + key + '"]');
+  checks.forEach(function(chk) {
+    var field = chk.getAttribute('data-fee-field');
+    if (field) {
+      var parts = field.split('.');
+      var ch2 = _channelFees.channels[key];
+      if (parts.length === 2 && ch2[parts[0]]) ch2[parts[0]][parts[1]] = chk.checked;
+    }
+  });
+}
+
+function toggleSsgLink(checked) {
+  if (!_channelFees.channels.gmarket.ssgLink) {
+    _channelFees.channels.gmarket.ssgLink = { enabled: true, rate: 1, unit: '%' };
+  }
+  _channelFees.channels.gmarket.ssgLink.enabled = checked;
+  renderChannelFees();
+}
+
+// ======================== 항목 추가/삭제 ========================
+function addFeeItem(chKey, section) {
+  var ch = _channelFees.channels[chKey];
+  if (!ch[section]) ch[section] = [];
+  // 먼저 현재 입력값 수집
+  collectFeeInputs(chKey);
+  if (section === 'fees') {
+    ch[section].push({ name: '', desc: '', rate: 0, unit: '%', fixed: false });
+  } else {
+    ch[section].push({ name: '', desc: '', rate: 0, unit: '%', fixed: false });
+  }
+  if (!_feeEditMode[chKey]) _feeEditMode[chKey] = true;
+  renderChannelFees();
+}
+
+function addFeeLogistics(chKey) {
+  var ch = _channelFees.channels[chKey];
+  if (!ch.logistics) ch.logistics = [];
+  collectFeeInputs(chKey);
+  ch.logistics.push({ size: '', cost: 0, unit: '원', fixed: false });
+  if (!_feeEditMode[chKey]) _feeEditMode[chKey] = true;
+  renderChannelFees();
+}
+
+function removeFeeItem(chKey, section, idx) {
+  var ch = _channelFees.channels[chKey];
+  if (ch[section] && ch[section][idx] && !ch[section][idx].fixed) {
+    collectFeeInputs(chKey);
+    ch[section].splice(idx, 1);
+    renderChannelFees();
+  }
+}
+
+// 새 행에 name 편집 가능하게 하기 위한 이벤트 위임 (추가된 항목)
+// → buildFeeCard에서 fixed=false인 항목은 name이 input으로 표시됨
+// 기존 saveFeeSettings 호환 래퍼
+function saveFeeSettings() {
+  // 모든 카드 저장
+  ['naver','coupang_mp','coupang_growth','gmarket','ssg'].forEach(function(k) {
+    collectFeeInputs(k);
+    _feeEditMode[k] = false;
+  });
+  _channelFees.lastUpdated = new Date().toISOString();
+  saveChannelFeesRaw();
+  syncChannelFeesToSettings();
+  renderChannelFees();
   toast('수수료 설정 저장 완료');
 }
+
+// 기존 updateNaverTotal/applyCoupangPreset은 더 이상 HTML에서 호출되지 않지만 안전을 위해 빈 함수 유지
+function updateNaverTotal() {}
+function applyCoupangPreset() {}
 
 // ======================== 설정 서브탭: 거래처 등록 ========================
 var _clientStart = performance.now();
