@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { selectItem } from '@/lib/erp';
 import { getAccessToken } from '@/lib/naver';
 
 interface PlatformStatus {
@@ -67,13 +66,37 @@ export async function POST(req: NextRequest) {
   try {
     switch (platformId) {
       case 'erp': {
-        // ERP SOAP 호출 테스트 (selectItem 재사용)
-        if (!process.env.ERP_USER_KEY || !process.env.ERP_URL) {
+        // ERP CheckService SOAP 호출 (cUserKey 파라미터 사용)
+        const userKey = process.env.ERP_USER_KEY;
+        const erpUrl = process.env.ERP_URL;
+        if (!userKey || !erpUrl) {
           return NextResponse.json({ success: false, message: 'ERP 환경변수 미설정' });
         }
         try {
-          await selectItem('TEST');
-          return NextResponse.json({ success: true, message: 'ERP 연결 성공' });
+          const soapEnv = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <CheckService xmlns="http://tempuri.org/">
+      <cUserKey>${userKey}</cUserKey>
+    </CheckService>
+  </soap:Body>
+</soap:Envelope>`;
+          const resp = await fetch(erpUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/xml; charset=utf-8',
+              'SOAPAction': 'http://tempuri.org/CheckService',
+            },
+            body: soapEnv,
+          });
+          if (!resp.ok) {
+            return NextResponse.json({ success: false, message: `ERP 응답 오류: ${resp.status}` });
+          }
+          const xml = await resp.text();
+          if (xml.includes('Service Ok')) {
+            return NextResponse.json({ success: true, message: 'ERP 연결 성공' });
+          }
+          return NextResponse.json({ success: false, message: 'ERP 응답 이상' });
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
           return NextResponse.json({ success: false, message: `ERP 연결 실패: ${msg}` });
