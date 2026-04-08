@@ -148,6 +148,22 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - ttiCancelOrder/ttiReorder: postMessage → 크롬 확장 실행 + debugger
   - TTI_ACTION_RESULT 수신 → 발주리스트 자동 새로고침
 
+- [2026-04-08] 온라인 판매채널 수수료 5카드 UI 리디자인 + SSG 추가
+  - 설정 → 수수료: 기존 4칸 flat → 5개 카드 레이아웃 (네이버/쿠팡MP/쿠팡로켓/G마켓옥션/SSG)
+  - 카드별 수정/저장 독립 토글, 항목 추가/삭제, SSG 제휴연동 토글
+  - 데이터 마이그레이션: 기존 flat → mw_channel_fees channels 구조
+  - 수수료 호환 레이어: getChannelFeeRate(channel, category), getCoupangLogistics(size)
+  - SSG flat 키: ssgElecFee/ssgHandFee (카테고리별 분리, 기본 13%)
+  - syncChannelFeesToSettings() — 기존 함수(buildRow, calcCost 등) 영향 없음
+- [2026-04-08] 밀워키/일반제품/검색및견적 SSG 컬럼 + 마켓 가격 뱃지
+  - 3개 단가표 테이블에 SSG 컬럼 추가 (오픈마켓 오른쪽)
+  - recalcAll: SSG 판매가 역산 (ssgElecFee/ssgHandFee + mkSsgElec/mkSsgHand 마크업)
+  - 설정 모달: SSG 마크업 입력칸 추가 (전동/수공구 별도)
+  - 스토어팜/오픈마켓/SSG 셀 → marketBadge 채널별 컬러 뱃지 (클릭 가능)
+  - openPriceDetail 팝업: 수수료 분해 (판매가-VAT-수수료=정산) + 가격 변동 이력
+  - mw_price_history: recalcAll 시 가격 변동 자동 감지/저장 (1년/10,000건 제한)
+  - Supabase 동기화: mw_channel_fees, mw_price_history
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인
