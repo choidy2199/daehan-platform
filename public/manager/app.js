@@ -1241,6 +1241,7 @@ function renderCatalog() {
       <td class="num">${fmt(p.priceRetail)}</td>
       <td class="num" style="background:${isD ? 'transparent' : '#F8FBFF'}">${fmt(p.priceNaver)}${isD ? '' : marginBadge(p.priceNaver, p.cost, DB.settings.naverFee || 0.0663)}</td>
       <td class="num" style="background:${isD ? 'transparent' : '#FEFCF5'}">${fmt(p.priceOpen)}${isD ? '' : marginBadge(p.priceOpen, p.cost, p.category === '파워툴' ? (DB.settings.openElecFee || 0.13) : (DB.settings.openHandFee || 0.176))}</td>
+      <td class="num" style="background:${isD ? 'transparent' : '#FFFBEB'}">${fmt(p.priceSsg || 0)}${isD ? '' : marginBadge(p.priceSsg, p.cost, p.category === '파워툴' ? (DB.settings.ssgElecFee || 0.13) : (DB.settings.ssgHandFee || 0.13))}</td>
       <td class="center">${stockBadge}</td>
       <td class="center">${(function(){
         // TTI 스크래핑 데이터 우선, 없으면 기존 ttiStock 폴백
@@ -6588,6 +6589,8 @@ function showSettingsModal() {
   document.getElementById('set-mk-naver').value = s.mkNaver || 1;
   document.getElementById('set-mk-open-elec').value = s.mkOpenElec || 0.5;
   document.getElementById('set-mk-open-hand').value = s.mkOpenHand || 0.5;
+  document.getElementById('set-mk-ssg-elec').value = s.mkSsgElec || 0.5;
+  document.getElementById('set-mk-ssg-hand').value = s.mkSsgHand || 0.5;
 
   // 제품 추가 DC select 동적 채우기
   var cats = ['<option value="">분류 선택</option>'];
@@ -6938,6 +6941,8 @@ function applySettings() {
   DB.settings.mkNaver = pv('set-mk-naver', 1);
   DB.settings.mkOpenElec = pv('set-mk-open-elec', 0.5);
   DB.settings.mkOpenHand = pv('set-mk-open-hand', 0.5);
+  DB.settings.mkSsgElec = pv('set-mk-ssg-elec', 0.5);
+  DB.settings.mkSsgHand = pv('set-mk-ssg-hand', 0.5);
   DB.settings.vat = 0.1;
 
   // 제품 추가 DC 규칙 저장
@@ -6994,6 +6999,12 @@ function recalcAll() {
     var openRate = isElec ? (s.mkOpenElec || 0.5) : (s.mkOpenHand || 0.5);
     var openDenom = 10/11 - openFee - openRate / 100;
     p.priceOpen = openDenom > 0 ? Math.ceil(cost / openDenom / 100) * 100 : 0;
+
+    // SSG: 대분류 기준 수수료 적용 (VAT포함 역산, 네이버/오픈마켓과 동일 방식)
+    var ssgFee = isElec ? (s.ssgElecFee || 0.13) : (s.ssgHandFee || 0.13);
+    var ssgRate = isElec ? (s.mkSsgElec || 0.5) : (s.mkSsgHand || 0.5);
+    var ssgDenom = 10/11 - ssgFee - ssgRate / 100;
+    p.priceSsg = ssgDenom > 0 ? Math.ceil(cost / ssgDenom / 100) * 100 : 0;
   });
 
   // 프로모션 원가 재계산
@@ -10845,7 +10856,8 @@ function getCoupangLogistics(size) {
 function calcSsgPrice(cost, category, mkSsg) {
   var isElec = (category === '파워툴');
   var ssgFee = isElec ? (DB.settings.ssgElecFee || 0.13) : (DB.settings.ssgHandFee || 0.13);
-  var markup = (mkSsg !== undefined ? mkSsg : 0.5) / 100;
+  var mkDefault = isElec ? (DB.settings.mkSsgElec || 0.5) : (DB.settings.mkSsgHand || 0.5);
+  var markup = (mkSsg !== undefined ? mkSsg : mkDefault) / 100;
   var denom = 10/11 - ssgFee - markup;
   if (denom <= 0) return 0;
   return Math.ceil(cost / denom / 100) * 100;
