@@ -529,6 +529,217 @@ function marginBadge(price, cost, feeRate) {
   return '<div style="font-size:10px;color:' + color + ';line-height:1.2;margin-top:2px">' + m.rate.toFixed(1) + '% ' + (m.profit >= 0 ? '+' : '') + fmt(m.profit) + '원</div>';
 }
 
+// ======================== 마켓 가격 뱃지 ========================
+var _marketBadgeStyles = {
+  naver: { bg: '#E1F5EE', color: '#085041', dot: '#1D9E75', label: '스토어팜' },
+  gmarket: { bg: '#E6F1FB', color: '#0C447C', dot: '#185FA5', label: '오픈마켓' },
+  ssg: { bg: '#FEF3C7', color: '#92400E', dot: '#EF9F27', label: 'SSG' }
+};
+function marketBadge(p, channel) {
+  var st = _marketBadgeStyles[channel];
+  if (!st) return '';
+  var price = channel === 'naver' ? p.priceNaver : channel === 'gmarket' ? p.priceOpen : (p.priceSsg || 0);
+  if (!price) return '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
+  var feeRate = getMarketFeeRate(p, channel);
+  var m = calcMargin(price, p.cost, feeRate);
+  var mColor = m && m.profit >= 0 ? '#1D9E75' : '#CC2222';
+  var mText = m ? (m.rate.toFixed(1) + '% ' + (m.profit >= 0 ? '+' : '') + fmt(m.profit)) : '';
+  return '<div onclick="openPriceDetail(\'' + (p.code || '') + '\',\'' + channel + '\')" style="cursor:pointer;background:' + st.bg + ';border-radius:6px;padding:4px 6px;text-align:center;border:1px solid transparent;transition:border-color 0.15s" onmouseenter="this.style.borderColor=\'#B0B8CC\'" onmouseleave="this.style.borderColor=\'transparent\'">'
+    + '<div style="font-size:9px;color:' + st.color + ';opacity:0.7;line-height:1;margin-bottom:1px">' + st.label + '</div>'
+    + '<div style="font-size:13px;font-weight:700;color:' + st.color + ';line-height:1.2">' + fmt(price) + '</div>'
+    + (mText ? '<div style="font-size:9px;color:' + mColor + ';line-height:1;margin-top:1px">' + mText + '</div>' : '')
+    + '</div>';
+}
+function getMarketFeeRate(p, channel) {
+  var s = DB.settings;
+  if (channel === 'naver') return s.naverFee || 0.0663;
+  if (channel === 'gmarket') return p.category === '파워툴' ? (s.openElecFee || 0.13) : (s.openHandFee || 0.176);
+  if (channel === 'ssg') return p.category === '파워툴' ? (s.ssgElecFee || 0.13) : (s.ssgHandFee || 0.13);
+  return 0;
+}
+
+// ======================== 가격 상세 팝업 ========================
+function openPriceDetail(code, channel) {
+  var p = findProduct(code);
+  if (!p) return;
+  var st = _marketBadgeStyles[channel];
+  var price = channel === 'naver' ? p.priceNaver : channel === 'gmarket' ? p.priceOpen : (p.priceSsg || 0);
+  var cost = p.cost || 0;
+  var feeRate = getMarketFeeRate(p, channel);
+  var vat = Math.round(price / 11);
+  var fee = Math.round(price * feeRate);
+  var settle = price - vat - fee;
+  var profit = settle - cost;
+  var profitRate = price > 0 ? (profit / price * 100) : 0;
+  var profitColor = profit >= 0 ? '#1D9E75' : '#CC2222';
+  // 수수료 상세
+  var feeDetail = getFeeDetail(channel, p.category);
+  // VAT 태그
+  var vatTag = (channel === 'naver' || channel === 'gmarket' || channel === 'ssg')
+    ? '<span style="font-size:10px;padding:2px 6px;border-radius:3px;background:#E1F5EE;color:#085041;font-weight:500">VAT포함</span>' : '';
+  // 마크업 정보
+  var mkInfo = getMarkupInfo(channel, p.category);
+
+  var html = '<div id="price-detail-overlay" onclick="closePriceDetail(event)" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000">'
+    + '<div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;width:90%;max-width:520px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.15)">'
+    // 헤더
+    + '<div style="display:flex;align-items:center;gap:6px;padding:14px 18px;border-bottom:1px solid #DDE1EB">'
+    + '<span style="width:8px;height:8px;border-radius:50%;background:' + st.dot + ';display:inline-block"></span>'
+    + '<span style="font-size:15px;font-weight:600;color:#1A1D23">' + st.label + ' 가격 상세</span>'
+    + vatTag
+    + '<span style="flex:1"></span>'
+    + '<button onclick="closePriceDetail()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#9BA3B2;padding:4px">✕</button>'
+    + '</div>'
+    // 제품 정보
+    + '<div style="padding:14px 18px 0">'
+    + '<div style="font-size:12px;color:#5A6070">' + (p.model || p.code || '') + '</div>'
+    + '<div style="font-size:11px;color:#9BA3B2;margin-top:2px">' + (p.description || '') + '</div>'
+    + '</div>'
+    // 수수료 분해
+    + '<div style="margin:12px 18px;background:#F4F6FA;border-radius:8px;padding:14px 16px">'
+    + '<div style="display:flex;align-items:flex-end;justify-content:center;gap:6px;flex-wrap:wrap">'
+    + feeBreakdownItem(fmt(price), '판매가', '#1A1D23')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">−</span>'
+    + feeBreakdownItem(fmt(vat), 'VAT(÷11)', '#5A6070')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">−</span>'
+    + feeBreakdownItem(fmt(fee), feeDetail, '#CC2222')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">=</span>'
+    + feeBreakdownItem(fmt(settle), '정산금액', '#185FA5')
+    + '</div>'
+    + '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #DDE1EB;display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#5A6070">'
+    + '<span>매입원가: <b style="color:#1A1D23">' + fmt(cost) + '원</b></span>'
+    + '<span>마진: <b style="color:' + profitColor + '">' + (profit >= 0 ? '+' : '') + fmt(profit) + '원 (' + profitRate.toFixed(1) + '%)</b></span>'
+    + '<span>' + mkInfo + '</span>'
+    + '</div>'
+    + '</div>'
+    // 가격 이력
+    + '<div style="padding:0 18px 16px">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+    + '<span style="font-size:13px;font-weight:600;color:#1A1D23">가격 변동 이력</span>'
+    + '<span style="font-size:11px;color:#9BA3B2">최근 1년</span>'
+    + '</div>'
+    + buildPriceHistoryTable(code, channel)
+    + '</div>'
+    + '</div></div>';
+
+  var existing = document.getElementById('price-detail-overlay');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function feeBreakdownItem(value, label, color) {
+  return '<div style="text-align:center;min-width:60px">'
+    + '<div style="font-size:16px;font-weight:700;color:' + color + ';line-height:1.2">' + value + '</div>'
+    + '<div style="font-size:9px;color:#9BA3B2;margin-top:2px">' + label + '</div>'
+    + '</div>';
+}
+
+function getFeeDetail(channel, category) {
+  if (channel === 'naver') {
+    var s1 = DB.settings.naverSaleRate || 3;
+    var s2 = DB.settings.naverPayRate || 3.63;
+    return '수수료(' + s1 + '+' + s2 + '%)';
+  }
+  if (channel === 'gmarket') {
+    var rate = (category === '파워툴') ? ((DB.settings.openElecFee || 0.13) * 100).toFixed(1) : ((DB.settings.openHandFee || 0.176) * 100).toFixed(1);
+    return '이용료(' + rate + '%)';
+  }
+  if (channel === 'ssg') {
+    var rate = (category === '파워툴') ? ((DB.settings.ssgElecFee || 0.13) * 100).toFixed(1) : ((DB.settings.ssgHandFee || 0.13) * 100).toFixed(1);
+    return '수수료(' + rate + '%)';
+  }
+  return '수수료';
+}
+
+function getMarkupInfo(channel, category) {
+  var s = DB.settings;
+  if (channel === 'naver') return '마크업: ' + (s.mkNaver || 1) + '%';
+  if (channel === 'gmarket') {
+    var mk = (category === '파워툴') ? (s.mkOpenElec || 0.5) : (s.mkOpenHand || 0.5);
+    return '마크업: ' + mk + '%';
+  }
+  if (channel === 'ssg') {
+    var mk = (category === '파워툴') ? (s.mkSsgElec || 0.5) : (s.mkSsgHand || 0.5);
+    return '마크업: ' + mk + '%';
+  }
+  return '';
+}
+
+function closePriceDetail(e) {
+  if (e && e.target !== e.currentTarget) return;
+  var el = document.getElementById('price-detail-overlay');
+  if (el) el.remove();
+}
+
+// ======================== 가격 변동 이력 ========================
+var _priceHistory = JSON.parse(localStorage.getItem('mw_price_history') || '[]');
+
+function savePriceHistory() {
+  // 1년 이상 된 이력 제거 + 최대 10,000건
+  var cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 1);
+  var cutoffStr = cutoff.toISOString();
+  _priceHistory = _priceHistory.filter(function(h) { return h.timestamp >= cutoffStr; });
+  if (_priceHistory.length > 10000) _priceHistory = _priceHistory.slice(_priceHistory.length - 10000);
+  localStorage.setItem('mw_price_history', JSON.stringify(_priceHistory));
+  autoSyncToSupabase('mw_price_history');
+}
+
+function recordPriceChange(code, channel, oldPrice, newPrice, reason) {
+  if (!oldPrice && !newPrice) return;
+  if (oldPrice === newPrice) return;
+  _priceHistory.push({
+    code: String(code),
+    channel: channel,
+    oldPrice: oldPrice || 0,
+    newPrice: newPrice || 0,
+    reason: reason || '가격 재계산',
+    timestamp: new Date().toISOString(),
+    user: (typeof currentUser !== 'undefined' && currentUser) ? currentUser : 'admin'
+  });
+}
+
+function getPriceHistory(productCode, channel, months) {
+  months = months || 12;
+  var cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - months);
+  var cutoffStr = cutoff.toISOString();
+  return _priceHistory
+    .filter(function(h) { return String(h.code) === String(productCode) && h.channel === channel && h.timestamp >= cutoffStr; })
+    .sort(function(a, b) { return b.timestamp < a.timestamp ? -1 : 1; });
+}
+
+function buildPriceHistoryTable(code, channel) {
+  var hist = getPriceHistory(code, channel);
+  if (!hist.length) {
+    return '<div style="text-align:center;padding:20px;color:#9BA3B2;font-size:12px">가격 변동 이력이 없습니다</div>';
+  }
+  var h = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  h += '<thead><tr style="background:#F4F6FA">';
+  h += '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#5A6070;font-size:11px">날짜</th>';
+  h += '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#5A6070;font-size:11px">사유</th>';
+  h += '<th style="padding:6px 8px;text-align:right;font-weight:600;color:#5A6070;font-size:11px">변경 전</th>';
+  h += '<th style="padding:6px 8px;text-align:right;font-weight:600;color:#5A6070;font-size:11px">변경 후</th>';
+  h += '<th style="padding:6px 8px;text-align:right;font-weight:600;color:#5A6070;font-size:11px">변동</th>';
+  h += '</tr></thead><tbody>';
+  hist.slice(0, 20).forEach(function(r) {
+    var diff = r.newPrice - r.oldPrice;
+    var diffColor = diff > 0 ? '#CC2222' : '#1D9E75';
+    var arrow = diff > 0 ? '▲' : '▼';
+    var d = new Date(r.timestamp);
+    var dateStr = d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
+    h += '<tr style="border-bottom:1px solid #F0F2F7">';
+    h += '<td style="padding:5px 8px;color:#5A6070">' + dateStr + '</td>';
+    h += '<td style="padding:5px 8px;color:#1A1D23">' + (r.reason || '-') + '</td>';
+    h += '<td style="padding:5px 8px;text-align:right;color:#9BA3B2">' + fmt(r.oldPrice) + '</td>';
+    h += '<td style="padding:5px 8px;text-align:right;font-weight:600;color:#1A1D23">' + fmt(r.newPrice) + '</td>';
+    h += '<td style="padding:5px 8px;text-align:right;font-weight:600;color:' + diffColor + '">' + arrow + ' ' + fmt(Math.abs(diff)) + '</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  return h;
+}
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -1239,9 +1450,9 @@ function renderCatalog() {
       })()}
       <td class="num">${fmt(p.priceA)}</td>
       <td class="num">${fmt(p.priceRetail)}</td>
-      <td class="num" style="background:${isD ? 'transparent' : '#F8FBFF'}">${fmt(p.priceNaver)}${isD ? '' : marginBadge(p.priceNaver, p.cost, DB.settings.naverFee || 0.0663)}</td>
-      <td class="num" style="background:${isD ? 'transparent' : '#FEFCF5'}">${fmt(p.priceOpen)}${isD ? '' : marginBadge(p.priceOpen, p.cost, p.category === '파워툴' ? (DB.settings.openElecFee || 0.13) : (DB.settings.openHandFee || 0.176))}</td>
-      <td class="num" style="background:${isD ? 'transparent' : '#FFFBEB'}">${fmt(p.priceSsg || 0)}${isD ? '' : marginBadge(p.priceSsg, p.cost, p.category === '파워툴' ? (DB.settings.ssgElecFee || 0.13) : (DB.settings.ssgHandFee || 0.13))}</td>
+      <td class="num" style="padding:4px 3px">${isD ? fmt(p.priceNaver) : marketBadge(p, 'naver')}</td>
+      <td class="num" style="padding:4px 3px">${isD ? fmt(p.priceOpen) : marketBadge(p, 'gmarket')}</td>
+      <td class="num" style="padding:4px 3px">${isD ? fmt(p.priceSsg || 0) : marketBadge(p, 'ssg')}</td>
       <td class="center">${stockBadge}</td>
       <td class="center">${(function(){
         // TTI 스크래핑 데이터 우선, 없으면 기존 ttiStock 폴백
@@ -6977,6 +7188,11 @@ function recalcAll() {
   var naverFee = s.naverFee || 0.0663;
   var openElecFee = s.openElecFee || 0.13;
   var openHandFee = s.openHandFee || 0.176;
+  // 변경 전 값 저장 (이력 비교용)
+  var _oldPrices = {};
+  DB.products.forEach(function(p) {
+    if (p.code) _oldPrices[p.code] = { naver: p.priceNaver || 0, gmarket: p.priceOpen || 0, ssg: p.priceSsg || 0 };
+  });
 
   DB.products.forEach(function(p) {
     if (!p.supplyPrice) return;
@@ -7006,6 +7222,18 @@ function recalcAll() {
     var ssgDenom = 10/11 - ssgFee - ssgRate / 100;
     p.priceSsg = ssgDenom > 0 ? Math.ceil(cost / ssgDenom / 100) * 100 : 0;
   });
+
+  // 가격 변동 이력 기록
+  var reason = '가격 재계산';
+  DB.products.forEach(function(p) {
+    if (!p.code) return;
+    var old = _oldPrices[p.code];
+    if (!old) return;
+    if (old.naver !== (p.priceNaver || 0)) recordPriceChange(p.code, 'naver', old.naver, p.priceNaver || 0, reason);
+    if (old.gmarket !== (p.priceOpen || 0)) recordPriceChange(p.code, 'gmarket', old.gmarket, p.priceOpen || 0, reason);
+    if (old.ssg !== (p.priceSsg || 0)) recordPriceChange(p.code, 'ssg', old.ssg, p.priceSsg || 0, reason);
+  });
+  savePriceHistory();
 
   // 프로모션 원가 재계산
   DB.promotions.forEach(function(pr) {
