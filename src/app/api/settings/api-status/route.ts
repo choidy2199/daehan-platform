@@ -28,7 +28,7 @@ export async function GET() {
     {
       id: 'naver',
       name: '네이버 커머스',
-      status: checkEnvStatus(['NAVER_CLIENT_ID', 'NAVER_CLIENT_SECRET']),
+      status: (process.env.NAVER_CLIENT_ID && (process.env.NAVER_CLIENT_SECRET_B64 || process.env.NAVER_CLIENT_SECRET)) ? 'connected' : 'not_configured',
     },
     {
       id: 'coupang',
@@ -104,9 +104,14 @@ export async function POST(req: NextRequest) {
       }
 
       case 'naver': {
-        // 네이버 토큰 발급 테스트 (환경변수를 런타임에 직접 읽음)
+        // 네이버 토큰 발급 테스트 (B64로 저장된 SECRET 디코딩)
         const naverId = process.env.NAVER_CLIENT_ID;
-        const naverSecret = process.env.NAVER_CLIENT_SECRET;
+        const naverSecretB64 = process.env.NAVER_CLIENT_SECRET_B64;
+        const naverSecretRaw = process.env.NAVER_CLIENT_SECRET;
+        // B64 우선, 없으면 원본 사용
+        const naverSecret = naverSecretB64
+          ? Buffer.from(naverSecretB64, 'base64').toString('utf-8')
+          : naverSecretRaw;
         if (!naverId || !naverSecret) {
           return NextResponse.json({ success: false, message: '네이버 환경변수 미설정' });
         }
@@ -127,7 +132,7 @@ export async function POST(req: NextRequest) {
           });
           if (!naverResp.ok) {
             const errText = await naverResp.text();
-            return NextResponse.json({ success: false, message: `네이버 실패 (S:${naverSecret.length}자 "${naverSecret.substring(0,5)}...${naverSecret.substring(naverSecret.length-5)}"): ${errText.substring(0, 100)}` });
+            return NextResponse.json({ success: false, message: `네이버 토큰 발급 실패: ${naverResp.status} ${errText.substring(0, 200)}` });
           }
           const tokenData = await naverResp.json();
           if (tokenData.access_token) {
