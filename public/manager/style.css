@@ -274,13 +274,20 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
    발주 탭 리디자인 (Step B-1a)
    ======================================== */
 
-/* 상단 매출카드 1줄 */
-.po-kpi-row { display:flex; gap:6px; padding:8px 12px; align-items:stretch; overflow-x:auto; }
-.po-sale-card { flex:0 0 auto; min-width:140px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; display:flex; flex-direction:column; }
-.po-sale-card .po-card-label { font-size:13px; font-weight:600; margin-bottom:2px; }
-.po-sale-card .po-card-amount { font-size:20px; font-weight:700; color:#1A1D23; line-height:1.2; }
-.po-sale-card .po-card-target { font-size:11px; color:#9BA3B2; margin-top:2px; }
-.po-sale-card .po-progress { height:3px; background:#EAECF2; border-radius:2px; margin-top:4px; overflow:hidden; }
+/* 매출카드 — 좌/우 Grid 레이아웃 */
+.po-kpi-row { display:grid; grid-template-columns:1fr 280px; gap:10px; padding:10px 12px; }
+.po-kpi-left { display:flex; flex-direction:column; gap:8px; min-width:0; }
+.po-sector-label { font-size:11px; font-weight:600; color:#5A6070; display:flex; align-items:center; gap:6px; margin-bottom:0; }
+.po-sector-line { flex:1; height:1px; background:#DDE1EB; }
+.po-normal-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.po-promo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)) 44px; gap:8px; }
+
+/* 일반매출 카드 */
+.po-sale-card { background:#fff; border:1px solid #DDE1EB; border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; }
+.po-sale-card .po-card-label { font-size:13px; font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+.po-sale-card .po-card-amount { font-size:26px; font-weight:700; color:#1A1D23; line-height:1.2; }
+.po-sale-card .po-card-target { font-size:11px; color:#9BA3B2; margin-top:3px; }
+.po-sale-card .po-progress { height:3px; background:#EAECF2; border-radius:2px; margin-top:6px; overflow:hidden; }
 .po-sale-card .po-progress-fill { height:100%; border-radius:2px; }
 
 .tier-row { display:flex; gap:3px; margin-bottom:4px; }
@@ -288,37 +295,44 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .tier.done { background:#E1F5EE; color:#085041; }
 .tier.current { background:#E6F1FB; color:#0C447C; }
 .tier.next { background:#EAECF2; color:#9BA3B2; }
-.period-badge { font-size:11px; font-weight:600; padding:1px 6px; border-radius:3px; white-space:nowrap; background:#E6F1FB; color:#0C447C; }
+.period-badge { font-size:11px; font-weight:600; padding:1px 6px; border-radius:3px; white-space:nowrap; }
 .short { font-size:9px; font-weight:600; color:#CC2222; margin-top:2px; }
 
-.po-divider { width:1px; background:#B0B8CC; margin:4px 2px; opacity:0.4; flex-shrink:0; }
-
-.po-promo-card { flex:1; min-width:130px; background:#fff; border:1px solid #DDE1EB; border-radius:7px; padding:8px 11px; cursor:pointer; transition:box-shadow 0.15s; display:flex; flex-direction:column; }
+/* 누적프로모션 카드 */
+.po-promo-card { background:#fff; border:1px solid #DDE1EB; border-radius:8px; padding:10px 12px; cursor:pointer; transition:box-shadow 0.15s; display:flex; flex-direction:column; min-width:0; }
 .po-promo-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
-.po-promo-card .po-promo-name { font-size:13px; font-weight:600; display:flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.po-promo-card .po-promo-amount { font-size:20px; font-weight:700; color:#1A1D23; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.po-promo-card .po-promo-benefit { font-size:11px; color:#5A6070; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.po-promo-card .po-promo-name { font-size:11px; font-weight:700; display:flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.po-promo-card .po-promo-amount { font-size:18px; font-weight:700; color:#1A1D23; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.po-promo-card .po-promo-benefit { font-size:11px; color:#5A6070; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .po-promo-card .po-promo-next { font-size:11px; color:#9BA3B2; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-.po-add-promo-btn { flex:0 0 56px; border:2px dashed #DDE1EB; border-radius:7px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; background:transparent; }
+/* 추가 버튼 */
+.po-add-promo-btn { border:2px dashed #DDE1EB; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all 0.15s; background:transparent; min-height:80px; }
 .po-add-promo-btn:hover { border-color:#185FA5; background:#E6F1FB; }
 .po-add-promo-btn .po-add-icon { font-size:18px; color:#9BA3B2; line-height:1; }
-.po-add-promo-btn .po-add-label { font-size:9px; color:#9BA3B2; margin-top:1px; }
+.po-add-promo-btn .po-add-label { font-size:9px; color:#9BA3B2; margin-top:2px; }
 
-.po-total-card { flex:0 0 auto; min-width:160px; background:#185FA5; border-radius:7px; padding:8px 14px; color:#fff; }
+/* 합계 카드 (우측, 좌측 전체 높이) */
+.po-total-card { background:#185FA5; border-radius:8px; padding:16px 18px; color:#fff; display:flex; flex-direction:column; }
 .po-total-card .po-total-label { font-size:13px; opacity:0.8; }
-.po-total-card .po-total-amount { font-size:22px; font-weight:700; line-height:1.2; }
-.po-total-card .po-total-pct { font-size:11px; opacity:0.7; margin-top:2px; }
-.po-total-card .po-total-halves { display:flex; gap:4px; margin-top:6px; }
-.po-total-card .po-total-half { flex:1; background:rgba(255,255,255,0.15); border-radius:4px; padding:3px 6px; font-size:11px; text-align:center; }
+.po-total-card .po-total-amount { font-size:36px; font-weight:700; line-height:1.2; margin-top:4px; }
+.po-total-card .po-total-pct { font-size:12px; opacity:0.7; margin-top:4px; }
+.po-total-card .po-total-halves { display:flex; gap:6px; margin-top:10px; }
+.po-total-card .po-total-half { flex:1; background:rgba(255,255,255,0.12); border-radius:6px; padding:8px 10px; font-size:12px; text-align:center; line-height:1.4; }
 
 /* 커머셜P 힌트 */
-.po-commercial-hint { background:rgba(255,255,255,.15); border-radius:4px; padding:4px 8px; font-size:10px; color:rgba(255,255,255,.85); cursor:pointer; line-height:1.5; margin-top:4px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
-.po-commercial-hint:hover { background:rgba(255,255,255,.25); }
+.po-commercial-hint { background:rgba(255,255,255,.12); border-radius:6px; padding:8px 10px; font-size:11px; color:rgba(255,255,255,.85); cursor:pointer; line-height:1.5; margin-top:auto; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.po-commercial-hint:hover { background:rgba(255,255,255,.22); }
 .comm-tag { font-weight:700; color:#fff; }
 .comm-period { font-size:9px; color:rgba(255,255,255,.5); }
 .comm-next b { color:#FFCC66; }
 .comm-arrow { font-size:9px; color:rgba(255,255,255,.4); margin-left:auto; }
+
+/* 요약 바 */
+.po-summary-bar { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; padding:0 12px 10px; }
+.po-summary-item { background:#F4F6FA; border:1px solid #EAECF2; border-radius:8px; padding:10px 14px; text-align:center; }
+.po-summary-item .po-summary-num { font-size:18px; font-weight:700; color:#1A1D23; }
+.po-summary-item .po-summary-lbl { font-size:11px; color:#5A6070; margin-top:2px; }
 /* 커머셜 모달 폰트 상속 */
 #commercial-promo-modal input, #commercial-promo-modal button, #commercial-promo-modal select { font-family:inherit; }
 
