@@ -1,7 +1,17 @@
 // 네이버 커머스 API 공통 함수
 import bcrypt from 'bcryptjs';
 
-const BASE_URL = 'https://api.commerce.naver.com/external';
+const NAVER_DIRECT_URL = 'https://api.commerce.naver.com/external';
+
+function getBaseUrl(): string {
+  const proxyUrl = process.env.NAVER_PROXY_URL;
+  return proxyUrl ? `${proxyUrl}/naver` : NAVER_DIRECT_URL;
+}
+
+function getProxyHeaders(): Record<string, string> {
+  const proxyKey = process.env.NAVER_PROXY_API_KEY;
+  return proxyKey ? { 'X-API-Key': proxyKey } : {};
+}
 
 // 환경변수를 런타임에 읽음 (Vercel의 $ 문자 이스케이프 문제 방지)
 function getClientId(): string {
@@ -56,9 +66,9 @@ export async function getAccessToken(): Promise<string> {
     type: 'SELF',
   });
 
-  const resp = await fetch(`${BASE_URL}/v1/oauth2/token`, {
+  const resp = await fetch(`${getBaseUrl()}/v1/oauth2/token`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...getProxyHeaders() },
     body: params.toString(),
   });
 
@@ -83,11 +93,12 @@ export async function naverApi(
 
   const token = await getAccessToken();
 
-  const resp = await fetch(`${BASE_URL}${path}`, {
+  const resp = await fetch(`${getBaseUrl()}${path}`, {
     method,
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
+      ...getProxyHeaders(),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
