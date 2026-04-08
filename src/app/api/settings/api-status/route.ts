@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { soapCall } from '@/lib/erp';
+import { selectItem } from '@/lib/erp';
 import { getAccessToken } from '@/lib/naver';
 
 interface PlatformStatus {
@@ -67,18 +67,14 @@ export async function POST(req: NextRequest) {
   try {
     switch (platformId) {
       case 'erp': {
-        // ERP SOAP 호출 테스트 (간단한 품목 조회)
+        // ERP SOAP 호출 테스트 (selectItem 재사용)
         if (!process.env.ERP_USER_KEY || !process.env.ERP_URL) {
           return NextResponse.json({ success: false, message: 'ERP 환경변수 미설정' });
         }
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
         try {
-          await soapCall('SelectItemUrlEnc', { pSearchText: 'TEST', pSearchGubun: '0' });
-          clearTimeout(timeout);
+          await selectItem('TEST');
           return NextResponse.json({ success: true, message: 'ERP 연결 성공' });
         } catch (e: unknown) {
-          clearTimeout(timeout);
           const msg = e instanceof Error ? e.message : String(e);
           return NextResponse.json({ success: false, message: `ERP 연결 실패: ${msg}` });
         }

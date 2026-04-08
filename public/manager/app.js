@@ -11444,8 +11444,8 @@ function renderApiManagement() {
       var html = '';
       (data.platforms || []).forEach(function(p) {
         var meta = _apiPlatformMeta[p.id] || { logo: '?', logoBg: '#999', keys: [], note: '' };
-        var badgeClass = p.status === 'connected' ? 'green' : p.status === 'error' ? 'red' : 'yellow';
-        var badgeText = p.status === 'connected' ? '● 연결됨' : p.status === 'error' ? '● 오류' : '● 미등록';
+        var badgeClass = p.status === 'connected' ? 'blue' : p.status === 'error' ? 'red' : 'yellow';
+        var badgeText = p.status === 'connected' ? '● 키 등록됨' : p.status === 'error' ? '● 오류' : '● 미등록';
         var keysHtml = meta.keys.map(function(k) {
           var masked = p.status === 'connected' ? '••••••••' : '';
           return '<div class="api-field"><div class="api-field-label">' + k + '</div>' +
@@ -11488,6 +11488,15 @@ function testApiConnection(platformId) {
       if (data.success) {
         btn.textContent = '✓ ' + data.message;
         btn.classList.add('success');
+        // 배지를 "연결 확인됨" (초록)으로 업데이트
+        var card = btn.closest('.api-card');
+        if (card) {
+          var badge = card.querySelector('.api-badge');
+          if (badge) {
+            badge.className = 'api-badge api-badge-green';
+            badge.textContent = '● 연결 확인됨';
+          }
+        }
       } else {
         btn.textContent = '✕ ' + data.message;
         btn.classList.add('fail');
