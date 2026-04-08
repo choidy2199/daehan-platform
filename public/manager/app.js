@@ -7828,10 +7828,10 @@ function exportAll() {
 
   // Products
   if (DB.products.length) {
-    const pData = [['단종', '코드', '관리코드', '대분류', '제품군', '제품구성', '프로모션No.', '제품번호', '모델명', '공급가', '원가', 'A(도매)', '소매', '스토어팜', '오픈마켓']];
-    DB.products.forEach(p => pData.push([p.discontinued, p.code, p.manageCode || '', p.category, p.subcategory, p.detail, p.orderNum, p.ttiNum, p.model, p.supplyPrice, p.cost, p.priceA, p.priceRetail, p.priceNaver, p.priceOpen]));
+    const pData = [['단종', '코드', '관리코드', '대분류', '제품군', '제품구성', '프로모션No.', '제품번호', '모델명', '공급가', '원가', 'A(도매)', '소매', '스토어팜', '오픈마켓', 'SSG']];
+    DB.products.forEach(p => pData.push([p.discontinued, p.code, p.manageCode || '', p.category, p.subcategory, p.detail, p.orderNum, p.ttiNum, p.model, p.supplyPrice, p.cost, p.priceA, p.priceRetail, p.priceNaver, p.priceOpen, p.priceSsg || 0]));
     const ws = XLSX.utils.aoa_to_sheet(pData);
-    ws['!cols'] = [{ wch: 6 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 25 }, { wch: 40 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+    ws['!cols'] = [{ wch: 6 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 25 }, { wch: 40 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
     XLSX.utils.book_append_sheet(wb, ws, '전체가격표');
   }
 
