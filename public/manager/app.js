@@ -482,7 +482,7 @@ let DB = {
   inventory: load(KEYS.inventory),
   promotions: load(KEYS.promotions),
   orders: loadObj(KEYS.orders, { elec: [], hand: [], pack: [] }),
-  settings: loadObj(KEYS.settings, { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, ssgFee: 0.13, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] }),
+  settings: loadObj(KEYS.settings, { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, ssgElecFee: 0.13, ssgHandFee: 0.13, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] }),
   rebate: load(KEYS.rebate)
 };
 console.log('[PERF] DB localStorage 파싱: ' + (performance.now() - _dbStart).toFixed(0) + 'ms (products:' + DB.products.length + ', inventory:' + DB.inventory.length + ', promos:' + DB.promotions.length + ')');
@@ -6707,7 +6707,7 @@ function executeDataReset() {
       if (typeof partsPrices !== 'undefined') { partsPrices = {}; localStorage.setItem('mw_parts_prices', '{}'); }
     }
     if (v === 'settings') {
-      DB.settings = { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, ssgFee: 0.13, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] };
+      DB.settings = { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, ssgElecFee: 0.13, ssgHandFee: 0.13, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] };
       save(KEYS.settings, DB.settings);
       DB.rebate = []; save(KEYS.rebate, DB.rebate);
     }
@@ -10771,7 +10771,9 @@ function syncChannelFeesToSettings() {
   if (DB.settings.openHandFee === undefined) DB.settings.openHandFee = 0.176;
   // SSG flat 키 동기화
   var ssgCats = ch.ssg.categories || [];
-  DB.settings.ssgFee = ssgCats[0] ? ssgCats[0].rate / 100 : 0.13;
+  // SSG: 현재 전동/수공구 동일 13%이지만 향후 분리 가능
+  DB.settings.ssgElecFee = ssgCats[0] ? ssgCats[0].rate / 100 : 0.13;
+  DB.settings.ssgHandFee = ssgCats.length > 1 ? ssgCats[1].rate / 100 : (ssgCats[0] ? ssgCats[0].rate / 100 : 0.13);
   DB.settings.feeVatMode = 'incl';
   save(KEYS.settings, DB.settings);
 }
@@ -10816,10 +10818,10 @@ function getChannelFeeRate(channel, category) {
     return rate / 100;
   }
 
-  // SSG
+  // SSG: 카테고리별 분기 (현재 동일 13%이지만 향후 변경 가능)
   if (channel === 'ssg') {
-    // SSG는 카테고리 구분 없이 동일 수수료 (기본 13%)
-    return cats[0] ? cats[0].rate / 100 : 0.13;
+    if (isElec) return DB.settings.ssgElecFee || 0.13;
+    return DB.settings.ssgHandFee || 0.13;
   }
 
   return 0;
@@ -10841,7 +10843,8 @@ function getCoupangLogistics(size) {
 // cost: 원가, category: '파워툴' 등, mkSsg: 마크업%(기본 0.5)
 // 공식: price = cost / (10/11 - ssgFee - mkSsg/100), 백원 올림
 function calcSsgPrice(cost, category, mkSsg) {
-  var ssgFee = DB.settings.ssgFee || 0.13;
+  var isElec = (category === '파워툴');
+  var ssgFee = isElec ? (DB.settings.ssgElecFee || 0.13) : (DB.settings.ssgHandFee || 0.13);
   var markup = (mkSsg !== undefined ? mkSsg : 0.5) / 100;
   var denom = 10/11 - ssgFee - markup;
   if (denom <= 0) return 0;
