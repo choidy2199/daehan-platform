@@ -277,17 +277,24 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 /* 매출카드 — 1행 섹션박스 + 합계 바 */
 .po-cards-area { display:flex; gap:10px; padding:10px 12px 6px; }
 .po-section-box { background:#fff; border:1px solid #DDE1EB; border-radius:8px; overflow:hidden; min-width:0; }
+.po-section-normal { flex:3; }
+.po-section-promo { flex:4; }
 .po-section-title { background:#F4F6FA; padding:5px 12px; font-size:10px; font-weight:600; color:#5A6070; border-bottom:1px solid #EAECF2; }
 .po-section-cards { display:flex; }
-.po-card-cell { padding:10px 12px; flex:1; border-right:1px solid #F0F2F7; min-width:0; }
+
+/* 카드 셀 — 고정 행 높이 */
+.po-card-cell { padding:10px 12px; flex:1; border-right:1px solid #F0F2F7; min-width:0; display:flex; flex-direction:column; }
 .po-card-cell:last-child { border-right:none; }
-.po-card-cat { font-size:10px; font-weight:700; display:flex; align-items:center; gap:4px; margin-bottom:3px; white-space:nowrap; }
-.po-card-amt { font-size:18px; font-weight:700; color:#1A1D23; letter-spacing:-0.3px; margin-bottom:2px; }
-.po-card-info { font-size:9px; color:#5A6070; line-height:1.4; }
-.po-card-tier { font-size:9px; font-weight:600; margin-top:3px; }
-.po-card-bar { height:2px; background:#EAECF2; border-radius:1px; margin-top:4px; overflow:hidden; }
-.po-card-bar-fill { height:100%; border-radius:1px; }
-.po-card-short { font-size:9px; color:#CC2222; font-weight:600; margin-top:3px; }
+.po-card-row1 { font-size:10px; font-weight:700; display:flex; align-items:center; gap:4px; white-space:nowrap; height:16px; overflow:hidden; }
+.po-card-row2 { font-size:18px; font-weight:700; letter-spacing:-0.3px; height:24px; line-height:24px; margin-top:4px; }
+.po-card-row3 { font-size:9px; color:#5A6070; height:14px; line-height:14px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.po-card-row4 { font-size:9px; font-weight:600; height:14px; line-height:14px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.po-card-row5 { height:2px; background:#EAECF2; border-radius:1px; margin-top:5px; overflow:hidden; }
+.po-card-row5-fill { height:100%; border-radius:1px; }
+
+.po-card-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; display:inline-block; }
+.po-card-tag { font-size:8px; font-weight:600; padding:1px 4px; border-radius:3px; }
+.po-card-badge { font-size:8px; padding:1px 4px; border-radius:3px; background:#FAEEDA; color:#412402; font-weight:600; }
 
 .period-badge { font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; white-space:nowrap; }
 .tier-row { display:flex; gap:3px; margin-bottom:4px; }

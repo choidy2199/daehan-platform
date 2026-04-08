@@ -2295,20 +2295,21 @@ function renderPOTab() {
   // 집계 데이터
   var salesData = calcPOSalesData();
 
-  // 상단 매출카드 — 1행 섹션박스 + 합계 바
+  // 상단 매출카드 — 1행 섹션박스 (row1~row5 통일)
   var html = '<div class="po-cards-area">';
 
   // ── 일반 매출 섹션 ──
-  html += '<div class="po-section-box" style="flex:0 0 auto">';
+  html += '<div class="po-section-box po-section-normal">';
   html += '<div class="po-section-title">일반 매출 · 일반주문만 집계</div>';
   html += '<div class="po-section-cards">';
 
   // 파워툴
   html += '<div class="po-card-cell">';
-  html += '<div class="po-card-cat" style="color:#185FA5">파워툴 <span class="period-badge" style="background:#E6F1FB;color:#0C447C">월</span></div>';
-  html += '<div class="po-card-amt">' + fmtPO(salesData.powerTool) + '</div>';
-  html += '<div class="po-card-info">목표 - · 0%</div>';
-  html += '<div class="po-card-bar"><div class="po-card-bar-fill" style="width:0%;background:#185FA5"></div></div>';
+  html += '<div class="po-card-row1"><span style="color:#185FA5">파워툴</span> <span class="po-card-tag" style="background:#E6F1FB;color:#0C447C">월</span></div>';
+  html += '<div class="po-card-row2">' + fmtPO(salesData.powerTool) + '</div>';
+  html += '<div class="po-card-row3">목표 - · 0%</div>';
+  html += '<div class="po-card-row4" style="color:#9BA3B2">-</div>';
+  html += '<div class="po-card-row5"><div class="po-card-row5-fill" style="width:0%;background:#185FA5"></div></div>';
   html += '</div>';
 
   // 수공구
@@ -2317,14 +2318,12 @@ function renderPOTab() {
   var _htPct = _htMax.amount > 0 ? Math.min(100, Math.round(salesData.handTool / _htMax.amount * 100)) : 0;
   var _htShortage = Math.max(0, _htMax.amount - salesData.handTool);
   var _htDone = salesData.handTool >= _htMax.amount;
-  var _htColor = _htCur.rate === 0 ? '#9BA3B2' : (_htDone ? '#1D9E75' : '#185FA5');
   html += '<div class="po-card-cell">';
-  html += '<div class="po-card-cat" style="color:#1D9E75">수공구 <span class="period-badge" style="background:#E1F5EE;color:#085041">분기</span></div>';
-  html += '<div class="po-card-amt">' + fmtPO(salesData.handTool) + '</div>';
-  html += '<div class="po-card-info">목표 ' + _htMax.rate + '% (' + fmtPO(_htMax.amount) + '원)</div>';
-  html += '<div class="po-card-tier" style="color:' + _htColor + '">현재 ' + _htCur.rate + '%' + (_htDone ? ' (최고 달성)' : '') + '</div>';
-  html += '<div class="po-card-bar"><div class="po-card-bar-fill" style="width:' + _htPct + '%;background:#1D9E75"></div></div>';
-  if (!_htDone) html += '<div class="po-card-short">부족 ' + fmtPO(_htShortage) + '원</div>';
+  html += '<div class="po-card-row1"><span style="color:#1D9E75">수공구</span> <span class="po-card-tag" style="background:#E1F5EE;color:#085041">분기</span></div>';
+  html += '<div class="po-card-row2">' + fmtPO(salesData.handTool) + '</div>';
+  html += '<div class="po-card-row3">목표 ' + _htMax.rate + '% (' + fmtPO(_htMax.amount) + '원)</div>';
+  html += '<div class="po-card-row4" style="color:' + (_htDone ? '#1D9E75' : '#CC2222') + '">' + (_htDone ? '최고 달성' : '부족 ' + fmtPO(_htShortage) + '원') + '</div>';
+  html += '<div class="po-card-row5"><div class="po-card-row5-fill" style="width:' + _htPct + '%;background:#1D9E75"></div></div>';
   html += '</div>';
 
   // 팩아웃
@@ -2333,20 +2332,18 @@ function renderPOTab() {
   var _pkPct = _pkMax.amount > 0 ? Math.min(100, Math.round(salesData.packout / _pkMax.amount * 100)) : 0;
   var _pkShortage = Math.max(0, _pkMax.amount - salesData.packout);
   var _pkDone = salesData.packout >= _pkMax.amount;
-  var _pkColor = _pkCur.rate === 0 ? '#9BA3B2' : (_pkDone ? '#1D9E75' : '#185FA5');
   html += '<div class="po-card-cell">';
-  html += '<div class="po-card-cat" style="color:#D4537E">팩아웃 <span class="period-badge" style="background:#FCE7F3;color:#9D174D">월</span></div>';
-  html += '<div class="po-card-amt">' + fmtPO(salesData.packout) + '</div>';
-  html += '<div class="po-card-info">목표 ' + _pkMax.rate + '% (' + fmtPO(_pkMax.amount) + '원)</div>';
-  html += '<div class="po-card-tier" style="color:' + _pkColor + '">현재 ' + _pkCur.rate + '%' + (_pkDone ? ' (최고 달성)' : '') + '</div>';
-  html += '<div class="po-card-bar"><div class="po-card-bar-fill" style="width:' + _pkPct + '%;background:#D4537E"></div></div>';
-  if (!_pkDone) html += '<div class="po-card-short">부족 ' + fmtPO(_pkShortage) + '원</div>';
+  html += '<div class="po-card-row1"><span style="color:#D4537E">팩아웃</span> <span class="po-card-tag" style="background:#FCE7F3;color:#9D174D">월</span></div>';
+  html += '<div class="po-card-row2">' + fmtPO(salesData.packout) + '</div>';
+  html += '<div class="po-card-row3">목표 ' + _pkMax.rate + '% (' + fmtPO(_pkMax.amount) + '원)</div>';
+  html += '<div class="po-card-row4" style="color:' + (_pkDone ? '#1D9E75' : '#CC2222') + '">' + (_pkDone ? '최고 달성' : '부족 ' + fmtPO(_pkShortage) + '원') + '</div>';
+  html += '<div class="po-card-row5"><div class="po-card-row5-fill" style="width:' + _pkPct + '%;background:#D4537E"></div></div>';
   html += '</div>';
 
   html += '</div></div>'; // .po-section-cards, .po-section-box
 
   // ── 누적 프로모션 섹션 ──
-  html += '<div class="po-section-box" style="flex:1">';
+  html += '<div class="po-section-box po-section-promo">';
   html += '<div class="po-section-title">누적 프로모션 · FOC 쿠폰 기반</div>';
   html += '<div class="po-section-cards">';
 
@@ -2363,17 +2360,17 @@ function renderPOTab() {
     if (p.periodStart && p.periodEnd) {
       var _ps = new Date(p.periodStart), _pe = new Date(p.periodEnd);
       var _months = (_pe.getFullYear() - _ps.getFullYear()) * 12 + _pe.getMonth() - _ps.getMonth() + 1;
-      if (_months <= 1) _periodBadge = '<span class="period-badge" style="background:' + pal.bg + ';color:' + pal.text + '">월</span>';
-      else if (_months === 2) _periodBadge = '<span class="period-badge" style="background:' + pal.bg + ';color:' + pal.text + '">2월</span>';
-      else if (_months === 3) _periodBadge = '<span class="period-badge" style="background:' + pal.bg + ';color:' + pal.text + '">분기</span>';
-      else _periodBadge = '<span class="period-badge" style="background:' + pal.bg + ';color:' + pal.text + '">' + _months + '월</span>';
+      if (_months <= 1) _periodBadge = '<span class="po-card-tag" style="background:' + pal.bg + ';color:' + pal.text + '">월</span>';
+      else if (_months === 2) _periodBadge = '<span class="po-card-tag" style="background:' + pal.bg + ';color:' + pal.text + '">2월</span>';
+      else if (_months === 3) _periodBadge = '<span class="po-card-tag" style="background:' + pal.bg + ';color:' + pal.text + '">분기</span>';
+      else _periodBadge = '<span class="po-card-tag" style="background:' + pal.bg + ';color:' + pal.text + '">' + _months + '월</span>';
     }
     html += '<div class="po-card-cell" style="border-left:3px solid ' + pal.main + ';cursor:pointer" onclick="openCumulativePromoModal(' + i + ')">';
-    html += '<div class="po-card-cat"><span style="width:5px;height:5px;border-radius:50%;background:' + pal.main + ';display:inline-block;flex-shrink:0"></span> ' + p.name + ' ' + _periodBadge + '</div>';
-    html += '<div class="po-card-amt" style="color:' + pal.text + '">' + fmtPO(cd.amount) + '</div>';
-    html += '<div class="po-card-info">' + (p.benefit || '-') + ' <span style="background:' + pal.bg + ';color:' + pal.text + ';padding:1px 4px;border-radius:3px;font-size:8px;font-weight:600">' + cd.achieveCount + '회</span></div>';
-    html += '<div class="po-card-bar"><div class="po-card-bar-fill" style="width:' + _cardPct + '%;background:' + pal.main + '"></div></div>';
-    html += '<div class="po-card-short" style="color:#CC2222">부족 ' + fmtPO(cd.shortage) + '원</div>';
+    html += '<div class="po-card-row1"><span class="po-card-dot" style="background:' + pal.main + '"></span> ' + p.name + ' ' + _periodBadge + '</div>';
+    html += '<div class="po-card-row2" style="color:' + pal.text + '">' + fmtPO(cd.amount) + '</div>';
+    html += '<div class="po-card-row3">' + (p.benefit || '-') + ' <span class="po-card-badge">' + cd.achieveCount + '매</span></div>';
+    html += '<div class="po-card-row4" style="color:#CC2222">부족 ' + fmtPO(cd.shortage) + '원</div>';
+    html += '<div class="po-card-row5"><div class="po-card-row5-fill" style="width:' + _cardPct + '%;background:' + pal.main + '"></div></div>';
     html += '</div>';
   });
   html += '<div class="po-promo-add" onclick="addCumulativePromo()">+</div>';
