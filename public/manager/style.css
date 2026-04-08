@@ -320,19 +320,23 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-total-comm:hover { background:rgba(255,255,255,0.22); }
 .po-total-comm b { color:#FFCC66; }
 
-/* 요약 바 */
-.po-summary-bar { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; padding:0 12px 10px; }
-.po-summary-item { background:#F4F6FA; border:1px solid #EAECF2; border-radius:8px; padding:10px 14px; text-align:center; }
-.po-summary-item .po-summary-num { font-size:18px; font-weight:700; color:#1A1D23; }
-.po-summary-item .po-summary-lbl { font-size:11px; color:#5A6070; margin-top:2px; }
+/* 통합 액션바 (서브탭 + 요약뱃지 + 동기화) */
+.po-action-bar { display:flex; align-items:center; gap:8px; padding:8px 12px; overflow-x:auto; }
+.po-badge { padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; font-family:'Pretendard',-apple-system,sans-serif; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; border:none; cursor:pointer; }
+.po-badge-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; display:inline-block; }
+.po-tab-active { background:#1A1D23; color:#fff; }
+.po-tab-inactive { background:#F4F6FA; color:#5A6070; border:1px solid #EAECF2; }
+.po-tab-inactive:hover { background:#EAECF2; }
+.po-action-sep { width:1px; height:32px; background:#DDE1EB; margin:0 4px; flex-shrink:0; }
+.po-stat-blue  { background:#E6F1FB; color:#0C447C; cursor:default; }
+.po-stat-green { background:#E1F5EE; color:#085041; cursor:default; }
+.po-stat-amber { background:#FAEEDA; color:#412402; cursor:default; }
+.po-stat-teal  { background:#E1F5EE; color:#04342C; cursor:default; }
+.po-stat-red   { background:#FCEBEB; color:#791F1F; cursor:default; }
+.po-sync-btn { border:1px solid #185FA5 !important; background:#fff; color:#185FA5; margin-left:auto; }
+.po-sync-btn:hover { background:#E6F1FB; }
 /* 커머셜 모달 폰트 상속 */
 #commercial-promo-modal input, #commercial-promo-modal button, #commercial-promo-modal select { font-family:inherit; }
-
-/* 서브탭 7개 */
-.po-subtabs { display:flex; gap:4px; padding:6px 12px; overflow-x:auto; align-items:center; }
-.po-sub-tab { background:#1A1D23; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; font-family:'Pretendard',sans-serif; transition:background 0.15s; }
-.po-sub-tab:hover { opacity:0.85; }
-.po-sub-tab .po-tab-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 
 /* 패널 */
 .po-panel { background:#fff; border:1px solid #DDE1EB; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }

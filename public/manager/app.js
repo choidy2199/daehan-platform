@@ -2390,7 +2390,7 @@ function renderPOTab() {
   }
   html += '</div>'; // .po-total-bar
 
-  // 요약 바
+  // 통합 액션바 (서브탭 + 요약뱃지 + 동기화)
   var _poHistory = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   var _todayStr = now.toISOString().slice(0, 10);
   var _todayOrders = _poHistory.filter(function(h) { return !h.dryRun && h.date && h.date.slice(0, 10) === _todayStr; });
@@ -2399,30 +2399,26 @@ function renderPOTab() {
   var _focCount = _todayOrders.filter(function(h) { return h.subtab === 'foc' || h.type === 'foc'; }).length;
   var _erpTotal = _todayOrders.length;
   var _erpDone = _todayOrders.filter(function(h) { return h.erpRegistered; }).length;
-  html += '<div class="po-summary-bar">';
-  html += '<div class="po-summary-item"><div class="po-summary-num">' + _todayOrders.length + '건</div><div class="po-summary-lbl">오늘 발주</div></div>';
-  html += '<div class="po-summary-item"><div class="po-summary-num">' + _normalCount + '건</div><div class="po-summary-lbl">일반주문</div></div>';
-  html += '<div class="po-summary-item"><div class="po-summary-num">' + _promoCount + '건</div><div class="po-summary-lbl">프로모션</div></div>';
-  html += '<div class="po-summary-item"><div class="po-summary-num">' + _focCount + '건</div><div class="po-summary-lbl">FOC</div></div>';
-  html += '<div class="po-summary-item"><div class="po-summary-num">' + _erpDone + '/' + _erpTotal + '건</div><div class="po-summary-lbl">경영박사 등록</div></div>';
-  html += '</div>';
 
-  // 서브탭 7개
-  html += '<div class="po-subtabs">';
+  html += '<div class="po-action-bar">';
+  // 서브탭
   _poSubTabs.forEach(function(t) {
     var isActive = t.id === activeSubTab;
-    var bg = isActive ? t.activeBg : '#1A1D23';
-    html += '<button class="po-sub-tab" data-tab="' + t.id + '" style="background:' + bg + '" onclick="switchPOSubTab(\'' + t.id + '\')">';
-    html += '<span class="po-tab-dot" style="background:' + t.dot + '"></span>' + t.label;
-    html += '</button>';
+    html += '<button class="po-badge ' + (isActive ? 'po-tab-active' : 'po-tab-inactive') + '" data-tab="' + t.id + '" onclick="switchPOSubTab(\'' + t.id + '\')">';
+    html += '<span class="po-badge-dot" style="background:' + t.dot + '"></span>' + t.label + '</button>';
   });
-  html += '<div style="flex:1"></div>';
-  var _orderSyncTs = ''; try { _orderSyncTs = JSON.parse(localStorage.getItem('mw_order_sync_time') || '""') || ''; } catch(e) { _orderSyncTs = localStorage.getItem('mw_order_sync_time') || ''; }
-  var _orderSyncText = _orderSyncTs ? (function(d) { return (d.getMonth()+1)+'월 '+d.getDate()+'일 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })(new Date(_orderSyncTs)) : '-';
-  html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">';
-  html += '<button onclick="startTtiOrderSync()" style="background:#185FA5;color:#fff;border:none;border-radius:16px;padding:6px 14px;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;font-family:Pretendard,-apple-system,sans-serif" onmouseover="this.style.background=\'#0C447C\'" onmouseout="this.style.background=\'#185FA5\'"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><path d="M8 1v3h3" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>주문내역 동기화</button>';
-  html += '<span id="po-scrape-timestamp" style="font-size:9px;color:#9BA3B2">최근 동기화: ' + _orderSyncText + '</span>';
-  html += '</div>';
+  // 구분선
+  html += '<div class="po-action-sep"></div>';
+  // 요약 뱃지
+  html += '<span class="po-badge po-stat-blue"><span class="po-badge-dot" style="background:#185FA5"></span>오늘 발주 <b id="po-stat-today">' + _todayOrders.length + '</b>건</span>';
+  html += '<span class="po-badge po-stat-green"><span class="po-badge-dot" style="background:#1D9E75"></span>일반주문 <b id="po-stat-normal">' + _normalCount + '</b>건</span>';
+  html += '<span class="po-badge po-stat-amber"><span class="po-badge-dot" style="background:#EF9F27"></span>프로모션 <b id="po-stat-promo">' + _promoCount + '</b>건</span>';
+  html += '<span class="po-badge po-stat-teal"><span class="po-badge-dot" style="background:#0F6E56"></span>FOC <b id="po-stat-foc">' + _focCount + '</b>건</span>';
+  html += '<span class="po-badge po-stat-red"><span class="po-badge-dot" style="background:#CC2222"></span>경영박사 <b id="po-stat-erp">' + _erpDone + '/' + _erpTotal + '</b></span>';
+  // 구분선
+  html += '<div class="po-action-sep"></div>';
+  // 동기화 버튼
+  html += '<button class="po-badge po-sync-btn" onclick="startTtiOrderSync()">↻ 주문내역 동기화</button>';
   html += '</div>';
 
   // 탭 콘텐츠 영역
@@ -2650,10 +2646,9 @@ function switchPOSubTab(tabName) {
   var isGridTab = tabName === 'normal' || tabName === 'foc' || tabName === 'package' || tabName === 'kit' || tabName.indexOf('promo-') === 0;
   if (content) content.style.display = isGridTab ? 'grid' : 'block';
 
-  document.querySelectorAll('.po-sub-tab').forEach(function(btn) {
+  document.querySelectorAll('.po-action-bar .po-badge[data-tab]').forEach(function(btn) {
     var id = btn.getAttribute('data-tab');
-    var tabDef = _poSubTabs.find(function(t) { return t.id === id; });
-    btn.style.background = id === tabName ? (tabDef ? tabDef.activeBg : '#185FA5') : '#1A1D23';
+    btn.className = 'po-badge ' + (id === tabName ? 'po-tab-active' : 'po-tab-inactive');
   });
 
   localStorage.setItem('mw_po_active_subtab', tabName);
