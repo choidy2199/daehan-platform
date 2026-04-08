@@ -79,16 +79,30 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .btn-danger { background: #CC2222; color: #FFF; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Pretendard', sans-serif; }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 
-/* Content */
-.content { max-width: 100%; margin: 0 auto; padding: 16px 24px 40px; }
+/* Content — 전체 레이아웃을 뷰포트 높이에 맞춤 */
+.content { max-width: 100%; margin: 0 auto; padding: 16px 24px 40px; height: calc(100vh - 52px); display: flex; flex-direction: column; overflow: hidden; }
 .tab-content { display: none; }
-.tab-content.active { display: block; }
-#tab-catalog.active { display: flex; flex-direction: column; height: calc(100vh - 140px); overflow: hidden; }
+.tab-content.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+#tab-catalog.active { overflow: hidden; }
 
-/* Section */
+/* Section — 탭 내 마지막 section이 남은 높이를 채움 */
 .section { margin-bottom: 20px; border-radius: 6px; overflow: hidden; border: 1px solid var(--tl-border); }
-.section-header { background: #1A1D23; color: #FFF; padding: 0 16px; height: 40px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 600; }
+.tab-content.active > .section:last-of-type { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 0; overflow: hidden; }
+.tab-content.active > .section:last-of-type > .section-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.tab-content.active > .section:last-of-type > .section-body > .table-scroll { flex: 1; overflow-y: auto; overflow-x: auto; min-height: 0; max-height: none !important; }
+.section-header { background: #1A1D23; color: #FFF; padding: 0 16px; height: 40px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 600; flex-shrink: 0; }
 .section-body { background: var(--tl-bg); padding: 16px; }
+
+/* 서브탭 래퍼(판매/설정 등)도 flex 확장 */
+.tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section):not([style*="display:none"]) { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 0; overflow: hidden; }
+.tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type > .section-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type > .section-body > .table-scroll { flex: 1; overflow-y: auto; overflow-x: auto; min-height: 0; max-height: none !important; }
+/* sub-tabs 축소 방지 */
+.sub-tabs { flex-shrink: 0; }
+
+/* table-scroll 내 thead sticky */
+.table-scroll .data-table thead th { position: sticky; top: 0; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
 /* Forms */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
