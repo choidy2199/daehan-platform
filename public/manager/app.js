@@ -11412,14 +11412,102 @@ function switchSettingsMain(type) {
   document.getElementById('settings-sub-client').style.display = type === 'client' ? '' : 'none';
   document.getElementById('settings-sub-history').style.display = type === 'history' ? '' : 'none';
   document.getElementById('settings-sub-users').style.display = type === 'users' ? '' : 'none';
+  document.getElementById('settings-sub-api').style.display = type === 'api' ? '' : 'none';
   var tabs = document.querySelectorAll('#settings-main-tabs .sub-tab');
   tabs[0].classList.toggle('active', type === 'fee');
   tabs[1].classList.toggle('active', type === 'client');
   tabs[2].classList.toggle('active', type === 'history');
   tabs[3].classList.toggle('active', type === 'users');
+  tabs[4].classList.toggle('active', type === 'api');
   if (type === 'client') renderClients();
   if (type === 'history') renderActionHistory();
   if (type === 'users') renderUsers();
+  if (type === 'api') renderApiManagement();
+}
+
+// ======================== 설정 서브탭: API 관리 ========================
+var _apiPlatformMeta = {
+  erp:     { logo: '경', logoBg: '#1A1D23', keys: ['ERP_USER_KEY', 'ERP_URL'], note: '' },
+  naver:   { logo: 'N',  logoBg: '#03C75A', keys: ['NAVER_CLIENT_ID', 'NAVER_CLIENT_SECRET'], note: '' },
+  coupang: { logo: 'C',  logoBg: '#E3002B', keys: ['COUPANG_ACCESS_KEY', 'COUPANG_SECRET_KEY'], note: '' },
+  ssg:     { logo: 'S',  logoBg: '#FF5A2E', keys: ['SSG_API_KEY'], note: '※ 운영서버 IP 등록 필요' },
+  gmarket: { logo: 'G',  logoBg: '#43B02A', keys: ['GMARKET_API_KEY'], note: '고객센터 문의 완료 · 답변 대기 중' },
+  kakao:   { logo: 'AI', logoBg: '#D97706', keys: ['KAKAO_REST_API_KEY'], note: '카카오톡 자동응답 (NAS Docker) 연동용' }
+};
+
+function renderApiManagement() {
+  var container = document.getElementById('api-management-container');
+  container.innerHTML = '<div style="text-align:center;padding:40px;color:#9BA3B2;font-size:13px">API 상태 조회 중...</div>';
+  fetch('/api/settings/api-status')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var html = '';
+      (data.platforms || []).forEach(function(p) {
+        var meta = _apiPlatformMeta[p.id] || { logo: '?', logoBg: '#999', keys: [], note: '' };
+        var badgeClass = p.status === 'connected' ? 'green' : p.status === 'error' ? 'red' : 'yellow';
+        var badgeText = p.status === 'connected' ? '● 연결됨' : p.status === 'error' ? '● 오류' : '● 미등록';
+        var keysHtml = meta.keys.map(function(k) {
+          var masked = p.status === 'connected' ? '••••••••' : '';
+          return '<div class="api-field"><div class="api-field-label">' + k + '</div>' +
+            '<div class="api-field-value' + (masked ? '' : ' empty') + '">' + (masked || '미등록') + '</div></div>';
+        }).join('');
+        var noteHtml = meta.note ? '<div class="api-note">' + meta.note + '</div>' : '';
+        html += '<div class="api-card">' +
+          '<div class="api-card-header">' +
+            '<div class="api-card-logo" style="background:' + meta.logoBg + ';">' + meta.logo + '</div>' +
+            '<span class="api-card-name">' + p.name + '</span>' +
+            '<span class="api-badge api-badge-' + badgeClass + '">' + badgeText + '</span>' +
+          '</div>' +
+          '<div class="api-card-body">' + keysHtml + noteHtml + '</div>' +
+          '<div class="api-card-footer">' +
+            '<button class="api-btn api-btn-test" id="api-test-btn-' + p.id + '" onclick="testApiConnection(\'' + p.id + '\')">연결 테스트</button>' +
+          '</div>' +
+        '</div>';
+      });
+      container.innerHTML = html;
+    })
+    .catch(function(err) {
+      container.innerHTML = '<div style="text-align:center;padding:40px;color:#791F1F;font-size:13px">API 상태 조회 실패: ' + err.message + '</div>';
+    });
+}
+
+function testApiConnection(platformId) {
+  var btn = document.getElementById('api-test-btn-' + platformId);
+  if (!btn) return;
+  var origText = btn.textContent;
+  btn.textContent = '테스트 중...';
+  btn.disabled = true;
+  btn.classList.remove('success', 'fail');
+  fetch('/api/settings/api-status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ platformId: platformId })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        btn.textContent = '✓ ' + data.message;
+        btn.classList.add('success');
+      } else {
+        btn.textContent = '✕ ' + data.message;
+        btn.classList.add('fail');
+      }
+      setTimeout(function() {
+        btn.textContent = origText;
+        btn.disabled = false;
+        btn.classList.remove('success', 'fail');
+      }, 3000);
+    })
+    .catch(function(err) {
+      btn.textContent = '✕ 오류';
+      btn.classList.add('fail');
+      alert('연결 테스트 오류: ' + err.message);
+      setTimeout(function() {
+        btn.textContent = origText;
+        btn.disabled = false;
+        btn.classList.remove('fail');
+      }, 3000);
+    });
 }
 
 function saveClients() {
