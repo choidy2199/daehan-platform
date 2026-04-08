@@ -2640,20 +2640,20 @@ function onPOProductScroll() {
 
 // 오른쪽 패널 — 주문 목록
 function buildPOOrderPanel() {
-  var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
-  html += '<div class="po-panel-header"><span>주문 목록<span class="po-header-count">0건</span></span>';
+  var html = '<div class="po-panel" style="max-height:calc(100vh - 260px);overflow-y:auto">';
+  html += '<div class="po-panel-header" style="position:sticky;top:0;z-index:2"><span>주문 목록<span class="po-header-count">0건</span></span>';
   html += '<button style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="clearPOCart()">비우기</button>';
   html += '</div>';
 
   // 제품등록 검색행
-  html += '<div class="po-register-row">';
+  html += '<div class="po-register-row" style="position:sticky;top:38px;z-index:2;background:#fff">';
   html += '<span style="font-size:12px;font-weight:600;color:#5A6070;white-space:nowrap">제품등록 :</span>';
   html += '<input type="search" placeholder="상품번호, 모델명, 제품명 검색 → Enter" id="po-cart-search" autocomplete="off" onkeydown="if(event.key===\'Enter\')addPOCartItem()">';
   html += '<button class="po-register-btn" onclick="addPOCartItem()">+ 등록</button>';
   html += '</div>';
 
   // 테이블
-  html += '<div class="po-panel-body">';
+  html += '<div class="po-table-wrap" style="padding:8px">';
   html += '<table class="po-table"><thead><tr>';
   html += '<th class="center" style="width:36px">누적</th><th>프로모션번호</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
   html += '</tr></thead><tbody id="po-cart-body">';
