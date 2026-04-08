@@ -405,6 +405,8 @@ async function realtimeDownloadAndRefresh() {
     for (var i = 0; i < data.length; i++) {
       var item = data[i];
       if (item.key && item.value) {
+        // API 키는 localStorage에 저장 안 함 (서버에서만 관리)
+        if (item.key === 'api_keys') continue;
         // 로컬에 아직 업로드 안 된 변경이 있으면 서버 데이터로 덮어쓰지 않음
         if (_syncTimers[item.key]) {
           console.log('[Realtime] 로컬 변경 대기 중, 스킵:', item.key);

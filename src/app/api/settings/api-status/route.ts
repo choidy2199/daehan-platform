@@ -1,54 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccessToken } from '@/lib/naver';
+import { getApiKeys, saveApiKeys, ApiKeys } from '@/lib/api-keys';
 
-interface PlatformStatus {
-  id: string;
-  name: string;
-  status: 'connected' | 'not_configured' | 'error';
-  message?: string;
+function maskKey(key: string): string {
+  if (!key) return '';
+  if (key.length <= 6) return '***';
+  return key.substring(0, 3) + '***' + key.substring(key.length - 3);
 }
 
-// 환경변수 존재 여부로 상태 판단
-function checkEnvStatus(keys: string[]): 'connected' | 'not_configured' {
-  const allPresent = keys.every(k => {
-    const val = process.env[k];
-    return val !== undefined && val !== '';
-  });
-  return allPresent ? 'connected' : 'not_configured';
-}
+// GET — 전체 플랫폼 상태 + 키 조회
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const raw = searchParams.get('raw') === 'true';
+  const keys = await getApiKeys();
 
-// GET — 전체 플랫폼 상태 일괄 조회 (환경변수 기반)
-export async function GET() {
-  const platforms: PlatformStatus[] = [
+  const platforms = [
     {
       id: 'erp',
       name: '경영박사 ERP',
-      status: checkEnvStatus(['ERP_USER_KEY', 'ERP_URL']),
+      status: (keys.erp.userKey && keys.erp.url) ? 'connected' as const : 'not_configured' as const,
+      keys: [
+        { label: 'ERP_USER_KEY', value: raw ? keys.erp.userKey : maskKey(keys.erp.userKey) },
+        { label: 'ERP_URL', value: raw ? keys.erp.url : maskKey(keys.erp.url) },
+      ],
     },
     {
       id: 'naver',
       name: '네이버 커머스',
-      status: checkEnvStatus(['NAVER_CLIENT_ID']) === 'connected' && (process.env.NAVER_CLIENT_SECRET_B64 || process.env.NAVER_CLIENT_SECRET) ? 'connected' : 'not_configured',
+      status: (keys.naver.clientId && keys.naver.clientSecret) ? 'connected' as const : 'not_configured' as const,
+      keys: [
+        { label: 'NAVER_CLIENT_ID', value: raw ? keys.naver.clientId : maskKey(keys.naver.clientId) },
+        { label: 'NAVER_CLIENT_SECRET', value: raw ? keys.naver.clientSecret : maskKey(keys.naver.clientSecret) },
+      ],
     },
     {
       id: 'coupang',
       name: '쿠팡 마켓플레이스',
-      status: checkEnvStatus(['COUPANG_ACCESS_KEY', 'COUPANG_SECRET_KEY']),
+      status: (keys.coupang.accessKey && keys.coupang.secretKey) ? 'connected' as const : 'not_configured' as const,
+      keys: [
+        { label: 'COUPANG_ACCESS_KEY', value: raw ? keys.coupang.accessKey : maskKey(keys.coupang.accessKey) },
+        { label: 'COUPANG_SECRET_KEY', value: raw ? keys.coupang.secretKey : maskKey(keys.coupang.secretKey) },
+      ],
     },
     {
       id: 'ssg',
       name: 'SSG.COM',
-      status: checkEnvStatus(['SSG_API_KEY']),
+      status: keys.ssg.apiKey ? 'connected' as const : 'not_configured' as const,
+      keys: [
+        { label: 'SSG_API_KEY', value: raw ? keys.ssg.apiKey : maskKey(keys.ssg.apiKey) },
+      ],
     },
     {
       id: 'gmarket',
       name: 'G마켓/옥션 (ESM)',
-      status: checkEnvStatus(['GMARKET_API_KEY']),
+      status: keys.gmarket.apiKey ? 'connected' as const : 'not_configured' as const,
+      keys: [
+        { label: 'GMARKET_API_KEY', value: raw ? keys.gmarket.apiKey : maskKey(keys.gmarket.apiKey) },
+      ],
     },
     {
       id: 'kakao',
       name: '카카오 알림톡',
-      status: checkEnvStatus(['KAKAO_REST_API_KEY']),
+      status: keys.kakao.apiKey ? 'connected' as const : 'not_configured' as const,
+      keys: [
+        { label: 'KAKAO_REST_API_KEY', value: raw ? keys.kakao.apiKey : maskKey(keys.kakao.apiKey) },
+      ],
     },
   ];
 
@@ -63,14 +79,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'platformId 필수' }, { status: 400 });
   }
 
+  const keys = await getApiKeys();
+
   try {
     switch (platformId) {
       case 'erp': {
-        // ERP CheckService SOAP 호출 (cUserKey 파라미터 사용)
-        const userKey = process.env.ERP_USER_KEY;
-        const erpUrl = process.env.ERP_URL;
+        const userKey = keys.erp.userKey;
+        const erpUrl = keys.erp.url;
         if (!userKey || !erpUrl) {
-          return NextResponse.json({ success: false, message: 'ERP 환경변수 미설정' });
+          return NextResponse.json({ success: false, message: 'ERP API 키 미설정' });
         }
         try {
           const soapEnv = `<?xml version="1.0" encoding="utf-8"?>
@@ -104,9 +121,8 @@ export async function POST(req: NextRequest) {
       }
 
       case 'naver': {
-        // 네이버 토큰 발급 테스트 — naver.ts의 getAccessToken 재사용
-        if (!process.env.NAVER_CLIENT_ID || !(process.env.NAVER_CLIENT_SECRET_B64 || process.env.NAVER_CLIENT_SECRET)) {
-          return NextResponse.json({ success: false, message: '네이버 환경변수 미설정' });
+        if (!keys.naver.clientId || !keys.naver.clientSecret) {
+          return NextResponse.json({ success: false, message: '네이버 API 키 미설정' });
         }
         try {
           const token = await getAccessToken();
@@ -121,13 +137,11 @@ export async function POST(req: NextRequest) {
       }
 
       case 'coupang': {
-        // 쿠팡: 키 존재 + 형식 검증 (vendorId는 선택)
-        const accessKey = process.env.COUPANG_ACCESS_KEY;
-        const secretKey = process.env.COUPANG_SECRET_KEY;
+        const accessKey = keys.coupang.accessKey;
+        const secretKey = keys.coupang.secretKey;
         if (!accessKey || !secretKey) {
           return NextResponse.json({ success: false, message: '쿠팡 API 키 미등록' });
         }
-        // HMAC 서명 방식 — 키가 있으면 형식만 검증
         if (accessKey.length < 10 || secretKey.length < 10) {
           return NextResponse.json({ success: false, message: '쿠팡 API 키 형식 오류 (너무 짧음)' });
         }
@@ -135,30 +149,24 @@ export async function POST(req: NextRequest) {
       }
 
       case 'ssg': {
-        // SSG: 키 존재 여부 확인 (IP 등록 필요할 수 있음)
-        const ssgKey = process.env.SSG_API_KEY;
-        if (!ssgKey) {
+        if (!keys.ssg.apiKey) {
           return NextResponse.json({ success: false, message: 'SSG API 키 미등록' });
         }
         return NextResponse.json({ success: true, message: 'SSG API 키 등록됨 (IP 등록 필요)' });
       }
 
       case 'gmarket': {
-        // G마켓: 키 존재 여부
-        const gmKey = process.env.GMARKET_API_KEY;
-        if (!gmKey) {
+        if (!keys.gmarket.apiKey) {
           return NextResponse.json({ success: false, message: 'G마켓 API 키 미등록' });
         }
         return NextResponse.json({ success: true, message: 'G마켓 API 키 등록됨' });
       }
 
       case 'kakao': {
-        // 카카오: 키 형식 검증
-        const kakaoKey = process.env.KAKAO_REST_API_KEY;
-        if (!kakaoKey) {
+        if (!keys.kakao.apiKey) {
           return NextResponse.json({ success: false, message: '카카오 REST API 키 미등록' });
         }
-        if (kakaoKey.length < 10) {
+        if (keys.kakao.apiKey.length < 10) {
           return NextResponse.json({ success: false, message: '카카오 API 키 형식 오류' });
         }
         return NextResponse.json({ success: true, message: '카카오 API 키 등록됨' });
@@ -170,5 +178,26 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ success: false, message: `연결 테스트 오류: ${msg}` }, { status: 500 });
+  }
+}
+
+// PUT — API 키 저장
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const keys = body.keys as ApiKeys;
+
+    if (!keys || typeof keys !== 'object') {
+      return NextResponse.json({ success: false, message: '잘못된 데이터 형식' }, { status: 400 });
+    }
+
+    const result = await saveApiKeys(keys);
+    if (result) {
+      return NextResponse.json({ success: true, message: 'API 키 저장 완료' });
+    }
+    return NextResponse.json({ success: false, message: 'Supabase 저장 실패' }, { status: 500 });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ success: false, message: `저장 실패: ${msg}` }, { status: 500 });
   }
 }
