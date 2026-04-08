@@ -132,6 +132,7 @@ export async function getNaverProducts(page = 1, size = 100) {
 export async function updateNaverPrice(originProductNo: string, newPrice: number) {
   return naverApi('PUT', `/v2/products/origin-products/${originProductNo}`, {
     originProduct: {
+      statusType: 'SALE',
       salePrice: newPrice,
     },
   });
