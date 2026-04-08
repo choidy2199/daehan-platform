@@ -11437,6 +11437,22 @@ var _apiPlatformMeta = {
   kakao:   { logo: 'AI', logoBg: '#D97706', keys: ['KAKAO_REST_API_KEY'], note: '카카오톡 자동응답 (NAS Docker) 연동용' }
 };
 
+// API 키 → Supabase 필드 매핑 (label → keys 객체 경로)
+var _apiKeyFieldMap = {
+  'ERP_USER_KEY': { platform: 'erp', field: 'userKey' },
+  'ERP_URL': { platform: 'erp', field: 'url' },
+  'NAVER_CLIENT_ID': { platform: 'naver', field: 'clientId' },
+  'NAVER_CLIENT_SECRET': { platform: 'naver', field: 'clientSecret' },
+  'COUPANG_ACCESS_KEY': { platform: 'coupang', field: 'accessKey' },
+  'COUPANG_SECRET_KEY': { platform: 'coupang', field: 'secretKey' },
+  'SSG_API_KEY': { platform: 'ssg', field: 'apiKey' },
+  'GMARKET_API_KEY': { platform: 'gmarket', field: 'apiKey' },
+  'KAKAO_REST_API_KEY': { platform: 'kakao', field: 'apiKey' }
+};
+
+// 편집 모드 raw 데이터 캐시
+var _apiRawKeys = null;
+
 function renderApiManagement() {
   var container = document.getElementById('api-management-container');
   container.innerHTML = '<div style="text-align:center;padding:40px;color:#9BA3B2;font-size:13px">API 상태 조회 중...</div>';
@@ -11448,20 +11464,24 @@ function renderApiManagement() {
         var meta = _apiPlatformMeta[p.id] || { logo: '?', logoBg: '#999', keys: [], note: '' };
         var badgeClass = p.status === 'connected' ? 'blue' : p.status === 'error' ? 'red' : 'yellow';
         var badgeText = p.status === 'connected' ? '● 키 등록됨' : p.status === 'error' ? '● 오류' : '● 미등록';
+        // 서버에서 마스킹된 키 값 사용
+        var serverKeys = {};
+        (p.keys || []).forEach(function(k) { serverKeys[k.label] = k.value || ''; });
         var keysHtml = meta.keys.map(function(k) {
-          var masked = p.status === 'connected' ? '••••••••' : '';
+          var val = serverKeys[k] || '';
           return '<div class="api-field"><div class="api-field-label">' + k + '</div>' +
-            '<div class="api-field-value' + (masked ? '' : ' empty') + '">' + (masked || '미등록') + '</div></div>';
+            '<div class="api-field-value' + (val ? '' : ' empty') + '" id="api-val-' + p.id + '-' + k + '">' + (val || '미등록') + '</div></div>';
         }).join('');
         var noteHtml = meta.note ? '<div class="api-note">' + meta.note + '</div>' : '';
-        html += '<div class="api-card">' +
+        html += '<div class="api-card" id="api-card-' + p.id + '">' +
           '<div class="api-card-header">' +
             '<div class="api-card-logo" style="background:' + meta.logoBg + ';">' + meta.logo + '</div>' +
             '<span class="api-card-name">' + p.name + '</span>' +
             '<span class="api-badge api-badge-' + badgeClass + '">' + badgeText + '</span>' +
           '</div>' +
-          '<div class="api-card-body">' + keysHtml + noteHtml + '</div>' +
+          '<div class="api-card-body" id="api-body-' + p.id + '">' + keysHtml + noteHtml + '</div>' +
           '<div class="api-card-footer">' +
+            '<button class="api-btn" style="background:#F4F6FA;color:#5A6070" onclick="editApiKeys(\'' + p.id + '\')">수정</button>' +
             '<button class="api-btn api-btn-test" id="api-test-btn-' + p.id + '" onclick="testApiConnection(\'' + p.id + '\')">연결 테스트</button>' +
           '</div>' +
         '</div>';
@@ -11470,6 +11490,118 @@ function renderApiManagement() {
     })
     .catch(function(err) {
       container.innerHTML = '<div style="text-align:center;padding:40px;color:#791F1F;font-size:13px">API 상태 조회 실패: ' + err.message + '</div>';
+    });
+}
+
+// 수정 모드 진입
+function editApiKeys(platformId) {
+  var card = document.getElementById('api-card-' + platformId);
+  if (!card) return;
+  var meta = _apiPlatformMeta[platformId] || { keys: [] };
+  var body = document.getElementById('api-body-' + platformId);
+  if (!body) return;
+
+  // raw 키 로드 (최초 1회만)
+  var loadRaw = _apiRawKeys ? Promise.resolve(_apiRawKeys) : fetch('/api/settings/api-status?raw=true')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // 플랫폼별 raw 값 캐시
+      var raw = {};
+      (data.platforms || []).forEach(function(p) {
+        raw[p.id] = {};
+        (p.keys || []).forEach(function(k) { raw[p.id][k.label] = k.value || ''; });
+      });
+      _apiRawKeys = raw;
+      return raw;
+    });
+
+  loadRaw.then(function(raw) {
+    var platformRaw = raw[platformId] || {};
+    var fieldsHtml = meta.keys.map(function(k) {
+      var val = platformRaw[k] || '';
+      return '<div class="api-field"><div class="api-field-label">' + k + '</div>' +
+        '<input type="text" class="api-field-input" id="api-input-' + platformId + '-' + k + '" value="' + val.replace(/"/g, '&quot;') + '" ' +
+        'style="width:100%;font-size:12px;padding:6px 10px;border:1px solid #185FA5;border-radius:4px;font-family:Courier New,monospace;background:#FAFBFF;outline:none;box-sizing:border-box" ' +
+        'placeholder="' + k + ' 입력"></div>';
+    }).join('');
+    body.innerHTML = fieldsHtml;
+
+    // 푸터 버튼 교체: 저장 + 취소
+    var footer = card.querySelector('.api-card-footer');
+    if (footer) {
+      footer.innerHTML =
+        '<button class="api-btn" style="background:#F4F6FA;color:#5A6070" onclick="_apiRawKeys=null;renderApiManagement()">취소</button>' +
+        '<button class="api-btn" style="background:#185FA5;color:#fff" onclick="saveApiKeysFromUI(\'' + platformId + '\')">저장</button>';
+    }
+  });
+}
+
+// UI에서 전체 키 수집 → PUT 저장
+function saveApiKeysFromUI(platformId) {
+  // 현재 편집 중인 input에서 값 수집
+  var meta = _apiPlatformMeta[platformId] || { keys: [] };
+  var updates = {};
+  meta.keys.forEach(function(k) {
+    var inp = document.getElementById('api-input-' + platformId + '-' + k);
+    updates[k] = inp ? inp.value.trim() : '';
+  });
+
+  // raw 캐시에 반영
+  if (_apiRawKeys && _apiRawKeys[platformId]) {
+    Object.keys(updates).forEach(function(k) { _apiRawKeys[platformId][k] = updates[k]; });
+  }
+
+  // 전체 keys 객체 구성 (Supabase에 저장할 형태)
+  var keysObj = { erp: { userKey: '', url: '' }, naver: { clientId: '', clientSecret: '' }, coupang: { accessKey: '', secretKey: '' }, ssg: { apiKey: '' }, gmarket: { apiKey: '' }, kakao: { apiKey: '' } };
+
+  // 캐시에서 전체 값 채우기
+  if (_apiRawKeys) {
+    Object.keys(_apiKeyFieldMap).forEach(function(label) {
+      var m = _apiKeyFieldMap[label];
+      var platformRaw = _apiRawKeys[m.platform] || {};
+      keysObj[m.platform][m.field] = platformRaw[label] || '';
+    });
+  }
+
+  // 현재 편집 값 덮어쓰기
+  Object.keys(updates).forEach(function(label) {
+    var m = _apiKeyFieldMap[label];
+    if (m) keysObj[m.platform][m.field] = updates[label];
+  });
+
+  // PUT 호출
+  var card = document.getElementById('api-card-' + platformId);
+  var footer = card ? card.querySelector('.api-card-footer') : null;
+  if (footer) {
+    var saveBtn = footer.querySelectorAll('button')[1];
+    if (saveBtn) { saveBtn.textContent = '저장 중...'; saveBtn.disabled = true; }
+  }
+
+  fetch('/api/settings/api-status', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keys: keysObj })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        toast('API 키 저장 완료');
+        _apiRawKeys = null; // 캐시 초기화
+        renderApiManagement(); // 마스킹 모드로 복귀
+      } else {
+        alert('저장 실패: ' + (data.message || '알 수 없는 오류'));
+        if (footer) {
+          var saveBtn2 = footer.querySelectorAll('button')[1];
+          if (saveBtn2) { saveBtn2.textContent = '저장'; saveBtn2.disabled = false; }
+        }
+      }
+    })
+    .catch(function(err) {
+      alert('저장 실패: ' + err.message);
+      if (footer) {
+        var saveBtn3 = footer.querySelectorAll('button')[1];
+        if (saveBtn3) { saveBtn3.textContent = '저장'; saveBtn3.disabled = false; }
+      }
     });
 }
 
