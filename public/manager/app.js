@@ -10784,9 +10784,8 @@ function renderChannelFees() {
   if (!container) return;
   var ch = _channelFees.channels;
   var keys = ['naver', 'coupang_mp', 'coupang_growth', 'gmarket', 'ssg'];
-  var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">';
-  keys.forEach(function(key, i) {
-    if (i === 3) html += '</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+  var html = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">';
+  keys.forEach(function(key) {
     html += buildFeeCard(key, ch[key]);
   });
   html += '</div>';
