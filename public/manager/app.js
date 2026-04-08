@@ -2363,34 +2363,8 @@ function renderPOTab() {
 
   html += '</div>'; // .po-cards-area
 
-  // ── 합계 바 ──
+  // ── 합계 + 탭/뱃지 통합 행 ──
   var _lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  html += '<div class="po-total-bar">';
-  html += '<div><div class="po-total-lbl">합계 · ' + month + '월</div><div class="po-total-val">' + fmtPO(salesData.totalMonth) + '</div></div>';
-  html += '<div class="po-total-split">';
-  html += '<div class="po-total-split-item"><div class="po-total-split-label">1~15일</div>' + fmtPO(salesData.first15) + '</div>';
-  html += '<div class="po-total-split-item"><div class="po-total-split-label">16~' + _lastDay + '일</div>' + fmtPO(salesData.last15) + '</div>';
-  html += '</div>';
-  html += '<div class="po-total-sub">전체 목표 대비 0%</div>';
-  // 커머셜P
-  var _commPromo = _getActiveCommercialPromo();
-  if (_commPromo) {
-    var _commSales = _calcCommercialSales(_commPromo);
-    var _commTier = _findCommercialTier(_commPromo, _commSales);
-    var _commRate = _commTier.current && _commTier.current.rate != null ? _commTier.current.rate + '%' : '미달';
-    html += '<div class="po-total-comm" onclick="openCommercialPromoModal()">';
-    html += '커머셜P (' + _commPeriodLabel(_commPromo) + ') 현재 ' + _commRate;
-    if (_commTier.next && _commTier.next.rate != null) {
-      var _shortage = _commTier.shortage > 0 ? _commTier.shortage : 0;
-      html += ' · 다음 ' + _commTier.next.rate + '% 까지 <b>' + fmtPO(_shortage) + '원</b>';
-    }
-    html += ' ▶</div>';
-  } else {
-    html += '<div class="po-total-comm" onclick="openCommercialPromoModal()" style="opacity:0.6">커머셜P 미등록 — 클릭하여 설정 ▶</div>';
-  }
-  html += '</div>'; // .po-total-bar
-
-  // 통합 액션바 (서브탭 + 요약뱃지 + 동기화)
   var _poHistory = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   var _todayStr = now.toISOString().slice(0, 10);
   var _todayOrders = _poHistory.filter(function(h) { return !h.dryRun && h.date && h.date.slice(0, 10) === _todayStr; });
@@ -2400,26 +2374,48 @@ function renderPOTab() {
   var _erpTotal = _todayOrders.length;
   var _erpDone = _todayOrders.filter(function(h) { return h.erpRegistered; }).length;
 
-  html += '<div class="po-action-bar">';
-  // 서브탭
+  html += '<div class="po-top-row">';
+
+  // 합계 박스 (파란)
+  html += '<div class="po-total-compact">';
+  html += '<div><div class="po-tc-label">합계 · ' + month + '월</div><div class="po-tc-value">' + fmtPO(salesData.totalMonth) + '</div></div>';
+  html += '<div class="po-tc-split">';
+  html += '<div class="po-tc-sp"><div class="po-tc-sp-l">1~15일</div>' + fmtPO(salesData.first15) + '</div>';
+  html += '<div class="po-tc-sp"><div class="po-tc-sp-l">16~' + _lastDay + '일</div>' + fmtPO(salesData.last15) + '</div>';
+  html += '</div>';
+  var _commPromo = _getActiveCommercialPromo();
+  if (_commPromo) {
+    var _commSales = _calcCommercialSales(_commPromo);
+    var _commTier = _findCommercialTier(_commPromo, _commSales);
+    var _commRate = _commTier.current && _commTier.current.rate != null ? _commTier.current.rate + '%' : '미달';
+    html += '<div class="po-tc-comm" onclick="openCommercialPromoModal()" style="cursor:pointer">';
+    html += '커머셜P ' + _commRate;
+    if (_commTier.next && _commTier.next.rate != null) {
+      var _shortage = _commTier.shortage > 0 ? _commTier.shortage : 0;
+      html += ' · 다음 ' + _commTier.next.rate + '%까지 <b style="color:#FFCC66">' + fmtPO(_shortage) + '원</b>';
+    }
+    html += ' ▶</div>';
+  } else {
+    html += '<div class="po-tc-comm" onclick="openCommercialPromoModal()" style="cursor:pointer;opacity:0.6">커머셜P 미등록 ▶</div>';
+  }
+  html += '</div>'; // .po-total-compact
+
+  // 탭+뱃지 박스 (흰)
+  html += '<div class="po-action-compact">';
   _poSubTabs.forEach(function(t) {
     var isActive = t.id === activeSubTab;
     html += '<button class="po-badge ' + (isActive ? 'po-tab-active' : 'po-tab-inactive') + '" data-tab="' + t.id + '" onclick="switchPOSubTab(\'' + t.id + '\')">';
     html += '<span class="po-badge-dot" style="background:' + t.dot + '"></span>' + t.label + '</button>';
   });
-  // 구분선
   html += '<div class="po-action-sep"></div>';
-  // 요약 뱃지
-  html += '<span class="po-badge po-stat-blue"><span class="po-badge-dot" style="background:#185FA5"></span>오늘 발주 <b id="po-stat-today">' + _todayOrders.length + '</b>건</span>';
-  html += '<span class="po-badge po-stat-green"><span class="po-badge-dot" style="background:#1D9E75"></span>일반주문 <b id="po-stat-normal">' + _normalCount + '</b>건</span>';
+  html += '<span class="po-badge po-stat-blue"><span class="po-badge-dot" style="background:#185FA5"></span>오늘 <b id="po-stat-today">' + _todayOrders.length + '</b>건</span>';
+  html += '<span class="po-badge po-stat-green"><span class="po-badge-dot" style="background:#1D9E75"></span>일반 <b id="po-stat-normal">' + _normalCount + '</b>건</span>';
   html += '<span class="po-badge po-stat-amber"><span class="po-badge-dot" style="background:#EF9F27"></span>프로모션 <b id="po-stat-promo">' + _promoCount + '</b>건</span>';
   html += '<span class="po-badge po-stat-teal"><span class="po-badge-dot" style="background:#0F6E56"></span>FOC <b id="po-stat-foc">' + _focCount + '</b>건</span>';
   html += '<span class="po-badge po-stat-red"><span class="po-badge-dot" style="background:#CC2222"></span>경영박사 <b id="po-stat-erp">' + _erpDone + '/' + _erpTotal + '</b></span>';
-  // 구분선
-  html += '<div class="po-action-sep"></div>';
-  // 동기화 버튼
-  html += '<button class="po-badge po-sync-btn" onclick="startTtiOrderSync()">↻ 주문내역 동기화</button>';
-  html += '</div>';
+  html += '</div>'; // .po-action-compact
+
+  html += '</div>'; // .po-top-row
 
   // 탭 콘텐츠 영역
   html += '<div id="po-tab-contents" style="padding:8px 12px">';
@@ -2696,13 +2692,14 @@ function buildPOListPanel() {
 
   h += '<div class="po-panel" style="max-height:calc(100vh - 320px)">';
   h += '<div class="po-panel-header"><span>발주 리스트</span><div style="display:flex;gap:6px;align-items:center">';
-  h += '<button onclick="deleteSelectedPOHistory()" style="padding:5px 12px;font-size:11px;color:#791F1F;background:#FCEBEB;border:0.5px solid #F09595;border-radius:6px;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500">선택 삭제</button>';
-  h += '<select id="po-list-filter" onchange="changePOListFilter(this.value)" style="height:28px;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.15);color:#fff;font-size:10px;border-radius:4px;padding:0 6px;font-family:Pretendard,sans-serif">';
+  h += '<button class="po-hdr-btn po-hdr-del" onclick="deleteSelectedPOHistory()">선택 삭제</button>';
+  h += '<select id="po-list-filter" class="po-hdr-select" onchange="changePOListFilter(this.value)">';
   h += '<option value="today"' + (filterEl === 'today' ? ' selected' : '') + '>오늘</option>';
   h += '<option value="week"' + (filterEl === 'week' ? ' selected' : '') + '>이번 주</option>';
   h += '<option value="month"' + (filterEl === 'month' ? ' selected' : '') + '>이번 달</option>';
   h += '</select>';
-  h += '<button onclick="registerErpFromList()" style="background:#1D9E75;color:#fff;border:none;border-radius:5px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">경영박사 매입전표 등록</button>';
+  h += '<button class="po-hdr-btn po-hdr-sync" onclick="startTtiOrderSync()">↻ 밀워키 주문내역 동기화</button>';
+  h += '<button class="po-hdr-btn po-hdr-erp" onclick="registerErpFromList()">↻ 경영박사 매입전표 등록</button>';
   h += '</div></div>';
 
   h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
