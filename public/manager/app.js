@@ -482,7 +482,7 @@ let DB = {
   inventory: load(KEYS.inventory),
   promotions: load(KEYS.promotions),
   orders: loadObj(KEYS.orders, { elec: [], hand: [], pack: [] }),
-  settings: loadObj(KEYS.settings, { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] }),
+  settings: loadObj(KEYS.settings, { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, ssgFee: 0.13, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] }),
   rebate: load(KEYS.rebate)
 };
 console.log('[PERF] DB localStorage 파싱: ' + (performance.now() - _dbStart).toFixed(0) + 'ms (products:' + DB.products.length + ', inventory:' + DB.inventory.length + ', promos:' + DB.promotions.length + ')');
@@ -6707,7 +6707,7 @@ function executeDataReset() {
       if (typeof partsPrices !== 'undefined') { partsPrices = {}; localStorage.setItem('mw_parts_prices', '{}'); }
     }
     if (v === 'settings') {
-      DB.settings = { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] };
+      DB.settings = { quarterDC: 0.04, yearDC: 0.018, vat: 0.1, naverFee: 0.059, openElecFee: 0.13, openHandFee: 0.176, ssgFee: 0.13, domaeFee: 0.01, mkDomae: 1, mkRetail: 15, mkNaver: 17, mkOpen: 27, promoFee1: 5.8, promoFee2: 3.6, arPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}], volPromos: [{name:'',rate:0},{name:'',rate:0},{name:'',rate:0},{name:'',rate:0}] };
       save(KEYS.settings, DB.settings);
       DB.rebate = []; save(KEYS.rebate, DB.rebate);
     }
@@ -10769,8 +10769,83 @@ function syncChannelFeesToSettings() {
   // 기존 설정이 없을 때만 기본값 적용.
   if (DB.settings.openElecFee === undefined) DB.settings.openElecFee = 0.13;
   if (DB.settings.openHandFee === undefined) DB.settings.openHandFee = 0.176;
+  // SSG flat 키 동기화
+  var ssgCats = ch.ssg.categories || [];
+  DB.settings.ssgFee = ssgCats[0] ? ssgCats[0].rate / 100 : 0.13;
   DB.settings.feeVatMode = 'incl';
   save(KEYS.settings, DB.settings);
+}
+
+// ======================== 수수료 읽기 헬퍼 ========================
+// 새 channels 구조에서 채널+카테고리별 수수료율(%)을 리턴
+// channel: 'naver','coupang_mp','coupang_growth','gmarket','ssg'
+// category: 'powertool'(전동공구), 'handtool'(수공구/악세서리/팩아웃), 또는 카테고리 한글명
+// 리턴: 소수(0.xx) — 기존 DB.settings 형식과 동일
+function getChannelFeeRate(channel, category) {
+  if (!_channelFees) loadChannelFees();
+  var ch = _channelFees.channels;
+  var data = ch[channel];
+  if (!data) return 0;
+
+  // 네이버: 전체 fees 합산
+  if (channel === 'naver') {
+    var sum = 0;
+    (data.fees || []).forEach(function(f) { if (f.unit === '%') sum += (f.rate || 0); });
+    return sum / 100;
+  }
+
+  // 카테고리 매칭 함수
+  var isElec = !category || category === 'powertool' || category === '파워툴' || category === '전동공구';
+  var cats = data.categories || [];
+
+  // 쿠팡 마켓플레이스
+  if (channel === 'coupang_mp') {
+    var rate = isElec ? (cats[0] ? cats[0].rate : 7.8) : (cats[1] ? cats[1].rate : 10.8);
+    return rate / 100;
+  }
+
+  // 쿠팡 로켓그로스
+  if (channel === 'coupang_growth') {
+    var rate = isElec ? (cats[0] ? cats[0].rate : 7.8) : (cats[1] ? cats[1].rate : 10.8);
+    return rate / 100;
+  }
+
+  // G마켓/옥션
+  if (channel === 'gmarket') {
+    var rate = isElec ? (cats[0] ? cats[0].rate : 9) : (cats[1] ? cats[1].rate : 13);
+    return rate / 100;
+  }
+
+  // SSG
+  if (channel === 'ssg') {
+    // SSG는 카테고리 구분 없이 동일 수수료 (기본 13%)
+    return cats[0] ? cats[0].rate / 100 : 0.13;
+  }
+
+  return 0;
+}
+
+// 쿠팡 로켓그로스 물류비(원) 조회
+// size: '극소형','소형','중형','대형' 또는 인덱스
+function getCoupangLogistics(size) {
+  if (!_channelFees) loadChannelFees();
+  var logi = _channelFees.channels.coupang_growth.logistics || [];
+  if (typeof size === 'number') return logi[size] ? logi[size].cost : 2800;
+  for (var i = 0; i < logi.length; i++) {
+    if (logi[i].size === size) return logi[i].cost;
+  }
+  return 2800; // 기본 중형
+}
+
+// SSG 판매가 역산 (네이버/G마켓과 동일한 VAT포함 방식)
+// cost: 원가, category: '파워툴' 등, mkSsg: 마크업%(기본 0.5)
+// 공식: price = cost / (10/11 - ssgFee - mkSsg/100), 백원 올림
+function calcSsgPrice(cost, category, mkSsg) {
+  var ssgFee = DB.settings.ssgFee || 0.13;
+  var markup = (mkSsg !== undefined ? mkSsg : 0.5) / 100;
+  var denom = 10/11 - ssgFee - markup;
+  if (denom <= 0) return 0;
+  return Math.ceil(cost / denom / 100) * 100;
 }
 
 function loadFeeSettings() {
