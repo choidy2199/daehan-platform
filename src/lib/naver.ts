@@ -1,5 +1,5 @@
 // 네이버 커머스 API 공통 함수
-import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 const BASE_URL = 'https://api.commerce.naver.com/external';
 
@@ -27,7 +27,8 @@ async function rateLimit() {
 }
 
 /**
- * HMAC-SHA256 서명 생성 (네이버 커머스 API 인증용)
+ * bcrypt 전자서명 생성 (네이버 커머스 API 인증용)
+ * password = clientId_timestamp → bcrypt.hashSync(password, clientSecret) → base64
  */
 function generateSignature(timestamp: string): string {
   const clientId = getClientId();
@@ -35,11 +36,9 @@ function generateSignature(timestamp: string): string {
   if (!clientId || !clientSecret) {
     throw new Error('NAVER_CLIENT_ID 또는 NAVER_CLIENT_SECRET이 설정되지 않았습니다');
   }
-  const message = `${clientId}_${timestamp}`;
-  return crypto
-    .createHmac('sha256', clientSecret)
-    .update(message)
-    .digest('base64');
+  const password = `${clientId}_${timestamp}`;
+  const hashed = bcrypt.hashSync(password, clientSecret);
+  return Buffer.from(hashed).toString('base64');
 }
 
 /**
