@@ -1479,7 +1479,6 @@ function renderCatalog() {
         return '<span style="font-size:11px;color:#5A6070">' + s + '</span>';
       })()}</td>
       <td style="text-align:left;font-size:12px;cursor:pointer;white-space:nowrap;padding-left:8px" onclick="editInDate(${idx})" title="클릭하여 입고날짜 메모 편집">${p.inDate ? '<span style="color:#CC2222;margin-right:4px">●</span>' + p.inDate : '-'}</td>
-      <td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="showProductModal(${idx})">수정</button> <button class="btn-danger btn-sm" onclick="deleteProduct(${idx})" style="padding:2px 6px;font-size:11px">삭제</button> <button class="btn-edit" onclick="toggleDiscontinued(${idx},${!isD})" style="padding:2px 6px;font-size:11px;${isD ? 'background:#CC2222' : 'background:#9BA3B2'}">${isD ? '단종됨' : '단종'}</button></td>
     </tr>`;
   }
 
@@ -1496,7 +1495,7 @@ function renderCatalog() {
     for (var i = start; i < end; i++) { fragment += buildRow(allRows[i]); }
     // 마지막 배치 후 단종 품목 추가
     if (end >= allRows.length && _catalogDiscontinued.length > 0 && start < allRows.length) {
-      fragment += '<tr class="discontinued-divider"><td colspan="21">단종 품목 (' + _catalogDiscontinued.length + '건)</td></tr>';
+      fragment += '<tr class="discontinued-divider"><td colspan="19">단종 품목 (' + _catalogDiscontinued.length + '건)</td></tr>';
       fragment += _catalogDiscontinued.slice(0, 200).map(buildRow).join('');
     }
     _catalogRenderedCount = end;
@@ -5985,9 +5984,54 @@ function downloadTemplate() {
 }
 
 // ======================== PRODUCT CRUD ========================
+
+// 제품등록및수정 탭 팝업 열기
+function showProductManageModal() {
+  switchPmTab('import');
+  document.getElementById('import-modal').classList.add('show');
+  resetImportFile();
+  document.getElementById('import-replace-section').style.display = 'none';
+  document.getElementById('import-replace-arrow').style.transform = 'rotate(0deg)';
+  var agreeEl = document.getElementById('import-replace-agree');
+  if (agreeEl) agreeEl.checked = false;
+  updateReplaceBtn();
+}
+
+// 탭 전환
+function switchPmTab(tabName) {
+  document.querySelectorAll('.pm-tab').forEach(function(btn) {
+    var isActive = btn.getAttribute('data-pm-tab') === tabName;
+    btn.style.color = isActive ? '#185FA5' : '#9BA3B2';
+    btn.style.fontWeight = isActive ? '600' : '500';
+    btn.style.borderBottom = isActive ? '2px solid #185FA5' : '2px solid transparent';
+    if (isActive) btn.classList.add('active'); else btn.classList.remove('active');
+  });
+  document.querySelectorAll('.pm-content').forEach(function(el) { el.style.display = 'none'; });
+  var target = document.getElementById('pm-content-' + tabName);
+  if (target) target.style.display = '';
+}
+
+// 편집 모드 토글
+var _mwEditMode = false;
+function toggleMwEditMode() {
+  _mwEditMode = !_mwEditMode;
+  var btn = document.getElementById('mw-edit-toggle-btn');
+  if (_mwEditMode) {
+    btn.textContent = '✕ 취소';
+    btn.style.background = 'transparent';
+    btn.style.color = '#fff';
+    btn.style.border = '1px solid rgba(255,255,255,0.4)';
+  } else {
+    btn.textContent = '✎ 수정';
+    btn.style.background = '#1D9E75';
+    btn.style.color = '#fff';
+    btn.style.border = 'none';
+  }
+  console.log('편집 모드:', _mwEditMode);
+}
+
 function showProductModal(idx) {
   const isEdit = idx !== undefined && idx >= 0;
-  document.getElementById('product-modal-title').textContent = isEdit ? '제품 수정' : '제품 추가';
   document.getElementById('prod-edit-idx').value = isEdit ? idx : -1;
 
   if (isEdit) {
@@ -6008,10 +6052,12 @@ function showProductModal(idx) {
     ['prod-code','prod-manageCode','prod-category','prod-subcategory','prod-detail','prod-orderNum','prod-ttiNum','prod-model','prod-supplyPrice','prod-inDate'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('prod-discontinued').value = '';
   }
-  document.getElementById('product-modal').classList.add('show');
+  // 제품등록및수정 팝업의 제품등록 탭으로 열기
+  switchPmTab('add');
+  document.getElementById('import-modal').classList.add('show');
 }
 
-function closeProductModal() { document.getElementById('product-modal').classList.remove('show'); }
+function closeProductModal() { document.getElementById('import-modal').classList.remove('show'); }
 
 function editInDate(idx) {
   const p = DB.products[idx];
@@ -6429,13 +6475,8 @@ var _importCompareResult = null;
 var _importParsedWb = null;
 
 function showImportModal() {
-  document.getElementById('import-modal').classList.add('show');
-  resetImportFile();
-  document.getElementById('import-replace-section').style.display = 'none';
-  document.getElementById('import-replace-arrow').style.transform = 'rotate(0deg)';
-  var agreeEl = document.getElementById('import-replace-agree');
-  if (agreeEl) agreeEl.checked = false;
-  updateReplaceBtn();
+  // 제품등록및수정 팝업의 가져오기 탭으로 열기
+  showProductManageModal();
 }
 function closeModal() { document.getElementById('import-modal').classList.remove('show'); }
 
