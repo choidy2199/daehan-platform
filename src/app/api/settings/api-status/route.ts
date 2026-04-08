@@ -104,45 +104,15 @@ export async function POST(req: NextRequest) {
       }
 
       case 'naver': {
-        // 네이버 토큰 발급 테스트 (B64로 저장된 SECRET 디코딩)
-        const naverId = process.env.NAVER_CLIENT_ID;
-        const naverSecretB64 = process.env.NAVER_CLIENT_SECRET_B64;
-        const naverSecretRaw = process.env.NAVER_CLIENT_SECRET;
-        // B64 우선, 없으면 원본 사용
-        const naverSecret = naverSecretB64
-          ? Buffer.from(naverSecretB64, 'base64').toString('utf-8')
-          : naverSecretRaw;
-        if (!naverId || !naverSecret) {
-          return NextResponse.json({ success: false, message: '네이버 환경변수 미설정' });
-        }
-        try {
-          const ts = String(Date.now());
-          const sig = crypto.createHmac('sha256', naverSecret).update(`${naverId}_${ts}`).digest('base64');
-          const params = new URLSearchParams({
-            client_id: naverId,
-            timestamp: ts,
-            client_secret_sign: sig,
-            grant_type: 'client_credentials',
-            type: 'SELF',
-          });
-          const naverResp = await fetch('https://api.commerce.naver.com/external/v1/oauth2/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString(),
-          });
-          if (!naverResp.ok) {
-            const errText = await naverResp.text();
-            return NextResponse.json({ success: false, message: `네이버 토큰 발급 실패: ${naverResp.status} ${errText.substring(0, 200)}` });
-          }
-          const tokenData = await naverResp.json();
-          if (tokenData.access_token) {
-            return NextResponse.json({ success: true, message: '네이버 API 연결 성공 (토큰 발급 완료)' });
-          }
-          return NextResponse.json({ success: false, message: '네이버 토큰 응답 이상' });
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          return NextResponse.json({ success: false, message: `네이버 연결 실패: ${msg}` });
-        }
+        // 디버그: Vercel에서 환경변수 실제 값 확인
+        const _id = process.env.NAVER_CLIENT_ID || '';
+        const _secret = process.env.NAVER_CLIENT_SECRET || '';
+        const _b64 = process.env.NAVER_CLIENT_SECRET_B64 || '';
+        const _b64dec = _b64 ? Buffer.from(_b64, 'base64').toString('utf-8') : '';
+        return NextResponse.json({
+          success: false,
+          message: `DEBUG: ID=${_id.length}자[${_id.substring(0,4)}...${_id.substring(_id.length-4)}], SECRET=${_secret.length}자[${_secret.substring(0,6)}...${_secret.substring(Math.max(0,_secret.length-4))}], B64=${_b64.length}자, B64dec=${_b64dec.length}자[${_b64dec.substring(0,6)}...${_b64dec.substring(Math.max(0,_b64dec.length-4))}]`
+        });
       }
 
       case 'coupang': {
