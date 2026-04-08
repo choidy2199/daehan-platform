@@ -114,3 +114,25 @@ export async function naverApi(
   }
   return resp.text();
 }
+
+/**
+ * 네이버 상품 목록 조회
+ */
+export async function getNaverProducts(page = 1, size = 100) {
+  return naverApi('POST', '/v1/products/search', {
+    page,
+    size,
+    statusTypes: ['SALE', 'SUSPENSION', 'OUTOFSTOCK'],
+  });
+}
+
+/**
+ * 네이버 단건 가격 수정
+ */
+export async function updateNaverPrice(originProductNo: string, newPrice: number) {
+  return naverApi('PUT', `/v2/products/origin-products/${originProductNo}`, {
+    originProduct: {
+      salePrice: newPrice,
+    },
+  });
+}

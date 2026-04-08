@@ -12032,3 +12032,34 @@ function renderUsers() {
 }
 
 init();
+
+// ── 네이버 API 콘솔 테스트용 (나중에 제거) ──
+window._testNaverProducts = async function() {
+  try {
+    const res = await fetch('/api/naver/products?page=1&size=10');
+    const data = await res.json();
+    console.log('네이버 상품 목록:', data);
+    return data;
+  } catch(e) {
+    console.error('네이버 상품 조회 실패:', e);
+  }
+};
+
+window._testNaverPriceUpdate = async function(originProductNo, newPrice) {
+  if (!originProductNo || !newPrice) {
+    console.error('사용법: _testNaverPriceUpdate("상품번호", 55000)');
+    return;
+  }
+  try {
+    const res = await fetch('/api/naver/products', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originProductNo, newPrice }),
+    });
+    const data = await res.json();
+    console.log('가격 수정 결과:', data);
+    return data;
+  } catch(e) {
+    console.error('가격 수정 실패:', e);
+  }
+};
