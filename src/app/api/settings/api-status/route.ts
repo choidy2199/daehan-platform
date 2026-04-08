@@ -111,7 +111,6 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: false, message: '네이버 환경변수 미설정' });
         }
         try {
-          console.log(`[naver-test] CLIENT_ID len=${naverId.length}, SECRET len=${naverSecret.length}, SECRET_first3=${naverSecret.substring(0,3)}`);
           const ts = String(Date.now());
           const sig = crypto.createHmac('sha256', naverSecret).update(`${naverId}_${ts}`).digest('base64');
           const params = new URLSearchParams({
@@ -128,7 +127,7 @@ export async function POST(req: NextRequest) {
           });
           if (!naverResp.ok) {
             const errText = await naverResp.text();
-            return NextResponse.json({ success: false, message: `네이버 토큰 발급 실패: ${naverResp.status} (ID:${naverId.length}자,SECRET:${naverSecret.length}자) ${errText.substring(0, 150)}` });
+            return NextResponse.json({ success: false, message: `네이버 토큰 발급 실패: ${naverResp.status} ${errText.substring(0, 200)}` });
           }
           const tokenData = await naverResp.json();
           if (tokenData.access_token) {
