@@ -34,12 +34,12 @@ export async function GET() {
     {
       id: 'coupang',
       name: '쿠팡 마켓플레이스',
-      status: checkEnvStatus(['COUPANG_VENDOR_ID', 'COUPANG_ACCESS_KEY', 'COUPANG_SECRET_KEY']),
+      status: checkEnvStatus(['COUPANG_ACCESS_KEY', 'COUPANG_SECRET_KEY']),
     },
     {
       id: 'ssg',
       name: 'SSG.COM',
-      status: checkEnvStatus(['SSG_API_KEY', 'SSG_SECRET_KEY']),
+      status: checkEnvStatus(['SSG_API_KEY']),
     },
     {
       id: 'gmarket',
@@ -99,11 +99,10 @@ export async function POST(req: NextRequest) {
       }
 
       case 'coupang': {
-        // 쿠팡: 키 존재 + 형식 검증
-        const vendorId = process.env.COUPANG_VENDOR_ID;
+        // 쿠팡: 키 존재 + 형식 검증 (vendorId는 선택)
         const accessKey = process.env.COUPANG_ACCESS_KEY;
         const secretKey = process.env.COUPANG_SECRET_KEY;
-        if (!vendorId || !accessKey || !secretKey) {
+        if (!accessKey || !secretKey) {
           return NextResponse.json({ success: false, message: '쿠팡 API 키 미등록' });
         }
         // HMAC 서명 방식 — 키가 있으면 형식만 검증
@@ -116,8 +115,7 @@ export async function POST(req: NextRequest) {
       case 'ssg': {
         // SSG: 키 존재 여부 확인 (IP 등록 필요할 수 있음)
         const ssgKey = process.env.SSG_API_KEY;
-        const ssgSecret = process.env.SSG_SECRET_KEY;
-        if (!ssgKey || !ssgSecret) {
+        if (!ssgKey) {
           return NextResponse.json({ success: false, message: 'SSG API 키 미등록' });
         }
         return NextResponse.json({ success: true, message: 'SSG API 키 등록됨 (IP 등록 필요)' });

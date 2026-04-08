@@ -561,7 +561,11 @@ function getMarketFeeRate(p, channel) {
 // ======================== 가격 상세 팝업 ========================
 function openPriceDetail(code, channel) {
   var p = findProduct(code);
-  if (!p) return;
+  if (!p) {
+    // 일반제품에서 검색
+    var genP = (typeof genProducts !== 'undefined') ? genProducts.find(function(g) { return String(g.code) === String(code); }) : null;
+    if (genP) p = genP; else return;
+  }
   var st = _marketBadgeStyles[channel];
   var price = channel === 'naver' ? p.priceNaver : channel === 'gmarket' ? p.priceOpen : (p.priceSsg || 0);
   var cost = p.cost || 0;
@@ -8485,8 +8489,9 @@ function renderGenProducts() {
       <td class="center">${p.stock != null && p.stock !== '' ? (p.stock > 0 ? '<span class="badge badge-green">' + p.stock + '</span>' : p.stock === 0 ? '<span class="badge badge-amber">0</span>' : '<span class="badge badge-red">' + p.stock + '</span>') : '<span class="badge badge-gray">-</span>'}</td>
       <td class="num" style="color:#1D9E75">${fmt(p.cost || 0)}</td>
       <td class="num">${fmt(p.priceA || 0)}</td>
-      <td class="num">${fmt(p.priceNaver || 0)}${marginBadge(p.priceNaver, p.cost, DB.settings.naverFee || 0.0663)}</td>
-      <td class="num">${fmt(p.priceOpen || 0)}${marginBadge(p.priceOpen, p.cost, DB.settings.openElecFee || 0.13)}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'naver')}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'gmarket')}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'ssg')}</td>
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'in')">${(p.inQty || p.inPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.inQty ? '<span style="font-size:10px;color:#5A6070">' + p.inQty + '개</span>' : '') + (p.inPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.inPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'out')">${(p.outQty || p.outPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.outQty ? '<span style="font-size:10px;color:#5A6070">' + p.outQty + '개</span>' : '') + (p.outPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.outPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'pallet')">${(p.palletQty || p.palletPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.palletQty ? '<span style="font-size:10px;color:#5A6070">' + p.palletQty + '개</span>' : '') + (p.palletPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.palletPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
@@ -8496,7 +8501,7 @@ function renderGenProducts() {
     </tr>`;
   }).join('');
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="16"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="17"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
   }
   document.getElementById('gen-count').textContent = `${genProducts.length}건`;
   initColumnResize('gen-table');
@@ -8856,8 +8861,9 @@ function searchEstProducts(val) {
       <td class="center">${(function(){ var s = p._source === 'milwaukee' ? findStock(p.code) : (p.stock != null ? p.stock : null); return s != null ? (s > 0 ? '<span class="badge badge-green">' + s + '</span>' : s === 0 ? '<span class="badge badge-amber">0</span>' : '<span class="badge badge-red">' + s + '</span>') : '<span class="badge badge-gray">-</span>'; })()}</td>
       <td class="num" style="color:#1D9E75">${cost ? fmt(cost) : '-'}</td>
       <td class="num" style="color:#185FA5;font-weight:700">${fmt(aPrice)}</td>
-      <td class="num">${naverPrice ? fmt(naverPrice) : '-'}</td>
-      <td class="num">${openPrice ? fmt(openPrice) : '-'}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'naver')}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'gmarket')}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'ssg')}</td>
       <td class="center">${inCell}</td>
       <td class="center">${outCell}</td>
       <td class="center">${palletCell}</td>

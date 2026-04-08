@@ -383,7 +383,7 @@
       <input class="input" id="gen-search" type="search" name="search_naf_gen" placeholder="코드, 모델명, 제품설명 검색..." autocomplete="nope" data-form-type="other" data-lpignore="true" style="max-width:400px;margin-bottom:12px" oninput="renderGenProducts()">
       <div class="table-scroll" style="max-height:500px;overflow-y:auto">
         <table class="data-table" id="gen-table">
-          <thead><tr><th>코드</th><th>관리코드</th><th>대분류</th><th>모델 및 규격</th><th>제품설명 및 품명</th><th class="center">재고</th><th class="num">원가</th><th class="num">도매(A)</th><th class="num">스토어팜</th><th class="num">오픈마켓</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">IN</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">OUT</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">파레트</th><th>비고</th><th style="min-width:120px">입고날짜</th><th class="center" style="width:90px">관리</th></tr></thead>
+          <thead><tr><th>코드</th><th>관리코드</th><th>대분류</th><th>모델 및 규격</th><th>제품설명 및 품명</th><th class="center">재고</th><th class="num">원가</th><th class="num">도매(A)</th><th class="num">스토어팜</th><th class="num">오픈마켓</th><th class="num" style="background:#FEF3C7;color:#92400E">SSG</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">IN</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">OUT</th><th class="center" style="width:70px;background:#E6F1FB;color:#0C447C">파레트</th><th>비고</th><th style="min-width:120px">입고날짜</th><th class="center" style="width:90px">관리</th></tr></thead>
           <tbody id="gen-body"></tbody>
         </table>
       </div>
@@ -415,6 +415,7 @@
             <th>도매가</th>
             <th>스토어팜</th>
             <th>오픈마켓</th>
+            <th style="background:#FEF3C7;color:#92400E">SSG</th>
             <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">IN</th>
             <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">OUT</th>
             <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">파레트</th>
@@ -499,6 +500,7 @@
     <button class="sub-tab" onclick="switchSettingsMain('client')">거래처 등록</button>
     <button class="sub-tab" onclick="switchSettingsMain('history')">작업이력</button>
     <button class="sub-tab" onclick="switchSettingsMain('users')">사용자관리</button>
+    <button class="sub-tab" onclick="switchSettingsMain('api')">API 관리</button>
     <button id="btn-supabase-upload" onclick="uploadAllToSupabase()" style="background:#185FA5;color:white;border:none;padding:5px 14px;border-radius:4px;font-size:12px;cursor:pointer;margin-left:4px">업로드</button>
     <span id="sync-status" style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:4px 8px;background:rgba(29,158,117,0.15);border-radius:4px;font-size:10px;color:#1D9E75"><span style="width:6px;height:6px;border-radius:50%;background:#1D9E75;display:inline-block"></span> 대기 중</span>
   </div>
