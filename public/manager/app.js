@@ -6008,26 +6008,93 @@ function switchPmTab(tabName) {
   });
   document.querySelectorAll('.pm-content').forEach(function(el) { el.style.display = 'none'; });
   var target = document.getElementById('pm-content-' + tabName);
-  if (target) target.style.display = '';
+  if (target) target.style.display = 'block';
 }
 
-// 편집 모드 토글
+// ======================== 편집 모드 ========================
 var _mwEditMode = false;
+
 function toggleMwEditMode() {
   _mwEditMode = !_mwEditMode;
   var btn = document.getElementById('mw-edit-toggle-btn');
   if (_mwEditMode) {
-    btn.textContent = '✕ 취소';
-    btn.style.background = 'transparent';
+    btn.textContent = '저장';
+    btn.style.background = '#E24B4A';
     btn.style.color = '#fff';
-    btn.style.border = '1px solid rgba(255,255,255,0.4)';
+    btn.style.border = 'none';
+    _enterMwEditMode();
   } else {
     btn.textContent = '✎ 수정';
     btn.style.background = '#1D9E75';
     btn.style.color = '#fff';
     btn.style.border = 'none';
+    _exitMwEditMode();
   }
   console.log('편집 모드:', _mwEditMode);
+}
+
+function _enterMwEditMode() {
+  // thead에 체크박스 th 추가
+  var thead = document.querySelector('#catalog-table thead tr');
+  if (thead && !document.getElementById('mw-edit-checkall')) {
+    var th = document.createElement('th');
+    th.style.cssText = 'width:36px;position:sticky;top:0;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,0.1)';
+    th.innerHTML = '<input type="checkbox" id="mw-edit-checkall" onchange="toggleAllMwEditCheckbox(this)" style="width:15px;height:15px;accent-color:#185FA5">';
+    thead.insertBefore(th, thead.firstChild);
+  }
+  // tbody 모든 행에 체크박스 td 추가
+  var rows = document.querySelectorAll('#catalog-body tr');
+  rows.forEach(function(tr) {
+    if (tr.querySelector('.mw-edit-cb')) return;
+    var td = document.createElement('td');
+    td.innerHTML = '<input type="checkbox" class="mw-edit-cb" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
+    tr.insertBefore(td, tr.firstChild);
+  });
+  // 액션바 표시
+  var bar = document.getElementById('mw-edit-action-bar');
+  if (bar) bar.style.display = 'flex';
+  updateMwEditSelection();
+}
+
+function _exitMwEditMode() {
+  // thead 체크박스 th 제거
+  var checkallTh = document.getElementById('mw-edit-checkall');
+  if (checkallTh) checkallTh.closest('th').remove();
+  // tbody 체크박스 td 제거
+  document.querySelectorAll('#catalog-body .mw-edit-cb').forEach(function(cb) {
+    cb.closest('td').remove();
+  });
+  // 액션바 숨김
+  var bar = document.getElementById('mw-edit-action-bar');
+  if (bar) bar.style.display = 'none';
+}
+
+function toggleAllMwEditCheckbox(masterCb) {
+  document.querySelectorAll('.mw-edit-cb').forEach(function(cb) { cb.checked = masterCb.checked; });
+  updateMwEditSelection();
+}
+
+function updateMwEditSelection() {
+  var checked = document.querySelectorAll('.mw-edit-cb:checked').length;
+  var total = document.querySelectorAll('.mw-edit-cb').length;
+  var info = document.getElementById('mw-edit-selection-info');
+  if (info) info.textContent = checked + '개 선택됨';
+  var masterCb = document.getElementById('mw-edit-checkall');
+  if (masterCb) masterCb.checked = (checked === total && total > 0);
+  // 바의 체크박스도 동기화
+  var barCb = document.getElementById('mw-edit-checkall-bar');
+  if (barCb) barCb.checked = (checked === total && total > 0);
+}
+
+function mwEditAction(action) {
+  var checkedRows = document.querySelectorAll('.mw-edit-cb:checked');
+  var codes = [];
+  checkedRows.forEach(function(cb) {
+    var tr = cb.closest('tr');
+    if (tr) codes.push(tr.cells[1] ? tr.cells[1].textContent : '');
+  });
+  console.log('액션:', action, '선택:', codes.length, '개', codes);
+  // TODO: 실제 수정/삭제/단종/가격전송 로직
 }
 
 function showProductModal(idx) {
