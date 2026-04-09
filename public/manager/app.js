@@ -6484,6 +6484,10 @@ function saveProduct() {
   save(KEYS.products, DB.products);
   populateCatalogFilters();
   renderCatalog();
+  // 입력 필드 초기화
+  ['prod-code','prod-manageCode','prod-category','prod-subcategory','prod-detail','prod-orderNum','prod-ttiNum','prod-model','prod-supplyPrice','prod-inDate'].forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('prod-discontinued').value = '';
+  document.getElementById('prod-edit-idx').value = '-1';
   closeProductModal();
 }
 
