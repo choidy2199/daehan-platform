@@ -36,6 +36,34 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .btn-ghost { background: rgba(255,255,255,0.15); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'Pretendard', sans-serif; transition: all 0.2s; }
 .btn-ghost:hover { background: rgba(255,255,255,0.3); }
 
+/* ==================== 메인 메뉴 (신규) ==================== */
+.main-nav { background: #2A2D33; padding: 5px 12px; display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0; overflow-x: auto; border-radius: 6px; height: 40px; }
+.nav-group-label { padding: 6px 10px; font-size: 12px; font-weight: 700; color: #fff; border-radius: 4px; white-space: nowrap; flex-shrink: 0; font-family: 'Pretendard', sans-serif; }
+.nav-mw { background: #A32D2D; }
+.nav-gen { background: #B8860B; }
+.nav-sales { background: #534AB7; }
+.nav-import { background: #0F6E56; }
+.nav-sub { padding: 6px 8px; font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.55); cursor: pointer; white-space: nowrap; flex-shrink: 0; border-radius: 4px; font-family: 'Pretendard', sans-serif; transition: color 0.15s, background 0.15s; }
+.nav-sub:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.05); }
+.nav-sub.active { color: #fff; background: rgba(255,255,255,0.12); }
+.nav-sub-pending { opacity: 0.4; cursor: not-allowed; }
+.nav-sub-pending:hover { background: transparent; color: rgba(255,255,255,0.55); }
+.nav-sep { width: 1px; height: 22px; background: rgba(255,255,255,0.12); margin: 0 3px; flex-shrink: 0; }
+.nav-spacer { flex: 1; min-width: 6px; }
+.nav-solo { padding: 6px 10px; font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.55); cursor: pointer; white-space: nowrap; flex-shrink: 0; border-radius: 4px; font-family: 'Pretendard', sans-serif; transition: color 0.15s, background 0.15s; }
+.nav-solo:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.05); }
+.nav-solo.active { color: #fff; background: rgba(255,255,255,0.12); }
+.nav-setting { color: rgba(255,255,255,0.5); }
+.nav-setting.active { color: #fff; }
+
+/* 경박재고 버튼 + 마지막 실행 날짜 */
+.header-inv-sync { display: flex; flex-direction: column; align-items: center; gap: 2px; flex-shrink: 0; }
+.header-inv-sync .btn-ghost { padding: 5px 12px; font-size: 13px; font-weight: 600; }
+.header-inv-sync #inventory-sync-time { font-size: 10px; opacity: 0.5; color: #fff; white-space: nowrap; font-family: 'Pretendard', sans-serif; }
+
+/* Placeholder 탭 콘텐츠 */
+.tab-placeholder { padding: 80px 40px; text-align: center; color: #888; font-size: 14px; font-family: 'Pretendard', sans-serif; }
+
 /* Buttons */
 .btn-primary { background: #185FA5; color: #FFF; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Pretendard', sans-serif; transition: background 0.2s; }
 .btn-primary:hover { background: #0C447C; }

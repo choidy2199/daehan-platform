@@ -20,39 +20,40 @@
 
 <nav class="top-nav">
   <div class="nav-logo">(주)대한종합상사</div>
-  <div class="nav-tabs">
-    <div class="nav-sector nav-sector-milwaukee">
-      <span class="nav-sector-label label-milwaukee">밀워키</span>
-      <button class="nav-tab active" onclick="switchTab('catalog')">단가표</button>
-      <button class="nav-tab" onclick="switchTab('order')">발주</button>
-      <button class="nav-tab" onclick="switchTab('setbun')">세트및분해</button>
-    </div>
-    <div class="nav-divider"></div>
-    <div class="nav-sector nav-sector-general">
-      <span class="nav-sector-label label-general">일반</span>
-      <button class="nav-tab" onclick="switchTab('general')">일반제품 단가표</button>
-    </div>
-    <div class="nav-divider"></div>
-    <div class="nav-sector nav-sector-estimate">
-      <span class="nav-sector-label label-estimate">견적</span>
-      <button class="nav-tab" onclick="switchTab('estimate')">검색 및 견적</button>
-    </div>
-    <div class="nav-divider"></div>
-    <div class="nav-sector nav-sector-sales">
-      <span class="nav-sector-label label-sales">판매</span>
-      <button class="nav-tab" onclick="switchTab('sales')">온라인판매 관리</button>
-    </div>
-    <div class="nav-divider"></div>
-    <div class="nav-sector nav-sector-manage">
-      <button class="nav-tab" onclick="switchTab('manage')">설정</button>
-    </div>
+  <div class="main-nav">
+    <!-- 밀워키 그룹 -->
+    <span class="nav-group-label nav-mw">밀워키</span>
+    <span class="nav-sub active" data-tab="mw-price" onclick="switchTab('mw-price')">단가표</span>
+    <span class="nav-sub" data-tab="mw-order" onclick="switchTab('mw-order')">발주</span>
+    <span class="nav-sub" data-tab="mw-set" onclick="switchTab('mw-set')">세트및분해</span>
+    <span class="nav-sep"></span>
+    <!-- 일반 그룹 -->
+    <span class="nav-group-label nav-gen">일반</span>
+    <span class="nav-sub" data-tab="gen-price" onclick="switchTab('gen-price')">단가표</span>
+    <span class="nav-sub" data-tab="gen-trade" onclick="switchTab('gen-trade')">매입,매출,견적서</span>
+    <span class="nav-sep"></span>
+    <!-- 판매관리 그룹 -->
+    <span class="nav-group-label nav-sales">판매관리</span>
+    <span class="nav-sub" data-tab="sales-online" onclick="switchTab('sales-online')">온라인판매</span>
+    <span class="nav-sub nav-sub-pending" data-tab="sales-marketing" onclick="switchTab('sales-marketing')">마케팅</span>
+    <span class="nav-sep"></span>
+    <!-- 수입제품 그룹 -->
+    <span class="nav-group-label nav-import">수입제품</span>
+    <span class="nav-sub" data-tab="import-product" onclick="switchTab('import-product')">제품</span>
+    <span class="nav-sub" data-tab="import-calc" onclick="switchTab('import-calc')">수입계산기</span>
+    <span class="nav-sub" data-tab="import-invoice" onclick="switchTab('import-invoice')">인보이스</span>
+    <span class="nav-sep"></span>
+    <!-- 단독 메뉴 -->
+    <span class="nav-solo" data-tab="search" onclick="switchTab('search')">검색</span>
+    <span class="nav-sep"></span>
+    <span class="nav-solo" data-tab="notice" onclick="switchTab('notice')">공지사항</span>
+    <span class="nav-spacer"></span>
+    <span class="nav-solo nav-setting" data-tab="setting" onclick="switchTab('setting')">⚙ 설정</span>
   </div>
-  <span id="inventory-sync-time" style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.7);margin-right:6px"></span>
-  <button class="btn-ghost" onclick="syncInventory()" style="padding:5px 12px;font-size:13px;font-weight:600">📦 재고가져오기</button>
-  <button id="header-sync-btn" onclick="forceUploadAll()" style="display:inline-flex;align-items:center;gap:5px;background:rgba(29,158,117,0.25);color:#7DFFCC;border:1px solid rgba(29,158,117,0.5);border-radius:6px;padding:6px 14px;font-size:12px;font-weight:500;cursor:pointer;margin-left:8px;transition:all 0.2s">
-    <svg id="header-sync-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-    <span id="header-sync-text">동기화 완료</span>
-  </button>
+  <div class="header-inv-sync">
+    <button class="btn-ghost" onclick="syncInventory()">📦 경박재고</button>
+    <span id="inventory-sync-time"></span>
+  </div>
   <div style="display:flex;align-items:center;gap:8px;margin-left:12px">
     <span id="current-user-name" style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.85)"></span>
     <button onclick="doLogout()" style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer">로그아웃</button>
@@ -672,6 +673,26 @@
     </div>
   </div>
 
+</div>
+
+<!-- =============== Placeholder TABS (추후 구현 예정) =============== -->
+<div id="tab-gen-trade" class="tab-content">
+  <div class="tab-placeholder">매입,매출,견적서 — 추후 구현 예정</div>
+</div>
+<div id="tab-sales-marketing" class="tab-content">
+  <div class="tab-placeholder">마케팅 — 추후 구현 예정</div>
+</div>
+<div id="tab-import-product" class="tab-content">
+  <div class="tab-placeholder">수입제품 · 제품 — 추후 구현 예정</div>
+</div>
+<div id="tab-import-calc" class="tab-content">
+  <div class="tab-placeholder">수입제품 · 수입계산기 — 추후 구현 예정</div>
+</div>
+<div id="tab-import-invoice" class="tab-content">
+  <div class="tab-placeholder">수입제품 · 인보이스 — 추후 구현 예정</div>
+</div>
+<div id="tab-notice" class="tab-content">
+  <div class="tab-placeholder">공지사항 — 추후 구현 예정</div>
 </div>
 
 </div><!-- /content -->

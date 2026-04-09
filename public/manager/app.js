@@ -1337,32 +1337,89 @@ function debounce(fn, delay) {
 
 // ======================== TAB SWITCHING ========================
 var _renderedTabs = {};
+
+// 신규 메뉴 ID → { contentId, render (기존 렌더링 키), placeholder? }
+var _tabIdMap = {
+  'mw-price':         { contentId: 'tab-catalog',          render: 'catalog' },
+  'mw-order':         { contentId: 'tab-order',            render: 'order' },
+  'mw-set':           { contentId: 'tab-setbun',           render: 'setbun' },
+  'gen-price':        { contentId: 'tab-general',          render: 'general' },
+  'gen-trade':        { contentId: 'tab-gen-trade',        placeholder: true },
+  'sales-online':     { contentId: 'tab-sales',            render: 'sales' },
+  'sales-marketing':  { contentId: 'tab-sales-marketing',  placeholder: true },
+  'import-product':   { contentId: 'tab-import-product',   placeholder: true },
+  'import-calc':      { contentId: 'tab-import-calc',      placeholder: true },
+  'import-invoice':   { contentId: 'tab-import-invoice',   placeholder: true },
+  'search':           { contentId: 'tab-estimate',         render: 'estimate' },
+  'notice':           { contentId: 'tab-notice',           placeholder: true },
+  'setting':          { contentId: 'tab-manage',           render: 'manage' }
+};
+
+// 레거시 localStorage 값 호환 (catalog → mw-price 등)
+var _legacyTabIdMap = {
+  'catalog':  'mw-price',
+  'order':    'mw-order',
+  'setbun':   'mw-set',
+  'general':  'gen-price',
+  'sales':    'sales-online',
+  'estimate': 'search',
+  'manage':   'setting'
+};
+
 function switchTab(tab) {
+  // 레거시 호환: 기존 ID가 넘어오면 신규 ID로 변환
+  if (_legacyTabIdMap[tab]) tab = _legacyTabIdMap[tab];
+
+  var meta = _tabIdMap[tab];
+  if (!meta) return;
+
+  // 예정 탭(pending) 차단
+  var navEl = document.querySelector('.main-nav [data-tab="' + tab + '"]');
+  if (navEl && navEl.classList.contains('nav-sub-pending')) {
+    alert('준비 중입니다');
+    return;
+  }
+
   var t0 = performance.now();
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  if (event && event.target) event.target.classList.add('active');
+
+  // 콘텐츠 전환
+  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+  var contentEl = document.getElementById(meta.contentId);
+  if (contentEl) contentEl.classList.add('active');
+
+  // 메뉴 active 상태
+  document.querySelectorAll('.main-nav .nav-sub, .main-nav .nav-solo').forEach(function(el) { el.classList.remove('active'); });
+  if (navEl) navEl.classList.add('active');
+
   // 현재 탭 기억 (새로고침 시 복원용, 동기화 대상 아님)
   localStorage.setItem('mw_active_tab', tab);
+
+  // placeholder 탭은 렌더링 없이 종료
+  if (meta.placeholder) {
+    console.log('[PERF] switchTab(' + tab + ') placeholder: ' + (performance.now() - t0).toFixed(0) + 'ms');
+    return;
+  }
+
+  var renderKey = meta.render;
+
   // 첫 방문 시만 렌더링, 이후는 CSS 전환만 (즉시)
-  if (!_renderedTabs[tab]) {
+  if (!_renderedTabs[renderKey]) {
     // 무거운 렌더링을 requestAnimationFrame으로 지연 → UI 먼저 전환
     requestAnimationFrame(function() {
-      if (tab === 'catalog') renderCatalog();
-      if (tab === 'order') renderPOTab();
-      if (tab === 'sales') { renderSales(); renderOnlineSales(); }
-      if (tab === 'promo') { renderPromo(); renderAllPromosV2(); }
-      if (tab === 'setbun') renderSetbun();
-      if (tab === 'estimate') { renderEstimateList(); if (!_estDateManuallySet) document.getElementById('est-date').value = getTodayStr(); }
-      if (tab === 'general') renderGenProducts();
-      if (tab === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
-      _renderedTabs[tab] = true;
+      if (renderKey === 'catalog') renderCatalog();
+      if (renderKey === 'order') renderPOTab();
+      if (renderKey === 'sales') { renderSales(); renderOnlineSales(); }
+      if (renderKey === 'promo') { renderPromo(); renderAllPromosV2(); }
+      if (renderKey === 'setbun') renderSetbun();
+      if (renderKey === 'estimate') { renderEstimateList(); if (!_estDateManuallySet) document.getElementById('est-date').value = getTodayStr(); }
+      if (renderKey === 'general') renderGenProducts();
+      if (renderKey === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
+      _renderedTabs[renderKey] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
   } else {
     // 견적 탭 재방문 시 날짜 갱신 (사용자가 직접 변경하지 않은 경우)
-    if (tab === 'estimate' && !_estDateManuallySet) {
+    if (renderKey === 'estimate' && !_estDateManuallySet) {
       document.getElementById('est-date').value = getTodayStr();
     }
     console.log('[PERF] switchTab(' + tab + ') 캐시 히트: ' + (performance.now() - t0).toFixed(0) + 'ms');
@@ -8078,7 +8135,9 @@ function updateSyncTimeDisplay() {
   if (!el) return;
   var saved = localStorage.getItem('last_inventory_sync');
   if (saved) {
-    el.textContent = '✓ ' + saved;
+    // saved 포맷: "YYYY/MM/DD HH:MM:SS" → 표시 포맷: "MM-DD HH:MM"
+    var m = saved.match(/^\d{4}\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
+    el.textContent = m ? (m[1] + '-' + m[2] + ' ' + m[3] + ':' + m[4]) : saved;
   } else {
     el.textContent = '';
   }
@@ -11761,13 +11820,14 @@ async function init() {
 
   // 마지막 활성 탭 즉시 복원 (딜레이 없이)
   var savedTab = localStorage.getItem('mw_active_tab');
-  if (savedTab && savedTab !== 'catalog' && document.getElementById('tab-' + savedTab)) {
+  if (savedTab && _legacyTabIdMap[savedTab]) savedTab = _legacyTabIdMap[savedTab];
+  var _savedMeta = savedTab && _tabIdMap[savedTab];
+  if (_savedMeta && savedTab !== 'mw-price' && document.getElementById(_savedMeta.contentId)) {
     document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
-    document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
-    document.getElementById('tab-' + savedTab).classList.add('active');
-    document.querySelectorAll('.nav-tab').forEach(function(el) {
-      if (el.getAttribute('onclick') && el.getAttribute('onclick').indexOf("'" + savedTab + "'") !== -1) el.classList.add('active');
-    });
+    document.querySelectorAll('.main-nav .nav-sub, .main-nav .nav-solo').forEach(function(t) { t.classList.remove('active'); });
+    document.getElementById(_savedMeta.contentId).classList.add('active');
+    var _savedNavEl = document.querySelector('.main-nav [data-tab="' + savedTab + '"]');
+    if (_savedNavEl) _savedNavEl.classList.add('active');
     // localStorage 캐시 데이터로 즉시 렌더링되므로 tbody 비우기 불필요
   }
 
@@ -11781,7 +11841,7 @@ async function init() {
   populateCatalogFilters();
   renderCatalog();
   _renderedTabs['catalog'] = true;
-  if (savedTab && savedTab !== 'catalog') {
+  if (savedTab && savedTab !== 'mw-price') {
     switchTab(savedTab);
   }
   updateStatus();

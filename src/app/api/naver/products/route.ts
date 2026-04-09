@@ -48,8 +48,6 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { code, originProductNo, newPrice, channelProductNo } = body;
 
-    console.log('[DEBUG PUT] 요청 body:', JSON.stringify(body));
-
     if (!newPrice) {
       return NextResponse.json(
         { success: false, error: 'newPrice가 필요합니다' },
@@ -97,7 +95,6 @@ export async function PUT(request: NextRequest) {
       );
     }
     const result = await updateNaverPrice(String(originProductNo), Number(newPrice), channelProductNo ? Number(channelProductNo) : undefined);
-    console.log('[DEBUG PUT] updateNaverPrice 결과 keys:', result ? Object.keys(result) : 'null');
     console.log(`[PERF PUT] TOTAL (legacy path): ${Date.now() - tStart}ms`);
 
     return NextResponse.json({
