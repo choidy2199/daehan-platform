@@ -566,9 +566,9 @@ function marginBadge(price, cost, feeRate) {
 
 // ======================== 마켓 가격 뱃지 ========================
 var _marketBadgeStyles = {
-  naver: { bg: '#E1F5EE', color: '#085041', dot: '#1D9E75', label: '스토어팜' },
-  gmarket: { bg: '#E6F1FB', color: '#0C447C', dot: '#185FA5', label: '오픈마켓' },
-  ssg: { bg: '#FEF3C7', color: '#92400E', dot: '#EF9F27', label: 'SSG' }
+  naver: { bg: '#E1F5EE', color: '#085041', priceColor: '#085041', dot: '#1D9E75', label: '스토어팜' },
+  gmarket: { bg: '#E6F1FB', color: '#0C447C', priceColor: '#0C447C', dot: '#185FA5', label: '오픈마켓' },
+  ssg: { bg: '#FAEEDA', color: '#412402', priceColor: '#412402', dot: '#EF9F27', label: 'SSG' }
 };
 function marketBadge(p, channel) {
   var st = _marketBadgeStyles[channel];
@@ -580,9 +580,8 @@ function marketBadge(p, channel) {
   var mColor = m && m.profit >= 0 ? '#1D9E75' : '#CC2222';
   var mText = m ? (m.rate.toFixed(1) + '% ' + (m.profit >= 0 ? '+' : '') + fmt(m.profit)) : '';
   return '<div onclick="openPriceDetail(\'' + (p.code || '') + '\',\'' + channel + '\')" style="cursor:pointer;background:' + st.bg + ';border-radius:6px;padding:4px 6px;text-align:center;border:1px solid transparent;transition:border-color 0.15s" onmouseenter="this.style.borderColor=\'#B0B8CC\'" onmouseleave="this.style.borderColor=\'transparent\'">'
-    + '<div style="font-size:9px;color:' + st.color + ';opacity:0.7;line-height:1;margin-bottom:1px">' + st.label + '</div>'
-    + '<div style="font-size:13px;font-weight:700;color:' + st.color + ';line-height:1.2">' + fmt(price) + '</div>'
-    + (mText ? '<div style="font-size:9px;color:' + mColor + ';line-height:1;margin-top:1px">' + mText + '</div>' : '')
+    + '<div style="font-size:15px;font-weight:700;color:' + st.priceColor + ';line-height:1.2">' + fmt(price) + '</div>'
+    + (mText ? '<div style="font-size:11px;color:' + mColor + ';line-height:1;margin-top:2px">' + mText + '</div>' : '')
     + '</div>';
 }
 function getMarketFeeRate(p, channel) {
