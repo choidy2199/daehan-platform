@@ -62,9 +62,10 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .nav-setting:hover { background: rgba(255,255,255,0.2); color: #fff; }
 .nav-setting.active { background: rgba(255,255,255,0.22); color: #fff; }
 
-/* 경박재고 버튼 */
+/* 경박 버튼 (빨간 배경) */
 .header-inv-sync { display: flex; align-items: center; flex-shrink: 0; }
-.header-inv-sync .btn-ghost { padding: 8px 16px; font-size: 13px; font-weight: 600; }
+.header-inv-sync .btn-ghost { padding: 8px 16px; font-size: 13px; font-weight: 600; background: #A32D2D; border-color: #A32D2D; color: #fff; }
+.header-inv-sync .btn-ghost:hover { background: #BA3232; border-color: #BA3232; }
 
 /* Placeholder 탭 콘텐츠 */
 .tab-placeholder { padding: 80px 40px; text-align: center; color: #888; font-size: 14px; font-family: 'Pretendard', sans-serif; }
