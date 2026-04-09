@@ -1388,7 +1388,7 @@ function switchTab(tab) {
   if (contentEl) contentEl.classList.add('active');
 
   // 메뉴 active 상태
-  document.querySelectorAll('.main-nav .nav-sub, .main-nav .nav-solo').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('.main-nav [data-tab]').forEach(function(el) { el.classList.remove('active'); });
   if (navEl) navEl.classList.add('active');
 
   // 현재 탭 기억 (새로고침 시 복원용, 동기화 대상 아님)
@@ -11824,7 +11824,7 @@ async function init() {
   var _savedMeta = savedTab && _tabIdMap[savedTab];
   if (_savedMeta && savedTab !== 'mw-price' && document.getElementById(_savedMeta.contentId)) {
     document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
-    document.querySelectorAll('.main-nav .nav-sub, .main-nav .nav-solo').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.main-nav [data-tab]').forEach(function(t) { t.classList.remove('active'); });
     document.getElementById(_savedMeta.contentId).classList.add('active');
     var _savedNavEl = document.querySelector('.main-nav [data-tab="' + savedTab + '"]');
     if (_savedNavEl) _savedNavEl.classList.add('active');
