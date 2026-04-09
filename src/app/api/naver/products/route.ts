@@ -57,13 +57,14 @@ export async function PUT(request: NextRequest) {
     }
 
     const result = await updateNaverPrice(String(originProductNo), Number(newPrice));
-    console.log('[DEBUG PUT] updateNaverPrice 결과:', JSON.stringify(result));
+    console.log('[DEBUG PUT] updateNaverPrice 결과 keys:', result ? Object.keys(result) : 'null');
 
     return NextResponse.json({
       success: true,
       message: '가격 수정 성공',
       originProductNo,
       newPrice: Number(newPrice),
+      channelProductNo: result?.channelProductNo,
     });
   } catch (error: any) {
     console.error('네이버 가격 수정 실패:', error);

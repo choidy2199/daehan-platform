@@ -6338,6 +6338,7 @@ async function _startPriceSync() {
         body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: price }),
       });
       var putData = await putRes.json();
+      console.log('[PriceSync] PUT 응답:', JSON.stringify(putData));
       if (putData.success) {
         success.push({ code: code, model: p.model });
       } else {

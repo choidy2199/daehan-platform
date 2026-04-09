@@ -172,27 +172,41 @@ export async function updateNaverPrice(originProductNo: string, newPrice: number
   }
 
   // 3단계: 가격만 변경 (나머지 필드 유지)
-  console.log('[DEBUG updateNaverPrice] 변경 전 salePrice:', fullProduct.originProduct.salePrice);
+  console.log('[DEBUG updateNaverPrice] 변경 전 originProduct.salePrice:', fullProduct.originProduct.salePrice);
   console.log('[DEBUG updateNaverPrice] 변경할 newPrice:', newPrice, '타입:', typeof newPrice);
   fullProduct.originProduct.salePrice = newPrice;
 
-  // channelProducts의 salePrice도 변경해야 반영됨
+  // channelProducts 배열에서도 salePrice 변경
   if (fullProduct.originProduct.channelProducts) {
     fullProduct.originProduct.channelProducts.forEach((cp: any) => {
       console.log('[DEBUG updateNaverPrice] channelProduct 변경 전 salePrice:', cp.salePrice);
       cp.salePrice = newPrice;
+      // discountedPrice, mobileDiscountedPrice도 동일하게 변경 (할인 없는 경우)
+      if (cp.discountedPrice) cp.discountedPrice = newPrice;
+      if (cp.mobileDiscountedPrice) cp.mobileDiscountedPrice = newPrice;
     });
   }
 
-  // detailContent는 null로 보내면 기존값 유지됨 (네이버 공식 문서)
+  // detailContent는 null로 보내면 기존값 유지됨
   if (fullProduct.originProduct.detailContent) {
     fullProduct.originProduct.detailContent = null;
+  }
+  // detailContent 내부의 대형 필드도 null 처리
+  if (fullProduct.originProduct.detailAttribute?.purchaseQuantityInfo?.minPurchaseQuantity === 0) {
+    // 유지
   }
 
   // 4단계: 전체 데이터를 PUT으로 전송
   console.log('[DEBUG updateNaverPrice] PUT 전송 channelProductNo:', channelProductNo);
+  console.log('[DEBUG updateNaverPrice] 전송 salePrice:', fullProduct.originProduct.salePrice);
   const result = await naverApi('PUT', `/v2/products/channel-products/${channelProductNo}`, fullProduct);
-  console.log('[DEBUG updateNaverPrice] PUT 응답:', JSON.stringify(result).substring(0, 500));
+  console.log('[DEBUG updateNaverPrice] PUT 응답 status/keys:', result ? Object.keys(result) : 'null');
+
+  // 검증: 수정 후 재조회하여 실제 반영 확인
+  const verify = await naverApi('GET', `/v2/products/channel-products/${channelProductNo}`);
+  const verifyPrice = verify?.originProduct?.salePrice;
+  const verifyChPrice = verify?.originProduct?.channelProducts?.[0]?.salePrice;
+  console.log('[DEBUG updateNaverPrice] 검증 — originProduct.salePrice:', verifyPrice, 'channelProduct.salePrice:', verifyChPrice, '기대값:', newPrice, '일치:', verifyPrice === newPrice);
 
   return {
     success: true,
