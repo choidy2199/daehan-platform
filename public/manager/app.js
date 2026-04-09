@@ -670,7 +670,7 @@ function openPriceDetail(code, channel) {
     // 가격수정 액션 버튼 (초기 숨김)
     + '<div id="pd-edit-actions" style="display:none;padding:0 18px 12px;display:none;gap:8px;justify-content:flex-end">'
     + '<button onclick="_pdCancelEdit()" style="background:#fff;color:#5A6070;border:1px solid #DDE1EB;border-radius:6px;padding:6px 16px;font-size:12px;cursor:pointer;font-family:inherit">취소</button>'
-    + '<button id="pd-apply-btn" onclick="_pdApplyPrice(\'' + code + '\',\'' + channel + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">' + st.label + ' 가격 적용</button>'
+    + '<button id="pd-apply-btn" onclick="_pdApplyPrice(\'' + code + '\',\'' + channel + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">확인</button>'
     + '</div>'
     // 가격 이력
     + '<div style="padding:0 18px 16px">'
