@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
 // 단건 전송 최적화: { code, newPrice }만 보내면 서버에서 조회→수정 한 번에 처리
 // 기존 호환: { originProductNo, newPrice, channelProductNo } 도 지원
 export async function PUT(request: NextRequest) {
+  const tStart = Date.now();
   try {
     const body = await request.json();
     const { code, originProductNo, newPrice, channelProductNo } = body;
@@ -56,20 +57,28 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // code로 단건 전송 (신규 최적화 경로 — 클라이언트 왕복 1회)
+    // code로 단건 전송 (신규 최적화 경로 — 클라이언트 왕복 1회, rateLimit 스킵)
     if (code && !originProductNo) {
+      const tFind0 = Date.now();
       const product = await findNaverProductByCode(String(code));
+      const tFind1 = Date.now();
+      console.log(`[PERF PUT] findNaverProductByCode: ${tFind1 - tFind0}ms`);
       if (!product) {
         return NextResponse.json(
           { success: false, error: '해당 코드의 네이버 상품을 찾을 수 없습니다', code },
           { status: 404 }
         );
       }
+      const tUpd0 = Date.now();
       const result = await updateNaverPrice(
         String(product.originProductNo),
         Number(newPrice),
-        product.channelProductNo ? Number(product.channelProductNo) : undefined
+        product.channelProductNo ? Number(product.channelProductNo) : undefined,
+        { fast: true }
       );
+      const tUpd1 = Date.now();
+      console.log(`[PERF PUT] updateNaverPrice: ${tUpd1 - tUpd0}ms`);
+      console.log(`[PERF PUT] TOTAL (fast path): ${Date.now() - tStart}ms`);
       return NextResponse.json({
         success: true,
         message: '가격 수정 성공',
@@ -89,6 +98,7 @@ export async function PUT(request: NextRequest) {
     }
     const result = await updateNaverPrice(String(originProductNo), Number(newPrice), channelProductNo ? Number(channelProductNo) : undefined);
     console.log('[DEBUG PUT] updateNaverPrice 결과 keys:', result ? Object.keys(result) : 'null');
+    console.log(`[PERF PUT] TOTAL (legacy path): ${Date.now() - tStart}ms`);
 
     return NextResponse.json({
       success: true,

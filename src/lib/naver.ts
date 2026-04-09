@@ -60,8 +60,11 @@ let _cachedTokenExpiresAt = 0;
 export async function getAccessToken(): Promise<string> {
   // 캐시된 토큰이 유효하면 재사용
   if (_cachedToken && Date.now() < _cachedTokenExpiresAt) {
+    console.log('[PERF token] cache HIT');
     return _cachedToken;
   }
+  console.log('[PERF token] cache MISS - 재발급');
+  const t0 = Date.now();
   const timestamp = String(Date.now());
   const signature = generateSignature(timestamp);
 
@@ -89,20 +92,26 @@ export async function getAccessToken(): Promise<string> {
   // expires_in은 초 단위. 안전하게 90% 지점까지만 재사용
   const expiresInSec = Number(data.expires_in) || 10800; // 기본 3시간
   _cachedTokenExpiresAt = Date.now() + expiresInSec * 1000 * 0.9;
+  console.log(`[PERF token] 발급 완료 ${Date.now() - t0}ms, 유효 ${expiresInSec}s`);
   return _cachedToken as string;
 }
 
 /**
  * 네이버 커머스 API 공통 호출 함수 (Rate limit 자동 적용)
+ * opts.skipRateLimit: 단건 경로에서 사용 (불필요한 550ms 대기 제거)
  */
 export async function naverApi(
   method: string,
   path: string,
-  body?: any
+  body?: any,
+  opts?: { skipRateLimit?: boolean }
 ): Promise<any> {
-  await rateLimit();
+  const t0 = Date.now();
+  if (!opts?.skipRateLimit) await rateLimit();
+  const t1 = Date.now();
 
   const token = await getAccessToken();
+  const t2 = Date.now();
 
   const resp = await fetch(`${getBaseUrl()}${path}`, {
     method,
@@ -113,6 +122,7 @@ export async function naverApi(
     },
     body: body ? JSON.stringify(body) : undefined,
   });
+  const t3 = Date.now();
 
   if (!resp.ok) {
     const errText = await resp.text();
@@ -120,10 +130,10 @@ export async function naverApi(
   }
 
   const contentType = resp.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    return resp.json();
-  }
-  return resp.text();
+  const result = contentType.includes('application/json') ? await resp.json() : await resp.text();
+  const t4 = Date.now();
+  console.log(`[PERF naverApi] ${method} ${path} — rateLimit:${t1-t0}ms token:${t2-t1}ms fetch:${t3-t2}ms parse:${t4-t3}ms total:${t4-t0}ms`);
+  return result;
 }
 
 /**
@@ -147,13 +157,15 @@ const NAVER_CACHE_TTL = 10 * 60 * 1000; // 10분
 
 async function _ensureNaverCodeMap(): Promise<Map<string, any>> {
   if (_naverCodeMap && (Date.now() - _naverCacheTime) < NAVER_CACHE_TTL) {
+    console.log(`[PERF codeMap] cache HIT (${_naverCodeMap.size}개, age ${Date.now() - _naverCacheTime}ms)`);
     return _naverCodeMap;
   }
+  console.log('[PERF codeMap] cache MISS - 전체 로드 시작');
+  const tLoad0 = Date.now();
   const map = new Map<string, any>();
   let page = 1;
   const size = 100;
   while (true) {
-    await rateLimit();
     const result = await naverApi('POST', '/v1/products/search', { page, size, statusTypes: ['SALE', 'SUSPENSION', 'OUTOFSTOCK'] });
     const contents = result?.contents || [];
     for (const p of contents) {
@@ -165,7 +177,7 @@ async function _ensureNaverCodeMap(): Promise<Map<string, any>> {
     page++;
     if (page > 30) break;
   }
-  console.log(`[naverCodeMap] ${map.size}개 상품 캐시 완료 (${page}페이지)`);
+  console.log(`[PERF codeMap] 로드 완료 ${Date.now() - tLoad0}ms — ${map.size}개 상품 (${page}페이지)`);
   _naverCodeMap = map;
   _naverCacheTime = Date.now();
   return map;
@@ -196,8 +208,14 @@ export async function findNaverProductByCode(sellerCode: string) {
 /**
  * 네이버 단건 가격 수정
  * channelProductNo가 전달되면 검색 단계를 건너뜀 (정확 매칭 보장)
+ * opts.fast: 단건 경로 — rateLimit 스킵 (RPS 리스크는 호출 측에서 관리)
  */
-export async function updateNaverPrice(originProductNo: string, newPrice: number, channelProductNo?: number) {
+export async function updateNaverPrice(
+  originProductNo: string,
+  newPrice: number,
+  channelProductNo?: number,
+  opts?: { fast?: boolean }
+) {
   // 1단계: channelProductNo가 없으면 캐시에서 조회
   if (!channelProductNo) {
     const map = await _ensureNaverCodeMap();
@@ -216,8 +234,10 @@ export async function updateNaverPrice(originProductNo: string, newPrice: number
 
   console.log(`[updateNaverPrice] originProductNo: ${originProductNo}, channelProductNo: ${channelProductNo}, newPrice: ${newPrice}`);
 
+  const skipRL = !!opts?.fast;
+
   // 2단계: 채널상품 전체 정보 조회 (v2)
-  const fullProduct = await naverApi('GET', `/v2/products/channel-products/${channelProductNo}`);
+  const fullProduct = await naverApi('GET', `/v2/products/channel-products/${channelProductNo}`, undefined, { skipRateLimit: skipRL });
 
   if (!fullProduct?.originProduct) {
     throw new Error(`상품 상세 조회 실패. channelProductNo: ${channelProductNo}`);
@@ -251,7 +271,7 @@ export async function updateNaverPrice(originProductNo: string, newPrice: number
   // 4단계: 전체 데이터를 PUT으로 전송
   console.log('[DEBUG updateNaverPrice] PUT 전송 channelProductNo:', channelProductNo);
   console.log('[DEBUG updateNaverPrice] 전송 salePrice:', fullProduct.originProduct.salePrice);
-  const result = await naverApi('PUT', `/v2/products/channel-products/${channelProductNo}`, fullProduct);
+  const result = await naverApi('PUT', `/v2/products/channel-products/${channelProductNo}`, fullProduct, { skipRateLimit: skipRL });
   console.log('[DEBUG updateNaverPrice] PUT 응답 status/keys:', result ? Object.keys(result) : 'null');
 
   return {
