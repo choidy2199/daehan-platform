@@ -1489,6 +1489,11 @@ function renderCatalog() {
   var _catalogDiscontinued = discontinued;
   var _catalogRenderedCount = 0;
 
+  // 모듈 스코프로 노출 (편집 모드 전체 렌더링용)
+  window._catalogAllRows = allRows;
+  window._catalogDiscontinued = _catalogDiscontinued;
+  window._catalogBuildRow = buildRow;
+
   function renderBatch(start, count) {
     var fragment = '';
     var end = Math.min(start + count, allRows.length);
@@ -6055,6 +6060,30 @@ function toggleMwEditMode() {
 }
 
 function _enterMwEditMode() {
+  // 미렌더링 행이 있으면 전체 렌더링 (점진 로딩 우회)
+  var body = document.getElementById('catalog-body');
+  if (window._catalogAllRows && window._catalogBuildRow) {
+    var currentRowCount = body.querySelectorAll('tr').length;
+    var totalNeeded = window._catalogAllRows.length + (window._catalogDiscontinued || []).length;
+    if (currentRowCount < totalNeeded) {
+      // 전체 재렌더링
+      var html = '';
+      for (var i = 0; i < window._catalogAllRows.length; i++) {
+        html += window._catalogBuildRow(window._catalogAllRows[i]);
+      }
+      if (window._catalogDiscontinued && window._catalogDiscontinued.length > 0) {
+        html += '<tr class="discontinued-divider"><td colspan="19">단종 품목 (' + window._catalogDiscontinued.length + '건)</td></tr>';
+        html += window._catalogDiscontinued.slice(0, 200).map(window._catalogBuildRow).join('');
+      }
+      body.innerHTML = html;
+      // 스크롤 리스너 제거 (전체 렌더링 완료)
+      var scrollEl = body.closest('.table-scroll');
+      if (scrollEl && scrollEl._catalogScroll) {
+        scrollEl.removeEventListener('scroll', scrollEl._catalogScroll);
+        scrollEl._catalogScroll = null;
+      }
+    }
+  }
   // thead에 체크박스 th 추가
   var thead = document.querySelector('#catalog-table thead tr');
   if (thead && !document.getElementById('mw-edit-checkall')) {
@@ -6064,9 +6093,9 @@ function _enterMwEditMode() {
     thead.insertBefore(th, thead.firstChild);
   }
   // tbody 모든 행에 체크박스 td 추가
-  var rows = document.querySelectorAll('#catalog-body tr');
+  var rows = body.querySelectorAll('tr');
   rows.forEach(function(tr) {
-    if (tr.querySelector('.mw-edit-cb')) return;
+    if (tr.querySelector('.mw-edit-cb') || tr.classList.contains('discontinued-divider')) return;
     var td = document.createElement('td');
     td.innerHTML = '<input type="checkbox" class="mw-edit-cb" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
     tr.insertBefore(td, tr.firstChild);
@@ -6112,10 +6141,109 @@ function mwEditAction(action) {
   var codes = [];
   checkedRows.forEach(function(cb) {
     var tr = cb.closest('tr');
-    if (tr) codes.push(tr.cells[1] ? tr.cells[1].textContent : '');
+    if (tr) codes.push(tr.cells[1] ? tr.cells[1].textContent.trim() : '');
   });
+
+  if (action === 'modify') {
+    if (codes.length === 0) { alert('제품을 선택해주세요'); return; }
+    _showMwBulkEditModal(codes);
+    return;
+  }
+
   console.log('액션:', action, '선택:', codes.length, '개', codes);
-  // TODO: 실제 수정/삭제/단종/가격전송 로직
+  // TODO: 삭제/단종/가격전송 로직
+}
+
+// ── 일괄 수정 모달 ──
+function _showMwBulkEditModal(codes) {
+  // 기존 모달 제거
+  var old = document.getElementById('mw-bulk-edit-modal');
+  if (old) old.remove();
+
+  var html = '<div class="modal-bg show" id="mw-bulk-edit-modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:300;justify-content:center;align-items:flex-start;padding-top:60px">' +
+    '<div class="modal" style="max-width:480px;width:90%;border-radius:10px;background:white;overflow:hidden">' +
+      '<div class="modal-header" style="padding:16px 20px;border-bottom:1px solid #DDE1EB;display:flex;justify-content:space-between;align-items:center">' +
+        '<h3 style="font-size:16px;font-weight:600;margin:0">' + codes.length + '개 제품 일괄 수정</h3>' +
+        '<button onclick="closeMwBulkEditModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9BA3B2">&times;</button>' +
+      '</div>' +
+      '<div style="padding:20px">' +
+        '<div style="background:#E6F1FB;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#0C447C">빈 칸으로 두면 해당 필드는 변경되지 않습니다</div>' +
+        '<div style="display:flex;flex-direction:column;gap:12px">' +
+          '<div style="display:flex;align-items:center;gap:12px">' +
+            '<label style="width:100px;font-size:13px;font-weight:500;color:#5A6070;flex-shrink:0">공급가</label>' +
+            '<input class="input" id="mw-bulk-supplyPrice" type="text" placeholder="공급가 (빈칸=미변경)" style="flex:1" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');if(this.value)this.value=Number(this.value).toLocaleString()">' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:12px">' +
+            '<label style="width:100px;font-size:13px;font-weight:500;color:#5A6070;flex-shrink:0">카테고리</label>' +
+            '<select class="select" id="mw-bulk-category" style="flex:1">' +
+              '<option value="">미변경</option>' +
+              '<option value="파워툴">파워툴</option>' +
+              '<option value="수공구">수공구</option>' +
+              '<option value="악세사리">악세사리</option>' +
+              '<option value="팩아웃">팩아웃</option>' +
+              '<option value="드릴비트">드릴비트</option>' +
+            '</select>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:12px">' +
+            '<label style="width:100px;font-size:13px;font-weight:500;color:#5A6070;flex-shrink:0">단종 여부</label>' +
+            '<select class="select" id="mw-bulk-discontinued" style="flex:1">' +
+              '<option value="">미변경</option>' +
+              '<option value="정상">정상</option>' +
+              '<option value="단종">단종</option>' +
+            '</select>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:12px 20px;border-top:1px solid #DDE1EB;display:flex;justify-content:flex-end;gap:8px">' +
+        '<button class="btn-secondary" onclick="closeMwBulkEditModal()">취소</button>' +
+        '<button class="btn-primary" onclick="applyMwBulkEdit()">적용</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  // 선택된 코드를 모달에 저장
+  document.getElementById('mw-bulk-edit-modal')._codes = codes;
+}
+
+function closeMwBulkEditModal() {
+  var el = document.getElementById('mw-bulk-edit-modal');
+  if (el) el.remove();
+}
+
+function applyMwBulkEdit() {
+  var modal = document.getElementById('mw-bulk-edit-modal');
+  if (!modal) return;
+  var codes = modal._codes || [];
+
+  var rawPrice = document.getElementById('mw-bulk-supplyPrice').value.replace(/,/g, '');
+  var newSupplyPrice = rawPrice ? parseInt(rawPrice) : null;
+  var newCategory = document.getElementById('mw-bulk-category').value;
+  var newDiscontinued = document.getElementById('mw-bulk-discontinued').value;
+
+  if (newSupplyPrice === null && !newCategory && !newDiscontinued) {
+    alert('변경할 항목을 입력해주세요');
+    return;
+  }
+
+  var updated = 0;
+  DB.products.forEach(function(p) {
+    if (codes.indexOf(p.code) === -1) return;
+    if (newSupplyPrice !== null) p.supplyPrice = newSupplyPrice;
+    if (newCategory) p.category = newCategory;
+    if (newDiscontinued === '정상') p.discontinued = '';
+    else if (newDiscontinued === '단종') p.discontinued = '단종';
+    updated++;
+  });
+
+  if (updated > 0) {
+    recalcAll();
+    save(KEYS.products, DB.products);
+    renderCatalog();
+    toast(updated + '개 제품 수정 완료');
+  }
+
+  closeMwBulkEditModal();
 }
 
 function showProductModal(idx) {
