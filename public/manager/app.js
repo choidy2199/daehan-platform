@@ -3427,7 +3427,34 @@ function ttiReorder(item) {
 
 function changePOListFilter(val) {
   localStorage.setItem('mw_po_list_filter', val);
-  // 밀워키 발주확정 영역만 재렌더링
+
+  // 선택값에 따라 날짜 input 연동 (KST 기준, toISOString 사용 금지 — 시차 오차 방지)
+  var _today = new Date();
+  var _fmt = function(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+  var _todayStr = _fmt(_today);
+  var _dateFrom = _todayStr;
+  var _dateTo = _todayStr;
+  if (val === 'today') {
+    _dateFrom = _todayStr;
+    _dateTo = _todayStr;
+  } else if (val === 'week') {
+    // 이번주 월요일 ~ 오늘 (일요일=0 → 7로 변환)
+    var _dow = _today.getDay() || 7;
+    var _monday = new Date(_today);
+    _monday.setDate(_today.getDate() - _dow + 1);
+    _dateFrom = _fmt(_monday);
+    _dateTo = _todayStr;
+  } else if (val === 'month') {
+    // 이번달 1일 ~ 오늘
+    _dateFrom = _today.getFullYear() + '-' + String(_today.getMonth() + 1).padStart(2, '0') + '-01';
+    _dateTo = _todayStr;
+  }
+  localStorage.setItem('mw_po_items_date_from', _dateFrom);
+  localStorage.setItem('mw_po_items_date_to', _dateTo);
+
+  // 밀워키 발주확정 영역만 재렌더링 (date input 값은 localStorage에서 복원)
   var listContent = document.getElementById('po-content-confirmed');
   if (listContent) listContent.innerHTML = buildPOListPanel();
 }
