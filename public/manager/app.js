@@ -2907,6 +2907,10 @@ function renderPOTab() {
 
   container.innerHTML = html;
 
+  // 발주확정 탭이 활성화된 상태에서만 컬럼 리사이즈 초기화
+  // (숨겨진 탭은 offsetWidth=0 이므로 리사이즈 초기화 시점을 활성화 시점으로 미룸)
+  if (activeSubTab === 'confirmed') initColumnResize('po-list-table');
+
   // 수량 input Enter → 같은 행의 🛒 버튼 클릭 (이벤트 위임)
   var _poContents = document.getElementById('po-tab-contents');
   if (_poContents) _poContents.addEventListener('keydown', function(e) {
@@ -3122,7 +3126,10 @@ function switchPOSubTab(tabName) {
   // 밀워키 발주확정 탭 전환 시 재렌더링 (기존 발주리스트 로직 그대로)
   if (tabName === 'confirmed') {
     var confirmedContent = document.getElementById('po-content-confirmed');
-    if (confirmedContent) confirmedContent.innerHTML = buildPOListPanel();
+    if (confirmedContent) {
+      confirmedContent.innerHTML = buildPOListPanel();
+      initColumnResize('po-list-table');
+    }
   }
 }
 
@@ -3185,7 +3192,7 @@ function buildPOListPanel() {
   h += '</div></div>';
 
   // 발주확정 panel-body: padding 제거 (다크 헤더와 테이블 헤더 밀착 + 테이블 풀폭)
-  h += '<div class="po-panel-body" style="padding:0"><table class="po-table"><thead><tr>';
+  h += '<div class="po-panel-body" style="padding:0"><table id="po-list-table" class="po-table"><thead><tr>';
   h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
   h += '<th>날짜</th><th>구분</th><th>관리코드</th><th>코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">TTI상태</th><th class="center">액션</th><th class="center">주문번호</th><th class="center">경영박사</th>';
   h += '</tr></thead><tbody id="po-list-body">';
@@ -3202,7 +3209,7 @@ function buildPOListPanel() {
       var dateStr = String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
       // 구분 뱃지 — ttiPromotion 우선, 없으면 type 기반
       var typeBadge;
-      var _badgePad = 'padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500';
+      var _badgePad = 'padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600';
       if (item.ttiPromotion) {
         var _pmo = item.ttiPromotion;
         if (_pmo === '일반')        typeBadge = '<span style="background:#EAECF2;color:#5A6070;' + _badgePad + '">일반</span>';
@@ -3404,10 +3411,13 @@ function syncTtiOrderHistory(ttiOrders) {
 
   // 매출카드 + 발주리스트 새로고침
   var kpiRow = document.querySelector('.po-kpi-row');
-  if (kpiRow) renderPOTab();
+  if (kpiRow) { renderPOTab(); initColumnResize('po-list-table'); }
   else {
     var listContent = document.getElementById('po-content-confirmed');
-    if (listContent) listContent.innerHTML = buildPOListPanel();
+    if (listContent) {
+      listContent.innerHTML = buildPOListPanel();
+      initColumnResize('po-list-table');
+    }
   }
 }
 
@@ -3457,7 +3467,10 @@ function changePOListFilter(val) {
 
   // 밀워키 발주확정 영역만 재렌더링 (date input 값은 localStorage에서 복원)
   var listContent = document.getElementById('po-content-confirmed');
-  if (listContent) listContent.innerHTML = buildPOListPanel();
+  if (listContent) {
+    listContent.innerHTML = buildPOListPanel();
+    initColumnResize('po-list-table');
+  }
 }
 
 function registerErpFromList() {
@@ -10899,13 +10912,19 @@ window.addEventListener('message', function(event) {
       toast(actionText + ' 처리 완료');
       setTimeout(function() {
         var listContent = document.getElementById('po-content-confirmed');
-        if (listContent) listContent.innerHTML = buildPOListPanel();
+        if (listContent) {
+          listContent.innerHTML = buildPOListPanel();
+          initColumnResize('po-list-table');
+        }
       }, 3000);
     } else {
       console.error('[app] TTI', actionText, '실패:', event.data.error);
       alert(actionText + ' 처리에 실패했습니다.\n' + (event.data.error || 'TTI 사이트를 확인해주세요.'));
       var listContent = document.getElementById('po-content-confirmed');
-      if (listContent) listContent.innerHTML = buildPOListPanel();
+      if (listContent) {
+        listContent.innerHTML = buildPOListPanel();
+        initColumnResize('po-list-table');
+      }
     }
   }
 
@@ -11115,7 +11134,10 @@ function syncOrderItems(items, dateFrom, dateTo) {
 
   // 발주확정 탭 테이블 새로고침
   var confirmedContent = document.getElementById('po-content-confirmed');
-  if (confirmedContent) confirmedContent.innerHTML = buildPOListPanel();
+  if (confirmedContent) {
+    confirmedContent.innerHTML = buildPOListPanel();
+    initColumnResize('po-list-table');
+  }
 
   alert('아이템별 주문내역 동기화 완료: ' + items.length + '건 (' + created + '건 추가, ' + updated + '건 갱신)');
 }

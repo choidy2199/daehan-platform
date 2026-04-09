@@ -177,6 +177,14 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 }
 .data-table th .col-resize:hover, .data-table th .col-resize.active { background: var(--tl-primary); opacity: 0.6; }
 
+/* 발주확정 테이블 리사이즈 핸들 (동일 스펙) */
+#po-list-table th.resizable { position: relative; border-right: 1px solid #DDE1EB; }
+#po-list-table th .col-resize {
+  position: absolute; right: -1px; top: 0; width: 7px; height: 100%;
+  cursor: col-resize; user-select: none; z-index: 11;
+}
+#po-list-table th .col-resize:hover, #po-list-table th .col-resize.active { background: var(--tl-primary); opacity: 0.6; }
+
 /* Badge */
 .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
 .badge-blue { background: #E6F1FB; color: #0C447C; }
