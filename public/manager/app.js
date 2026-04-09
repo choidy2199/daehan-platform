@@ -620,22 +620,38 @@ function openPriceDetail(code, channel) {
   var mkInfo = getMarkupInfo(channel, p.category);
 
   var html = '<div id="price-detail-overlay" onclick="closePriceDetail(event)" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000">'
-    + '<div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;width:90%;max-width:520px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.15)">'
+    + '<div id="price-detail-popup" onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;width:90%;max-width:520px;max-height:calc(100vh - 100px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.15)">'
     // 헤더
-    + '<div style="display:flex;align-items:center;gap:6px;padding:14px 18px;border-bottom:1px solid #DDE1EB">'
+    + '<div id="price-detail-header" style="display:flex;align-items:center;gap:6px;padding:14px 18px;border-bottom:1px solid #DDE1EB;cursor:move;flex-shrink:0">'
     + '<span style="width:8px;height:8px;border-radius:50%;background:' + st.dot + ';display:inline-block"></span>'
     + '<span style="font-size:15px;font-weight:600;color:#1A1D23">' + st.label + ' 가격 상세</span>'
     + vatTag
     + '<span style="flex:1"></span>'
+    + '<button onclick="_pdPriceSync(\'' + code + '\',\'' + channel + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">▲ 가격전송</button>'
+    + '<button onclick="_pdGoSales()" style="background:#fff;color:#185FA5;border:1px solid #185FA5;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">판매관리</button>'
+    + '<button id="pd-edit-btn" onclick="_pdToggleEdit(\'' + code + '\',\'' + channel + '\')" style="background:#fff;color:#185FA5;border:1px solid #185FA5;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">가격수정</button>'
     + '<button onclick="closePriceDetail()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#9BA3B2;padding:4px">✕</button>'
     + '</div>'
+    // 스크롤 영역
+    + '<div style="overflow-y:auto;flex:1">'
     // 제품 정보
     + '<div style="padding:14px 18px 0">'
     + '<div style="font-size:12px;color:#5A6070">' + (p.model || p.code || '') + '</div>'
     + '<div style="font-size:11px;color:#9BA3B2;margin-top:2px">' + (p.description || '') + '</div>'
     + '</div>'
+    // 가격수정 입력 영역 (초기 숨김)
+    + '<div id="pd-edit-area" style="display:none;margin:10px 18px 0;background:#FFF8EE;border:1px solid #EF9F27;border-radius:8px;padding:12px 16px">'
+    + '<div style="font-size:12px;font-weight:600;color:#EF9F27;margin-bottom:8px">변경 가격 입력</div>'
+    + '<div style="display:flex;align-items:center;gap:8px">'
+    + '<span style="font-size:12px;color:#5A6070">현재가:</span>'
+    + '<span id="pd-cur-price" style="font-size:13px;font-weight:600;color:#1A1D23">' + fmt(price) + '원</span>'
+    + '<span style="font-size:14px;color:#9BA3B2">→</span>'
+    + '<input id="pd-new-price" type="text" value="" placeholder="변경가 입력" autocomplete="off" style="width:120px;padding:6px 10px;border:1px solid #DDE1EB;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;outline:none" onfocus="_pdInputFocus(this)" onblur="_pdInputBlur(this)" oninput="_pdCalcLive(\'' + code + '\',\'' + channel + '\')">'
+    + '<span style="font-size:12px;color:#5A6070">원</span>'
+    + '</div>'
+    + '</div>'
     // 수수료 분해
-    + '<div style="margin:12px 18px;background:#F4F6FA;border-radius:8px;padding:14px 16px">'
+    + '<div id="pd-fee-area" style="margin:12px 18px;background:#F4F6FA;border-radius:8px;padding:14px 16px">'
     + '<div style="display:flex;align-items:flex-end;justify-content:center;gap:6px;flex-wrap:wrap">'
     + feeBreakdownItem(fmt(price), '판매가', '#1A1D23')
     + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">−</span>'
@@ -651,6 +667,11 @@ function openPriceDetail(code, channel) {
     + '<span>' + mkInfo + '</span>'
     + '</div>'
     + '</div>'
+    // 가격수정 액션 버튼 (초기 숨김)
+    + '<div id="pd-edit-actions" style="display:none;padding:0 18px 12px;display:none;gap:8px;justify-content:flex-end">'
+    + '<button onclick="_pdCancelEdit()" style="background:#fff;color:#5A6070;border:1px solid #DDE1EB;border-radius:6px;padding:6px 16px;font-size:12px;cursor:pointer;font-family:inherit">취소</button>'
+    + '<button id="pd-apply-btn" onclick="_pdApplyPrice(\'' + code + '\',\'' + channel + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">' + st.label + ' 가격 적용</button>'
+    + '</div>'
     // 가격 이력
     + '<div style="padding:0 18px 16px">'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
@@ -659,11 +680,15 @@ function openPriceDetail(code, channel) {
     + '</div>'
     + buildPriceHistoryTable(code, channel)
     + '</div>'
-    + '</div></div>';
+    + '</div></div></div>';
 
   var existing = document.getElementById('price-detail-overlay');
   if (existing) existing.remove();
   document.body.insertAdjacentHTML('beforeend', html);
+  // 드래그 이동
+  var popup = document.getElementById('price-detail-popup');
+  var header = document.getElementById('price-detail-header');
+  if (popup && header) _makeDraggable(popup, header);
 }
 
 function feeBreakdownItem(value, label, color) {
@@ -708,6 +733,181 @@ function closePriceDetail(e) {
   if (e && e.target !== e.currentTarget) return;
   var el = document.getElementById('price-detail-overlay');
   if (el) el.remove();
+}
+
+// ── 가격 상세 팝업 버튼 핸들러 ──
+function _pdPriceSync(code, channel) {
+  if (channel !== 'naver') { alert((_marketBadgeStyles[channel] || {}).label + ' 가격전송은 준비 중입니다.'); return; }
+  var idx = DB.products.findIndex(function(p) { return String(p.code) === String(code); });
+  if (idx < 0) { alert('제품을 찾을 수 없습니다.'); return; }
+  _showPriceSyncModal([idx]);
+}
+
+function _pdGoSales() {
+  var tabEl = document.getElementById('tab-sales');
+  if (tabEl && typeof switchTab === 'function') {
+    closePriceDetail();
+    switchTab('tab-sales');
+  } else {
+    alert('판매관리 탭 준비 중입니다.');
+  }
+}
+
+var _pdEditMode = false;
+var _pdOriginalFeeHtml = '';
+
+function _pdToggleEdit(code, channel) {
+  if (_pdEditMode) { _pdCancelEdit(); return; }
+  _pdEditMode = true;
+  var btn = document.getElementById('pd-edit-btn');
+  if (btn) { btn.textContent = '수정중…'; btn.style.background = '#EF9F27'; btn.style.color = '#fff'; btn.style.borderColor = '#EF9F27'; }
+  var editArea = document.getElementById('pd-edit-area');
+  if (editArea) editArea.style.display = 'block';
+  var actArea = document.getElementById('pd-edit-actions');
+  if (actArea) { actArea.style.display = 'flex'; }
+  _pdOriginalFeeHtml = document.getElementById('pd-fee-area') ? document.getElementById('pd-fee-area').innerHTML : '';
+  var inp = document.getElementById('pd-new-price');
+  if (inp) { inp.value = ''; inp.focus(); }
+}
+
+function _pdCancelEdit() {
+  _pdEditMode = false;
+  var btn = document.getElementById('pd-edit-btn');
+  if (btn) { btn.textContent = '가격수정'; btn.style.background = '#fff'; btn.style.color = '#185FA5'; btn.style.borderColor = '#185FA5'; }
+  var editArea = document.getElementById('pd-edit-area');
+  if (editArea) editArea.style.display = 'none';
+  var actArea = document.getElementById('pd-edit-actions');
+  if (actArea) actArea.style.display = 'none';
+  if (_pdOriginalFeeHtml) {
+    var feeArea = document.getElementById('pd-fee-area');
+    if (feeArea) feeArea.innerHTML = _pdOriginalFeeHtml;
+  }
+  var inp = document.getElementById('pd-new-price');
+  if (inp) inp.value = '';
+}
+
+function _pdInputFocus(el) {
+  var v = el.value.replace(/,/g, '');
+  el.value = v === '0' ? '' : v;
+}
+function _pdInputBlur(el) {
+  var n = parseInt(el.value.replace(/[^0-9]/g, ''), 10);
+  el.value = n > 0 ? n.toLocaleString() : '';
+}
+
+function _pdCalcLive(code, channel) {
+  var inp = document.getElementById('pd-new-price');
+  if (!inp) return;
+  // 숫자+콤마만 허용
+  inp.value = inp.value.replace(/[^0-9,]/g, '');
+  var newPrice = parseInt(inp.value.replace(/,/g, ''), 10);
+  if (!newPrice || newPrice <= 0) return;
+  var p = findProduct(code);
+  if (!p) return;
+  var cost = p.cost || 0;
+  var feeRate = getMarketFeeRate(p, channel);
+  var vat = Math.round(newPrice / 11);
+  var fee = Math.round(newPrice * feeRate);
+  var settle = newPrice - vat - fee;
+  var profit = settle - cost;
+  var profitRate = settle > 0 ? (profit / settle * 100) : 0;
+  var markupRate = cost > 0 ? (profit / cost * 100) : 0;
+  var profitColor = profit >= 0 ? '#1D9E75' : '#CC2222';
+  var feeDetail = getFeeDetail(channel, p.category);
+  var feeArea = document.getElementById('pd-fee-area');
+  if (!feeArea) return;
+  feeArea.innerHTML =
+    '<div style="display:flex;align-items:flex-end;justify-content:center;gap:6px;flex-wrap:wrap">'
+    + feeBreakdownItem(fmt(newPrice), '판매가', '#EF9F27')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">−</span>'
+    + feeBreakdownItem(fmt(vat), 'VAT(÷11)', '#5A6070')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">−</span>'
+    + feeBreakdownItem(fmt(fee), feeDetail, '#CC2222')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">=</span>'
+    + feeBreakdownItem(fmt(settle), '정산금액', '#185FA5')
+    + '</div>'
+    + '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #DDE1EB;display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#5A6070">'
+    + '<span>매입원가: <b style="color:#1A1D23">' + fmt(cost) + '원</b></span>'
+    + '<span>마진: <b style="color:' + profitColor + '">' + (profit >= 0 ? '+' : '') + fmt(profit) + '원 (' + profitRate.toFixed(1) + '%)</b></span>'
+    + '<span>마크업: <b style="color:' + profitColor + '">' + markupRate.toFixed(1) + '%</b></span>'
+    + '</div>';
+}
+
+async function _pdApplyPrice(code, channel) {
+  var st = _marketBadgeStyles[channel];
+  if (channel !== 'naver') { alert((st ? st.label : '') + ' 가격 적용은 준비 중입니다.'); return; }
+  var inp = document.getElementById('pd-new-price');
+  if (!inp) return;
+  var newPrice = parseInt(inp.value.replace(/,/g, ''), 10);
+  if (!newPrice || newPrice <= 0) { alert('변경 가격을 입력하세요.'); return; }
+  var applyBtn = document.getElementById('pd-apply-btn');
+  if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = '전송 중…'; }
+  try {
+    // 네이버 상품 조회
+    var searchRes = await fetch('/api/naver/products?code=' + encodeURIComponent(code));
+    var searchData = await searchRes.json();
+    if (!searchData.success || !searchData.product) { alert('네이버 상품을 찾을 수 없습니다.'); return; }
+    // 가격 수정 전송
+    var putRes = await fetch('/api/naver/products', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: newPrice, channelProductNo: searchData.product.channelProductNo }),
+    });
+    var putData = await putRes.json();
+    if (!putData.success) { alert('가격 전송 실패: ' + (putData.error || '알 수 없는 오류')); return; }
+    // 성공: DB 업데이트
+    var p = findProduct(code);
+    if (p) {
+      var oldPrice = p.priceNaver || 0;
+      p.priceNaver = newPrice;
+      save(KEYS.products, DB.products);
+      // 가격이력 추가
+      _priceHistory.push({ code: code, channel: 'naver', oldPrice: oldPrice, newPrice: newPrice, timestamp: new Date().toISOString() });
+      savePriceHistory();
+    }
+    toast('네이버 가격 적용 완료: ' + fmt(newPrice) + '원');
+    _pdCancelEdit();
+    // 팝업 내 판매가 갱신
+    document.getElementById('pd-cur-price').textContent = fmt(newPrice) + '원';
+    _pdRefreshFee(code, channel, newPrice);
+  } catch (e) {
+    alert('네트워크 오류: ' + e.message);
+  } finally {
+    if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = (st ? st.label : '') + ' 가격 적용'; }
+  }
+}
+
+function _pdRefreshFee(code, channel, price) {
+  var p = findProduct(code);
+  if (!p) return;
+  var cost = p.cost || 0;
+  var feeRate = getMarketFeeRate(p, channel);
+  var vat = Math.round(price / 11);
+  var fee = Math.round(price * feeRate);
+  var settle = price - vat - fee;
+  var profit = settle - cost;
+  var profitRate = price > 0 ? (profit / price * 100) : 0;
+  var profitColor = profit >= 0 ? '#1D9E75' : '#CC2222';
+  var feeDetail = getFeeDetail(channel, p.category);
+  var mkInfo = getMarkupInfo(channel, p.category);
+  var feeArea = document.getElementById('pd-fee-area');
+  if (!feeArea) return;
+  feeArea.innerHTML =
+    '<div style="display:flex;align-items:flex-end;justify-content:center;gap:6px;flex-wrap:wrap">'
+    + feeBreakdownItem(fmt(price), '판매가', '#1A1D23')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">−</span>'
+    + feeBreakdownItem(fmt(vat), 'VAT(÷11)', '#5A6070')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">−</span>'
+    + feeBreakdownItem(fmt(fee), feeDetail, '#CC2222')
+    + '<span style="font-size:14px;color:#9BA3B2;padding-bottom:8px">=</span>'
+    + feeBreakdownItem(fmt(settle), '정산금액', '#185FA5')
+    + '</div>'
+    + '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #DDE1EB;display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:#5A6070">'
+    + '<span>매입원가: <b style="color:#1A1D23">' + fmt(cost) + '원</b></span>'
+    + '<span>마진: <b style="color:' + profitColor + '">' + (profit >= 0 ? '+' : '') + fmt(profit) + '원 (' + profitRate.toFixed(1) + '%)</b></span>'
+    + '<span>' + mkInfo + '</span>'
+    + '</div>';
+  _pdOriginalFeeHtml = feeArea.innerHTML;
 }
 
 // ======================== 가격 변동 이력 ========================
