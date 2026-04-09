@@ -243,12 +243,6 @@ export async function updateNaverPrice(originProductNo: string, newPrice: number
   const result = await naverApi('PUT', `/v2/products/channel-products/${channelProductNo}`, fullProduct);
   console.log('[DEBUG updateNaverPrice] PUT 응답 status/keys:', result ? Object.keys(result) : 'null');
 
-  // 검증: 수정 후 재조회하여 실제 반영 확인
-  const verify = await naverApi('GET', `/v2/products/channel-products/${channelProductNo}`);
-  const verifyPrice = verify?.originProduct?.salePrice;
-  const verifyChPrice = verify?.originProduct?.channelProducts?.[0]?.salePrice;
-  console.log('[DEBUG updateNaverPrice] 검증 — originProduct.salePrice:', verifyPrice, 'channelProduct.salePrice:', verifyChPrice, '기대값:', newPrice, '일치:', verifyPrice === newPrice);
-
   return {
     success: true,
     channelProductNo,

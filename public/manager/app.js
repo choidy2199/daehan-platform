@@ -747,12 +747,66 @@ function _pdSetHeaderBtnsDisabled(disabled) {
   });
 }
 
-function _pdPriceSync(code, channel) {
+async function _pdPriceSync(code, channel) {
   if (_pdEditMode) return;
+  var btn = document.getElementById('pd-btn-sync');
+  if (!btn) return;
   if (channel !== 'naver') { alert((_marketBadgeStyles[channel] || {}).label + ' 가격전송은 준비 중입니다.'); return; }
-  var idx = DB.products.findIndex(function(p) { return String(p.code) === String(code); });
-  if (idx < 0) { alert('제품을 찾을 수 없습니다.'); return; }
-  _showPriceSyncModal([idx]);
+  var p = findProduct(code);
+  if (!p) { alert('제품을 찾을 수 없습니다.'); return; }
+  var price = p.priceNaver || 0;
+  if (!price || price <= 0) { alert('스토어팜 가격이 없습니다.'); return; }
+  // 전송 중 UI
+  var origHtml = btn.innerHTML;
+  var origBg = btn.style.background;
+  var origColor = btn.style.color;
+  btn.disabled = true;
+  btn.style.opacity = '0.7';
+  btn.style.cursor = 'wait';
+  btn.textContent = '전송 중...';
+  try {
+    // 네이버 상품 조회
+    var searchRes = await fetch('/api/naver/products?code=' + encodeURIComponent(code));
+    var searchData = await searchRes.json();
+    if (!searchData.success || !searchData.product) throw new Error('네이버 상품 미등록');
+    // 가격 수정 전송
+    var putRes = await fetch('/api/naver/products', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: price, channelProductNo: searchData.product.channelProductNo }),
+    });
+    var putData = await putRes.json();
+    if (!putData.success) throw new Error(putData.error || '전송 실패');
+    // 성공 표시
+    btn.style.background = '#1D9E75';
+    btn.style.color = '#fff';
+    btn.style.opacity = '1';
+    btn.textContent = '전송완료 ✓';
+    setTimeout(function() {
+      var cur = document.getElementById('pd-btn-sync');
+      if (!cur) return;
+      cur.disabled = false;
+      cur.style.background = origBg || '#185FA5';
+      cur.style.color = origColor || '#fff';
+      cur.style.cursor = 'pointer';
+      cur.innerHTML = origHtml;
+    }, 3000);
+  } catch (e) {
+    btn.style.background = '#CC2222';
+    btn.style.color = '#fff';
+    btn.style.opacity = '1';
+    btn.textContent = '전송실패';
+    alert('네이버 전송 실패: ' + (e.message || '알 수 없는 오류'));
+    setTimeout(function() {
+      var cur = document.getElementById('pd-btn-sync');
+      if (!cur) return;
+      cur.disabled = false;
+      cur.style.background = origBg || '#185FA5';
+      cur.style.color = origColor || '#fff';
+      cur.style.cursor = 'pointer';
+      cur.innerHTML = origHtml;
+    }, 3000);
+  }
 }
 
 function _pdGoSales() {
@@ -849,48 +903,53 @@ function _pdCalcLive(code, channel) {
     + '</div>';
 }
 
-async function _pdApplyPrice(code, channel) {
+// 로컬 저장만 — 네이버 API 호출하지 않음
+function _pdApplyPrice(code, channel) {
   var st = _marketBadgeStyles[channel];
-  if (channel !== 'naver') { alert((st ? st.label : '') + ' 가격 적용은 준비 중입니다.'); return; }
   var inp = document.getElementById('pd-new-price');
   if (!inp) return;
   var newPrice = parseInt(inp.value.replace(/,/g, ''), 10);
   if (!newPrice || newPrice <= 0) { alert('변경 가격을 입력하세요.'); return; }
-  var applyBtn = document.getElementById('pd-apply-btn');
-  if (applyBtn) { applyBtn.disabled = true; applyBtn.textContent = '전송 중…'; }
-  try {
-    // 네이버 상품 조회
-    var searchRes = await fetch('/api/naver/products?code=' + encodeURIComponent(code));
-    var searchData = await searchRes.json();
-    if (!searchData.success || !searchData.product) { alert('네이버 상품을 찾을 수 없습니다.'); return; }
-    // 가격 수정 전송
-    var putRes = await fetch('/api/naver/products', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: newPrice, channelProductNo: searchData.product.channelProductNo }),
+  var p = findProduct(code);
+  if (!p) { alert('제품을 찾을 수 없습니다.'); return; }
+  // 채널별 가격 필드 업데이트
+  var priceField = channel === 'naver' ? 'priceNaver' : channel === 'gmarket' ? 'priceOpen' : channel === 'ssg' ? 'priceSsg' : null;
+  if (!priceField) { alert('알 수 없는 채널입니다.'); return; }
+  var oldPrice = p[priceField] || 0;
+  p[priceField] = newPrice;
+  save(KEYS.products, DB.products);
+  // 가격이력 추가
+  _priceHistory.push({ code: code, channel: channel, oldPrice: oldPrice, newPrice: newPrice, timestamp: new Date().toISOString() });
+  savePriceHistory();
+  // 팝업 내 판매가/수수료 영역 갱신
+  var curEl = document.getElementById('pd-cur-price');
+  if (curEl) curEl.textContent = fmt(newPrice) + '원';
+  _pdRefreshFee(code, channel, newPrice);
+  // 가격수정 모드 해제 (버튼 자동 복원)
+  _pdCancelEdit();
+  // 단가표 테이블 갱신 (현재 탭이 catalog인 경우)
+  if (typeof renderCatalog === 'function') { try { renderCatalog(); } catch(e){} }
+  // 가격이력 테이블 다시 그리기 — 팝업 전체 재렌더 필요하므로 buildPriceHistoryTable 컨테이너만 교체
+  var popup = document.getElementById('price-detail-popup');
+  if (popup) {
+    var histLabel = popup.querySelector('span[style*="font-weight:600"]');
+    // buildPriceHistoryTable은 HTML 문자열을 리턴하므로 가격이력 섹션 div를 찾아 교체
+    var histSec = Array.from(popup.querySelectorAll('div')).find(function(d) {
+      var lbl = d.querySelector('span');
+      return lbl && lbl.textContent === '가격 변동 이력';
     });
-    var putData = await putRes.json();
-    if (!putData.success) { alert('가격 전송 실패: ' + (putData.error || '알 수 없는 오류')); return; }
-    // 성공: DB 업데이트
-    var p = findProduct(code);
-    if (p) {
-      var oldPrice = p.priceNaver || 0;
-      p.priceNaver = newPrice;
-      save(KEYS.products, DB.products);
-      // 가격이력 추가
-      _priceHistory.push({ code: code, channel: 'naver', oldPrice: oldPrice, newPrice: newPrice, timestamp: new Date().toISOString() });
-      savePriceHistory();
+    if (histSec && histSec.parentElement) {
+      // 기존 테이블 컨테이너 제거 후 재삽입
+      var old = histSec.parentElement.querySelector('.pd-history-wrap');
+      var newHist = buildPriceHistoryTable(code, channel);
+      // buildPriceHistoryTable이 반환하는 최상위 요소를 교체
+      var tmp = document.createElement('div');
+      tmp.innerHTML = newHist;
+      var existingSibling = histSec.nextElementSibling;
+      if (existingSibling) existingSibling.outerHTML = newHist;
     }
-    toast('네이버 가격 적용 완료: ' + fmt(newPrice) + '원');
-    _pdCancelEdit();
-    // 팝업 내 판매가 갱신
-    document.getElementById('pd-cur-price').textContent = fmt(newPrice) + '원';
-    _pdRefreshFee(code, channel, newPrice);
-  } catch (e) {
-    alert('네트워크 오류: ' + e.message);
-  } finally {
-    if (applyBtn) { applyBtn.disabled = false; applyBtn.textContent = (st ? st.label : '') + ' 가격 적용'; }
   }
+  toast('가격이 저장되었습니다');
 }
 
 function _pdRefreshFee(code, channel, price) {
