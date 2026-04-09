@@ -3160,6 +3160,14 @@ function buildPOListPanel() {
 
   var h = '';
 
+  // 아이템별 스크래핑용 날짜 범위 (기본: 오늘)
+  var _todayKST = new Date();
+  var _todayStr = _todayKST.getFullYear() + '-' + String(_todayKST.getMonth() + 1).padStart(2, '0') + '-' + String(_todayKST.getDate()).padStart(2, '0');
+  var _itemsDateFrom = localStorage.getItem('mw_po_items_date_from') || _todayStr;
+  var _itemsDateTo = localStorage.getItem('mw_po_items_date_to') || _todayStr;
+  // 저장된 종료일이 오늘 이전이면 오늘로 갱신 (web-ui-patterns 1.3)
+  if (_itemsDateTo < _todayStr) _itemsDateTo = _todayStr;
+
   h += '<div class="po-panel" style="max-height:calc(100vh - 320px)">';
   h += '<div class="po-panel-header"><span>밀워키 발주확정</span><div style="display:flex;gap:6px;align-items:center">';
   h += '<button class="po-hdr-btn po-hdr-del" onclick="deleteSelectedPOHistory()">선택 삭제</button>';
@@ -3168,7 +3176,11 @@ function buildPOListPanel() {
   h += '<option value="week"' + (filterEl === 'week' ? ' selected' : '') + '>이번 주</option>';
   h += '<option value="month"' + (filterEl === 'month' ? ' selected' : '') + '>이번 달</option>';
   h += '</select>';
-  h += '<button class="po-hdr-btn po-hdr-sync" onclick="startTtiOrderSync()">↻ 밀워키 주문내역 동기화</button>';
+  // 아이템별 스크래핑 날짜 범위
+  h += '<input type="date" id="po-order-items-date-from" value="' + _itemsDateFrom + '" onchange="localStorage.setItem(\'mw_po_items_date_from\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
+  h += '<span style="color:rgba(255,255,255,0.6);font-size:11px">~</span>';
+  h += '<input type="date" id="po-order-items-date-to" value="' + _itemsDateTo + '" onchange="localStorage.setItem(\'mw_po_items_date_to\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
+  h += '<button class="po-hdr-btn po-hdr-sync" onclick="startTtiOrderItemsSync()">↻ 밀워키 주문내역 동기화</button>';
   h += '<button class="po-hdr-btn po-hdr-erp" onclick="registerErpFromList()">↻ 경영박사 매입전표 등록</button>';
   h += '</div></div>';
 
@@ -3187,10 +3199,18 @@ function buildPOListPanel() {
       var _poIdx = window._poListItems.length - 1;
       var d = new Date(item.date);
       var dateStr = String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      // 구분 뱃지 — ttiPromotion 우선, 없으면 type 기반
       var typeBadge;
-      if (item.type === 'normal') typeBadge = '<span style="background:#EAECF2;color:#5A6070;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">일반</span>';
-      else if (item.type === 'foc') typeBadge = '<span style="background:#FBEAF0;color:#72243E;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">FOC</span>';
-      else typeBadge = '<span style="background:#EEEDFE;color:#3C3489;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">' + item.type + '</span>';
+      var _badgePad = 'padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500';
+      if (item.ttiPromotion) {
+        var _pmo = item.ttiPromotion;
+        if (_pmo === '일반')        typeBadge = '<span style="background:#EAECF2;color:#5A6070;' + _badgePad + '">일반</span>';
+        else if (_pmo === 'T6')     typeBadge = '<span style="background:#EEEDFE;color:#3C3489;' + _badgePad + '">T6</span>';
+        else if (_pmo === 'PACKAGE') typeBadge = '<span style="background:#E1F5EE;color:#085041;' + _badgePad + '">PACKAGE</span>';
+        else                         typeBadge = '<span style="background:#FAEEDA;color:#633806;' + _badgePad + '">' + _pmo + '</span>';
+      } else if (item.type === 'normal') typeBadge = '<span style="background:#EAECF2;color:#5A6070;' + _badgePad + '">일반</span>';
+      else if (item.type === 'foc') typeBadge = '<span style="background:#FBEAF0;color:#72243E;' + _badgePad + '">FOC</span>';
+      else typeBadge = '<span style="background:#EEEDFE;color:#3C3489;' + _badgePad + '">' + item.type + '</span>';
       var erpBadge = item.erpStatus === 'done' ? '<span style="background:#E1F5EE;color:#085041;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">등록완료</span>' : '<span style="background:#FAEEDA;color:#633806;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">미등록</span>';
 
       // mw_products에서 코드/관리코드 매칭 (ttiNum 기준)
@@ -10873,6 +10893,14 @@ window.addEventListener('message', function(event) {
     }
     toast('주문내역 동기화 완료: ' + event.data.orders.length + '건');
   }
+
+  // Phase 2: TTI 아이템별 주문내역 수신
+  if (event.data && event.data.type === 'TTI_ORDER_ITEMS_DATA') {
+    var _items = event.data.items || [];
+    console.log('[app] TTI 아이템별 주문내역 수신:', _items.length, '건 (', event.data.dateFrom, '~', event.data.dateTo, ')');
+    syncOrderItems(_items, event.data.dateFrom, event.data.dateTo);
+    save('mw_order_sync_time', new Date().toISOString());
+  }
 });
 
 // 페이지 로드 시 확장 확인 + 뱃지 초기화
@@ -10912,6 +10940,156 @@ function startTtiOrderSync() {
   console.log('[TTI연동] 주문내역 동기화 요청:', startDate, '~', endDate);
   window.postMessage({ type: 'DAEHAN_SCRAPE_ORDER_HISTORY', startDate: startDate, endDate: endDate }, '*');
   showTtiSyncProgress('주문내역 수집 중...');
+}
+
+// Phase 2: TTI 아이템별 주문내역 동기화 요청 (order_list_sub_new.html)
+function startTtiOrderItemsSync() {
+  if (!window._daehanExtensionReady) {
+    alert('크롬 확장 프로그램이 설치되어 있지 않습니다.');
+    return;
+  }
+  var fromEl = document.getElementById('po-order-items-date-from');
+  var toEl = document.getElementById('po-order-items-date-to');
+  var dateFrom = (fromEl && fromEl.value) || '';
+  var dateTo = (toEl && toEl.value) || '';
+  if (!dateFrom || !dateTo) {
+    alert('시작일과 종료일을 입력해주세요.');
+    return;
+  }
+  if (dateFrom > dateTo) {
+    alert('시작일이 종료일보다 클 수 없습니다.');
+    return;
+  }
+  console.log('[TTI연동] 아이템별 주문내역 동기화 요청:', dateFrom, '~', dateTo);
+  window.postMessage({ type: 'DAEHAN_SCRAPE_ORDER_ITEMS', dateFrom: dateFrom, dateTo: dateTo }, '*');
+  showTtiSyncProgress('아이템별 주문내역 수집 중...');
+}
+
+// Phase 2: 아이템별 주문내역 → mw_po_history 저장
+// 중복 체크 키: ttiOrderItemKey = orderNo + '|' + 정규화된 productCode
+function syncOrderItems(items, dateFrom, dateTo) {
+  hideTtiSyncProgress();
+  if (!items || items.length === 0) {
+    alert('수신된 아이템별 주문내역이 없습니다.\n날짜 범위를 확인해주세요.');
+    return;
+  }
+
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var updated = 0;
+  var created = 0;
+
+  // 제품 맵 구성 (ttiNum 정규화 기준)
+  var _prodByCode = {};
+  (DB.products || []).forEach(function(p) {
+    if (p.ttiNum) _prodByCode[normalizeTtiCode(p.ttiNum)] = p;
+  });
+
+  // 기존 ttiOrderItemKey 맵 (업데이트용)
+  var _existingKeys = {};
+  for (var hi = 0; hi < history.length; hi++) {
+    if (history[hi].ttiOrderItemKey) _existingKeys[history[hi].ttiOrderItemKey] = history[hi];
+  }
+
+  items.forEach(function(item) {
+    var normCode = normalizeTtiCode(item.productCode || '');
+    var key = (item.orderNo || '') + '|' + normCode;
+    var matchedProd = _prodByCode[normCode] || null;
+
+    // type/subtab 분류 (프로모션 값 기준)
+    var promo = (item.promotion || '').trim();
+    var type, subtab;
+    if (!promo || promo === '일반')        { type = 'normal';  subtab = 'normal'; }
+    else if (promo === 'T6')               { type = 'T6';      subtab = 'promo-t6'; }
+    else if (promo === 'PACKAGE')          { type = 'PACKAGE'; subtab = 'promo-package'; }
+    else                                    { type = promo;    subtab = 'promo-' + promo.toLowerCase(); }
+
+    // 날짜 ISO 형식 변환 (YYYY-MM-DD → YYYY-MM-DDTHH:MM:SS, YYYY.MM.DD → YYYY-MM-DD)
+    var isoDate = (item.orderDate || '').replace(/\./g, '-');
+    if (isoDate && isoDate.length === 10) isoDate += 'T00:00:00';
+
+    var _supply = item.supplyPrice || 0;
+    var _qty = item.qty || 0;
+    var _amount = _supply * _qty;
+
+    var entry = _existingKeys[key];
+    if (entry) {
+      // 업데이트
+      entry.date = isoDate;
+      entry.type = type;
+      entry.subtab = subtab;
+      entry.qty = _qty;
+      entry.supplyPrice = _supply;
+      entry.amount = _amount;
+      entry.ttiOrderNo = item.orderNo || entry.ttiOrderNo;
+      entry.ttiOrderDate = item.orderDate || entry.ttiOrderDate;
+      entry.ttiOrderAmount = _amount;
+      entry.ttiUnitPrice = item.unitPrice || 0;
+      entry.ttiSupplyPrice = _supply;
+      entry.ttiPromotion = promo;
+      entry.ttiItemType = item.itemType || '';
+      entry.ttiBrand = item.brand || '';
+      entry.ttiMonth = item.month || '';
+      entry.ttiDealerNo = item.dealerNo || '';
+      entry.ttiDealerName = item.dealerName || '';
+      entry.ttiConsolidatedDealer = item.consolidatedDealer || '';
+      entry.ttiSalesRep = item.salesRep || '';
+      if (matchedProd) {
+        entry.manageCode = matchedProd.code || entry.manageCode || '';
+        entry.ttiNum = matchedProd.ttiNum || entry.ttiNum || normCode;
+        entry.model = matchedProd.model || entry.model;
+        entry.category = matchedProd.category || entry.category || '';
+      }
+      updated++;
+    } else {
+      // 신규 항목
+      history.push({
+        id: 'tti_item_' + (item.orderNo || '') + '_' + normCode + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        ttiOrderItemKey: key,
+        date: isoDate,
+        type: type,
+        subtab: subtab,
+        promoName: (promo && promo !== '일반') ? promo : '',
+        manageCode: matchedProd ? (matchedProd.code || '') : '',
+        ttiNum: matchedProd ? (matchedProd.ttiNum || '') : normCode,
+        model: matchedProd ? (matchedProd.model || '') : (item.modelName || ''),
+        category: matchedProd ? (matchedProd.category || '') : '',
+        qty: _qty,
+        supplyPrice: _supply,
+        costPrice: 0,
+        amount: _amount,
+        orderNumber: '',
+        dryRun: false,
+        erpStatus: 'external',
+        remark: '',
+        ttiOrderNo: item.orderNo || '',
+        ttiOrderDate: item.orderDate || '',
+        ttiOrderStatus: '주문접수',
+        ttiOrderAmount: _amount,
+        ttiUnitPrice: item.unitPrice || 0,
+        ttiSupplyPrice: _supply,
+        ttiPromotion: promo,
+        ttiItemType: item.itemType || '',
+        ttiBrand: item.brand || '',
+        ttiMonth: item.month || '',
+        ttiDealerNo: item.dealerNo || '',
+        ttiDealerName: item.dealerName || '',
+        ttiConsolidatedDealer: item.consolidatedDealer || '',
+        ttiSalesRep: item.salesRep || '',
+        source: 'tti-scrape-items'
+      });
+      _existingKeys[key] = history[history.length - 1];
+      created++;
+    }
+  });
+
+  save('mw_po_history', history);
+  console.log('[Phase2] 아이템별 주문내역 동기화:', created, '건 추가,', updated, '건 갱신');
+
+  // 발주확정 탭 테이블 새로고침
+  var confirmedContent = document.getElementById('po-content-confirmed');
+  if (confirmedContent) confirmedContent.innerHTML = buildPOListPanel();
+
+  alert('아이템별 주문내역 동기화 완료: ' + items.length + '건 (' + created + '건 추가, ' + updated + '건 갱신)');
 }
 
 // 스크래핑 진행 상태 표시
