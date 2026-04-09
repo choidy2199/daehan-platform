@@ -6225,7 +6225,163 @@ function mwEditAction(action) {
     toast(cnt + '개 제품 단종 처리 완료');
     return;
   }
+
+  if (action === 'priceSync') {
+    if (indices.length === 0) { alert('제품을 선택해주세요'); return; }
+    _showPriceSyncModal(indices);
+    return;
+  }
 }
+
+// ── 가격 전송 모달 ──
+var _priceSyncCancelled = false;
+
+function _showPriceSyncModal(indices) {
+  var old = document.getElementById('price-sync-modal');
+  if (old) old.remove();
+
+  var products = indices.map(function(i) { return DB.products[i]; }).filter(Boolean);
+  var count = products.length;
+
+  var html = '<div class="modal-bg show" id="price-sync-modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:300;justify-content:center;align-items:flex-start;padding-top:60px">' +
+    '<div class="modal" id="price-sync-inner" style="max-width:520px;width:92%;border-radius:10px;background:white;overflow:hidden">' +
+      '<div class="modal-header" style="padding:14px 20px;border-bottom:1px solid #DDE1EB;display:flex;justify-content:space-between;align-items:center">' +
+        '<h3 style="font-size:16px;font-weight:600;margin:0">가격 전송 — ' + count + '개 제품</h3>' +
+        '<button onclick="_closePriceSyncModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9BA3B2">&times;</button>' +
+      '</div>' +
+      '<div id="price-sync-body" style="padding:20px">' +
+        '<div style="font-size:13px;color:#5A6070;margin-bottom:16px">전송할 마켓을 선택하세요</div>' +
+        '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">' +
+          '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #DDE1EB;border-radius:6px;cursor:pointer"><input type="checkbox" id="ps-naver" checked style="accent-color:#185FA5;width:16px;height:16px"><span style="font-size:13px;font-weight:500">네이버 스토어팜</span></label>' +
+          '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #EAECF2;border-radius:6px;opacity:0.5;cursor:not-allowed"><input type="checkbox" disabled style="width:16px;height:16px"><span style="font-size:13px;color:#9BA3B2">G마켓/옥션</span><span style="font-size:10px;background:#EAECF2;color:#9BA3B2;padding:2px 6px;border-radius:3px;margin-left:auto">미구현</span></label>' +
+          '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #EAECF2;border-radius:6px;opacity:0.5;cursor:not-allowed"><input type="checkbox" disabled style="width:16px;height:16px"><span style="font-size:13px;color:#9BA3B2">SSG</span><span style="font-size:10px;background:#EAECF2;color:#9BA3B2;padding:2px 6px;border-radius:3px;margin-left:auto">미구현</span></label>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:flex-end;gap:8px">' +
+          '<button class="btn-secondary" onclick="_closePriceSyncModal()">취소</button>' +
+          '<button class="btn-primary" onclick="_startPriceSync()">전송 시작</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('price-sync-modal')._products = products;
+  var modalEl = document.getElementById('price-sync-inner');
+  var handleEl = modalEl ? modalEl.querySelector('.modal-header') : null;
+  if (modalEl && handleEl) _makeDraggable(modalEl, handleEl);
+}
+
+function _closePriceSyncModal() {
+  _priceSyncCancelled = true;
+  var el = document.getElementById('price-sync-modal');
+  if (el) el.remove();
+}
+
+async function _startPriceSync() {
+  var modal = document.getElementById('price-sync-modal');
+  if (!modal) return;
+  var products = modal._products || [];
+  if (products.length === 0) return;
+
+  var naver = document.getElementById('ps-naver');
+  if (!naver || !naver.checked) { alert('전송할 마켓을 선택하세요'); return; }
+
+  _priceSyncCancelled = false;
+  var total = products.length;
+  var success = [];
+  var failed = [];
+
+  // 프로그레스 화면으로 전환
+  var body = document.getElementById('price-sync-body');
+  body.innerHTML =
+    '<div style="margin-bottom:12px">' +
+      '<div style="background:#F4F6FA;border-radius:6px;height:8px;overflow:hidden"><div id="ps-bar" style="height:100%;background:#185FA5;width:0%;transition:width 0.3s"></div></div>' +
+      '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#9BA3B2"><span id="ps-progress-text">0 / ' + total + '</span><span id="ps-percent">0%</span></div>' +
+    '</div>' +
+    '<div id="ps-current" style="font-size:12px;color:#5A6070;margin-bottom:12px">준비 중...</div>' +
+    '<div style="display:flex;gap:16px;margin-bottom:16px">' +
+      '<span id="ps-success" style="font-size:13px;color:#1D9E75;font-weight:500">✅ 성공: 0</span>' +
+      '<span id="ps-fail" style="font-size:13px;color:#CC2222;font-weight:500">❌ 실패: 0</span>' +
+    '</div>' +
+    '<div style="text-align:right"><button class="btn-secondary" onclick="_priceSyncCancelled=true">전송 중단</button></div>';
+
+  for (var i = 0; i < total; i++) {
+    if (_priceSyncCancelled) break;
+    var p = products[i];
+    var code = String(p.code || '').trim();
+    var price = p.priceNaver || 0;
+
+    document.getElementById('ps-current').textContent = (p.model || code) + ' (' + (i + 1) + '/' + total + ')';
+    document.getElementById('ps-bar').style.width = Math.round(((i) / total) * 100) + '%';
+    document.getElementById('ps-progress-text').textContent = i + ' / ' + total;
+    document.getElementById('ps-percent').textContent = Math.round((i / total) * 100) + '%';
+
+    if (!code) { failed.push({ code: code, model: p.model, reason: '코드 없음' }); _updatePsCounters(success, failed); continue; }
+    if (!price || price <= 0) { failed.push({ code: code, model: p.model, reason: '스토어팜 가격 없음' }); _updatePsCounters(success, failed); continue; }
+
+    try {
+      // 1. 판매자코드로 네이버 상품 조회
+      var searchRes = await fetch('/api/naver/products?code=' + encodeURIComponent(code));
+      var searchData = await searchRes.json();
+      if (!searchData.success || !searchData.product) {
+        failed.push({ code: code, model: p.model, reason: '네이버 상품 미등록' });
+        _updatePsCounters(success, failed);
+        await _psDelay(2000);
+        continue;
+      }
+
+      // 2. 가격 수정 전송
+      var putRes = await fetch('/api/naver/products', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: price }),
+      });
+      var putData = await putRes.json();
+      if (putData.success) {
+        success.push({ code: code, model: p.model });
+      } else {
+        failed.push({ code: code, model: p.model, reason: putData.error || '전송 실패' });
+      }
+    } catch (e) {
+      failed.push({ code: code, model: p.model, reason: e.message || '네트워크 오류' });
+    }
+    _updatePsCounters(success, failed);
+    // RPS 제한: 2초 딜레이
+    if (i < total - 1 && !_priceSyncCancelled) await _psDelay(2000);
+  }
+
+  // 최종 프로그레스 업데이트
+  if (!_priceSyncCancelled) {
+    document.getElementById('ps-bar').style.width = '100%';
+    document.getElementById('ps-progress-text').textContent = total + ' / ' + total;
+    document.getElementById('ps-percent').textContent = '100%';
+  }
+
+  // 결과 화면
+  var resultHtml = '<div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:600;margin-bottom:8px">' + (_priceSyncCancelled ? '전송 중단됨' : '전송 완료') + '</div>' +
+    '<div style="font-size:14px"><span style="color:#1D9E75;font-weight:600">✅ 성공: ' + success.length + '건</span> &nbsp; <span style="color:#CC2222;font-weight:600">❌ 실패: ' + failed.length + '건</span></div></div>';
+  if (failed.length > 0) {
+    resultHtml += '<div style="max-height:200px;overflow-y:auto;border:1px solid #FCEBEB;border-radius:6px"><table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      '<thead><tr style="background:#FCEBEB"><th style="padding:6px 10px;text-align:left">코드</th><th style="padding:6px 10px;text-align:left">모델명</th><th style="padding:6px 10px;text-align:left">실패 사유</th></tr></thead><tbody>';
+    failed.forEach(function(f) {
+      resultHtml += '<tr><td style="padding:4px 10px;border-top:1px solid #FEE2E2">' + (f.code || '-') + '</td><td style="padding:4px 10px;border-top:1px solid #FEE2E2">' + (f.model || '-') + '</td><td style="padding:4px 10px;border-top:1px solid #FEE2E2;color:#CC2222">' + f.reason + '</td></tr>';
+    });
+    resultHtml += '</tbody></table></div>';
+  } else if (!_priceSyncCancelled) {
+    resultHtml += '<div style="text-align:center;color:#1D9E75;font-size:13px">모든 제품의 가격이 성공적으로 전송되었습니다</div>';
+  }
+  resultHtml += '<div style="text-align:right;margin-top:16px"><button class="btn-primary" onclick="_closePriceSyncModal()">확인</button></div>';
+  body.innerHTML = resultHtml;
+}
+
+function _updatePsCounters(success, failed) {
+  var s = document.getElementById('ps-success');
+  var f = document.getElementById('ps-fail');
+  if (s) s.textContent = '✅ 성공: ' + success.length;
+  if (f) f.textContent = '❌ 실패: ' + failed.length;
+}
+
+function _psDelay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
 // ── 일괄 수정 모달 ──
 // ── 제품별 탭 방식 일괄 수정 모달 ──

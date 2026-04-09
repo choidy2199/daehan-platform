@@ -127,6 +127,26 @@ export async function getNaverProducts(page = 1, size = 100) {
 }
 
 /**
+ * 판매자관리코드로 네이버 상품 조회
+ */
+export async function findNaverProductByCode(sellerCode: string) {
+  const result = await naverApi('POST', '/v1/products/search', {
+    page: 1,
+    size: 1,
+    sellerManagementCode: sellerCode,
+    statusTypes: ['SALE', 'SUSPENSION', 'OUTOFSTOCK'],
+  });
+  const product = result?.contents?.[0];
+  if (!product) return null;
+  return {
+    originProductNo: product.originProductNo,
+    channelProductNo: product.channelProducts?.[0]?.channelProductNo,
+    salePrice: product.channelProducts?.[0]?.salePrice,
+    name: product.channelProducts?.[0]?.name,
+  };
+}
+
+/**
  * 네이버 단건 가격 수정
  */
 export async function updateNaverPrice(originProductNo: string, newPrice: number) {

@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getNaverProducts, updateNaverPrice } from '@/lib/naver';
+import { getNaverProducts, updateNaverPrice, findNaverProductByCode } from '@/lib/naver';
 
 // GET /api/naver/products?page=1&size=100
+// GET /api/naver/products?code=21815 (판매자관리코드로 단건 조회)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const code = searchParams.get('code');
+
+    // 판매자관리코드로 단건 조회
+    if (code) {
+      const product = await findNaverProductByCode(code);
+      if (!product) {
+        return NextResponse.json({ success: false, error: '해당 코드의 상품을 찾을 수 없습니다', code }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, product });
+    }
+
+    // 전체 목록 조회
     const page = Number(searchParams.get('page') || '1');
     const size = Number(searchParams.get('size') || '100');
 
