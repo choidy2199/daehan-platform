@@ -1451,7 +1451,7 @@ function renderCatalog() {
     const cc = getCategoryColor(p.category);
     _catalogRowNum = (_catalogRowNum || 0) + 1;
     return `<tr class="${isD ? 'row-discontinued' : ''}">
-      <td class="mw-no-col center" style="width:40px;min-width:40px;font-size:11px;color:#9BA3B2" data-code="${p.code}">${_catalogRowNum}</td>
+      <td class="mw-no-col center" style="width:40px;min-width:40px;font-size:11px;color:#9BA3B2" data-idx="${idx}">${_catalogRowNum}</td>
       <td style="font-weight:500">${p.code}</td>
       <td>${p.manageCode || '-'}</td>
       <td><span style="background:${cc.bg};color:${cc.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${p.category || '-'}</span></td>
@@ -1551,8 +1551,8 @@ function renderCatalog() {
     body.querySelectorAll('.mw-no-col').forEach(function(td) {
       if (td.querySelector('.mw-edit-cb')) return;
       td._origHTML = td.innerHTML;
-      var code = td.dataset.code || '';
-      td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + code + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
+      var pidx = td.dataset.idx || '';
+      td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + pidx + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
     });
     updateMwEditSelection();
   }
@@ -1580,8 +1580,8 @@ function renderCatalog() {
               body.querySelectorAll('.mw-no-col').forEach(function(td) {
                 if (td.querySelector('.mw-edit-cb')) return;
                 td._origHTML = td.innerHTML;
-                var code = td.dataset.code || '';
-                td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + code + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
+                var pidx = td.dataset.idx || '';
+                td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + pidx + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
               });
               updateMwEditSelection();
             }
@@ -6131,11 +6131,11 @@ function _enterMwEditMode() {
     noTh._origHTML = noTh.innerHTML;
     noTh.innerHTML = '<input type="checkbox" id="mw-edit-checkall" onchange="toggleAllMwEditCheckbox(this)" style="width:15px;height:15px;accent-color:#185FA5">';
   }
-  // No. td → 체크박스로 교체
+  // No. td → 체크박스로 교체 (data-idx 기반)
   body.querySelectorAll('.mw-no-col').forEach(function(td) {
     td._origHTML = td.innerHTML;
-    var code = td.dataset.code || '';
-    td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + code + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
+    var pidx = td.dataset.idx || '';
+    td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + pidx + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
   });
   // 액션바 표시
   var bar = document.getElementById('mw-edit-action-bar');
@@ -6176,41 +6176,43 @@ function updateMwEditSelection() {
   if (barCb) barCb.checked = (checked === total && total > 0);
 }
 
-function mwEditAction(action) {
-  console.log('[mwEditAction] action:', action);
-  var checkedRows = document.querySelectorAll('.mw-edit-cb:checked');
-  console.log('[mwEditAction] checkedRows:', checkedRows.length);
-  var codes = [];
-  checkedRows.forEach(function(cb) {
-    console.log('[mwEditAction] cb.value:', cb.value, 'checked:', cb.checked);
-    if (cb.value) codes.push(cb.value);
+function _getCheckedProductIndices() {
+  var indices = [];
+  document.querySelectorAll('.mw-edit-cb:checked').forEach(function(cb) {
+    var v = parseInt(cb.value);
+    if (!isNaN(v) && v >= 0 && v < DB.products.length) indices.push(v);
   });
-  console.log('[mwEditAction] codes:', codes.length, codes.slice(0,3));
+  return indices;
+}
+
+function mwEditAction(action) {
+  var indices = _getCheckedProductIndices();
 
   if (action === 'modify') {
-    if (codes.length === 0) { alert('제품을 선택해주세요'); return; }
-    _showMwBulkEditModal(codes);
+    if (indices.length === 0) { alert('제품을 선택해주세요'); return; }
+    _showMwBulkEditModal(indices);
     return;
   }
 
   if (action === 'delete') {
-    if (codes.length === 0) { alert('제품을 선택해주세요'); return; }
-    if (!confirm('선택하신 ' + codes.length + '개 제품을 삭제하시겠습니까?')) return;
-    DB.products = DB.products.filter(function(p) { return codes.indexOf(String(p.code)) === -1; });
+    if (indices.length === 0) { alert('제품을 선택해주세요'); return; }
+    if (!confirm('선택하신 ' + indices.length + '개 제품을 삭제하시겠습니까?')) return;
+    var delSet = new Set(indices);
+    DB.products = DB.products.filter(function(p, i) { return !delSet.has(i); });
     recalcAll();
     save(KEYS.products, DB.products);
     renderCatalog();
     _enterMwEditMode();
-    toast(codes.length + '개 제품 삭제 완료');
+    toast(indices.length + '개 제품 삭제 완료');
     return;
   }
 
   if (action === 'discontinue') {
-    if (codes.length === 0) { alert('제품을 선택해주세요'); return; }
-    if (!confirm('선택하신 ' + codes.length + '개 제품을 단종 처리하시겠습니까?')) return;
+    if (indices.length === 0) { alert('제품을 선택해주세요'); return; }
+    if (!confirm('선택하신 ' + indices.length + '개 제품을 단종 처리하시겠습니까?')) return;
     var cnt = 0;
-    DB.products.forEach(function(p) {
-      if (codes.indexOf(String(p.code)) !== -1 && !p.discontinued) { p.discontinued = '단종'; cnt++; }
+    indices.forEach(function(i) {
+      if (!DB.products[i].discontinued) { DB.products[i].discontinued = '단종'; cnt++; }
     });
     recalcAll();
     save(KEYS.products, DB.products);
@@ -6219,32 +6221,33 @@ function mwEditAction(action) {
     toast(cnt + '개 제품 단종 처리 완료');
     return;
   }
-
-  console.log('액션:', action, '선택:', codes.length, '개', codes);
 }
 
 // ── 일괄 수정 모달 ──
 // ── 제품별 탭 방식 일괄 수정 모달 ──
 var _mwBulkEditData = []; // [{code, ...fields}, ...]
 var _mwBulkOrigData = []; // 원본 데이터 (변경 감지용)
+var _mwBulkIndices = []; // DB.products 인덱스 배열
 var _mwBulkActiveIdx = 0;
 var _mwBulkFields = ['code','manageCode','category','subcategory','detail','orderNum','ttiNum','model','supplyPrice'];
 var _mwBulkLabels = ['코드','관리코드','대분류','중분류','소분류','프로모션No.','TTI#','모델명','공급가'];
 
-function _showMwBulkEditModal(codes) {
+function _showMwBulkEditModal(indices) {
   var old = document.getElementById('mw-bulk-edit-modal');
   if (old) old.remove();
 
-  // DB에서 선택된 제품 데이터 복사 (String 비교로 타입 불일치 방지)
+  // DB에서 선택된 제품 데이터 복사 (인덱스 기반)
   _mwBulkEditData = [];
   _mwBulkOrigData = [];
-  codes.forEach(function(code) {
-    var p = DB.products.find(function(x) { return String(x.code).trim() === String(code).trim(); });
+  _mwBulkIndices = [];
+  indices.forEach(function(idx) {
+    var p = DB.products[idx];
     if (!p) return;
     var copy = {}, orig = {};
     _mwBulkFields.forEach(function(k) { copy[k] = p[k] !== undefined && p[k] !== null ? p[k] : ''; orig[k] = copy[k]; });
     _mwBulkEditData.push(copy);
     _mwBulkOrigData.push(orig);
+    _mwBulkIndices.push(idx);
   });
   if (_mwBulkEditData.length === 0) { alert('선택된 제품을 찾을 수 없습니다'); return; }
   _mwBulkActiveIdx = 0;
@@ -6346,6 +6349,7 @@ function closeMwBulkEditModal() {
   if (el) el.remove();
   _mwBulkEditData = [];
   _mwBulkOrigData = [];
+  _mwBulkIndices = [];
   _mwBulkActiveIdx = 0;
   _mwBulkTabReady = false;
 }
@@ -6356,7 +6360,8 @@ function applyMwBulkEdit() {
 
   var updated = 0;
   _mwBulkEditData.forEach(function(d, di) {
-    var p = DB.products.find(function(x) { return String(x.code).trim() === String(d.code).trim(); });
+    var pidx = _mwBulkIndices[di];
+    var p = DB.products[pidx];
     if (!p) return;
     var orig = _mwBulkOrigData[di] || {};
     var changed = false;
@@ -6367,7 +6372,6 @@ function applyMwBulkEdit() {
         newVal = parseInt(newVal) || 0;
         origVal = parseInt(origVal) || 0;
       }
-      // 원본과 비교하여 변경 감지
       if (String(newVal) !== String(origVal)) {
         p[k] = newVal;
         changed = true;
