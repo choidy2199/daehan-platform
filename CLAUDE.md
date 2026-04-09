@@ -209,6 +209,41 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - 모달 드래그: _makeDraggable 범용 헬퍼 (제품수정/설정/가격전송 팝업 적용)
   - 제품 저장 후 input 필드 자동 초기화
 
+- [2026-04-09] 가격 상세 팝업 리디자인 + 가격수정/가격전송 역할 분리
+  - openPriceDetail: 헤더에 ▲가격전송/판매관리/가격수정 버튼 3개 추가 (3개 마켓 공통)
+  - 가격수정 모드: 변경가 입력 → 실시간 VAT/수수료/정산/마진/마크업 재계산 (_pdCalcLive)
+  - _pdApplyPrice: 로컬만 저장 (DB.products + mw_price_history + renderCatalog + _pdCancelEdit)
+  - _pdPriceSync: 네이버 API 단건 전송 (전송중/전송완료✓/전송실패 3초 UI + 마켓명 매핑)
+  - 가격수정 모드 중 ▲가격전송/판매관리 비활성화 → _pdCancelEdit 시 복원
+  - 팝업 드래그(_makeDraggable) + max-height calc(100vh-100px) 반응형
+  - 하단 "확인" 버튼 3개 마켓 통일
+  - 가격 적용 후 편집모드+체크박스 인덱스 저장/복원 (renderCatalog 후 toggleMwEditMode 재진입)
+
+- [2026-04-09] 네이버 API 속도 개선 + 측정 로그
+  - getAccessToken: 토큰 3시간(90%) 캐싱 (_cachedToken/_cachedTokenExpiresAt)
+  - naverApi: skipRateLimit 옵션 추가 → 단건 경로에서 550ms 대기 제거
+  - updateNaverPrice: fast 옵션으로 GET/PUT 모두 rateLimit 스킵
+  - _ensureNaverCodeMap: 중복 rateLimit 제거 (naverApi 내부에만 유지) → 캐시 로드 시간 절반
+  - updateNaverPrice: 검증용 재조회 GET 제거 (PUT 후 불필요한 2차 조회)
+  - PUT /api/naver/products: {code, newPrice} 단건 최적화 경로 추가 (findByCode→update 일괄 처리)
+  - [PERF] 측정 로그: token cache HIT/MISS, codeMap 상태, naverApi 단계별 latency (Vercel 로그)
+
+- [2026-04-09] 마켓 뱃지/헤더 색상 통일 + 데이터 레이아웃
+  - _marketBadgeStyles: priceColor + border 필드 추가 (naver/gmarket/ssg)
+  - marketBadge: 마켓명 텍스트 제거 + 금액 15px 진한색 + 마진 11px + 1px border
+  - SSG 색상: #FEF3C7 → #FDF6E3 + #D4A843 border + #7A5C00 진한 골드
+  - index.html: 밀워키/일반제품/검색및견적 3개 테이블 헤더 th 배경 통일
+    - 스토어팜 #1D9E75, 오픈마켓 #185FA5, SSG #B8860B (텍스트 #fff)
+  - buildRow: _costP 계산 상단 리팩터링 → 원가P/A(도매) 셀에서 재사용
+  - 원가P 컬럼: 공급가 대비 마진%/차이금액 표시 (음수 빨강)
+  - A(도매) 컬럼: 원가P 대비 마진%/차이금액 (원가P 없으면 원가 대비)
+
+- [2026-04-09] 발주탭 제품/주문목록 테이블 스타일 통일
+  - .po-table 공통 CSS: th 12px/600 #EAECF2 + td 13px/400 #1A1D23 + hover #F4F6FA
+  - th sticky top:0 z-index:10 + box-shadow로 border-bottom 대체
+  - 주문목록 구조 변경: .po-panel overflow 제거 + .po-table-wrap → .po-panel-body 교체
+  - .po-panel-header/.po-register-row/.po-summary flex-shrink:0 (스크롤 바깥 고정)
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인
