@@ -1504,6 +1504,16 @@ function renderCatalog() {
 
   body.innerHTML = renderBatch(0, INITIAL_ROWS);
 
+  // 편집 모드 중이면 새로 렌더링된 행에 체크박스 삽입
+  if (_mwEditMode) {
+    body.querySelectorAll('tr:not(:has(.mw-edit-cb))').forEach(function(tr) {
+      var td = document.createElement('td');
+      td.innerHTML = '<input type="checkbox" class="mw-edit-cb" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
+      tr.insertBefore(td, tr.firstChild);
+    });
+    updateMwEditSelection();
+  }
+
   // 스크롤 시 나머지 행 점진 로드 — 이전 리스너 제거 후 재등록
   var scrollContainer = body.closest('.table-scroll');
   if (scrollContainer) {
@@ -1520,7 +1530,18 @@ function renderCatalog() {
         _loadingMore = true;
         requestAnimationFrame(function() {
           var html = renderBatch(_catalogRenderedCount, 100);
-          if (html) body.insertAdjacentHTML('beforeend', html);
+          if (html) {
+            body.insertAdjacentHTML('beforeend', html);
+            // 편집 모드 중이면 새로 추가된 행에 체크박스 삽입
+            if (_mwEditMode) {
+              body.querySelectorAll('tr:not(:has(.mw-edit-cb))').forEach(function(tr) {
+                var td = document.createElement('td');
+                td.innerHTML = '<input type="checkbox" class="mw-edit-cb" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
+                tr.insertBefore(td, tr.firstChild);
+              });
+              updateMwEditSelection();
+            }
+          }
           _loadingMore = false;
           if (_catalogRenderedCount >= allRows.length && scrollContainer._catalogScroll) {
             scrollContainer.removeEventListener('scroll', scrollContainer._catalogScroll);
