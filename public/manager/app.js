@@ -1725,6 +1725,31 @@ function renderCatalog() {
     const isD = !!p.discontinued;
     const cc = getCategoryColor(p.category);
     _catalogRowNum = (_catalogRowNum || 0) + 1;
+
+    // 원가P 최신값 계산 (A(도매) 마진 계산에도 재사용)
+    var _costP = 0;
+    (function() {
+      var code = String(p.code);
+      var results = [];
+      var now = Date.now();
+      var weekMs = 7 * 24 * 60 * 60 * 1000;
+      (orderHistory || []).forEach(function(record) {
+        if ((now - new Date(record.date).getTime()) < weekMs) {
+          (record.items || []).forEach(function(it) {
+            if (String(it.code) === code) results.push({ cost: it.cost });
+          });
+        }
+      });
+      (poHistory || []).forEach(function(record) {
+        if ((now - new Date(record.date).getTime()) < weekMs) {
+          (record.items || []).forEach(function(it) {
+            if (String(it.code) === code) results.push({ cost: it.cost });
+          });
+        }
+      });
+      if (results.length) _costP = results[results.length - 1].cost || 0;
+    })();
+
     return `<tr class="${isD ? 'row-discontinued' : ''}">
       <td class="mw-no-col center" style="width:40px;min-width:40px;font-size:11px;color:#9BA3B2" data-idx="${idx}">${_catalogRowNum}</td>
       <td style="font-weight:500">${p.code}</td>
@@ -1738,35 +1763,40 @@ function renderCatalog() {
       <td class="num">${fmt(p.supplyPrice)}</td>
       <td class="num">${fmt(p.cost)}</td>
       ${(function() {
-  const code = String(p.code);
-  const results = [];
-  const now = Date.now();
-  const weekMs = 7 * 24 * 60 * 60 * 1000;
-  (orderHistory || []).forEach(function(record) {
-    if ((now - new Date(record.date).getTime()) < weekMs) {
-      (record.items || []).forEach(function(it) {
-        if (String(it.code) === code) {
-          results.push({ cost: it.cost });
+        if (!_costP) {
+          return '<td class="num" style="background:#FEFAFA;color:#9BA3B2">-</td>';
         }
-      });
-    }
-  });
-  (poHistory || []).forEach(function(record) {
-    if ((now - new Date(record.date).getTime()) < weekMs) {
-      (record.items || []).forEach(function(it) {
-        if (String(it.code) === code) {
-          results.push({ cost: it.cost });
+        var code = String(p.code);
+        // 공급가 대비 마진
+        var supply = p.supplyPrice || 0;
+        var marginLine = '';
+        if (supply > 0) {
+          var diff = _costP - supply;
+          var rate = (diff / supply) * 100;
+          var col = diff >= 0 ? '#1D9E75' : '#CC2222';
+          var sign = diff >= 0 ? '+' : '';
+          marginLine = '<div style="font-size:11px;font-weight:500;color:' + col + ';margin-top:1px">' + rate.toFixed(1) + '% ' + sign + fmt(diff) + '</div>';
         }
-      });
-    }
-  });
-  if (!results.length) {
-    return '<td class="num" style="background:#FEFAFA;color:#9BA3B2">-</td>';
-  }
-  var latest = results[results.length - 1];
-  return '<td class="num" style="background:#FEFAFA"><span style="color:#CC2222;font-weight:700">' + fmt(latest.cost) + '</span> <span onclick="showPromoPop(event,\'' + code + '\')" style="display:inline-block;background:#CC2222;color:white;font-size:10px;font-weight:700;padding:1px 4px;border-radius:3px;cursor:pointer;vertical-align:middle">P</span></td>';
+        return '<td class="num" style="background:#FEFAFA">'
+          + '<div><span style="color:#CC2222;font-weight:700">' + fmt(_costP) + '</span> '
+          + '<span onclick="showPromoPop(event,\'' + code + '\')" style="display:inline-block;background:#CC2222;color:white;font-size:10px;font-weight:700;padding:1px 4px;border-radius:3px;cursor:pointer;vertical-align:middle">P</span></div>'
+          + marginLine
+          + '</td>';
       })()}
-      <td class="num">${fmt(p.priceA)}</td>
+      ${(function() {
+        var priceA = p.priceA || 0;
+        if (!priceA) return '<td class="num">-</td>';
+        var base = _costP || p.cost || 0;
+        if (!base) return '<td class="num">' + fmt(priceA) + '</td>';
+        var diff = priceA - base;
+        var rate = (diff / base) * 100;
+        var col = diff >= 0 ? '#1D9E75' : '#CC2222';
+        var sign = diff >= 0 ? '+' : '';
+        return '<td class="num">'
+          + '<div>' + fmt(priceA) + '</div>'
+          + '<div style="font-size:11px;font-weight:500;color:' + col + ';margin-top:1px">' + rate.toFixed(1) + '% ' + sign + fmt(diff) + '</div>'
+          + '</td>';
+      })()}
       <td class="num">${fmt(p.priceRetail)}</td>
       <td class="num" style="padding:4px 3px">${isD ? fmt(p.priceNaver) : marketBadge(p, 'naver')}</td>
       <td class="num" style="padding:4px 3px">${isD ? fmt(p.priceOpen) : marketBadge(p, 'gmarket')}</td>
