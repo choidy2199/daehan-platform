@@ -3188,7 +3188,7 @@ function buildPOListPanel() {
   h += '<span style="color:rgba(255,255,255,0.6);font-size:11px">~</span>';
   h += '<input type="date" id="po-order-items-date-to" value="' + _itemsDateTo + '" onchange="localStorage.setItem(\'mw_po_items_date_to\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
   h += '<button class="po-hdr-btn po-hdr-sync" onclick="startTtiOrderItemsSync()">↻ 밀워키 주문내역 동기화</button>';
-  h += '<button class="po-hdr-btn po-hdr-erp" onclick="registerErpFromList()">↻ 경영박사 매입전표 등록</button>';
+  h += '<button id="po-save-btn" class="po-save-btn" onclick="savePoConfirmed()" style="background:#185FA5;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">💾 저장</button>';
   h += '</div></div>';
 
   // 발주확정 panel-body: padding 제거 (다크 헤더와 테이블 헤더 밀착 + 테이블 풀폭)
@@ -3480,6 +3480,11 @@ function registerErpFromList() {
   checked.forEach(function(cb) { ids.push(cb.getAttribute('data-id')); });
   console.log('[발주] 경영박사 매입전표 등록 — 선택 항목:', ids);
   toast('경영박사 API 연결은 추후 구현됩니다 (' + ids.length + '건)');
+}
+
+// Phase 3 예정: mw_orders 반영, 원가계산, 프로모션 탭 분류, 버튼 → '경박 매입등록'으로 변환
+function savePoConfirmed() {
+  alert('저장 기능 — 다음 세션에서 구현 예정');
 }
 
 function togglePOListAll(el) {
