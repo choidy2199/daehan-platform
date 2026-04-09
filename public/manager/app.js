@@ -6335,7 +6335,7 @@ async function _startPriceSync() {
       var putRes = await fetch('/api/naver/products', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: price }),
+        body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: price, channelProductNo: searchData.product.channelProductNo }),
       });
       var putData = await putRes.json();
       console.log('[PriceSync] PUT 응답:', JSON.stringify(putData));

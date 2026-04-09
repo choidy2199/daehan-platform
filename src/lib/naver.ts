@@ -184,21 +184,26 @@ export async function findNaverProductByCode(sellerCode: string) {
 
 /**
  * 네이버 단건 가격 수정
+ * channelProductNo가 전달되면 검색 단계를 건너뜀 (정확 매칭 보장)
  */
-export async function updateNaverPrice(originProductNo: string, newPrice: number) {
-  // 1단계: 상품 검색으로 channelProductNo 확인
-  const searchResult = await naverApi('POST', '/v1/products/search', {
-    page: 1,
-    size: 1,
-    originProductNos: [Number(originProductNo)],
-  });
-
-  const product = searchResult?.contents?.[0];
-  const channelProductNo = product?.channelProducts?.[0]?.channelProductNo;
+export async function updateNaverPrice(originProductNo: string, newPrice: number, channelProductNo?: number) {
+  // 1단계: channelProductNo가 없으면 캐시에서 조회
+  if (!channelProductNo) {
+    const map = await _ensureNaverCodeMap();
+    // originProductNo로 캐시에서 찾기
+    for (const [, p] of map) {
+      if (String(p.originProductNo) === String(originProductNo)) {
+        channelProductNo = p.channelProducts?.[0]?.channelProductNo;
+        break;
+      }
+    }
+  }
 
   if (!channelProductNo) {
     throw new Error(`channelProductNo를 찾을 수 없습니다. originProductNo: ${originProductNo}`);
   }
+
+  console.log(`[updateNaverPrice] originProductNo: ${originProductNo}, channelProductNo: ${channelProductNo}, newPrice: ${newPrice}`);
 
   // 2단계: 채널상품 전체 정보 조회 (v2)
   const fullProduct = await naverApi('GET', `/v2/products/channel-products/${channelProductNo}`);

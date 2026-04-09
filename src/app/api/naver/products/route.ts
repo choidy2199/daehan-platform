@@ -43,11 +43,9 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { originProductNo, newPrice } = body;
+    const { originProductNo, newPrice, channelProductNo } = body;
 
     console.log('[DEBUG PUT] 요청 body:', JSON.stringify(body));
-    console.log('[DEBUG PUT] originProductNo:', originProductNo, '타입:', typeof originProductNo);
-    console.log('[DEBUG PUT] newPrice:', newPrice, '타입:', typeof newPrice);
 
     if (!originProductNo || !newPrice) {
       return NextResponse.json(
@@ -56,7 +54,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const result = await updateNaverPrice(String(originProductNo), Number(newPrice));
+    const result = await updateNaverPrice(String(originProductNo), Number(newPrice), channelProductNo ? Number(channelProductNo) : undefined);
     console.log('[DEBUG PUT] updateNaverPrice 결과 keys:', result ? Object.keys(result) : 'null');
 
     return NextResponse.json({
