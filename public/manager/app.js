@@ -1350,7 +1350,9 @@ var _tabIdMap = {
   'import-product':   { contentId: 'tab-import-product',   placeholder: true },
   'import-calc':      { contentId: 'tab-import-calc',      placeholder: true },
   'import-invoice':   { contentId: 'tab-import-invoice',   placeholder: true },
+  'delivery':         { contentId: 'tab-delivery',         placeholder: true },
   'search':           { contentId: 'tab-estimate',         render: 'estimate' },
+  'kakao':            { contentId: 'tab-kakao',            placeholder: true },
   'notice':           { contentId: 'tab-notice',           placeholder: true },
   'setting':          { contentId: 'tab-manage',           render: 'manage' }
 };

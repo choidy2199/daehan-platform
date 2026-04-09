@@ -44,14 +44,16 @@
     <span class="nav-sub" data-tab="import-invoice" onclick="switchTab('import-invoice')">인보이스</span>
     <span class="nav-sep"></span>
     <!-- 단독 메뉴 (컬러 뱃지) -->
+    <span class="nav-group-label nav-delivery" data-tab="delivery" onclick="switchTab('delivery')">택배</span>
+    <span class="nav-sep"></span>
     <span class="nav-group-label nav-search" data-tab="search" onclick="switchTab('search')">검색</span>
     <span class="nav-sep"></span>
-    <span class="nav-group-label nav-notice" data-tab="notice" onclick="switchTab('notice')">공지사항</span>
+    <span class="nav-group-label nav-kakao" data-tab="kakao" onclick="switchTab('kakao')">💬 카톡</span>
     <span class="nav-spacer"></span>
+    <!-- 우측 영역 (공지사항 → 설정 → 경박) -->
+    <span class="nav-group-label nav-notice" data-tab="notice" onclick="switchTab('notice')">공지사항</span>
     <span class="nav-solo nav-setting" data-tab="setting" onclick="switchTab('setting')">⚙ 설정</span>
-  </div>
-  <div class="header-inv-sync">
-    <button class="btn-ghost" onclick="syncInventory()">📦 경박</button>
+    <button class="nav-kb" onclick="syncInventory()">📦 경박</button>
   </div>
 </nav>
 
@@ -688,6 +690,12 @@
 </div>
 <div id="tab-notice" class="tab-content">
   <div class="tab-placeholder">공지사항 — 추후 구현 예정</div>
+</div>
+<div id="tab-delivery" class="tab-content">
+  <div class="tab-placeholder">택배 — 추후 구현 예정</div>
+</div>
+<div id="tab-kakao" class="tab-content">
+  <div class="tab-placeholder">카카오톡 — 추후 구현 예정</div>
 </div>
 
 </div><!-- /content -->
