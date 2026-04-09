@@ -509,6 +509,37 @@ function saveAll() {
 }
 
 // ======================== UTILITY ========================
+
+// 범용 모달 드래그 헬퍼
+function _makeDraggable(modalEl, handleEl) {
+  if (!modalEl || !handleEl) return;
+  handleEl.style.cursor = 'move';
+  var ox = 0, oy = 0, mx = 0, my = 0;
+  handleEl.addEventListener('mousedown', function(e) {
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+    e.preventDefault();
+    mx = e.clientX; my = e.clientY;
+    var rect = modalEl.getBoundingClientRect();
+    // 첫 드래그 시 position을 고정좌표로 전환
+    if (!modalEl._dragged) {
+      modalEl.style.position = 'fixed';
+      modalEl.style.left = rect.left + 'px';
+      modalEl.style.top = rect.top + 'px';
+      modalEl.style.margin = '0';
+      modalEl._dragged = true;
+    }
+    function onMove(e2) {
+      ox = e2.clientX - mx; oy = e2.clientY - my;
+      mx = e2.clientX; my = e2.clientY;
+      modalEl.style.left = (modalEl.offsetLeft + ox) + 'px';
+      modalEl.style.top = (modalEl.offsetTop + oy) + 'px';
+    }
+    function onUp() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
 const comma = n => { const s = String(Math.round(n)); return s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
 const fmt = n => n == null || isNaN(n) || n === 0 ? '-' : comma(n);
 const fmtN = n => n == null || isNaN(n) || n === 0 ? '-' : comma(n);
@@ -6021,6 +6052,9 @@ function showProductManageModal() {
   var agreeEl = document.getElementById('import-replace-agree');
   if (agreeEl) agreeEl.checked = false;
   updateReplaceBtn();
+  // 드래그 가능
+  var _im = document.querySelector('#import-modal > .modal');
+  if (_im && !_im._dragged) { var _imH = _im.querySelector('.modal-header'); if (_imH) _makeDraggable(_im, _imH); }
 }
 
 // 탭 전환
@@ -6157,22 +6191,25 @@ function mwEditAction(action) {
 // ── 일괄 수정 모달 ──
 // ── 제품별 탭 방식 일괄 수정 모달 ──
 var _mwBulkEditData = []; // [{code, ...fields}, ...]
+var _mwBulkOrigData = []; // 원본 데이터 (변경 감지용)
 var _mwBulkActiveIdx = 0;
 var _mwBulkFields = ['code','manageCode','category','subcategory','detail','orderNum','ttiNum','model','supplyPrice'];
-var _mwBulkLabels = ['코드','관리코드','대분류','중분류','소분류','순번','TTI#','모델명','공급가'];
+var _mwBulkLabels = ['코드','관리코드','대분류','중분류','소분류','프로모션No.','TTI#','모델명','공급가'];
 
 function _showMwBulkEditModal(codes) {
   var old = document.getElementById('mw-bulk-edit-modal');
   if (old) old.remove();
 
-  // DB에서 선택된 제품 데이터 복사
+  // DB에서 선택된 제품 데이터 복사 (String 비교로 타입 불일치 방지)
   _mwBulkEditData = [];
+  _mwBulkOrigData = [];
   codes.forEach(function(code) {
-    var p = DB.products.find(function(x) { return x.code === code; });
+    var p = DB.products.find(function(x) { return String(x.code) === String(code); });
     if (!p) return;
-    var copy = {};
-    _mwBulkFields.forEach(function(k) { copy[k] = p[k] || ''; });
+    var copy = {}, orig = {};
+    _mwBulkFields.forEach(function(k) { copy[k] = p[k] !== undefined && p[k] !== null ? p[k] : ''; orig[k] = copy[k]; });
     _mwBulkEditData.push(copy);
+    _mwBulkOrigData.push(orig);
   });
   if (_mwBulkEditData.length === 0) { alert('선택된 제품을 찾을 수 없습니다'); return; }
   _mwBulkActiveIdx = 0;
@@ -6219,6 +6256,10 @@ function _showMwBulkEditModal(codes) {
   '</div>';
 
   document.body.insertAdjacentHTML('beforeend', html);
+  // 드래그 가능하게
+  var modalEl = document.querySelector('#mw-bulk-edit-modal > .modal');
+  var handleEl = modalEl ? modalEl.querySelector('.modal-header') : null;
+  if (modalEl && handleEl) _makeDraggable(modalEl, handleEl);
   _mwBulkSwitchTab(0);
 }
 
@@ -6275,18 +6316,20 @@ function applyMwBulkEdit() {
   _mwBulkSaveCurrentTab();
 
   var updated = 0;
-  _mwBulkEditData.forEach(function(d) {
-    var p = DB.products.find(function(x) { return x.code === d.code; });
+  _mwBulkEditData.forEach(function(d, di) {
+    var p = DB.products.find(function(x) { return String(x.code) === String(d.code); });
     if (!p) return;
+    var orig = _mwBulkOrigData[di] || {};
     var changed = false;
     _mwBulkFields.forEach(function(k) {
       var newVal = d[k];
-      var oldVal = p[k] || '';
+      var origVal = orig[k] !== undefined ? orig[k] : '';
       if (k === 'supplyPrice') {
         newVal = parseInt(newVal) || 0;
-        oldVal = parseInt(oldVal) || 0;
+        origVal = parseInt(origVal) || 0;
       }
-      if (String(newVal) !== String(oldVal)) {
+      // 원본과 비교하여 변경 감지
+      if (String(newVal) !== String(origVal)) {
         p[k] = newVal;
         changed = true;
       }
@@ -6294,10 +6337,16 @@ function applyMwBulkEdit() {
     if (changed) updated++;
   });
 
+  // 스크롤 위치 저장
+  var scrollEl = document.querySelector('#catalog-table')?.closest('.table-scroll');
+  var scrollTop = scrollEl ? scrollEl.scrollTop : 0;
+
   if (updated > 0) {
     recalcAll();
     save(KEYS.products, DB.products);
     renderCatalog();
+    // 스크롤 위치 복원
+    if (scrollEl) requestAnimationFrame(function() { scrollEl.scrollTop = scrollTop; });
     toast(updated + '개 제품 수정 완료');
   } else {
     toast('변경된 항목이 없습니다');
@@ -7201,6 +7250,8 @@ function showSettingsModal() {
   // 기본 탭: 밀워키 리베이트
   switchSettingsTab('rebate');
   document.getElementById('settings-modal').classList.add('show');
+  var _sm = document.querySelector('#settings-modal > .modal');
+  if (_sm && !_sm._dragged) { var _smH = _sm.querySelector('.modal-header'); if (_smH) _makeDraggable(_sm, _smH); }
 }
 function closeSettingsModal() {
   document.getElementById('settings-modal').classList.remove('show');
