@@ -6177,11 +6177,15 @@ function updateMwEditSelection() {
 }
 
 function mwEditAction(action) {
+  console.log('[mwEditAction] action:', action);
   var checkedRows = document.querySelectorAll('.mw-edit-cb:checked');
+  console.log('[mwEditAction] checkedRows:', checkedRows.length);
   var codes = [];
   checkedRows.forEach(function(cb) {
+    console.log('[mwEditAction] cb.value:', cb.value, 'checked:', cb.checked);
     if (cb.value) codes.push(cb.value);
   });
+  console.log('[mwEditAction] codes:', codes.length, codes.slice(0,3));
 
   if (action === 'modify') {
     if (codes.length === 0) { alert('제품을 선택해주세요'); return; }
