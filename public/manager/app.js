@@ -747,11 +747,15 @@ function _pdSetHeaderBtnsDisabled(disabled) {
   });
 }
 
+// 채널 → 마켓명 매핑
+var _pdMarketNames = { naver: '스토어팜', gmarket: '오픈마켓', ssg: 'SSG', coupang: '쿠팡' };
+
 async function _pdPriceSync(code, channel) {
   if (_pdEditMode) return;
   var btn = document.getElementById('pd-btn-sync');
   if (!btn) return;
-  if (channel !== 'naver') { alert((_marketBadgeStyles[channel] || {}).label + ' 가격전송은 준비 중입니다.'); return; }
+  var marketName = _pdMarketNames[channel] || (_marketBadgeStyles[channel] || {}).label || '';
+  if (channel !== 'naver') { alert(marketName + ' 가격전송은 준비 중입니다.'); return; }
   var p = findProduct(code);
   if (!p) { alert('제품을 찾을 수 없습니다.'); return; }
   var price = p.priceNaver || 0;
@@ -765,15 +769,11 @@ async function _pdPriceSync(code, channel) {
   btn.style.cursor = 'wait';
   btn.textContent = '전송 중...';
   try {
-    // 네이버 상품 조회
-    var searchRes = await fetch('/api/naver/products?code=' + encodeURIComponent(code));
-    var searchData = await searchRes.json();
-    if (!searchData.success || !searchData.product) throw new Error('네이버 상품 미등록');
-    // 가격 수정 전송
+    // 단건 최적화 경로: code + newPrice만 전송 → 서버가 조회+수정 한 번에 처리
     var putRes = await fetch('/api/naver/products', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: price, channelProductNo: searchData.product.channelProductNo }),
+      body: JSON.stringify({ code: code, newPrice: price }),
     });
     var putData = await putRes.json();
     if (!putData.success) throw new Error(putData.error || '전송 실패');
@@ -782,6 +782,7 @@ async function _pdPriceSync(code, channel) {
     btn.style.color = '#fff';
     btn.style.opacity = '1';
     btn.textContent = '전송완료 ✓';
+    alert(marketName + ' 가격수정이 정상적으로 반영되었습니다.');
     setTimeout(function() {
       var cur = document.getElementById('pd-btn-sync');
       if (!cur) return;
@@ -796,7 +797,7 @@ async function _pdPriceSync(code, channel) {
     btn.style.color = '#fff';
     btn.style.opacity = '1';
     btn.textContent = '전송실패';
-    alert('네이버 전송 실패: ' + (e.message || '알 수 없는 오류'));
+    alert(marketName + ' 가격전송에 실패했습니다. 다시 시도해주세요.\n\n' + (e.message || '알 수 없는 오류'));
     setTimeout(function() {
       var cur = document.getElementById('pd-btn-sync');
       if (!cur) return;

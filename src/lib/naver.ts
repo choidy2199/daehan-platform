@@ -52,9 +52,16 @@ function generateSignature(timestamp: string): string {
 }
 
 /**
- * OAuth 토큰 발급
+ * OAuth 토큰 발급 (캐싱 적용 — 토큰 수명의 90% 지점까지 재사용)
  */
+let _cachedToken: string | null = null;
+let _cachedTokenExpiresAt = 0;
+
 export async function getAccessToken(): Promise<string> {
+  // 캐시된 토큰이 유효하면 재사용
+  if (_cachedToken && Date.now() < _cachedTokenExpiresAt) {
+    return _cachedToken;
+  }
   const timestamp = String(Date.now());
   const signature = generateSignature(timestamp);
 
@@ -78,7 +85,11 @@ export async function getAccessToken(): Promise<string> {
   }
 
   const data = await resp.json();
-  return data.access_token;
+  _cachedToken = data.access_token;
+  // expires_in은 초 단위. 안전하게 90% 지점까지만 재사용
+  const expiresInSec = Number(data.expires_in) || 10800; // 기본 3시간
+  _cachedTokenExpiresAt = Date.now() + expiresInSec * 1000 * 0.9;
+  return _cachedToken as string;
 }
 
 /**

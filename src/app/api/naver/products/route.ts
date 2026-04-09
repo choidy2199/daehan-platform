@@ -40,20 +40,53 @@ export async function GET(request: NextRequest) {
 }
 
 // PUT /api/naver/products
+// 단건 전송 최적화: { code, newPrice }만 보내면 서버에서 조회→수정 한 번에 처리
+// 기존 호환: { originProductNo, newPrice, channelProductNo } 도 지원
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { originProductNo, newPrice, channelProductNo } = body;
+    const { code, originProductNo, newPrice, channelProductNo } = body;
 
     console.log('[DEBUG PUT] 요청 body:', JSON.stringify(body));
 
-    if (!originProductNo || !newPrice) {
+    if (!newPrice) {
       return NextResponse.json(
-        { success: false, error: 'originProductNo와 newPrice가 필요합니다' },
+        { success: false, error: 'newPrice가 필요합니다' },
         { status: 400 }
       );
     }
 
+    // code로 단건 전송 (신규 최적화 경로 — 클라이언트 왕복 1회)
+    if (code && !originProductNo) {
+      const product = await findNaverProductByCode(String(code));
+      if (!product) {
+        return NextResponse.json(
+          { success: false, error: '해당 코드의 네이버 상품을 찾을 수 없습니다', code },
+          { status: 404 }
+        );
+      }
+      const result = await updateNaverPrice(
+        String(product.originProductNo),
+        Number(newPrice),
+        product.channelProductNo ? Number(product.channelProductNo) : undefined
+      );
+      return NextResponse.json({
+        success: true,
+        message: '가격 수정 성공',
+        code,
+        originProductNo: product.originProductNo,
+        newPrice: Number(newPrice),
+        channelProductNo: result?.channelProductNo,
+      });
+    }
+
+    // 기존 호환 경로: originProductNo + channelProductNo
+    if (!originProductNo) {
+      return NextResponse.json(
+        { success: false, error: 'code 또는 originProductNo가 필요합니다' },
+        { status: 400 }
+      );
+    }
     const result = await updateNaverPrice(String(originProductNo), Number(newPrice), channelProductNo ? Number(channelProductNo) : undefined);
     console.log('[DEBUG PUT] updateNaverPrice 결과 keys:', result ? Object.keys(result) : 'null');
 
