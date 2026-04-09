@@ -363,7 +363,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 /* 패널 */
 .po-panel { background:#fff; border:1px solid #DDE1EB; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
-.po-panel-header { background:#1A1D23; color:#fff; padding:8px 14px; font-size:14px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+.po-panel-header { background:#1A1D23; color:#fff; padding:8px 14px; font-size:14px; font-weight:600; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
 .po-panel-header .po-header-count { font-size:12px; font-weight:400; opacity:0.7; margin-left:6px; }
 .po-limit-btn { font-size:14px; font-weight:600; color:#fff; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius:4px; padding:2px 10px; cursor:pointer; white-space:nowrap; }
 .po-limit-btn:hover { background:rgba(255,255,255,0.25); }
@@ -371,11 +371,11 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 
 /* 제품 목록 / 주문 목록 테이블 */
 .po-table { width:100%; border-collapse:collapse; font-size:12px; }
-.po-table th { padding:5px 6px; text-align:left; font-weight:500; font-size:12px; color:#9BA3B2; border-bottom:1px solid #EAECF2; white-space:nowrap; background:#F8F9FB; position:sticky; top:0; z-index:1; }
-.po-table td { padding:4px 6px; border-bottom:1px solid #F0F2F7; white-space:nowrap; font-size:13px; }
+.po-table th { height:36px; padding:8px 10px; text-align:center; font-weight:600; font-size:12px; color:#5A6070; background:#EAECF2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; user-select:none; position:sticky; top:0; z-index:10; box-shadow:0 1px 0 0 #DDE1EB; }
+.po-table td { height:36px; padding:8px 10px; text-align:center; font-weight:400; font-size:13px; color:#1A1D23; border-bottom:1px solid #F0F2F7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .po-table .num { text-align:right; }
 .po-table .center { text-align:center; }
-.po-table tr:hover { background:#F8FBFF; }
+.po-table tr:hover td { background:#F4F6FA; }
 .po-cart-btn { width:24px; height:24px; border-radius:4px; border:1px solid #DDE1EB; background:#fff; cursor:pointer; font-size:12px; display:inline-flex; align-items:center; justify-content:center; }
 .po-cart-btn:hover { background:#E6F1FB; border-color:#185FA5; }
 .po-cart-btn-dark { width:26px; height:26px; border-radius:4px; border:none; background:#1A1D23; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; }
@@ -385,7 +385,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-promo-tag { display:inline-block; font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; margin-left:4px; }
 
 /* 주문 목록 하단 합계 */
-.po-summary { border-top:2px solid #DDE1EB; padding:12px 14px; background:#FAFBFC; }
+.po-summary { border-top:2px solid #DDE1EB; padding:12px 14px; background:#FAFBFC; flex-shrink:0; }
 .po-summary-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
 .po-summary-label { font-size:12px; color:#5A6070; }
 .po-summary-count { font-weight:600; color:#1A1D23; }
@@ -404,7 +404,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-filter-row input { flex:1; }
 
 /* 제품등록 검색행 */
-.po-register-row { display:flex; gap:6px; padding:8px; align-items:center; border-bottom:1px solid #EAECF2; }
+.po-register-row { display:flex; gap:6px; padding:8px; align-items:center; border-bottom:1px solid #EAECF2; flex-shrink:0; }
 .po-register-row input { flex:1; height:32px; border:1px solid #DDE1EB; border-radius:6px; padding:0 10px; font-size:12px; font-family:'Pretendard',sans-serif; }
 .po-register-row input:focus { border-color:#185FA5; outline:none; }
 .po-register-btn { height:32px; padding:0 14px; background:#185FA5; color:#fff; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; font-family:'Pretendard',sans-serif; }
