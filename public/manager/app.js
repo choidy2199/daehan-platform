@@ -6205,16 +6205,6 @@ function _showMwBulkEditModal(codes) {
   var old = document.getElementById('mw-bulk-edit-modal');
   if (old) old.remove();
 
-  // === BULK EDIT DEBUG ===
-  console.log('=== BULK EDIT DEBUG ===');
-  console.log('받은 codes:', JSON.stringify(codes));
-  console.log('DB 샘플:', DB.products.slice(0,5).map(function(p){ return {code:p.code, type:typeof p.code, len:String(p.code).length, model:p.model}; }));
-  codes.forEach(function(code, i) {
-    console.log('codes['+i+']:', JSON.stringify(code), '타입:', typeof code, '길이:', code.length, 'charCodes:', Array.from(code).map(function(c){return c.charCodeAt(0);}));
-    var found = DB.products.find(function(x) { return String(x.code) === String(code); });
-    console.log('  → 찾은 제품:', found ? found.model : 'NOT FOUND');
-  });
-
   // DB에서 선택된 제품 데이터 복사 (String 비교로 타입 불일치 방지)
   _mwBulkEditData = [];
   _mwBulkOrigData = [];
