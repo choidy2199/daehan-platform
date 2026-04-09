@@ -127,39 +127,31 @@ export async function getNaverProducts(page = 1, size = 100) {
 }
 
 /**
- * 판매자관리코드로 네이버 상품 조회 (정확 매칭)
+ * 판매자관리코드로 네이버 상품 조회 (sellerManagementCode 직접 필터)
  */
 export async function findNaverProductByCode(sellerCode: string) {
   const trimmed = String(sellerCode).trim();
   const result = await naverApi('POST', '/v1/products/search', {
-    page: 1,
-    size: 20,
     sellerManagementCode: trimmed,
-    statusTypes: ['SALE', 'SUSPENSION', 'OUTOFSTOCK'],
+    page: 1,
+    size: 50,
   });
 
   const contents = result?.contents || [];
-  console.log(`[findNaverProduct] 검색코드: "${trimmed}", 결과: ${contents.length}건`);
+  console.log(`[findNaverProduct] 코드: "${trimmed}", 결과: ${contents.length}건`);
 
-  // 정확 매칭 필터: sellerManagementCode가 정확히 일치하는 상품만
-  const exactMatches = contents.filter((p: any) => {
-    const cp = p.channelProducts?.[0];
-    const code = String(cp?.sellerManagementCode || '').trim();
-    console.log(`[findNaverProduct]   상품: ${cp?.name?.substring(0, 30)}, sellerCode: "${code}", originNo: ${p.originProductNo}`);
+  if (contents.length === 0) return null;
+
+  // sellerManagementCode 정확 매칭 확인
+  const exact = contents.find((p: any) => {
+    const code = String(p.channelProducts?.[0]?.sellerManagementCode || '').trim();
     return code === trimmed;
   });
 
-  if (exactMatches.length === 0) {
-    console.log(`[findNaverProduct] 정확 매칭 없음 (코드: ${trimmed})`);
-    return null;
-  }
-  if (exactMatches.length > 1) {
-    console.warn(`[findNaverProduct] 정확 매칭 ${exactMatches.length}건 — 첫 번째 사용`);
-  }
-
-  const matched = exactMatches[0];
+  const matched = exact || contents[0];
   const cp = matched.channelProducts?.[0];
-  console.log(`[findNaverProduct] 매칭: "${cp?.name}", originNo: ${matched.originProductNo}`);
+  console.log(`[findNaverProduct] 매칭: "${cp?.name}", originNo: ${matched.originProductNo}, sellerCode: ${cp?.sellerManagementCode}`);
+
   return {
     originProductNo: matched.originProductNo,
     channelProductNo: cp?.channelProductNo,
