@@ -326,40 +326,43 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-promo-add { width:40px; display:flex; align-items:center; justify-content:center; color:#9BA3B2; font-size:16px; cursor:pointer; border-left:1px solid #F0F2F7; flex-shrink:0; }
 .po-promo-add:hover { background:#F4F6FA; }
 
-/* 합계+탭/뱃지 통합 행 */
-.po-top-row { display:flex; gap:10px; align-items:stretch; padding:0 12px 10px; }
-.po-total-compact { background:#185FA5; border-radius:8px; padding:10px 16px; color:#fff; display:flex; align-items:center; gap:14px; flex-shrink:0; }
-.po-tc-label { font-size:10px; opacity:0.7; }
-.po-tc-value { font-size:22px; font-weight:700; letter-spacing:-0.3px; white-space:nowrap; }
-.po-tc-split { display:flex; gap:4px; }
-.po-tc-sp { background:rgba(255,255,255,0.15); border-radius:4px; padding:4px 10px; text-align:center; font-size:10px; font-weight:600; }
-.po-tc-sp-l { font-size:8px; opacity:0.5; }
-.po-tc-comm { background:rgba(255,255,255,0.12); border-radius:4px; padding:5px 10px; font-size:10px; font-weight:600; white-space:nowrap; margin-left:auto; }
-.po-tc-comm:hover { background:rgba(255,255,255,0.22); }
+/* 발주탭 상단 바 — 합계카드 + 서브탭 3개 + stats 뱃지 5개 (1줄) */
+.po-top-row { display:flex; align-items:stretch; gap:6px; padding:8px 12px; }
+.po-top-spacer { flex:1; }
 
-.po-action-compact { background:#fff; border:1px solid #DDE1EB; border-radius:8px; padding:10px 16px; display:flex; align-items:center; gap:6px; flex:1; min-width:0; overflow-x:auto; }
-.po-badge { padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600; font-family:'Pretendard',-apple-system,sans-serif; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; border:none; cursor:pointer; }
-.po-badge-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; display:inline-block; }
-.po-tab-active { background:#1A1D23; color:#fff; }
-.po-tab-inactive { background:#F4F6FA; color:#5A6070; border:1px solid #EAECF2; }
-.po-tab-inactive:hover { background:#EAECF2; }
-/* 발주 서브탭 (일반주문 / 발주리스트 / 밀워키 발주확정) */
-.po-subtab { padding:6px 14px; border-radius:6px; font-size:12px; font-weight:600; font-family:'Pretendard',-apple-system,sans-serif; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; border:none; cursor:pointer; line-height:1; }
+/* 합계 카드 — 빨간 #C0392B, 3섹션 2줄 */
+.po-total-compact { background:#C0392B; border-radius:8px; padding:10px 16px; color:#fff; display:flex; align-items:center; flex-shrink:0; font-family:'Pretendard',-apple-system,sans-serif; }
+.po-tc-sec { display:flex; flex-direction:column; justify-content:center; padding:0 12px; }
+.po-tc-sec + .po-tc-sec { border-left:1px solid rgba(255,255,255,0.25); }
+.po-tc-sec:first-child { padding-left:0; }
+.po-tc-sec:last-child { padding-right:0; }
+.po-tc-label { font-size:10px; opacity:0.7; white-space:nowrap; line-height:1.2; }
+.po-tc-value { font-size:20px; font-weight:700; letter-spacing:-0.3px; white-space:nowrap; line-height:1.15; }
+.po-tc-halfrow { display:flex; align-items:center; gap:8px; line-height:1.5; }
+.po-tc-halfrow-l { font-size:10px; opacity:0.7; min-width:40px; }
+.po-tc-halfrow-v { font-size:12px; font-weight:600; white-space:nowrap; }
+.po-tc-commtag { display:inline-block; background:rgba(255,255,255,0.18); border-radius:4px; padding:1px 6px; font-size:10px; font-weight:600; line-height:1.5; white-space:nowrap; align-self:flex-start; }
+.po-tc-commnext { font-size:12px; white-space:nowrap; margin-top:3px; opacity:0.9; line-height:1.4; }
+.po-tc-commnext b { color:#FFD93D; font-weight:700; font-size:12px; }
+.po-tc-sec-comm:hover .po-tc-commtag { background:rgba(255,255,255,0.28); }
+
+/* 서브탭 3개 — 합계카드와 높이 맞춤 */
+.po-subtab { padding:10px 16px; border-radius:8px; font-size:13px; font-weight:600; font-family:'Pretendard',-apple-system,sans-serif; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; border:none; cursor:pointer; line-height:1; flex-shrink:0; }
 .po-subtab-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; display:inline-block; }
 .po-subtab-active { background:#1A1D23; color:#fff; }
 .po-subtab-active .po-subtab-dot { background:#fff; }
 .po-subtab-inactive { background:#E8E8E8; color:#888; }
 .po-subtab-inactive .po-subtab-dot { background:#aaa; }
 .po-subtab-inactive:hover { background:#DCDCDC; }
-/* 서브탭 섹션 헤더 바 — 현재 탭명 표시 */
-.po-subtab-section-header { background:#1A1D23; color:#fff; padding:10px 16px; margin:0 12px 10px; border-radius:6px; font-family:'Pretendard',-apple-system,sans-serif; font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px; white-space:nowrap; }
-.po-subtab-section-dot { width:6px; height:6px; border-radius:50%; background:#fff; flex-shrink:0; display:inline-block; }
-.po-action-sep { width:1px; height:28px; background:#DDE1EB; margin:0 2px; flex-shrink:0; }
-.po-stat-blue  { background:#E6F1FB; color:#0C447C; cursor:default; }
-.po-stat-green { background:#E1F5EE; color:#085041; cursor:default; }
-.po-stat-amber { background:#FAEEDA; color:#412402; cursor:default; }
-.po-stat-teal  { background:#E1F5EE; color:#04342C; cursor:default; }
-.po-stat-red   { background:#FCEBEB; color:#791F1F; cursor:default; }
+
+/* Stats 뱃지 5개 — 서브탭과 동일 사이즈, 기존 색상 유지 */
+.po-badge { padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600; font-family:'Pretendard',-apple-system,sans-serif; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; border:none; cursor:default; flex-shrink:0; line-height:1; }
+.po-badge-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; display:inline-block; }
+.po-stat-blue  { background:#E6F1FB; color:#0C447C; }
+.po-stat-green { background:#E1F5EE; color:#085041; }
+.po-stat-amber { background:#FAEEDA; color:#412402; }
+.po-stat-teal  { background:#E1F5EE; color:#04342C; }
+.po-stat-red   { background:#FCEBEB; color:#791F1F; }
 
 /* 발주리스트 헤더 버튼 */
 .po-hdr-btn { font-family:'Pretendard',-apple-system,sans-serif; font-size:12px; font-weight:600; padding:6px 14px; border-radius:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }

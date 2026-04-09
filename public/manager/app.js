@@ -2771,50 +2771,57 @@ function renderPOTab() {
 
   html += '<div class="po-top-row">';
 
-  // 합계 박스 (파란)
+  // 합계 박스 (빨간 #C0392B) — 3섹션 2줄 레이아웃
   html += '<div class="po-total-compact">';
-  html += '<div><div class="po-tc-label">합계 · ' + month + '월</div><div class="po-tc-value">' + fmtPO(salesData.totalMonth) + '</div></div>';
-  html += '<div class="po-tc-split">';
-  html += '<div class="po-tc-sp"><div class="po-tc-sp-l">1~15일</div>' + fmtPO(salesData.first15) + '</div>';
-  html += '<div class="po-tc-sp"><div class="po-tc-sp-l">16~' + _lastDay + '일</div>' + fmtPO(salesData.last15) + '</div>';
+  // 좌측: 총 매출
+  html += '<div class="po-tc-sec po-tc-sec-main">';
+  html += '<div class="po-tc-label">합계 · ' + month + '월</div>';
+  html += '<div class="po-tc-value">' + fmtPO(salesData.totalMonth) + '</div>';
   html += '</div>';
+  // 가운데: 반월별 2줄
+  html += '<div class="po-tc-sec po-tc-sec-half">';
+  html += '<div class="po-tc-halfrow"><span class="po-tc-halfrow-l">1~15일</span><span class="po-tc-halfrow-v">' + fmtPO(salesData.first15) + '</span></div>';
+  html += '<div class="po-tc-halfrow"><span class="po-tc-halfrow-l">16~' + _lastDay + '일</span><span class="po-tc-halfrow-v">' + fmtPO(salesData.last15) + '</span></div>';
+  html += '</div>';
+  // 우측: 커머셜P 2줄
   var _commPromo = _getActiveCommercialPromo();
+  html += '<div class="po-tc-sec po-tc-sec-comm" onclick="openCommercialPromoModal()" style="cursor:pointer">';
   if (_commPromo) {
     var _commSales = _calcCommercialSales(_commPromo);
     var _commTier = _findCommercialTier(_commPromo, _commSales);
     var _commRate = _commTier.current && _commTier.current.rate != null ? _commTier.current.rate + '%' : '미달';
-    html += '<div class="po-tc-comm" onclick="openCommercialPromoModal()" style="cursor:pointer">';
-    html += '커머셜P ' + _commRate;
+    html += '<div class="po-tc-commtag">커머셜P ' + _commRate + '</div>';
     if (_commTier.next && _commTier.next.rate != null) {
       var _shortage = _commTier.shortage > 0 ? _commTier.shortage : 0;
-      html += ' · 다음 ' + _commTier.next.rate + '%까지 <b style="color:#FFCC66">' + fmtPO(_shortage) + '원</b>';
+      html += '<div class="po-tc-commnext">다음 ' + _commTier.next.rate + '% <b>' + fmtPO(_shortage) + '원</b> ▶</div>';
+    } else {
+      html += '<div class="po-tc-commnext"><b>최고 달성</b> ▶</div>';
     }
-    html += ' ▶</div>';
   } else {
-    html += '<div class="po-tc-comm" onclick="openCommercialPromoModal()" style="cursor:pointer;opacity:0.6">커머셜P 미등록 ▶</div>';
+    html += '<div class="po-tc-commtag">커머셜P 미등록</div>';
+    html += '<div class="po-tc-commnext">등록하기 ▶</div>';
   }
+  html += '</div>';
   html += '</div>'; // .po-total-compact
 
-  // 탭+뱃지 박스 (흰)
-  html += '<div class="po-action-compact">';
+  // 서브탭 3개 (po-top-row 직접 자식)
   _poSubTabs.forEach(function(t) {
     var isActive = t.id === activeSubTab;
     html += '<button class="po-subtab ' + (isActive ? 'po-subtab-active' : 'po-subtab-inactive') + '" data-tab="' + t.id + '" onclick="switchPOSubTab(\'' + t.id + '\')">';
     html += '<span class="po-subtab-dot"></span>' + t.label + '</button>';
   });
-  html += '<div class="po-action-sep"></div>';
+
+  // Spacer — stats 뱃지를 우측 끝으로
+  html += '<div class="po-top-spacer"></div>';
+
+  // Stats 뱃지 5개 (기존 색상 유지, 사이즈만 업)
   html += '<span class="po-badge po-stat-blue"><span class="po-badge-dot" style="background:#185FA5"></span>오늘 <b id="po-stat-today">' + _todayOrders.length + '</b>건</span>';
   html += '<span class="po-badge po-stat-green"><span class="po-badge-dot" style="background:#1D9E75"></span>일반 <b id="po-stat-normal">' + _normalCount + '</b>건</span>';
   html += '<span class="po-badge po-stat-amber"><span class="po-badge-dot" style="background:#EF9F27"></span>프로모션 <b id="po-stat-promo">' + _promoCount + '</b>건</span>';
   html += '<span class="po-badge po-stat-teal"><span class="po-badge-dot" style="background:#0F6E56"></span>FOC <b id="po-stat-foc">' + _focCount + '</b>건</span>';
   html += '<span class="po-badge po-stat-red"><span class="po-badge-dot" style="background:#CC2222"></span>경영박사 <b id="po-stat-erp">' + _erpDone + '/' + _erpTotal + '</b></span>';
-  html += '</div>'; // .po-action-compact
 
   html += '</div>'; // .po-top-row
-
-  // 섹션 헤더 바 (다크 #1A1D23) — 현재 서브탭명 표시
-  var _activeTabObj = _poSubTabs.find(function(t) { return t.id === activeSubTab; }) || _poSubTabs[0];
-  html += '<div class="po-subtab-section-header" id="po-subtab-section-header"><span class="po-subtab-section-dot"></span>' + _activeTabObj.label + '</div>';
 
   // 탭 콘텐츠 영역
   html += '<div id="po-tab-contents" style="padding:8px 12px">';
@@ -3046,17 +3053,10 @@ function switchPOSubTab(tabName) {
   var isGridTab = tabName === 'normal' || tabName === 'foc' || tabName === 'package' || tabName === 'kit' || tabName.indexOf('promo-') === 0;
   if (content) content.style.display = isGridTab ? 'grid' : 'block';
 
-  document.querySelectorAll('.po-action-compact .po-subtab[data-tab]').forEach(function(btn) {
+  document.querySelectorAll('.po-top-row .po-subtab[data-tab]').forEach(function(btn) {
     var id = btn.getAttribute('data-tab');
     btn.className = 'po-subtab ' + (id === tabName ? 'po-subtab-active' : 'po-subtab-inactive');
   });
-
-  // 섹션 헤더 텍스트 업데이트
-  var headerEl = document.getElementById('po-subtab-section-header');
-  if (headerEl) {
-    var _tab = _poSubTabs.find(function(t) { return t.id === tabName; });
-    if (_tab) headerEl.innerHTML = '<span class="po-subtab-section-dot"></span>' + _tab.label;
-  }
 
   localStorage.setItem('mw_po_active_subtab', tabName);
 
@@ -3102,7 +3102,7 @@ function buildPOListPanel() {
   var h = '';
 
   h += '<div class="po-panel" style="max-height:calc(100vh - 320px)">';
-  h += '<div class="po-panel-header"><span>발주 리스트</span><div style="display:flex;gap:6px;align-items:center">';
+  h += '<div class="po-panel-header"><span>밀워키 발주확정</span><div style="display:flex;gap:6px;align-items:center">';
   h += '<button class="po-hdr-btn po-hdr-del" onclick="deleteSelectedPOHistory()">선택 삭제</button>';
   h += '<select id="po-list-filter" class="po-hdr-select" onchange="changePOListFilter(this.value)">';
   h += '<option value="today"' + (filterEl === 'today' ? ' selected' : '') + '>오늘</option>';
