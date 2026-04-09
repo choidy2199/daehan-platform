@@ -1381,10 +1381,12 @@ function setCatalogFilter(mode) {
 }
 
 var _lastRenderCatalog = 0;
+var _catalogRowNum = 0;
 function renderCatalog() {
   var now = performance.now();
   if (now - _lastRenderCatalog < 200) return;
   _lastRenderCatalog = now;
+  _catalogRowNum = 0;
   var _rc0 = now;
   const search = document.getElementById('catalog-search').value.toLowerCase();
   const cat = document.getElementById('catalog-cat').value;
@@ -1447,7 +1449,9 @@ function renderCatalog() {
     // 제품DC 컬럼 제거됨 (카테고리 기반으로 변경)
     const isD = !!p.discontinued;
     const cc = getCategoryColor(p.category);
+    _catalogRowNum = (_catalogRowNum || 0) + 1;
     return `<tr class="${isD ? 'row-discontinued' : ''}">
+      <td class="mw-no-col center" style="width:40px;min-width:40px;font-size:11px;color:#9BA3B2" data-code="${p.code}">${_catalogRowNum}</td>
       <td style="font-weight:500">${p.code}</td>
       <td>${p.manageCode || '-'}</td>
       <td><span style="background:${cc.bg};color:${cc.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${p.category || '-'}</span></td>
@@ -1533,7 +1537,7 @@ function renderCatalog() {
     for (var i = start; i < end; i++) { fragment += buildRow(allRows[i]); }
     // 마지막 배치 후 단종 품목 추가
     if (end >= allRows.length && _catalogDiscontinued.length > 0 && start < allRows.length) {
-      fragment += '<tr class="discontinued-divider"><td colspan="19">단종 품목 (' + _catalogDiscontinued.length + '건)</td></tr>';
+      fragment += '<tr class="discontinued-divider"><td colspan="20">단종 품목 (' + _catalogDiscontinued.length + '건)</td></tr>';
       fragment += _catalogDiscontinued.slice(0, 200).map(buildRow).join('');
     }
     _catalogRenderedCount = end;
@@ -1542,12 +1546,13 @@ function renderCatalog() {
 
   body.innerHTML = renderBatch(0, INITIAL_ROWS);
 
-  // 편집 모드 중이면 새로 렌더링된 행에 체크박스 삽입
+  // 편집 모드 중이면 새로 렌더링된 행의 No. td를 체크박스로 교체
   if (_mwEditMode) {
-    body.querySelectorAll('tr:not(:has(.mw-edit-cb))').forEach(function(tr) {
-      var td = document.createElement('td');
-      td.innerHTML = '<input type="checkbox" class="mw-edit-cb" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
-      tr.insertBefore(td, tr.firstChild);
+    body.querySelectorAll('.mw-no-col').forEach(function(td) {
+      if (td.querySelector('.mw-edit-cb')) return;
+      td._origHTML = td.innerHTML;
+      var code = td.dataset.code || '';
+      td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + code + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
     });
     updateMwEditSelection();
   }
@@ -1570,12 +1575,13 @@ function renderCatalog() {
           var html = renderBatch(_catalogRenderedCount, 100);
           if (html) {
             body.insertAdjacentHTML('beforeend', html);
-            // 편집 모드 중이면 새로 추가된 행에 체크박스 삽입
+            // 편집 모드 중이면 새로 추가된 행의 No. td를 체크박스로 교체
             if (_mwEditMode) {
-              body.querySelectorAll('tr:not(:has(.mw-edit-cb))').forEach(function(tr) {
-                var td = document.createElement('td');
-                td.innerHTML = '<input type="checkbox" class="mw-edit-cb" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
-                tr.insertBefore(td, tr.firstChild);
+              body.querySelectorAll('.mw-no-col').forEach(function(td) {
+                if (td.querySelector('.mw-edit-cb')) return;
+                td._origHTML = td.innerHTML;
+                var code = td.dataset.code || '';
+                td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + code + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
               });
               updateMwEditSelection();
             }
@@ -6099,20 +6105,19 @@ function _enterMwEditMode() {
   // 미렌더링 행이 있으면 전체 렌더링 (점진 로딩 우회)
   var body = document.getElementById('catalog-body');
   if (window._catalogAllRows && window._catalogBuildRow) {
-    var currentRowCount = body.querySelectorAll('tr').length;
+    var currentRowCount = body.querySelectorAll('tr:not(.discontinued-divider)').length;
     var totalNeeded = window._catalogAllRows.length + (window._catalogDiscontinued || []).length;
     if (currentRowCount < totalNeeded) {
-      // 전체 재렌더링
+      _catalogRowNum = 0;
       var html = '';
       for (var i = 0; i < window._catalogAllRows.length; i++) {
         html += window._catalogBuildRow(window._catalogAllRows[i]);
       }
       if (window._catalogDiscontinued && window._catalogDiscontinued.length > 0) {
-        html += '<tr class="discontinued-divider"><td colspan="19">단종 품목 (' + window._catalogDiscontinued.length + '건)</td></tr>';
+        html += '<tr class="discontinued-divider"><td colspan="20">단종 품목 (' + window._catalogDiscontinued.length + '건)</td></tr>';
         html += window._catalogDiscontinued.slice(0, 200).map(window._catalogBuildRow).join('');
       }
       body.innerHTML = html;
-      // 스크롤 리스너 제거 (전체 렌더링 완료)
       var scrollEl = body.closest('.table-scroll');
       if (scrollEl && scrollEl._catalogScroll) {
         scrollEl.removeEventListener('scroll', scrollEl._catalogScroll);
@@ -6120,21 +6125,17 @@ function _enterMwEditMode() {
       }
     }
   }
-  // thead에 체크박스 th 추가
-  var thead = document.querySelector('#catalog-table thead tr');
-  if (thead && !document.getElementById('mw-edit-checkall')) {
-    var th = document.createElement('th');
-    th.style.cssText = 'width:36px;position:sticky;top:0;z-index:5;box-shadow:0 1px 3px rgba(0,0,0,0.1)';
-    th.innerHTML = '<input type="checkbox" id="mw-edit-checkall" onchange="toggleAllMwEditCheckbox(this)" style="width:15px;height:15px;accent-color:#185FA5">';
-    thead.insertBefore(th, thead.firstChild);
+  // No. th → 전체선택 체크박스로 교체
+  var noTh = document.getElementById('mw-no-th');
+  if (noTh) {
+    noTh._origHTML = noTh.innerHTML;
+    noTh.innerHTML = '<input type="checkbox" id="mw-edit-checkall" onchange="toggleAllMwEditCheckbox(this)" style="width:15px;height:15px;accent-color:#185FA5">';
   }
-  // tbody 모든 행에 체크박스 td 추가
-  var rows = body.querySelectorAll('tr');
-  rows.forEach(function(tr) {
-    if (tr.querySelector('.mw-edit-cb') || tr.classList.contains('discontinued-divider')) return;
-    var td = document.createElement('td');
-    td.innerHTML = '<input type="checkbox" class="mw-edit-cb" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
-    tr.insertBefore(td, tr.firstChild);
+  // No. td → 체크박스로 교체
+  body.querySelectorAll('.mw-no-col').forEach(function(td) {
+    td._origHTML = td.innerHTML;
+    var code = td.dataset.code || '';
+    td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + code + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
   });
   // 액션바 표시
   var bar = document.getElementById('mw-edit-action-bar');
@@ -6143,12 +6144,15 @@ function _enterMwEditMode() {
 }
 
 function _exitMwEditMode() {
-  // thead 체크박스 th 제거
-  var checkallTh = document.getElementById('mw-edit-checkall');
-  if (checkallTh) checkallTh.closest('th').remove();
-  // tbody 체크박스 td 제거
-  document.querySelectorAll('#catalog-body .mw-edit-cb').forEach(function(cb) {
-    cb.closest('td').remove();
+  // No. th 복원
+  var noTh = document.getElementById('mw-no-th');
+  if (noTh && noTh._origHTML) { noTh.innerHTML = noTh._origHTML; delete noTh._origHTML; }
+  else if (noTh) noTh.textContent = 'No.';
+  // No. td 복원 (순번 재생성)
+  var num = 0;
+  document.querySelectorAll('#catalog-body .mw-no-col').forEach(function(td) {
+    if (td._origHTML) { td.innerHTML = td._origHTML; delete td._origHTML; }
+    else { num++; td.textContent = num; }
   });
   // 액션바 숨김
   var bar = document.getElementById('mw-edit-action-bar');
@@ -6176,8 +6180,7 @@ function mwEditAction(action) {
   var checkedRows = document.querySelectorAll('.mw-edit-cb:checked');
   var codes = [];
   checkedRows.forEach(function(cb) {
-    var tr = cb.closest('tr');
-    if (tr) codes.push(tr.cells[1] ? tr.cells[1].textContent.trim() : '');
+    if (cb.value) codes.push(cb.value);
   });
 
   if (action === 'modify') {
@@ -6275,8 +6278,9 @@ function _showMwBulkEditModal(codes) {
   _mwBulkSwitchTab(0);
 }
 
+var _mwBulkTabReady = false; // input에 값이 채워진 후에만 저장 허용
 function _mwBulkSaveCurrentTab() {
-  // 현재 탭의 input값을 editData에 저장
+  if (!_mwBulkTabReady) return; // 첫 switchTab 호출 시 빈 input으로 덮어쓰기 방지
   var d = _mwBulkEditData[_mwBulkActiveIdx];
   if (!d) return;
   _mwBulkFields.forEach(function(k) {
@@ -6314,13 +6318,16 @@ function _mwBulkSwitchTab(idx) {
       el.value = d[k] || '';
     }
   });
+  _mwBulkTabReady = true; // 이제 탭 전환 시 저장 허용
 }
 
 function closeMwBulkEditModal() {
   var el = document.getElementById('mw-bulk-edit-modal');
   if (el) el.remove();
   _mwBulkEditData = [];
+  _mwBulkOrigData = [];
   _mwBulkActiveIdx = 0;
+  _mwBulkTabReady = false;
 }
 
 function applyMwBulkEdit() {
