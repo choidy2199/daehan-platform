@@ -566,9 +566,9 @@ function marginBadge(price, cost, feeRate) {
 
 // ======================== 마켓 가격 뱃지 ========================
 var _marketBadgeStyles = {
-  naver: { bg: '#E1F5EE', color: '#085041', priceColor: '#085041', dot: '#1D9E75', label: '스토어팜' },
-  gmarket: { bg: '#E6F1FB', color: '#0C447C', priceColor: '#0C447C', dot: '#185FA5', label: '오픈마켓' },
-  ssg: { bg: '#FAEEDA', color: '#412402', priceColor: '#412402', dot: '#EF9F27', label: 'SSG' }
+  naver: { bg: '#E1F5EE', border: '#9FE1CB', color: '#085041', priceColor: '#085041', dot: '#1D9E75', label: '스토어팜' },
+  gmarket: { bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C', priceColor: '#0C447C', dot: '#185FA5', label: '오픈마켓' },
+  ssg: { bg: '#FDF6E3', border: '#D4A843', color: '#7A5C00', priceColor: '#7A5C00', dot: '#B8860B', label: 'SSG' }
 };
 function marketBadge(p, channel) {
   var st = _marketBadgeStyles[channel];
@@ -579,7 +579,7 @@ function marketBadge(p, channel) {
   var m = calcMargin(price, p.cost, feeRate);
   var mColor = m && m.profit >= 0 ? '#1D9E75' : '#CC2222';
   var mText = m ? (m.rate.toFixed(1) + '% ' + (m.profit >= 0 ? '+' : '') + fmt(m.profit)) : '';
-  return '<div onclick="openPriceDetail(\'' + (p.code || '') + '\',\'' + channel + '\')" style="cursor:pointer;background:' + st.bg + ';border-radius:6px;padding:4px 6px;text-align:center;border:1px solid transparent;transition:border-color 0.15s" onmouseenter="this.style.borderColor=\'#B0B8CC\'" onmouseleave="this.style.borderColor=\'transparent\'">'
+  return '<div onclick="openPriceDetail(\'' + (p.code || '') + '\',\'' + channel + '\')" data-mb-border="' + st.border + '" style="cursor:pointer;background:' + st.bg + ';border-radius:6px;padding:4px 6px;text-align:center;border:1px solid ' + st.border + ';transition:border-color 0.15s" onmouseenter="this.style.borderColor=\'#1A1D23\'" onmouseleave="this.style.borderColor=this.getAttribute(\'data-mb-border\')">'
     + '<div style="font-size:15px;font-weight:700;color:' + st.priceColor + ';line-height:1.2">' + fmt(price) + '</div>'
     + (mText ? '<div style="font-size:11px;color:' + mColor + ';line-height:1;margin-top:2px">' + mText + '</div>' : '')
     + '</div>';
