@@ -8323,32 +8323,19 @@ function deleteAllGenProducts() {
   toast('일반제품 전체 삭제 완료 (' + count + '건)');
 }
 
-// ======================== STICKY HEADER (JS) ========================
+// ======================== STICKY HEADER (CSS only) ========================
 var _stickyTimers = {};
 function initStickyHeader(tableId) {
-  if (_stickyTimers[tableId]) {
-    (window.cancelIdleCallback || clearTimeout)(_stickyTimers[tableId]);
-  }
-  _stickyTimers[tableId] = _rIC(function() { _initStickyHeaderImpl(tableId); });
-}
-function _initStickyHeaderImpl(tableId) {
-  const table = document.getElementById(tableId);
+  // CSS sticky 방식으로 통일 — JS translateY 제거
+  var table = document.getElementById(tableId);
   if (!table) return;
-  const scrollContainer = table.closest('.table-scroll');
-  if (!scrollContainer) return;
-  const thead = table.querySelector('thead');
+  var thead = table.querySelector('thead');
   if (!thead) return;
-
-  scrollContainer.addEventListener('scroll', function() {
-    const scrollTop = this.scrollTop;
-    thead.style.transform = 'translateY(' + scrollTop + 'px)';
-    thead.style.zIndex = '5';
-  });
-
-  thead.querySelectorAll('th').forEach(th => {
-    if (!th.style.background) {
-      th.style.background = '#EAECF2';
-    }
+  // 기존 translateY 초기화 (이전 리스너가 남긴 값 제거)
+  thead.style.transform = '';
+  // th 배경색 보장 (투명이면 뒤 내용 비침)
+  thead.querySelectorAll('th').forEach(function(th) {
+    if (!th.style.background) th.style.background = '#EAECF2';
   });
 }
 

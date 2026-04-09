@@ -88,7 +88,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 /* Section — 탭 내 마지막 section이 남은 높이를 채움 */
 .section { margin-bottom: 20px; border-radius: 6px; overflow: hidden; border: 1px solid var(--tl-border); }
 .tab-content.active > .section:last-of-type { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 0; overflow: hidden; }
-.tab-content.active > .section:last-of-type > .section-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.tab-content.active > .section:last-of-type > .section-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .tab-content.active > .section:last-of-type > .section-body > .table-scroll { flex: 1; overflow-y: auto; overflow-x: auto; min-height: 0; max-height: none !important; }
 .section-header { background: #1A1D23; color: #FFF; padding: 0 16px; height: 40px; display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 600; flex-shrink: 0; }
 .section-body { background: var(--tl-bg); padding: 16px; }
@@ -96,7 +96,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 /* 서브탭 래퍼(판매/설정 등)도 flex 확장 */
 .tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section):not([style*="display:none"]) { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 0; overflow: hidden; }
-.tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type > .section-body { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type > .section-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type > .section-body > .table-scroll { flex: 1; overflow-y: auto; overflow-x: auto; min-height: 0; max-height: none !important; }
 /* sub-tabs 축소 방지 */
 .sub-tabs { flex-shrink: 0; }
