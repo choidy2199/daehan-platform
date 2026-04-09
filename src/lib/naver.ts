@@ -127,31 +127,52 @@ export async function getNaverProducts(page = 1, size = 100) {
 }
 
 /**
- * 판매자관리코드로 네이버 상품 조회 (sellerManagementCode 직접 필터)
+ * 네이버 전체 상품 캐시 (sellerManagementCode → 상품 매핑)
+ * API가 부분매칭을 리턴하므로, 전체를 캐시하고 클라이언트에서 정확 매칭
+ */
+let _naverCodeMap: Map<string, any> | null = null;
+let _naverCacheTime = 0;
+const NAVER_CACHE_TTL = 10 * 60 * 1000; // 10분
+
+async function _ensureNaverCodeMap(): Promise<Map<string, any>> {
+  if (_naverCodeMap && (Date.now() - _naverCacheTime) < NAVER_CACHE_TTL) {
+    return _naverCodeMap;
+  }
+  const map = new Map<string, any>();
+  let page = 1;
+  const size = 100;
+  while (true) {
+    await rateLimit();
+    const result = await naverApi('POST', '/v1/products/search', { page, size, statusTypes: ['SALE', 'SUSPENSION', 'OUTOFSTOCK'] });
+    const contents = result?.contents || [];
+    for (const p of contents) {
+      const cp = p.channelProducts?.[0];
+      const code = String(cp?.sellerManagementCode || '').trim();
+      if (code) map.set(code, p);
+    }
+    if (contents.length < size) break;
+    page++;
+    if (page > 30) break;
+  }
+  console.log(`[naverCodeMap] ${map.size}개 상품 캐시 완료 (${page}페이지)`);
+  _naverCodeMap = map;
+  _naverCacheTime = Date.now();
+  return map;
+}
+
+/**
+ * 판매자관리코드로 네이버 상품 조회 (정확 매칭, 캐시 사용)
  */
 export async function findNaverProductByCode(sellerCode: string) {
   const trimmed = String(sellerCode).trim();
-  const result = await naverApi('POST', '/v1/products/search', {
-    sellerManagementCode: trimmed,
-    page: 1,
-    size: 50,
-  });
-
-  const contents = result?.contents || [];
-  console.log(`[findNaverProduct] 코드: "${trimmed}", 결과: ${contents.length}건`);
-
-  if (contents.length === 0) return null;
-
-  // sellerManagementCode 정확 매칭 확인
-  const exact = contents.find((p: any) => {
-    const code = String(p.channelProducts?.[0]?.sellerManagementCode || '').trim();
-    return code === trimmed;
-  });
-
-  const matched = exact || contents[0];
+  const map = await _ensureNaverCodeMap();
+  const matched = map.get(trimmed);
+  if (!matched) {
+    console.log(`[findNaverProduct] 매칭 없음 (코드: ${trimmed})`);
+    return null;
+  }
   const cp = matched.channelProducts?.[0];
   console.log(`[findNaverProduct] 매칭: "${cp?.name}", originNo: ${matched.originProductNo}, sellerCode: ${cp?.sellerManagementCode}`);
-
   return {
     originProductNo: matched.originProductNo,
     channelProductNo: cp?.channelProductNo,
