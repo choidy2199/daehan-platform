@@ -21,6 +21,9 @@
 - 로컬: `npm run dev` → http://localhost:3000
 - 사이트 열기: `open "https://daehantool.dev/manager/index.html"`
 
+## 작업 전 반드시 읽을 파일
+- ~/.claude/skills/web-ui-patterns/SKILL.md
+
 ## 라우트 구조
 - / → /manager/index.html로 리다이렉트
 - /manager/index.html → 기존 HTML 관리시스템 (메인)
