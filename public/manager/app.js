@@ -2641,8 +2641,9 @@ function initPOAutocomplete(inputId, onSelect) {
 
 function _buildPoSubTabs() {
   var tabs = [
-    { id: 'normal', label: '일반주문', dot: '#4B9FE8', activeBg: '#185FA5' },
-    { id: 'list', label: '발주 리스트', dot: '#B4B2A9', activeBg: '#444441' }
+    { id: 'normal', label: '일반주문' },
+    { id: 'prelist', label: '발주리스트' },
+    { id: 'confirmed', label: '밀워키 발주확정' }
   ];
   return tabs;
 }
@@ -2665,6 +2666,8 @@ function renderPOTab() {
   PO_PROMO_LIMIT = _getPromoLimits();
 
   var activeSubTab = localStorage.getItem('mw_po_active_subtab') || 'normal';
+  // legacy 값 호환: 기존 'list' → 'confirmed' (밀워키 발주확정)
+  if (activeSubTab === 'list') activeSubTab = 'confirmed';
   var now = new Date();
   var month = now.getMonth() + 1;
 
@@ -2796,8 +2799,8 @@ function renderPOTab() {
   html += '<div class="po-action-compact">';
   _poSubTabs.forEach(function(t) {
     var isActive = t.id === activeSubTab;
-    html += '<button class="po-badge ' + (isActive ? 'po-tab-active' : 'po-tab-inactive') + '" data-tab="' + t.id + '" onclick="switchPOSubTab(\'' + t.id + '\')">';
-    html += '<span class="po-badge-dot" style="background:' + t.dot + '"></span>' + t.label + '</button>';
+    html += '<button class="po-subtab ' + (isActive ? 'po-subtab-active' : 'po-subtab-inactive') + '" data-tab="' + t.id + '" onclick="switchPOSubTab(\'' + t.id + '\')">';
+    html += '<span class="po-subtab-dot"></span>' + t.label + '</button>';
   });
   html += '<div class="po-action-sep"></div>';
   html += '<span class="po-badge po-stat-blue"><span class="po-badge-dot" style="background:#185FA5"></span>오늘 <b id="po-stat-today">' + _todayOrders.length + '</b>건</span>';
@@ -2809,6 +2812,10 @@ function renderPOTab() {
 
   html += '</div>'; // .po-top-row
 
+  // 섹션 헤더 바 (다크 #1A1D23) — 현재 서브탭명 표시
+  var _activeTabObj = _poSubTabs.find(function(t) { return t.id === activeSubTab; }) || _poSubTabs[0];
+  html += '<div class="po-subtab-section-header" id="po-subtab-section-header"><span class="po-subtab-section-dot"></span>' + _activeTabObj.label + '</div>';
+
   // 탭 콘텐츠 영역
   html += '<div id="po-tab-contents" style="padding:8px 12px">';
 
@@ -2818,12 +2825,17 @@ function renderPOTab() {
   html += buildPOOrderPanel();
   html += '</div>';
 
-  // 발주 리스트 탭
-  html += '<div id="po-content-list" class="po-tab-content" style="display:' + (activeSubTab === 'list' ? 'block' : 'none') + '">';
+  // 발주리스트 탭 (신규 — 추후 구현)
+  html += '<div id="po-content-prelist" class="po-tab-content" style="display:' + (activeSubTab === 'prelist' ? 'block' : 'none') + '">';
+  html += '<div id="po-prelist-content" style="padding:40px;text-align:center;color:#888;">발주리스트 — 추후 구현 예정</div>';
+  html += '</div>';
+
+  // 밀워키 발주확정 탭 (기존 "발주 리스트" — 이름/ID만 변경)
+  html += '<div id="po-content-confirmed" class="po-tab-content" style="display:' + (activeSubTab === 'confirmed' ? 'block' : 'none') + '">';
   html += buildPOListPanel();
   html += '</div>';
 
-  // (FOC/T프로모션/패키지/키트 탭 제거됨 — 일반주문 + 발주리스트만 유지)
+  // (FOC/T프로모션/패키지/키트 탭 제거됨 — 일반주문 + 발주리스트 + 밀워키 발주확정 3개 유지)
 
   html += '</div>'; // #po-tab-contents
 
@@ -3034,17 +3046,24 @@ function switchPOSubTab(tabName) {
   var isGridTab = tabName === 'normal' || tabName === 'foc' || tabName === 'package' || tabName === 'kit' || tabName.indexOf('promo-') === 0;
   if (content) content.style.display = isGridTab ? 'grid' : 'block';
 
-  document.querySelectorAll('.po-action-bar .po-badge[data-tab]').forEach(function(btn) {
+  document.querySelectorAll('.po-action-compact .po-subtab[data-tab]').forEach(function(btn) {
     var id = btn.getAttribute('data-tab');
-    btn.className = 'po-badge ' + (id === tabName ? 'po-tab-active' : 'po-tab-inactive');
+    btn.className = 'po-subtab ' + (id === tabName ? 'po-subtab-active' : 'po-subtab-inactive');
   });
+
+  // 섹션 헤더 텍스트 업데이트
+  var headerEl = document.getElementById('po-subtab-section-header');
+  if (headerEl) {
+    var _tab = _poSubTabs.find(function(t) { return t.id === tabName; });
+    if (_tab) headerEl.innerHTML = '<span class="po-subtab-section-dot"></span>' + _tab.label;
+  }
 
   localStorage.setItem('mw_po_active_subtab', tabName);
 
-  // 발주 리스트 탭 전환 시 재렌더링
-  if (tabName === 'list') {
-    var listContent = document.getElementById('po-content-list');
-    if (listContent) listContent.innerHTML = buildPOListPanel();
+  // 밀워키 발주확정 탭 전환 시 재렌더링 (기존 발주리스트 로직 그대로)
+  if (tabName === 'confirmed') {
+    var confirmedContent = document.getElementById('po-content-confirmed');
+    if (confirmedContent) confirmedContent.innerHTML = buildPOListPanel();
   }
 }
 
@@ -3307,7 +3326,7 @@ function syncTtiOrderHistory(ttiOrders) {
   var kpiRow = document.querySelector('.po-kpi-row');
   if (kpiRow) renderPOTab();
   else {
-    var listContent = document.getElementById('po-content-list');
+    var listContent = document.getElementById('po-content-confirmed');
     if (listContent) listContent.innerHTML = buildPOListPanel();
   }
 }
@@ -3329,8 +3348,8 @@ function ttiReorder(item) {
 
 function changePOListFilter(val) {
   localStorage.setItem('mw_po_list_filter', val);
-  // 발주 리스트 영역만 재렌더링
-  var listContent = document.getElementById('po-content-list');
+  // 밀워키 발주확정 영역만 재렌더링
+  var listContent = document.getElementById('po-content-confirmed');
   if (listContent) listContent.innerHTML = buildPOListPanel();
 }
 
@@ -10770,13 +10789,13 @@ window.addEventListener('message', function(event) {
       console.log('[app] TTI', actionText, '성공:', event.data.orderNo);
       toast(actionText + ' 처리 완료');
       setTimeout(function() {
-        var listContent = document.getElementById('po-content-list');
+        var listContent = document.getElementById('po-content-confirmed');
         if (listContent) listContent.innerHTML = buildPOListPanel();
       }, 3000);
     } else {
       console.error('[app] TTI', actionText, '실패:', event.data.error);
       alert(actionText + ' 처리에 실패했습니다.\n' + (event.data.error || 'TTI 사이트를 확인해주세요.'));
-      var listContent = document.getElementById('po-content-list');
+      var listContent = document.getElementById('po-content-confirmed');
       if (listContent) listContent.innerHTML = buildPOListPanel();
     }
   }
