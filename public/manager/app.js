@@ -1459,7 +1459,7 @@ function renderCatalog() {
       <td>${p.detail || '-'}</td>
       <td class="center">${p.orderNum || '-'}</td>
       <td>${p.ttiNum || '-'}</td>
-      <td style="max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.model || ''}">${(function(){ var m=p.model||''; var si=m.indexOf(' / '); if(si<0) return '<span style="font-weight:500">'+m+'</span>'; return '<span style="font-weight:500">'+m.substring(0,si)+'</span> <span style="color:#888">'+m.substring(si)+'</span>'; })()}</td>
+      <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.model || ''}">${(function(){ var m=p.model||''; var si=m.indexOf(' / '); if(si<0) return '<span style="font-weight:500">'+m+'</span>'; return '<span style="font-weight:500">'+m.substring(0,si)+'</span> <span style="color:#888">'+m.substring(si)+'</span>'; })()}</td>
       <td class="num">${fmt(p.supplyPrice)}</td>
       <td class="num">${fmt(p.cost)}</td>
       ${(function() {
