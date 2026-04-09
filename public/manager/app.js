@@ -1522,7 +1522,7 @@ function renderCatalog() {
   const body = document.getElementById('catalog-body');
   // 초기 50행만 렌더링, 나머지는 스크롤 시 점진 로드
   var INITIAL_ROWS = 50;
-  var allRows = active.slice(0, 500);
+  var allRows = active;
   var _catalogDiscontinued = discontinued;
   var _catalogRenderedCount = 0;
 
@@ -6115,7 +6115,7 @@ function _enterMwEditMode() {
       }
       if (window._catalogDiscontinued && window._catalogDiscontinued.length > 0) {
         html += '<tr class="discontinued-divider"><td colspan="20">단종 품목 (' + window._catalogDiscontinued.length + '건)</td></tr>';
-        html += window._catalogDiscontinued.slice(0, 200).map(window._catalogBuildRow).join('');
+        html += window._catalogDiscontinued.map(window._catalogBuildRow).join('');
       }
       body.innerHTML = html;
       var scrollEl = body.closest('.table-scroll');
