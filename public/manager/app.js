@@ -928,7 +928,30 @@ function _pdApplyPrice(code, channel) {
   // 가격수정 모드 해제 (버튼 자동 복원)
   _pdCancelEdit();
   // 단가표 테이블 갱신 (현재 탭이 catalog인 경우)
-  if (typeof renderCatalog === 'function') { try { renderCatalog(); } catch(e){} }
+  // 편집 모드 + 체크 상태 보존
+  if (typeof renderCatalog === 'function') {
+    try {
+      var _wasEditMode = !!_mwEditMode;
+      var _checkedIdxs = [];
+      if (_wasEditMode) {
+        document.querySelectorAll('.mw-edit-cb:checked').forEach(function(cb) {
+          _checkedIdxs.push(cb.value);
+        });
+      }
+      renderCatalog();
+      // 편집 모드 복원
+      if (_wasEditMode) {
+        _mwEditMode = false;  // toggleMwEditMode가 true로 전환하도록
+        toggleMwEditMode();
+        // 체크 상태 복원
+        _checkedIdxs.forEach(function(idx) {
+          var cb = document.querySelector('.mw-edit-cb[value="' + idx + '"]');
+          if (cb) cb.checked = true;
+        });
+        updateMwEditSelection();
+      }
+    } catch(e) { console.warn('[pdApplyPrice] renderCatalog/편집모드 복원 실패', e); }
+  }
   // 가격이력 테이블 다시 그리기 — 팝업 전체 재렌더 필요하므로 buildPriceHistoryTable 컨테이너만 교체
   var popup = document.getElementById('price-detail-popup');
   if (popup) {
