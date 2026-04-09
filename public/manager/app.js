@@ -6189,8 +6189,34 @@ function mwEditAction(action) {
     return;
   }
 
+  if (action === 'delete') {
+    if (codes.length === 0) { alert('제품을 선택해주세요'); return; }
+    if (!confirm('선택하신 ' + codes.length + '개 제품을 삭제하시겠습니까?')) return;
+    DB.products = DB.products.filter(function(p) { return codes.indexOf(String(p.code)) === -1; });
+    recalcAll();
+    save(KEYS.products, DB.products);
+    renderCatalog();
+    _enterMwEditMode();
+    toast(codes.length + '개 제품 삭제 완료');
+    return;
+  }
+
+  if (action === 'discontinue') {
+    if (codes.length === 0) { alert('제품을 선택해주세요'); return; }
+    if (!confirm('선택하신 ' + codes.length + '개 제품을 단종 처리하시겠습니까?')) return;
+    var cnt = 0;
+    DB.products.forEach(function(p) {
+      if (codes.indexOf(String(p.code)) !== -1 && !p.discontinued) { p.discontinued = '단종'; cnt++; }
+    });
+    recalcAll();
+    save(KEYS.products, DB.products);
+    renderCatalog();
+    _enterMwEditMode();
+    toast(cnt + '개 제품 단종 처리 완료');
+    return;
+  }
+
   console.log('액션:', action, '선택:', codes.length, '개', codes);
-  // TODO: 삭제/단종/가격전송 로직
 }
 
 // ── 일괄 수정 모달 ──
