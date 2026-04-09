@@ -172,7 +172,17 @@ export async function updateNaverPrice(originProductNo: string, newPrice: number
   }
 
   // 3단계: 가격만 변경 (나머지 필드 유지)
+  console.log('[DEBUG updateNaverPrice] 변경 전 salePrice:', fullProduct.originProduct.salePrice);
+  console.log('[DEBUG updateNaverPrice] 변경할 newPrice:', newPrice, '타입:', typeof newPrice);
   fullProduct.originProduct.salePrice = newPrice;
+
+  // channelProducts의 salePrice도 변경해야 반영됨
+  if (fullProduct.originProduct.channelProducts) {
+    fullProduct.originProduct.channelProducts.forEach((cp: any) => {
+      console.log('[DEBUG updateNaverPrice] channelProduct 변경 전 salePrice:', cp.salePrice);
+      cp.salePrice = newPrice;
+    });
+  }
 
   // detailContent는 null로 보내면 기존값 유지됨 (네이버 공식 문서)
   if (fullProduct.originProduct.detailContent) {
@@ -180,7 +190,9 @@ export async function updateNaverPrice(originProductNo: string, newPrice: number
   }
 
   // 4단계: 전체 데이터를 PUT으로 전송
+  console.log('[DEBUG updateNaverPrice] PUT 전송 channelProductNo:', channelProductNo);
   const result = await naverApi('PUT', `/v2/products/channel-products/${channelProductNo}`, fullProduct);
+  console.log('[DEBUG updateNaverPrice] PUT 응답:', JSON.stringify(result).substring(0, 500));
 
   return {
     success: true,

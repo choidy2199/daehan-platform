@@ -45,6 +45,10 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { originProductNo, newPrice } = body;
 
+    console.log('[DEBUG PUT] 요청 body:', JSON.stringify(body));
+    console.log('[DEBUG PUT] originProductNo:', originProductNo, '타입:', typeof originProductNo);
+    console.log('[DEBUG PUT] newPrice:', newPrice, '타입:', typeof newPrice);
+
     if (!originProductNo || !newPrice) {
       return NextResponse.json(
         { success: false, error: 'originProductNo와 newPrice가 필요합니다' },
@@ -52,7 +56,8 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    await updateNaverPrice(String(originProductNo), Number(newPrice));
+    const result = await updateNaverPrice(String(originProductNo), Number(newPrice));
+    console.log('[DEBUG PUT] updateNaverPrice 결과:', JSON.stringify(result));
 
     return NextResponse.json({
       success: true,

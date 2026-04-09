@@ -6316,8 +6316,9 @@ async function _startPriceSync() {
     document.getElementById('ps-progress-text').textContent = i + ' / ' + total;
     document.getElementById('ps-percent').textContent = Math.round((i / total) * 100) + '%';
 
+    console.log('[PriceSync] 제품:', code, '모델:', p.model, 'priceNaver:', price, '타입:', typeof price);
     if (!code) { failed.push({ code: code, model: p.model, reason: '코드 없음' }); _updatePsCounters(success, failed); continue; }
-    if (!price || price <= 0) { failed.push({ code: code, model: p.model, reason: '스토어팜 가격 없음' }); _updatePsCounters(success, failed); continue; }
+    if (!price || price <= 0) { failed.push({ code: code, model: p.model, reason: '스토어팜 가격 없음 (' + price + ')' }); _updatePsCounters(success, failed); continue; }
 
     try {
       // 1. 판매자코드로 네이버 상품 조회
