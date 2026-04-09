@@ -3184,7 +3184,8 @@ function buildPOListPanel() {
   h += '<button class="po-hdr-btn po-hdr-erp" onclick="registerErpFromList()">↻ 경영박사 매입전표 등록</button>';
   h += '</div></div>';
 
-  h += '<div class="po-panel-body"><table class="po-table"><thead><tr>';
+  // 발주확정 panel-body: padding 제거 (다크 헤더와 테이블 헤더 밀착 + 테이블 풀폭)
+  h += '<div class="po-panel-body" style="padding:0"><table class="po-table"><thead><tr>';
   h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
   h += '<th>날짜</th><th>구분</th><th>관리코드</th><th>코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">TTI상태</th><th class="center">액션</th><th class="center">주문번호</th><th class="center">경영박사</th>';
   h += '</tr></thead><tbody id="po-list-body">';
