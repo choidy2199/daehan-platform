@@ -80,7 +80,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 
 /* Content — 전체 레이아웃을 뷰포트 높이에 맞춤 */
-.content { max-width: 100%; margin: 0 auto; padding: 16px 24px 40px; height: calc(100vh - 52px); display: flex; flex-direction: column; overflow: hidden; }
+.content { max-width: 100%; margin: 0 auto; padding: 16px 24px 8px; height: calc(100vh - 52px); display: flex; flex-direction: column; overflow: hidden; }
 .tab-content { display: none; }
 .tab-content.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 #tab-catalog.active { overflow: hidden; }

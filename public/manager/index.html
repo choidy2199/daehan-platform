@@ -85,23 +85,23 @@
       </div>
     </div>
     <div class="section-body" style="padding:12px;flex:1;display:flex;flex-direction:column;min-height:0">
-      <div class="search-bar" style="flex-shrink:0">
-        <input class="input" id="catalog-search" type="search" name="search_naf_catalog" placeholder="코드, 모델명 검색..." autocomplete="nope" data-form-type="other" data-lpignore="true" oninput="renderCatalog()">
-        <select class="select" id="catalog-cat" onchange="renderCatalog()">
+      <div class="search-bar" style="flex-shrink:0;display:flex;align-items:center;gap:8px">
+        <input class="input" id="catalog-search" type="search" name="search_naf_catalog" placeholder="코드, 모델명 검색..." autocomplete="nope" data-form-type="other" data-lpignore="true" oninput="renderCatalog()" style="flex:0 0 auto;width:240px">
+        <select class="select" id="catalog-cat" onchange="renderCatalog()" style="flex:0 0 auto;width:130px">
           <option value="">전체 대분류</option>
         </select>
-        <select class="select" id="catalog-sub" onchange="renderCatalog()">
+        <select class="select" id="catalog-sub" onchange="renderCatalog()" style="flex:0 0 auto;width:130px">
           <option value="">전체 중분류</option>
         </select>
-      </div>
-      <div id="mw-edit-action-bar" style="display:none;background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:6px;padding:8px 12px;margin-bottom:6px;align-items:center;gap:8px;flex-shrink:0">
-        <input type="checkbox" id="mw-edit-checkall-bar" onchange="toggleAllMwEditCheckbox(this)" style="width:16px;height:16px;accent-color:#185FA5">
-        <span id="mw-edit-selection-info" style="font-size:13px;color:#185FA5;font-weight:500;flex:1">0개 선택됨</span>
-        <button onclick="mwEditAction('modify')" style="padding:0 14px;height:28px;border-radius:4px;font-size:12px;font-weight:600;background:#185FA5;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif">선택 수정</button>
-        <button onclick="mwEditAction('delete')" style="padding:0 14px;height:28px;border-radius:4px;font-size:12px;font-weight:600;background:#FCEBEB;color:#791F1F;border:none;cursor:pointer;font-family:'Pretendard',sans-serif">선택 삭제</button>
-        <button onclick="mwEditAction('discontinue')" style="padding:0 14px;height:28px;border-radius:4px;font-size:12px;font-weight:600;background:#FAEEDA;color:#854F0B;border:none;cursor:pointer;font-family:'Pretendard',sans-serif">단종 처리</button>
-        <div style="width:1px;height:20px;background:#B5D4F4"></div>
-        <button onclick="mwEditAction('priceSync')" style="padding:0 14px;height:28px;border-radius:4px;font-size:12px;font-weight:600;background:#1D9E75;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif">▲ 가격 전송</button>
+        <div id="mw-edit-action-bar" style="display:none;align-items:center;gap:6px;margin-left:auto">
+          <input type="checkbox" id="mw-edit-checkall-bar" onchange="toggleAllMwEditCheckbox(this)" style="width:15px;height:15px;accent-color:#185FA5">
+          <span id="mw-edit-selection-info" style="font-size:12px;color:#185FA5;font-weight:500;white-space:nowrap">0개 선택됨</span>
+          <button onclick="mwEditAction('modify')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#185FA5;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">선택 수정</button>
+          <button onclick="mwEditAction('delete')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#FCEBEB;color:#791F1F;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">선택 삭제</button>
+          <button onclick="mwEditAction('discontinue')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#FAEEDA;color:#854F0B;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">단종 처리</button>
+          <div style="width:1px;height:18px;background:#B5D4F4"></div>
+          <button onclick="mwEditAction('priceSync')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#1D9E75;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">▲ 가격 전송</button>
+        </div>
       </div>
       <div class="table-scroll" style="flex:1;overflow-y:auto;overflow-x:auto;min-height:0">
         <table class="data-table" id="catalog-table">
