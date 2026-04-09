@@ -173,6 +173,10 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .sub-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
 .sub-tab { background: var(--tl-bg); border: 1px solid var(--tl-border); border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'Pretendard', sans-serif; color: var(--tl-text-secondary); transition: all 0.2s; }
 .sub-tab.active { background: var(--tl-primary); color: white; border-color: var(--tl-primary); }
+/* 밀워키 다크헤더 내 필터탭 */
+.mw-filter-tab { background: none; color: rgba(255,255,255,0.5); border: none; border-radius: 5px; padding: 5px 12px; font-size: 11px; font-weight: 400; cursor: pointer; font-family: 'Pretendard', sans-serif; transition: all 0.15s; white-space: nowrap; }
+.mw-filter-tab:hover { color: rgba(255,255,255,0.8); }
+.mw-filter-tab.active { background: rgba(255,255,255,0.15); color: #fff; font-weight: 500; }
 .sub-tab-order-sheet { background: #EF9F27 !important; color: #1A1D23 !important; border-color: #EF9F27 !important; font-weight: 700 !important; }
 .sub-tab-order-sheet.active { background: var(--tl-accent-dark) !important; color: white !important; border-color: var(--tl-accent-dark) !important; }
 

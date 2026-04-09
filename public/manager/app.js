@@ -1373,7 +1373,7 @@ let catalogFilterMode = 'all';
 
 function setCatalogFilter(mode) {
   catalogFilterMode = mode;
-  document.querySelectorAll('#catalog-filter-tabs .sub-tab').forEach(function(btn) {
+  document.querySelectorAll('#catalog-filter-tabs .mw-filter-tab').forEach(function(btn) {
     btn.classList.remove('active');
   });
   event.target.classList.add('active');
@@ -1631,7 +1631,7 @@ function renderCatalog() {
     var nocode = all.filter(function(p) { return !p.manageCode || p.manageCode.trim() === '' || p.manageCode === '-'; });
     var nosku = all.filter(function(p) { return !p.code || p.code.trim() === '' || p.code === '-'; });
 
-    var tabs = document.querySelectorAll('#catalog-filter-tabs .sub-tab');
+    var tabs = document.querySelectorAll('#catalog-filter-tabs .mw-filter-tab');
     if (tabs[0]) tabs[0].textContent = '전체제품(' + all.length + ')';
     if (tabs[1]) tabs[1].textContent = '재고있음(' + instock.length + ')';
     if (tabs[2]) tabs[2].textContent = '재고없음(' + outstock.length + ')';
