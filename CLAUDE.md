@@ -182,6 +182,33 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - startTtiOrderSync(): 이번달 1일~오늘 범위 동기화
   - 동기화 타임스탬프: mw_order_sync_time
 
+- [2026-04-09] 네이버 커머스 API 상품 조회/가격 수정 연동
+  - src/lib/naver.ts: getNaverProducts(), updateNaverPrice(), findNaverProductByCode()
+  - src/app/api/naver/products/route.ts: GET(상품 조회, ?code= 판매자코드 단건), PUT(가격 수정)
+  - updateNaverPrice: 채널상품 전체 조회→salePrice/discountedPrice 변경→PUT 전체 전송
+  - findNaverProductByCode: 전체 상품 캐시(Map) + sellerManagementCode 정확 매칭 (API 부분매칭 문제 해결)
+  - channelProductNo 직접 전달 방식으로 재검색 오매칭 방지
+
+- [2026-04-09] 밀워키 단가표 편집 모드 전면 리디자인
+  - 헤더 버튼: [제품등록및수정] | [⚙ 설정] [✎ 수정/저장] 3개로 통합
+  - 제품등록및수정 팝업: 탭 3개 (가져오기/내보내기/+제품등록), 기존 모달 통합
+  - 편집 모드: No. 컬럼 ↔ 체크박스 in-place 교체 (컬럼 수 불변, 헤더 정렬 유지)
+  - 액션바: 검색바 우측 인라인 (선택수정/선택삭제/단종처리/가격전송)
+  - 전체 행 렌더링: active.slice(0,500) 제한 해제, 편집 모드 시 전체 DOM 렌더링
+  - 선택수정: 제품별 탭 팝업 (9필드 3열 그리드), _mwBulkTabReady 플래그로 첫 탭 빈값 방지
+  - 선택삭제: confirm → DB.products filter → recalcAll → save
+  - 단종처리: confirm → discontinued='단종' → 테이블 하단 이동
+  - 가격전송: 마켓 선택 팝업 → 프로그레스 바 → 네이버 API 순차 전송 (2초 RPS) → 결과 화면
+  - 제품 식별: code→DB.products 인덱스(data-idx) 기반으로 전환
+
+- [2026-04-09] UI 개선
+  - 필터탭(전체제품/재고있음 등)을 다크 헤더 바 안으로 이동 (.mw-filter-tab)
+  - 테이블 레이아웃: table-layout:fixed + 컬럼 너비 고정 (모델명만 가변)
+  - 테이블 확장: .content flex column + .tab-content flex:1 + .section-body overflow 수정
+  - 테이블 헤더 sticky: JS translateY 제거 → 순수 CSS position:sticky 통일
+  - 모달 드래그: _makeDraggable 범용 헬퍼 (제품수정/설정/가격전송 팝업 적용)
+  - 제품 저장 후 input 필드 자동 초기화
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인
