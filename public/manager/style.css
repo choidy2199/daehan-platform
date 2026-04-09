@@ -102,7 +102,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .sub-tabs { flex-shrink: 0; }
 
 /* table-scroll 내 thead sticky */
-.table-scroll .data-table thead th { position: sticky; top: 0; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.table-scroll .data-table thead th { position: sticky; top: 0; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); background: #EAECF2; }
 
 /* Forms */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }

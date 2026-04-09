@@ -6141,6 +6141,8 @@ function _enterMwEditMode() {
   var bar = document.getElementById('mw-edit-action-bar');
   if (bar) bar.style.display = 'flex';
   updateMwEditSelection();
+  // sticky header 재초기화
+  initStickyHeader('catalog-table');
 }
 
 function _exitMwEditMode() {
@@ -6157,6 +6159,8 @@ function _exitMwEditMode() {
   // 액션바 숨김
   var bar = document.getElementById('mw-edit-action-bar');
   if (bar) bar.style.display = 'none';
+  // sticky header 재초기화
+  initStickyHeader('catalog-table');
 }
 
 function toggleAllMwEditCheckbox(masterCb) {
