@@ -627,8 +627,8 @@ function openPriceDetail(code, channel) {
     + '<span style="font-size:15px;font-weight:600;color:#1A1D23">' + st.label + ' 가격 상세</span>'
     + vatTag
     + '<span style="flex:1"></span>'
-    + '<button onclick="_pdPriceSync(\'' + code + '\',\'' + channel + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">▲ 가격전송</button>'
-    + '<button onclick="_pdGoSales()" style="background:#fff;color:#185FA5;border:1px solid #185FA5;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">판매관리</button>'
+    + '<button id="pd-btn-sync" onclick="_pdPriceSync(\'' + code + '\',\'' + channel + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">▲ 가격전송</button>'
+    + '<button id="pd-btn-sales" onclick="_pdGoSales()" style="background:#fff;color:#185FA5;border:1px solid #185FA5;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">판매관리</button>'
     + '<button id="pd-edit-btn" onclick="_pdToggleEdit(\'' + code + '\',\'' + channel + '\')" style="background:#fff;color:#185FA5;border:1px solid #185FA5;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">가격수정</button>'
     + '<button onclick="closePriceDetail()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#9BA3B2;padding:4px">✕</button>'
     + '</div>'
@@ -736,7 +736,19 @@ function closePriceDetail(e) {
 }
 
 // ── 가격 상세 팝업 버튼 핸들러 ──
+function _pdSetHeaderBtnsDisabled(disabled) {
+  ['pd-btn-sync', 'pd-btn-sales'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (!b) return;
+    b.disabled = disabled;
+    b.style.opacity = disabled ? '0.4' : '1';
+    b.style.cursor = disabled ? 'not-allowed' : 'pointer';
+    b.style.pointerEvents = disabled ? 'none' : 'auto';
+  });
+}
+
 function _pdPriceSync(code, channel) {
+  if (_pdEditMode) return;
   if (channel !== 'naver') { alert((_marketBadgeStyles[channel] || {}).label + ' 가격전송은 준비 중입니다.'); return; }
   var idx = DB.products.findIndex(function(p) { return String(p.code) === String(code); });
   if (idx < 0) { alert('제품을 찾을 수 없습니다.'); return; }
@@ -761,6 +773,8 @@ function _pdToggleEdit(code, channel) {
   _pdEditMode = true;
   var btn = document.getElementById('pd-edit-btn');
   if (btn) { btn.textContent = '수정중…'; btn.style.background = '#EF9F27'; btn.style.color = '#fff'; btn.style.borderColor = '#EF9F27'; }
+  // 가격전송/판매관리 버튼 비활성화
+  _pdSetHeaderBtnsDisabled(true);
   var editArea = document.getElementById('pd-edit-area');
   if (editArea) editArea.style.display = 'block';
   var actArea = document.getElementById('pd-edit-actions');
@@ -774,6 +788,8 @@ function _pdCancelEdit() {
   _pdEditMode = false;
   var btn = document.getElementById('pd-edit-btn');
   if (btn) { btn.textContent = '가격수정'; btn.style.background = '#fff'; btn.style.color = '#185FA5'; btn.style.borderColor = '#185FA5'; }
+  // 가격전송/판매관리 버튼 복원
+  _pdSetHeaderBtnsDisabled(false);
   var editArea = document.getElementById('pd-edit-area');
   if (editArea) editArea.style.display = 'none';
   var actArea = document.getElementById('pd-edit-actions');
