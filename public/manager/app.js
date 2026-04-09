@@ -6155,85 +6155,143 @@ function mwEditAction(action) {
 }
 
 // ── 일괄 수정 모달 ──
+// ── 제품별 탭 방식 일괄 수정 모달 ──
+var _mwBulkEditData = []; // [{code, ...fields}, ...]
+var _mwBulkActiveIdx = 0;
+var _mwBulkFields = ['code','manageCode','category','subcategory','detail','orderNum','ttiNum','model','supplyPrice'];
+var _mwBulkLabels = ['코드','관리코드','대분류','중분류','소분류','순번','TTI#','모델명','공급가'];
+
 function _showMwBulkEditModal(codes) {
-  // 기존 모달 제거
   var old = document.getElementById('mw-bulk-edit-modal');
   if (old) old.remove();
 
-  var html = '<div class="modal-bg show" id="mw-bulk-edit-modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:300;justify-content:center;align-items:flex-start;padding-top:60px">' +
-    '<div class="modal" style="max-width:480px;width:90%;border-radius:10px;background:white;overflow:hidden">' +
-      '<div class="modal-header" style="padding:16px 20px;border-bottom:1px solid #DDE1EB;display:flex;justify-content:space-between;align-items:center">' +
-        '<h3 style="font-size:16px;font-weight:600;margin:0">' + codes.length + '개 제품 일괄 수정</h3>' +
+  // DB에서 선택된 제품 데이터 복사
+  _mwBulkEditData = [];
+  codes.forEach(function(code) {
+    var p = DB.products.find(function(x) { return x.code === code; });
+    if (!p) return;
+    var copy = {};
+    _mwBulkFields.forEach(function(k) { copy[k] = p[k] || ''; });
+    _mwBulkEditData.push(copy);
+  });
+  if (_mwBulkEditData.length === 0) { alert('선택된 제품을 찾을 수 없습니다'); return; }
+  _mwBulkActiveIdx = 0;
+
+  // 탭 HTML
+  var tabsHtml = _mwBulkEditData.map(function(d, i) {
+    var label = d.model || d.code;
+    if (label.length > 20) label = label.substring(0, 20) + '…';
+    return '<button class="mwbe-tab" data-idx="' + i + '" onclick="_mwBulkSwitchTab(' + i + ')" ' +
+      'style="background:none;border:none;padding:8px 14px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;' +
+      'font-family:\'Pretendard\',sans-serif;color:#9BA3B2;border-bottom:2px solid transparent;margin-bottom:-2px">' + label + '</button>';
+  }).join('');
+
+  // 필드 HTML (3열 그리드)
+  var fieldsHtml = '';
+  for (var r = 0; r < 3; r++) {
+    fieldsHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">';
+    for (var c = 0; c < 3; c++) {
+      var fi = r * 3 + c;
+      var fk = _mwBulkFields[fi];
+      var fl = _mwBulkLabels[fi];
+      var inputType = fk === 'supplyPrice' ? 'text' : 'text';
+      var oninput = fk === 'supplyPrice' ? ' oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v)this.value=Number(v).toLocaleString();else this.value=\'\'"' : '';
+      fieldsHtml += '<div class="form-field"><label class="label">' + fl + '</label>' +
+        '<input class="input mwbe-input" data-field="' + fk + '" id="mwbe-f-' + fk + '" type="' + inputType + '"' + oninput + '></div>';
+    }
+    fieldsHtml += '</div>';
+  }
+
+  var html = '<div class="modal-bg show" id="mw-bulk-edit-modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:300;justify-content:center;align-items:flex-start;padding-top:40px">' +
+    '<div class="modal" style="max-width:720px;width:92%;border-radius:10px;background:white;overflow:hidden">' +
+      '<div class="modal-header" style="padding:14px 20px;border-bottom:1px solid #DDE1EB;display:flex;justify-content:space-between;align-items:center">' +
+        '<h3 style="font-size:16px;font-weight:600;margin:0">' + _mwBulkEditData.length + '개 제품 수정</h3>' +
         '<button onclick="closeMwBulkEditModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9BA3B2">&times;</button>' +
       '</div>' +
-      '<div style="padding:20px">' +
-        '<div style="background:#E6F1FB;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#0C447C">빈 칸으로 두면 해당 필드는 변경되지 않습니다</div>' +
-        '<div style="display:flex;flex-direction:column;gap:12px">' +
-          '<div style="display:flex;align-items:center;gap:12px">' +
-            '<label style="width:100px;font-size:13px;font-weight:500;color:#5A6070;flex-shrink:0">공급가</label>' +
-            '<input class="input" id="mw-bulk-supplyPrice" type="text" placeholder="공급가 (빈칸=미변경)" style="flex:1" oninput="this.value=this.value.replace(/[^0-9]/g,\'\');if(this.value)this.value=Number(this.value).toLocaleString()">' +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:12px">' +
-            '<label style="width:100px;font-size:13px;font-weight:500;color:#5A6070;flex-shrink:0">카테고리</label>' +
-            '<select class="select" id="mw-bulk-category" style="flex:1">' +
-              '<option value="">미변경</option>' +
-              '<option value="파워툴">파워툴</option>' +
-              '<option value="수공구">수공구</option>' +
-              '<option value="악세사리">악세사리</option>' +
-              '<option value="팩아웃">팩아웃</option>' +
-              '<option value="드릴비트">드릴비트</option>' +
-            '</select>' +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:12px">' +
-            '<label style="width:100px;font-size:13px;font-weight:500;color:#5A6070;flex-shrink:0">단종 여부</label>' +
-            '<select class="select" id="mw-bulk-discontinued" style="flex:1">' +
-              '<option value="">미변경</option>' +
-              '<option value="정상">정상</option>' +
-              '<option value="단종">단종</option>' +
-            '</select>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
+      '<div style="background:#F4F6FA;padding:8px 20px;font-size:11px;color:#5A6070">각 제품 탭을 클릭하여 개별 수정 · 수정 후 \'전체 적용\'으로 일괄 저장</div>' +
+      '<div id="mwbe-tabs" style="display:flex;gap:0;border-bottom:2px solid #DDE1EB;margin:0 20px;overflow-x:auto;flex-shrink:0">' + tabsHtml + '</div>' +
+      '<div style="padding:16px 20px">' + fieldsHtml + '</div>' +
       '<div style="padding:12px 20px;border-top:1px solid #DDE1EB;display:flex;justify-content:flex-end;gap:8px">' +
         '<button class="btn-secondary" onclick="closeMwBulkEditModal()">취소</button>' +
-        '<button class="btn-primary" onclick="applyMwBulkEdit()">적용</button>' +
+        '<button class="btn-primary" onclick="applyMwBulkEdit()">전체 적용</button>' +
       '</div>' +
     '</div>' +
   '</div>';
 
   document.body.insertAdjacentHTML('beforeend', html);
-  // 선택된 코드를 모달에 저장
-  document.getElementById('mw-bulk-edit-modal')._codes = codes;
+  _mwBulkSwitchTab(0);
+}
+
+function _mwBulkSaveCurrentTab() {
+  // 현재 탭의 input값을 editData에 저장
+  var d = _mwBulkEditData[_mwBulkActiveIdx];
+  if (!d) return;
+  _mwBulkFields.forEach(function(k) {
+    var el = document.getElementById('mwbe-f-' + k);
+    if (!el) return;
+    if (k === 'supplyPrice') {
+      d[k] = parseInt(el.value.replace(/[^0-9]/g, '')) || 0;
+    } else {
+      d[k] = el.value;
+    }
+  });
+}
+
+function _mwBulkSwitchTab(idx) {
+  // 기존 탭 저장
+  _mwBulkSaveCurrentTab();
+  _mwBulkActiveIdx = idx;
+  // 탭 활성 스타일
+  document.querySelectorAll('.mwbe-tab').forEach(function(btn, i) {
+    var active = i === idx;
+    btn.style.color = active ? '#185FA5' : '#9BA3B2';
+    btn.style.fontWeight = active ? '600' : '500';
+    btn.style.borderBottom = active ? '2px solid #185FA5' : '2px solid transparent';
+    btn.style.background = active ? '#E6F1FB' : 'none';
+  });
+  // 필드에 데이터 채우기
+  var d = _mwBulkEditData[idx];
+  if (!d) return;
+  _mwBulkFields.forEach(function(k) {
+    var el = document.getElementById('mwbe-f-' + k);
+    if (!el) return;
+    if (k === 'supplyPrice') {
+      el.value = d[k] ? Number(d[k]).toLocaleString() : '';
+    } else {
+      el.value = d[k] || '';
+    }
+  });
 }
 
 function closeMwBulkEditModal() {
   var el = document.getElementById('mw-bulk-edit-modal');
   if (el) el.remove();
+  _mwBulkEditData = [];
+  _mwBulkActiveIdx = 0;
 }
 
 function applyMwBulkEdit() {
-  var modal = document.getElementById('mw-bulk-edit-modal');
-  if (!modal) return;
-  var codes = modal._codes || [];
-
-  var rawPrice = document.getElementById('mw-bulk-supplyPrice').value.replace(/,/g, '');
-  var newSupplyPrice = rawPrice ? parseInt(rawPrice) : null;
-  var newCategory = document.getElementById('mw-bulk-category').value;
-  var newDiscontinued = document.getElementById('mw-bulk-discontinued').value;
-
-  if (newSupplyPrice === null && !newCategory && !newDiscontinued) {
-    alert('변경할 항목을 입력해주세요');
-    return;
-  }
+  // 현재 탭 저장
+  _mwBulkSaveCurrentTab();
 
   var updated = 0;
-  DB.products.forEach(function(p) {
-    if (codes.indexOf(p.code) === -1) return;
-    if (newSupplyPrice !== null) p.supplyPrice = newSupplyPrice;
-    if (newCategory) p.category = newCategory;
-    if (newDiscontinued === '정상') p.discontinued = '';
-    else if (newDiscontinued === '단종') p.discontinued = '단종';
-    updated++;
+  _mwBulkEditData.forEach(function(d) {
+    var p = DB.products.find(function(x) { return x.code === d.code; });
+    if (!p) return;
+    var changed = false;
+    _mwBulkFields.forEach(function(k) {
+      var newVal = d[k];
+      var oldVal = p[k] || '';
+      if (k === 'supplyPrice') {
+        newVal = parseInt(newVal) || 0;
+        oldVal = parseInt(oldVal) || 0;
+      }
+      if (String(newVal) !== String(oldVal)) {
+        p[k] = newVal;
+        changed = true;
+      }
+    });
+    if (changed) updated++;
   });
 
   if (updated > 0) {
@@ -6241,8 +6299,9 @@ function applyMwBulkEdit() {
     save(KEYS.products, DB.products);
     renderCatalog();
     toast(updated + '개 제품 수정 완료');
+  } else {
+    toast('변경된 항목이 없습니다');
   }
-
   closeMwBulkEditModal();
 }
 
