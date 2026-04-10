@@ -11998,11 +11998,29 @@ function _initPLTab() {
     var cat = btn.getAttribute('data-cat');
     btn.className = 'pl-cat-tab' + (cat === _plActiveCat ? ' pl-cat-active' : '');
   });
+  // 패널 높이 동적 조정
+  requestAnimationFrame(_adjustPLPanelHeight);
 }
+
+// 발주리스트 패널 높이를 뷰포트에 맞게 동적 조정
+function _adjustPLPanelHeight() {
+  var panels = document.querySelectorAll('#po-content-prelist .po-panel');
+  panels.forEach(function(panel) {
+    var rect = panel.getBoundingClientRect();
+    var available = window.innerHeight - rect.top - 10;
+    if (available > 200) panel.style.maxHeight = available + 'px';
+  });
+}
+// 창 크기 변경 시 재조정
+window.addEventListener('resize', function() {
+  if (document.getElementById('po-content-prelist') && document.getElementById('po-content-prelist').style.display !== 'none') {
+    _adjustPLPanelHeight();
+  }
+});
 
 // 좌측 패널: 제품 목록 (일반주문 buildPOProductPanel과 동일 구조)
 function buildPLProductPanel() {
-  var html = '<div class="po-panel" style="font-family:\'Pretendard\',-apple-system,sans-serif;max-height:calc(100vh - 260px)">';
+  var html = '<div class="po-panel" style="font-family:\'Pretendard\',-apple-system,sans-serif">';
   html += '<div class="po-panel-header"><span>제품 목록<span class="po-header-count" id="pl-prod-count">0건</span></span>';
   // 카테고리 탭 (다크 헤더 내 배치 — 디자인 시스템 filter-tab in dark header)
   html += '<div style="display:flex;gap:2px;margin-left:16px">';
@@ -12242,9 +12260,6 @@ function renderPLProductRows() {
   }
   if (_plFilteredProducts.length === 0) {
     html = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#9BA3B2">검색 결과가 없습니다</td></tr>';
-  } else {
-    // 하단 여백 행 — 마지막 행이 푸터에 가려지지 않도록
-    html += '<tr><td colspan="12" style="height:40px;border:none"></td></tr>';
   }
   body.innerHTML = html;
   var countEl = document.getElementById('pl-prod-count');
@@ -12297,7 +12312,7 @@ function switchPLCat(cat) {
 
 // 우측 패널: 주문 목록 (일반주문 buildPOOrderPanel과 100% 동일 구조)
 function buildPLOrderPanel() {
-  var html = '<div class="po-panel" style="font-family:\'Pretendard\',-apple-system,sans-serif;max-height:calc(100vh - 260px)">';
+  var html = '<div class="po-panel" style="font-family:\'Pretendard\',-apple-system,sans-serif">';
   html += '<div class="po-panel-header"><span>주문 목록<span class="po-header-count" id="pl-cart-count-header">0건</span></span>';
   html += '<button style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="clearPLCart()">비우기</button>';
   html += '</div>';
