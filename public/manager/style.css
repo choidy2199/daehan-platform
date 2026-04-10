@@ -438,11 +438,11 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-cart-btn-dark { width:26px; height:26px; border-radius:4px; border:none; background:#1A1D23; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0; }
 .po-cart-btn-dark:hover { background:#333; }
 
-/* 발주리스트 카테고리 탭 */
-.pl-cat-tab { padding:4px 10px; font-size:12px; font-weight:600; border:1px solid #DDE1EB; border-radius:4px; background:#F4F6FA; color:#9BA3B2; cursor:pointer; white-space:nowrap; font-family:'Pretendard',sans-serif; transition:all 0.15s; }
-.pl-cat-tab:hover { background:#EAECF2; color:#5A6070; }
-.pl-cat-active { background:#1A1D23; color:#fff; border-color:#1A1D23; }
-.pl-cat-active:hover { background:#333; color:#fff; }
+/* 발주리스트 카테고리 탭 (다크 헤더 내 filter-tab 패턴) */
+.pl-cat-tab { background:transparent; color:rgba(255,255,255,0.6); border:none; border-radius:4px; padding:4px 12px; font-size:12px; font-weight:500; cursor:pointer; white-space:nowrap; font-family:'Pretendard',sans-serif; transition:all 0.15s; }
+.pl-cat-tab:hover { background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.85); }
+.pl-cat-active { background:rgba(255,255,255,0.2); color:#FFFFFF; font-weight:600; }
+.pl-cat-active:hover { background:rgba(255,255,255,0.25); color:#FFFFFF; }
 
 /* po-table-lg: 기본 po-table과 동일 (확장용 예비) */
 .po-promo-tag { display:inline-block; font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; margin-left:4px; }

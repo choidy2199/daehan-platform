@@ -11996,15 +11996,12 @@ function _initPLTab() {
   });
 }
 
-// 좌측 패널: 제품 목록
+// 좌측 패널: 제품 목록 (일반주문 buildPOProductPanel과 동일 구조)
 function buildPLProductPanel() {
   var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
-  html += '<div class="po-panel-header"><span>제품 목록<span class="po-header-count" id="pl-prod-count">0건</span></span></div>';
-
-  // 검색 + 카테고리 탭
-  html += '<div class="po-filter-row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap">';
-  html += '<input type="search" placeholder="코드, 모델명 검색" id="pl-prod-search" autocomplete="off" oninput="filterPLProducts()" style="flex:1;min-width:120px">';
-  html += '<div style="display:flex;gap:4px;flex-shrink:0">';
+  html += '<div class="po-panel-header"><span>제품 목록<span class="po-header-count" id="pl-prod-count">0건</span></span>';
+  // 카테고리 탭 (다크 헤더 내 배치 — 디자인 시스템 filter-tab in dark header)
+  html += '<div style="display:flex;gap:2px;margin-left:16px">';
   var _catTabs = ['파워툴', '수공구&악세사리', '팩아웃'];
   _catTabs.forEach(function(c) {
     var isActive = c === (_plActiveCat || '파워툴');
@@ -12012,28 +12009,33 @@ function buildPLProductPanel() {
   });
   html += '</div></div>';
 
-  // 테이블
+  // 필터 행 (일반주문과 동일 구조)
+  html += '<div class="po-filter-row">';
+  html += '<input type="search" placeholder="코드, 모델명 검색" id="pl-prod-search" autocomplete="off" oninput="filterPLProducts()">';
+  html += '</div>';
+
+  // 테이블 (po-table, table-layout:fixed — 디자인 시스템 컬럼 너비 가이드 준수)
   html += '<div class="po-panel-body" id="pl-prod-scroll">';
   html += '<table class="po-table" style="table-layout:fixed"><thead><tr>';
-  html += '<th class="center" style="width:32px">No</th>';
-  html += '<th style="width:70px">코드</th>';
-  html += '<th class="center" style="width:50px">누적</th>';
-  html += '<th style="width:60px">프로모션</th>';
-  html += '<th>모델명</th>';
-  html += '<th class="num" style="width:70px">공급가</th>';
-  html += '<th class="center" style="width:44px;color:#1D9E75">S재고</th>';
-  html += '<th class="center" style="width:44px;color:#185FA5">B재고</th>';
-  html += '<th class="center" style="width:40px">본사</th>';
-  html += '<th class="center" style="width:32px">기타</th>';
-  html += '<th class="center" style="width:44px">수량</th>';
+  html += '<th class="center" style="width:36px">No</th>';
+  html += '<th class="center" style="width:36px">누적</th>';
+  html += '<th style="width:70px">프로모션번호</th>';
+  html += '<th style="width:64px">제품번호</th>';
+  html += '<th style="min-width:180px">모델명</th>';
+  html += '<th class="num" style="width:66px">공급가</th>';
+  html += '<th class="center" style="width:42px">S재고</th>';
+  html += '<th class="center" style="width:42px">B재고</th>';
+  html += '<th class="center" style="width:42px">본사</th>';
+  html += '<th class="center" style="width:36px">기타</th>';
+  html += '<th class="center" style="width:50px">수량</th>';
   html += '<th class="center" style="width:36px">주문</th>';
   html += '</tr></thead><tbody id="pl-prod-body">';
   html += '</tbody></table></div>';
 
-  // 하단 정보
+  // 하단 정보 (status-bar 패턴)
   var _pairCount = (DB.products || []).filter(function(p) { return p.pairCodes && p.pairCodes.length > 0; }).length;
   var _invCount = (DB.inventory || []).length;
-  html += '<div style="padding:6px 12px;font-size:11px;color:#9BA3B2;display:flex;justify-content:space-between">';
+  html += '<div style="padding:6px 12px;font-size:12px;color:#9BA3B2;display:flex;justify-content:space-between;flex-shrink:0;border-top:1px solid #F0F2F7">';
   html += '<span id="pl-footer-info">제품: 0건 | S/B 매칭: ' + Math.floor(_pairCount / 2) + '쌍</span>';
   html += '<span>경영박사 재고: ' + (_invCount > 0 ? _invCount + '건 등록' : '미등록') + '</span>';
   html += '</div>';
@@ -12092,15 +12094,12 @@ function buildPLProductRow(p, rowIndex) {
     }
   }
 
-  // 프로모션 번호
-  var promoNum = p.orderNum || '-';
-
-  // 본사 재고 (TTI)
+  // 본사 재고 (TTI) — 일반주문 buildPOProductRow와 동일 SVG 아이콘
   var stockStatus = code && _poTtiStockMap[code] !== undefined ? _poTtiStockMap[code] : null;
   var stockIcon;
-  if (stockStatus === 'a') stockIcon = '<span style="color:#1D9E75;font-weight:700">●</span>';
-  else if (stockStatus === 'b') stockIcon = '<span style="color:#F5A623;font-weight:700">▲</span>';
-  else if (stockStatus === 'c') stockIcon = '<span style="color:#E24B4A;font-weight:700">✕</span>';
+  if (stockStatus === 'a') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="#4A90D9"/></svg>';
+  else if (stockStatus === 'b') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,2 12,11 2,11" fill="#F5A623"/></svg>';
+  else if (stockStatus === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
   else stockIcon = '<span style="color:#B4B2A9">-</span>';
 
   // S재고/B재고
@@ -12108,25 +12107,23 @@ function buildPLProductRow(p, rowIndex) {
   var sHtml = sb.s === '-' ? '<span style="color:#B4B2A9">-</span>' : '<span style="color:#1D9E75;font-weight:600">' + sb.s + '</span>';
   var bHtml = sb.b === '-' ? '<span style="color:#B4B2A9">-</span>' : '<span style="color:#185FA5;font-weight:600">' + sb.b + '</span>';
 
-  // 소진 비활성화
+  // 소진(stock_c) 제품 비활성화 — 일반주문과 동일 input 스타일
   var _isSoldOut = stockStatus === 'c';
-  var _qtyStyle = 'width:40px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif';
-  if (_isSoldOut) _qtyStyle += ';background:#EAECF2;color:#9BA3B2';
-  var _qtyDisabled = _isSoldOut ? ' disabled' : '';
+  var _qtyDisabled = _isSoldOut ? ' disabled style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif;background:#EAECF2;color:#9BA3B2"' : ' style="width:44px;height:26px;border:1px solid #DDE1EB;border-radius:3px;text-align:center;font-size:13px;font-family:Pretendard,sans-serif"';
   var _btnDisabled = _isSoldOut ? ' disabled style="opacity:0.3;cursor:not-allowed"' : '';
 
   var tr = '<tr>';
-  tr += '<td class="center" style="color:#9BA3B2;font-size:11px">' + (rowIndex + 1) + '</td>';
-  tr += '<td style="font-family:monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis" title="' + (p.code || '') + '">' + (p.code || '-') + '</td>';
+  tr += '<td class="center" style="color:#9BA3B2">' + (rowIndex + 1) + '</td>';
   tr += '<td class="center">' + promoBadge + '</td>';
-  tr += '<td style="font-size:11px;color:#9BA3B2;overflow:hidden;text-overflow:ellipsis">' + promoNum + '</td>';
-  tr += '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
+  tr += '<td>' + (p.orderNum || '-') + '</td>';
+  tr += '<td style="font-family:monospace;font-size:12px">' + (p.code || '-') + '</td>';
+  tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
   tr += '<td class="center">' + sHtml + '</td>';
   tr += '<td class="center">' + bHtml + '</td>';
   tr += '<td class="center">' + stockIcon + '</td>';
   tr += '<td class="center"><span style="color:#B4B2A9">-</span></td>';
-  tr += '<td class="center"><input type="number" min="1" placeholder="" style="' + _qtyStyle + '"' + _qtyDisabled + ' data-plcode="' + (p.code || '') + '"></td>';
+  tr += '<td class="center"><input type="number" min="1" placeholder=""' + _qtyDisabled + ' data-plcode="' + (p.code || '') + '"></td>';
   tr += '<td class="center"><button class="po-cart-btn-dark"' + _btnDisabled + ' onclick="addToPLCart(\'' + (p.code || '') + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button></td>';
   tr += '</tr>';
   return tr;
