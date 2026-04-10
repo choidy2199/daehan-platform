@@ -11070,8 +11070,14 @@ window.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'TTI_ORDER_ITEMS_DATA') {
     var _items = event.data.items || [];
     console.log('[app] TTI 아이템별 주문내역 수신:', _items.length, '건 (', event.data.dateFrom, '~', event.data.dateTo, ')');
-    syncOrderItems(_items, event.data.dateFrom, event.data.dateTo);
-    save('mw_order_sync_time', new Date().toISOString());
+    try {
+      syncOrderItems(_items, event.data.dateFrom, event.data.dateTo);
+      save('mw_order_sync_time', new Date().toISOString());
+    } catch (err) {
+      console.error('[app] TTI_ORDER_ITEMS_DATA 처리 중 오류:', err, err && err.stack);
+      hideTtiSyncProgress();
+      alert('주문내역 동기화 중 오류가 발생했습니다:\n' + (err && err.message ? err.message : err));
+    }
   }
 });
 
@@ -11140,11 +11146,13 @@ function startTtiOrderItemsSync() {
 // Phase 2: 아이템별 주문내역 → mw_po_history 저장
 // 중복 체크 키: ttiOrderItemKey = orderNo + '|' + 정규화된 productCode
 function syncOrderItems(items, dateFrom, dateTo) {
+  console.log('[syncOrderItems] 호출됨, items:', items ? items.length : 0, 'dateFrom:', dateFrom, 'dateTo:', dateTo);
   hideTtiSyncProgress();
   if (!items || items.length === 0) {
     alert('수신된 아이템별 주문내역이 없습니다.\n날짜 범위를 확인해주세요.');
     return;
   }
+  try {
 
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   var updated = 0;
@@ -11268,6 +11276,11 @@ function syncOrderItems(items, dateFrom, dateTo) {
   }
 
   alert('아이템별 주문내역 동기화 완료: ' + items.length + '건 (' + created + '건 추가, ' + updated + '건 갱신)');
+  } catch (err) {
+    console.error('[syncOrderItems] 처리 중 오류:', err, err && err.stack);
+    hideTtiSyncProgress();
+    alert('아이템별 주문내역 처리 중 오류가 발생했습니다:\n' + (err && err.message ? err.message : err));
+  }
 }
 
 // 스크래핑 진행 상태 표시
