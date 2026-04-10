@@ -1214,7 +1214,7 @@ document.addEventListener('click', function(e) {
 });
 
 // Calculate cost from supply price (엑셀 원가 공식)
-function calcCost(supplyPrice, category) {
+function calcCost(supplyPrice, category, ttiNum) {
   if (!supplyPrice) return 0;
   const s = DB.settings;
   const sp = supplyPrice;
@@ -1232,6 +1232,12 @@ function calcCost(supplyPrice, category) {
       volTotal += sp - (sp / (1 + rule.rate / 100));
     }
   });
+  // 누적프로모션 DC역산 (대상 제품만)
+  if (ttiNum) {
+    var cumulMap = _getCumulDCMap();
+    var cumulRate = cumulMap[normalizeTtiCode(ttiNum)] || 0;
+    if (cumulRate > 0) { volTotal += sp - (sp / (1 + cumulRate / 100)); }
+  }
   // 최종: 공급가 - AR할인합계 - 물량할인합계
   return sp - arTotal - volTotal;
 }
@@ -2626,22 +2632,44 @@ function _isCumulTarget(item) {
   for (var pi = 0; pi < promos.length; pi++) {
     var cp = promos[pi];
     if (!cp.products || !Array.isArray(cp.products)) continue;
-    var matched = cp.products.some(function(pr) {
-      if (_normTti && pr.ttiNum && normalizeTtiCode(pr.ttiNum) === _normTti) return true;
-      if (_normManage && pr.ttiNum && normalizeTtiCode(pr.ttiNum) === _normManage) return true;
-      if (_modelKey && pr.model && '_model_' + pr.model.toLowerCase() === _modelKey) return true;
-      return false;
-    });
-    if (matched) return { index: pi, name: cp.name || '' };
+    for (var j = 0; j < cp.products.length; j++) {
+      var pr = cp.products[j];
+      var _normPr = pr.ttiNum ? normalizeTtiCode(pr.ttiNum) : '';
+      if ((_normTti && _normPr === _normTti) || (_normManage && _normPr === _normManage) || (_modelKey && pr.model && '_model_' + pr.model.toLowerCase() === _modelKey)) {
+        return { index: pi, name: cp.name || '', discountRate: parseFloat(pr.discountRate) || 0 };
+      }
+    }
   }
   return null;
 }
 function _cumulBadgeHtml(item) {
   var match = _isCumulTarget(item);
   if (!match) return '';
-  var rs = _poCumulPromoRowStyles[match.index] || _poCumulPromoRowStyles[0];
-  return ' <span style="background:#D1FAE5;color:#065F46;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px">누적</span>';
+  var rate = match.discountRate;
+  // 할인율 포맷: 정수면 "8%", 소수 있으면 "5.6%", "0.8%" (trailing zero 제거)
+  var rateStr = rate > 0 ? (rate % 1 === 0 ? rate.toFixed(0) : parseFloat(rate.toFixed(2))) + '%' : '';
+  return ' <span style="background:#D1FAE5;color:#065F46;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px">누적' + (rateStr ? ' ' + rateStr : '') + '</span>';
 }
+
+// 누적 DC역산 캐시 맵 (calcCost/calcOrderCost 성능용)
+var _cumulDCCache = null;
+function _getCumulDCMap() {
+  if (_cumulDCCache) return _cumulDCCache;
+  _cumulDCCache = {};
+  var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null');
+  if (!promos || !Array.isArray(promos)) return _cumulDCCache;
+  promos.forEach(function(cp) {
+    if (!cp.products || !Array.isArray(cp.products)) return;
+    cp.products.forEach(function(pr) {
+      if (pr.ttiNum) {
+        var rate = parseFloat(pr.discountRate) || 0;
+        if (rate > 0) _cumulDCCache[normalizeTtiCode(pr.ttiNum)] = rate;
+      }
+    });
+  });
+  return _cumulDCCache;
+}
+function _invalidateCumulDCCache() { _cumulDCCache = null; }
 
 // ========================================
 // 매출카드 상세 매입내역 팝업
@@ -7489,7 +7517,8 @@ function saveProduct() {
 
   // Calculate cost and prices using current settings (same as recalcAll)
   const s = DB.settings;
-  const cost = calcCost(supplyPrice, prodCategory);
+  var _prodTtiNum = document.getElementById('prod-ttiNum').value.trim();
+  const cost = calcCost(supplyPrice, prodCategory, _prodTtiNum);
 
   const item = {
     code: code,
@@ -7498,7 +7527,7 @@ function saveProduct() {
     subcategory: document.getElementById('prod-subcategory').value.trim(),
     detail: document.getElementById('prod-detail').value.trim(),
     orderNum: document.getElementById('prod-orderNum').value.trim(),
-    ttiNum: document.getElementById('prod-ttiNum').value.trim(),
+    ttiNum: _prodTtiNum,
     model: model,
     supplyPrice: supplyPrice,
     productDC: 0,
@@ -8617,7 +8646,7 @@ function updateSyncTimeDisplay() {
 
 
 // 발주용 매입원가 계산 (분기+년간+커머셜 모두 적용)
-function calcOrderCost(price, category) {
+function calcOrderCost(price, category, ttiNum) {
   if (!price) return 0;
   const s = DB.settings;
   // 분기+년간 리베이트 (단가표 설정에서)
@@ -8635,6 +8664,12 @@ function calcOrderCost(price, category) {
       volTotal += price - (price / (1 + rule.rate / 100));
     }
   });
+  // 누적프로모션 DC역산 (대상 제품만)
+  if (ttiNum) {
+    var cumulMap = _getCumulDCMap();
+    var cumulRate = cumulMap[normalizeTtiCode(ttiNum)] || 0;
+    if (cumulRate > 0) { volTotal += price - (price / (1 + cumulRate / 100)); }
+  }
   // 최종: 공급가 - AR할인합계 - 물량할인합계
   return price - arTotal - volTotal;
 }
@@ -8680,6 +8715,7 @@ function applySettings() {
 }
 
 function recalcAll() {
+  _invalidateCumulDCCache(); // 누적프로모션 할인율 캐시 새로고침
   var s = DB.settings;
   var naverFee = s.naverFee || 0.0663;
   var openElecFee = s.openElecFee || 0.13;
@@ -8692,7 +8728,7 @@ function recalcAll() {
 
   DB.products.forEach(function(p) {
     if (!p.supplyPrice) return;
-    var cost = calcCost(p.supplyPrice, p.category || '');
+    var cost = calcCost(p.supplyPrice, p.category || '', p.ttiNum || '');
     p.cost = Math.round(cost);
 
     // 도매: 단순 마크업, 백원 반올림
@@ -11527,7 +11563,7 @@ function syncOrderItems(items, dateFrom, dateTo) {
         category: matchedProd ? (matchedProd.category || '') : '',
         qty: _qty,
         supplyPrice: _unitPrice,  // 1개 가격 (TTI 단가)
-        costPrice: Math.round(calcOrderCost(_unitPrice, matchedProd ? (matchedProd.category || '') : '')),  // 1개 기준 원가
+        costPrice: Math.round(calcOrderCost(_unitPrice, matchedProd ? (matchedProd.category || '') : '', normCode)),  // 1개 기준 원가 (누적DC 포함)
         amount: _totalAmount,     // 총 금액 (TTI 공급가 = 수량 × 단가)
         orderNumber: '',
         dryRun: false,
