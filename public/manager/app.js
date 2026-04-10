@@ -12242,6 +12242,9 @@ function renderPLProductRows() {
   }
   if (_plFilteredProducts.length === 0) {
     html = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#9BA3B2">검색 결과가 없습니다</td></tr>';
+  } else {
+    // 하단 여백 행 — 마지막 행이 푸터에 가려지지 않도록
+    html += '<tr><td colspan="12" style="height:40px;border:none"></td></tr>';
   }
   body.innerHTML = html;
   var countEl = document.getElementById('pl-prod-count');
