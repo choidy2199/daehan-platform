@@ -2615,6 +2615,35 @@ function calcPOSalesData() {
 }
 
 // ========================================
+// 누적프로모션 대상 판별 헬퍼
+// ========================================
+function _isCumulTarget(item) {
+  var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null');
+  if (!promos || !Array.isArray(promos)) return null;
+  var _normTti = item.ttiNum ? normalizeTtiCode(item.ttiNum) : '';
+  var _normManage = item.manageCode ? normalizeTtiCode(item.manageCode) : '';
+  var _modelKey = item.model ? '_model_' + item.model.toLowerCase() : '';
+  for (var pi = 0; pi < promos.length; pi++) {
+    var cp = promos[pi];
+    if (!cp.products || !Array.isArray(cp.products)) continue;
+    var matched = cp.products.some(function(pr) {
+      if (_normTti && pr.ttiNum && normalizeTtiCode(pr.ttiNum) === _normTti) return true;
+      if (_normManage && pr.ttiNum && normalizeTtiCode(pr.ttiNum) === _normManage) return true;
+      if (_modelKey && pr.model && '_model_' + pr.model.toLowerCase() === _modelKey) return true;
+      return false;
+    });
+    if (matched) return { index: pi, name: cp.name || '' };
+  }
+  return null;
+}
+function _cumulBadgeHtml(item) {
+  var match = _isCumulTarget(item);
+  if (!match) return '';
+  var rs = _poCumulPromoRowStyles[match.index] || _poCumulPromoRowStyles[0];
+  return ' <span style="background:#D1FAE5;color:#065F46;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px">누적</span>';
+}
+
+// ========================================
 // 매출카드 상세 매입내역 팝업
 // ========================================
 function openPoSalesDetailPopup(category) {
@@ -2819,12 +2848,14 @@ function _buildPoSdpTable(items) {
       var typeBadge = (!promo || promo === '일반')
         ? '<span style="background:#EAECF2;color:#5A6070;' + _badgePad + '">일반</span>'
         : '<span style="background:#EEEDFE;color:#3C3489;' + _badgePad + '">' + promo + '</span>';
+      typeBadge += _cumulBadgeHtml(item);
+      var isCumul = !!_isCumulTarget(item);
       var cat = _getCat(item);
       var cc = _catColors[cat] || { bg:'#F3F4F6', color:'#374151' };
       var catBadge = cat ? '<span style="background:' + cc.bg + ';color:' + cc.color + ';' + _badgePad + '">' + cat + '</span>' : '-';
-      h += '<tr>';
+      h += '<tr' + (isCumul ? ' style="background:#FAFFF5"' : '') + '>';
       h += '<td style="white-space:nowrap">' + _fmtDate(item.date) + '</td>';
-      h += '<td>' + typeBadge + '</td>';
+      h += '<td style="white-space:nowrap">' + typeBadge + '</td>';
       h += '<td class="center">' + catBadge + '</td>';
       h += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
       h += '<td class="num">' + fmtPO(item.supplyPrice) + '</td>';
@@ -3584,7 +3615,7 @@ function buildPOListPanel() {
       h += '<tr style="' + rowStyle + '">';
       h += '<td class="center" style="padding:10px 6px"><input type="checkbox" class="po-history-checkbox" data-id="' + item.id + '" onchange="this.closest(\'tr\').style.background=this.checked?\'#E6F1FB\':\'\'"></td>';
       h += '<td data-col="date" style="' + _tdS + 'white-space:nowrap;' + textDeco + '">' + dateStr + '</td>';
-      h += '<td data-col="type" style="' + _tdS + '">' + typeBadge + '</td>';
+      h += '<td data-col="type" style="' + _tdS + 'white-space:nowrap">' + typeBadge + _cumulBadgeHtml(item) + '</td>';
       h += '<td data-col="majorCategory" class="center" style="padding:10px 6px">' + _catBadge + '</td>';
       h += '<td data-col="manageCode" style="' + _tdS + 'color:#5A6070;' + textDeco + '">' + _dispManage + '</td>';
       h += '<td data-col="code" style="' + _tdS + 'color:#5A6070;' + textDeco + '">' + _dispCode + '</td>';
