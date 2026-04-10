@@ -1249,6 +1249,23 @@ function calcCost(supplyPrice, category, ttiNum) {
     var cumulRate = cumulMap[normalizeTtiCode(ttiNum)] || 0;
     if (cumulRate > 0) { volTotal += sp - (sp / (1 + cumulRate / 100)); }
   }
+  // 커머셜 프로모션 달성 할인 (진행 중 프로모션만)
+  var _commPromos = _getCommercialPromos();
+  var _now = new Date(); _now.setHours(0,0,0,0);
+  _commPromos.forEach(function(cp) {
+    var _cs = new Date(cp.startDate); _cs.setHours(0,0,0,0);
+    var _ce = new Date(cp.endDate); _ce.setHours(23,59,59,999);
+    if (_now < _cs || _now > _ce) return;
+    var _cSales = _calcCommercialSales(cp);
+    var _cTier = _findCommercialTier(cp, _cSales);
+    var _cRate = (_cTier.current && _cTier.current.rate > 0) ? _cTier.current.rate : 0;
+    if (_cRate <= 0) return;
+    if ((cp.discountType || 'ar') === 'volume') {
+      volTotal += sp - (sp / (1 + _cRate / 100));
+    } else {
+      arTotal += sp * (_cRate / 100);
+    }
+  });
   // 최종: 공급가 - AR할인합계 - 물량할인합계
   return sp - arTotal - volTotal;
 }
@@ -9067,6 +9084,23 @@ function calcOrderCost(price, category, ttiNum, remark) {
     var cumulRate = cumulMap[normalizeTtiCode(ttiNum)] || 0;
     if (cumulRate > 0) { volTotal += price - (price / (1 + cumulRate / 100)); }
   }
+  // 커머셜 프로모션 달성 할인 (진행 중 프로모션만)
+  var _commPromos2 = _getCommercialPromos();
+  var _now2 = new Date(); _now2.setHours(0,0,0,0);
+  _commPromos2.forEach(function(cp) {
+    var _cs2 = new Date(cp.startDate); _cs2.setHours(0,0,0,0);
+    var _ce2 = new Date(cp.endDate); _ce2.setHours(23,59,59,999);
+    if (_now2 < _cs2 || _now2 > _ce2) return;
+    var _cSales2 = _calcCommercialSales(cp);
+    var _cTier2 = _findCommercialTier(cp, _cSales2);
+    var _cRate2 = (_cTier2.current && _cTier2.current.rate > 0) ? _cTier2.current.rate : 0;
+    if (_cRate2 <= 0) return;
+    if ((cp.discountType || 'ar') === 'volume') {
+      volTotal += price - (price / (1 + _cRate2 / 100));
+    } else {
+      arTotal += price * (_cRate2 / 100);
+    }
+  });
   // 최종: 공급가 - AR할인합계 - 물량할인합계
   return price - arTotal - volTotal;
 }
