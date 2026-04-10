@@ -12123,8 +12123,7 @@ function buildPLProductRow(p, rowIndex) {
   tr += '<td class="center">' + promoBadge + '</td>';
   tr += '<td>' + (p.orderNum || '-') + '</td>';
   tr += '<td>' + (p.code || '-') + '</td>';
-  var _plIndent = (_plActiveCat === '파워툴' && p.productType === 'bare') ? 'padding-left:20px;' : '';
-  tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;text-align:left;' + _plIndent + '" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
+  tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;text-align:left" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
   tr += '<td class="center">' + sHtml + '</td>';
   tr += '<td class="center">' + bHtml + '</td>';
@@ -12159,6 +12158,13 @@ function _plSeriesOrder(model) {
 function _plSeriesLabel(order) {
   var labels = ['M18', 'M12', '충전기/배터리', 'L4', 'MX', '기타'];
   return labels[order] || '기타';
+}
+// 시리즈 컬러 뱃지 HTML
+function _plSeriesBadge(order) {
+  var colors = ['#E24B4A', '#185FA5', '#EF9F27', '#1D9E75', '#534AB7', '#888780'];
+  var bg = colors[order] || colors[5];
+  var name = _plSeriesLabel(order);
+  return '<span style="display:inline-block;font-size:12px;font-weight:700;padding:2px 12px;border-radius:3px;color:#fff;background:' + bg + '">' + name + '</span>';
 }
 // 시리즈 필터 매칭 (중분류 드롭다운)
 function _plMatchesSeries(model, filterVal) {
@@ -12228,7 +12234,7 @@ function renderPLProductRows() {
     if (_plActiveCat === '파워툴') {
       var _curSeries = _plSeriesOrder(_plFilteredProducts[i].model);
       if (_curSeries !== _prevSeries) {
-        html += '<tr><td colspan="12" style="font-size:11px;color:#666;padding:5px 10px;background:#F0F1F3;font-weight:600;text-align:left">' + _plSeriesLabel(_curSeries) + '</td></tr>';
+        html += '<tr><td colspan="12" style="background:#1A1D23;padding:5px 0;text-align:center;border-bottom:none">' + _plSeriesBadge(_curSeries) + '</td></tr>';
         _prevSeries = _curSeries;
       }
     }
