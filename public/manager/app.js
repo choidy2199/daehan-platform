@@ -3324,7 +3324,11 @@ function renderPOTab() {
     var _commSales = _calcCommercialSales(_commPromo);
     var _commTier = _findCommercialTier(_commPromo, _commSales);
     var _commRate = _commTier.current && _commTier.current.rate != null ? _commTier.current.rate + '%' : '미달';
-    html += '<div class="po-tc-commtag">커머셜P ' + _commRate + '</div>';
+    var _kpiDtBadge = '';
+    var _kpiDt = _commPromo.discountType || 'ar';
+    if (_kpiDt === 'ar') _kpiDtBadge = ' <span style="background:#FDF6E3;color:#7A5C00;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;border:1px solid #D4A843;vertical-align:middle">AR</span>';
+    else _kpiDtBadge = ' <span style="background:#E6F1FB;color:#0C447C;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;border:1px solid #85B7EB;vertical-align:middle">물량</span>';
+    html += '<div class="po-tc-commtag">커머셜P ' + _commRate + _kpiDtBadge + '</div>';
     if (_commTier.next && _commTier.next.rate != null) {
       var _shortage = _commTier.shortage > 0 ? _commTier.shortage : 0;
       html += '<div class="po-tc-commnext">다음 ' + _commTier.next.rate + '% <b>' + fmtPO(_shortage) + '원</b> ▶</div>';
@@ -4942,6 +4946,14 @@ function _buildCommPromoAccordion(promo, idx, history) {
   // 아코디언 바디
   h += '<div id="comm-body-' + idx + '" style="padding:12px;display:' + (collapsed ? 'none' : 'block') + '">';
 
+  // AR/물량 토글
+  var _dt = promo.discountType || 'ar';
+  var _arSel = _dt === 'ar';
+  h += '<div style="display:flex;gap:0;margin:0 0 10px 0">';
+  h += '<div class="comm-type-btn" data-type="ar" data-idx="' + idx + '" onclick="_toggleCommDiscountType(' + idx + ',\'ar\')" style="flex:1;padding:6px 0;text-align:center;font-size:12px;font-weight:' + (_arSel ? '600' : '500') + ';cursor:pointer;border:1px solid ' + (_arSel ? '#D4A843' : '#ddd') + ';border-radius:4px 0 0 4px;background:' + (_arSel ? '#FDF6E3' : '#fff') + ';color:' + (_arSel ? '#7A5C00' : '#9BA3B2') + '">AR차감</div>';
+  h += '<div class="comm-type-btn" data-type="volume" data-idx="' + idx + '" onclick="_toggleCommDiscountType(' + idx + ',\'volume\')" style="flex:1;padding:6px 0;text-align:center;font-size:12px;font-weight:' + (!_arSel ? '600' : '500') + ';cursor:pointer;border:1px solid ' + (!_arSel ? '#85B7EB' : '#ddd') + ';border-radius:0 4px 4px 0;background:' + (!_arSel ? '#E6F1FB' : '#fff') + ';color:' + (!_arSel ? '#0C447C' : '#9BA3B2') + '">물량지원</div>';
+  h += '</div>';
+
   // 기본 정보 입력
   h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">프로모션명</label><input type="text" class="comm-input" data-field="name" data-idx="' + idx + '" value="' + (promo.name || '') + '" style="width:100%;padding:6px 10px;border:1px solid #DDE1EB;border-radius:4px;font-size:14px"></div>';
@@ -4979,7 +4991,13 @@ function _buildCommPromoAccordion(promo, idx, history) {
     h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="minAmount" value="' + fmtPO(tier.minAmount || 0) + '" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0;background:transparent"></td>';
     h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="maxAmount" value="' + (tier.maxAmount !== null ? fmtPO(tier.maxAmount) : '') + '" placeholder="무제한" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0"></td>';
     h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="benefit" value="' + (tier.benefit || '') + '" style="width:100%;border:none;font-size:13px;padding:2px 0"></td>';
-    h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-rate" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="rate" value="' + (tier.rate !== null && tier.rate !== undefined ? tier.rate + '%' : '') + '" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0"></td>';
+    var _dtBadge = '';
+    if (tier.rate !== null && tier.rate !== undefined) {
+      var _dtp = promo.discountType || 'ar';
+      if (_dtp === 'ar') _dtBadge = '<span style="background:#FDF6E3;color:#7A5C00;font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;border:1px solid #D4A843;margin-left:4px">AR</span>';
+      else _dtBadge = '<span style="background:#E6F1FB;color:#0C447C;font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;border:1px solid #85B7EB;margin-left:4px">물량</span>';
+    }
+    h += '<td style="padding:4px 6px;border:1px solid #EAECF2;white-space:nowrap"><input type="text" class="comm-tier-input comm-rate" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="rate" value="' + (tier.rate !== null && tier.rate !== undefined ? tier.rate + '%' : '') + '" style="width:60%;border:none;font-size:13px;text-align:right;padding:2px 0;display:inline-block">' + _dtBadge + '</td>';
     h += '<td style="padding:3px 6px;text-align:center;border:1px solid #EAECF2">' + tierStatus + '</td>';
     h += '<td style="padding:3px 4px;text-align:center;border:1px solid #EAECF2"><button onclick="_deleteCommTier(' + idx + ',' + ti + ')" style="background:none;border:none;color:#CC2222;cursor:pointer;font-size:12px;padding:0">✕</button></td>';
     h += '</tr>';
@@ -5017,6 +5035,7 @@ function _addNewCommercialPromo() {
     endDate: y + '-' + String(m + 1).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0'),
     condition: '',
     targetAmount: 0,
+    discountType: 'ar',
     tiers: [{ minAmount: 0, maxAmount: null, benefit: '', rate: null }]
   });
   _saveCommercialPromos(promos);
@@ -5025,6 +5044,23 @@ function _addNewCommercialPromo() {
   openCommercialPromoModal();
   // 마지막 아코디언 펼치기
   setTimeout(function() { var lastIdx = promos.length - 1; var body = document.getElementById('comm-body-' + lastIdx); if (body) body.style.display = 'block'; var arrow = document.getElementById('comm-arrow-' + lastIdx); if (arrow) arrow.style.transform = 'rotate(90deg)'; }, 50);
+}
+
+function _toggleCommDiscountType(idx, type) {
+  var promos = _collectCommModalInputs();
+  if (!promos[idx]) return;
+  promos[idx].discountType = type;
+  _saveCommercialPromos(promos);
+  // 모달 재렌더링
+  document.getElementById('commercial-promo-modal').remove();
+  openCommercialPromoModal();
+  // 해당 아코디언 펼치기
+  setTimeout(function() {
+    var body = document.getElementById('comm-body-' + idx);
+    if (body) body.style.display = 'block';
+    var arrow = document.getElementById('comm-arrow-' + idx);
+    if (arrow) arrow.style.transform = 'rotate(90deg)';
+  }, 50);
 }
 
 function _deleteCommPromo(idx) {
