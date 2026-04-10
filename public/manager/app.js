@@ -11987,9 +11987,10 @@ function _initPLTab() {
     scrollEl.removeEventListener('scroll', onPLProductScroll);
     scrollEl.addEventListener('scroll', onPLProductScroll);
   }
-  // 컬럼 리사이즈 초기화 (좌측 테이블)
-  initColumnResize('pl-prod-table');
-  console.log('initColumnResize pl-prod-table 완료');
+  // 컬럼 리사이즈 초기화 (좌측 테이블) — requestAnimationFrame으로 DOM 렌더 완료 후 호출
+  requestAnimationFrame(function() {
+    initColumnResize('pl-prod-table');
+  });
   initPOAutocomplete('pl-cart-search', function(p) { addToPLCartDirect(p); });
   renderPLCartTable();
   // 카테고리 탭 활성 표시
@@ -12119,7 +12120,7 @@ function buildPLProductRow(p, rowIndex) {
   tr += '<td class="center" style="color:#9BA3B2">' + (rowIndex + 1) + '</td>';
   tr += '<td class="center">' + promoBadge + '</td>';
   tr += '<td>' + (p.orderNum || '-') + '</td>';
-  tr += '<td style="font-family:monospace;font-size:12px">' + (p.code || '-') + '</td>';
+  tr += '<td>' + (p.code || '-') + '</td>';
   tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
   tr += '<td class="center">' + sHtml + '</td>';
