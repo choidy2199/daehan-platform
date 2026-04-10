@@ -316,3 +316,5 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 3. git status 로 커밋 안 된 변경사항 확인
 4. git log --oneline -3 으로 최근 커밋 3개 출력
 5. 위 결과를 요약해서 현재 상태 브리핑
+
+원가계산 로직 전체 조사: docs/cost-calculation-report.md 참조
