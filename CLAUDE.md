@@ -247,6 +247,69 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - 주문목록 구조 변경: .po-panel overflow 제거 + .po-table-wrap → .po-panel-body 교체
   - .po-panel-header/.po-register-row/.po-summary flex-shrink:0 (스크롤 바깥 고정)
 
+- [2026-04-10] 발주탭 서브탭 3개 + 상단바 리디자인
+  - 서브탭 3개로 변경: 일반주문 / 발주리스트(placeholder) / 밀워키 발주확정
+  - _poSubTabs 재정의 + legacy 'list'→'confirmed' 마이그레이션
+  - po-content-list → po-content-confirmed 5곳 rename
+  - 상단바 1줄 통합: 빨간 합계카드(#C0392B) + 서브탭 + spacer + stats 뱃지 5개
+  - 합계 카드 3섹션 (총매출/반월별/커머셜P) + 노란 #FFD93D 강조
+  - .po-action-compact 제거 + .po-top-spacer(flex:1)로 우측 정렬
+  - 섹션 헤더 다크바 신규 추가/삭제 (1차 추가 → 2차 정리)
+
+- [2026-04-10] 메인 메뉴 전면 리디자인 + 디버그 로그 정리
+  - .nav-tabs → .main-nav 전면 교체 (4그룹 + 솔로 + spacer + 설정)
+  - 그룹 라벨: 밀워키 #A32D2D / 일반 #B8860B / 판매관리 #534AB7 / 수입제품 #0F6E56
+  - _tabIdMap (신규 id → contentId/render) + _legacyTabIdMap 호환
+  - placeholder 탭 6개 신규 (.tab-placeholder)
+  - savedTab 복원 로직 + switchTab 전면 재작성
+  - [DEBUG updateNaverPrice] 6개 + [DEBUG PUT] 2개 삭제 ([PERF] 30개 유지)
+  - 우측 상단: 동기화 배지 삭제, 재고가져오기 → 📦 경박 + 빨간 #A32D2D
+  - 관리자님/로그아웃 삭제 (doLogout 함수는 보존)
+
+- [2026-04-10] 메뉴 사이즈업 + 검색/공지사항/택배/카톡 컬러 뱃지
+  - .main-nav padding 6x16, gap 6px, 그룹 라벨 13/700 padding 8x14
+  - .nav-sub 13px padding 8x10, .nav-sep height 24 margin 0 6
+  - .nav-setting 강조 (bg rgba(255,255,255,0.12), 13/600, padding 8x16)
+  - 검색/공지사항: .nav-solo → .nav-group-label + .nav-search(#185FA5)/.nav-notice(#854F0B)
+  - 택배 신규 (.nav-delivery #5F5E5A, placeholder)
+  - 💬 카톡 신규 (.nav-kakao #F7E600/#3B1E1E, placeholder)
+  - 공지사항 위치 이동 (좌측 → 우측 spacer 직후)
+  - 📦 경박 .header-inv-sync → .main-nav 내부 .nav-kb (right end)
+  - .nav-group-label에 line-height:1+inline-flex+align-items:center (이모지 높이 통일)
+  - switchTab/savedTab 셀렉터 .main-nav [data-tab] 통일
+
+- [2026-04-10] Phase 1: TTI 아이템별 주문내역 스크래핑 엔진 (크롬 확장)
+  - content-tti.js: scrapeOrderListSub() 15컬럼 파싱 함수
+  - order_list_sub_new.html URL 감지 + SCRAPE_ORDER_LIST_SUB 리스너
+  - background.js: NAVIGATE_AND_SCRAPE_ORDER_ITEMS 핸들러
+    · TTI 탭 query → 없으면 chrome.tabs.create (daehan 탭 절대 이동 금지)
+    · order_list_sub_new.html?...&num_per_page=300 URL 조합
+  - content-daehan.js: DAEHAN_SCRAPE_ORDER_ITEMS 릴레이 + TTI_ORDER_ITEMS_DATA 수신
+  - 데이터 흐름: app.js → daehan → bg → tti → scrape → bg → daehan → app.js
+
+- [2026-04-10] Phase 2: app.js TTI 아이템별 주문내역 수신/저장/표시
+  - buildPOListPanel 헤더에 날짜 input 2개 (mw_po_items_date_from/to)
+  - startTtiOrderItemsSync() 신규 (DAEHAN_SCRAPE_ORDER_ITEMS postMessage)
+  - syncOrderItems() 신규: ttiOrderItemKey(orderNo+|+정규화코드)로 중복 체크
+    · 18개 tti* 필드 (Promotion/ItemType/Brand/Month/UnitPrice/SupplyPrice/Dealer/SalesRep)
+    · type/subtab 분류: 일반→normal, T6→promo-t6, PACKAGE→promo-package
+    · DB.products 매칭 → manageCode/code/model/category 보정
+  - 구분 컬럼 ttiPromotion 기반 4색 뱃지 (일반/T6/PACKAGE/기타)
+  - changePOListFilter 드롭다운 → 날짜 input 자동 연동 (today/week/month)
+
+- [2026-04-10] 발주확정 테이블 폴리싱 + 컬럼 표시 설정
+  - panel-body inline padding:0 (다크 헤더와 테이블 헤더 밀착 + 풀폭)
+  - 테이블 id="po-list-table" + initColumnResize 6곳 호출 추가
+  - #po-list-table 전용 .col-resize 핸들 CSS (z-index 11)
+  - 구분 뱃지 사이즈업 (12px/4x10/600/radius4)
+  - 대분류 컬럼 신규 (구분 옆) + mw_products 매칭 + 4색 카테고리 뱃지
+    · 파워툴/수공구/팩아웃/드릴비트 (밀워키 단가표 getCategoryColor 동일)
+  - ⚙ 컬럼 표시 설정 드롭다운 (저장 버튼 우측)
+    · 14컬럼 체크박스 + po_confirm_visible_cols localStorage
+    · 동적 <style id="po-col-vis-style"> 갱신 + display:none !important
+    · 외부 클릭 닫힘 + 페이지 로드 시 자동 복원
+  - 💾 저장 버튼 신규 (savePoConfirmed placeholder, Phase 3 대기)
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인
