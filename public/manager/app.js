@@ -11987,6 +11987,8 @@ function _initPLTab() {
     scrollEl.removeEventListener('scroll', onPLProductScroll);
     scrollEl.addEventListener('scroll', onPLProductScroll);
   }
+  // 컬럼 리사이즈 초기화 (좌측 테이블)
+  initColumnResize('pl-prod-table');
   initPOAutocomplete('pl-cart-search', function(p) { addToPLCartDirect(p); });
   renderPLCartTable();
   // 카테고리 탭 활성 표시
@@ -12016,7 +12018,7 @@ function buildPLProductPanel() {
 
   // 테이블 (po-table, table-layout:fixed — 디자인 시스템 컬럼 너비 가이드 준수)
   html += '<div class="po-panel-body" id="pl-prod-scroll">';
-  html += '<table class="po-table" style="table-layout:fixed"><thead><tr>';
+  html += '<table class="po-table" id="pl-prod-table" style="table-layout:fixed"><thead><tr>';
   html += '<th class="center" style="width:36px">No</th>';
   html += '<th class="center" style="width:36px">누적</th>';
   html += '<th style="width:70px">프로모션번호</th>';
