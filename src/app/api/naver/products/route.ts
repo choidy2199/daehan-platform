@@ -77,6 +77,15 @@ export async function PUT(request: NextRequest) {
       const tUpd1 = Date.now();
       console.log(`[PERF PUT] updateNaverPrice: ${tUpd1 - tUpd0}ms`);
       console.log(`[PERF PUT] TOTAL (fast path): ${Date.now() - tStart}ms`);
+      // 품절 상품 감지
+      if (result && !result.success && result.reason === 'OUT_OF_STOCK') {
+        return NextResponse.json({
+          success: false,
+          reason: 'OUT_OF_STOCK',
+          message: '품절 상품',
+          code,
+        });
+      }
       return NextResponse.json({
         success: true,
         message: '가격 수정 성공',
@@ -97,6 +106,15 @@ export async function PUT(request: NextRequest) {
     const result = await updateNaverPrice(String(originProductNo), Number(newPrice), channelProductNo ? Number(channelProductNo) : undefined);
     console.log(`[PERF PUT] TOTAL (legacy path): ${Date.now() - tStart}ms`);
 
+    // 품절 상품 감지
+    if (result && !result.success && result.reason === 'OUT_OF_STOCK') {
+      return NextResponse.json({
+        success: false,
+        reason: 'OUT_OF_STOCK',
+        message: '품절 상품',
+        originProductNo,
+      });
+    }
     return NextResponse.json({
       success: true,
       message: '가격 수정 성공',

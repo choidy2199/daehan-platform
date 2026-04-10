@@ -775,13 +775,24 @@ async function _pdPriceSync(code, channel) {
       body: JSON.stringify({ code: code, newPrice: price }),
     });
     var putData = await putRes.json();
-    if (!putData.success) throw new Error(putData.error || '전송 실패');
-    // 성공 표시
-    btn.style.background = '#1D9E75';
-    btn.style.color = '#fff';
-    btn.style.opacity = '1';
-    btn.textContent = '전송완료 ✓';
-    alert(marketName + ' 가격수정이 정상적으로 반영되었습니다.');
+    if (!putData.success) {
+      if (putData.reason === 'OUT_OF_STOCK') {
+        btn.style.background = '#FF6B35';
+        btn.style.color = '#fff';
+        btn.style.opacity = '1';
+        btn.textContent = '품절 상품';
+        alert(marketName + ' 품절 상품입니다.\n네이버에서 상품 상태를 변경한 후 다시 전송하세요.');
+      } else {
+        throw new Error(putData.error || '전송 실패');
+      }
+    } else {
+      // 성공 표시
+      btn.style.background = '#1D9E75';
+      btn.style.color = '#fff';
+      btn.style.opacity = '1';
+      btn.textContent = '전송완료 ✓';
+      alert(marketName + ' 가격수정이 정상적으로 반영되었습니다.');
+    }
     setTimeout(function() {
       var cur = document.getElementById('pd-btn-sync');
       if (!cur) return;
@@ -7455,6 +7466,7 @@ async function _startPriceSync() {
     '<div id="ps-current" style="font-size:12px;color:#5A6070;margin-bottom:12px">준비 중...</div>' +
     '<div style="display:flex;gap:16px;margin-bottom:16px">' +
       '<span id="ps-success" style="font-size:13px;color:#1D9E75;font-weight:500">✅ 성공: 0</span>' +
+      '<span id="ps-oos" style="font-size:13px;color:#FF6B35;font-weight:500;display:none">🚫 품절: 0</span>' +
       '<span id="ps-fail" style="font-size:13px;color:#CC2222;font-weight:500">❌ 실패: 0</span>' +
     '</div>' +
     '<div style="text-align:right"><button class="btn-secondary" onclick="_priceSyncCancelled=true">전송 중단</button></div>';
@@ -7495,6 +7507,8 @@ async function _startPriceSync() {
       console.log('[PriceSync] PUT 응답:', JSON.stringify(putData));
       if (putData.success) {
         success.push({ code: code, model: p.model });
+      } else if (putData.reason === 'OUT_OF_STOCK') {
+        failed.push({ code: code, model: p.model, reason: '품절 상품', outOfStock: true });
       } else {
         failed.push({ code: code, model: p.model, reason: putData.error || '전송 실패' });
       }
@@ -7514,15 +7528,24 @@ async function _startPriceSync() {
   }
 
   // 결과 화면
+  var _oosCount = failed.filter(function(x) { return x.outOfStock; }).length;
+  var _failOnly = failed.length - _oosCount;
+  var _resultSummary = '<span style="color:#1D9E75;font-weight:600">✅ 성공: ' + success.length + '건</span>';
+  if (_oosCount > 0) _resultSummary += ' &nbsp; <span style="color:#FF6B35;font-weight:600">🚫 품절: ' + _oosCount + '건</span>';
+  if (_failOnly > 0) _resultSummary += ' &nbsp; <span style="color:#CC2222;font-weight:600">❌ 실패: ' + _failOnly + '건</span>';
   var resultHtml = '<div style="text-align:center;margin-bottom:16px"><div style="font-size:16px;font-weight:600;margin-bottom:8px">' + (_priceSyncCancelled ? '전송 중단됨' : '전송 완료') + '</div>' +
-    '<div style="font-size:14px"><span style="color:#1D9E75;font-weight:600">✅ 성공: ' + success.length + '건</span> &nbsp; <span style="color:#CC2222;font-weight:600">❌ 실패: ' + failed.length + '건</span></div></div>';
+    '<div style="font-size:14px">' + _resultSummary + '</div></div>';
   if (failed.length > 0) {
     resultHtml += '<div style="max-height:200px;overflow-y:auto;border:1px solid #FCEBEB;border-radius:6px"><table style="width:100%;font-size:12px;border-collapse:collapse">' +
       '<thead><tr style="background:#FCEBEB"><th style="padding:6px 10px;text-align:left">코드</th><th style="padding:6px 10px;text-align:left">모델명</th><th style="padding:6px 10px;text-align:left">실패 사유</th></tr></thead><tbody>';
     failed.forEach(function(f) {
-      resultHtml += '<tr><td style="padding:4px 10px;border-top:1px solid #FEE2E2">' + (f.code || '-') + '</td><td style="padding:4px 10px;border-top:1px solid #FEE2E2">' + (f.model || '-') + '</td><td style="padding:4px 10px;border-top:1px solid #FEE2E2;color:#CC2222">' + f.reason + '</td></tr>';
+      var _reasonColor = f.outOfStock ? '#FF6B35' : '#CC2222';
+      resultHtml += '<tr><td style="padding:4px 10px;border-top:1px solid #FEE2E2">' + (f.code || '-') + '</td><td style="padding:4px 10px;border-top:1px solid #FEE2E2">' + (f.model || '-') + '</td><td style="padding:4px 10px;border-top:1px solid #FEE2E2;color:' + _reasonColor + '">' + f.reason + '</td></tr>';
     });
     resultHtml += '</tbody></table></div>';
+    if (_oosCount > 0) {
+      resultHtml += '<div style="margin-top:8px;padding:8px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px;font-size:12px;color:#9A3412">품절 상품은 네이버에서 상태를 변경한 후 다시 전송하세요.</div>';
+    }
   } else if (!_priceSyncCancelled) {
     resultHtml += '<div style="text-align:center;color:#1D9E75;font-size:13px">모든 제품의 가격이 성공적으로 전송되었습니다</div>';
   }
@@ -7533,8 +7556,12 @@ async function _startPriceSync() {
 function _updatePsCounters(success, failed) {
   var s = document.getElementById('ps-success');
   var f = document.getElementById('ps-fail');
+  var o = document.getElementById('ps-oos');
+  var oosCount = failed.filter(function(x) { return x.outOfStock; }).length;
+  var failCount = failed.length - oosCount;
   if (s) s.textContent = '✅ 성공: ' + success.length;
-  if (f) f.textContent = '❌ 실패: ' + failed.length;
+  if (f) f.textContent = '❌ 실패: ' + failCount;
+  if (o) { o.textContent = '🚫 품절: ' + oosCount; o.style.display = oosCount > 0 ? '' : 'none'; }
 }
 
 function _psDelay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }

@@ -266,13 +266,29 @@ export async function updateNaverPrice(
   }
 
   // 4단계: 전체 데이터를 PUT으로 전송
-  const result = await naverApi('PUT', `/v2/products/channel-products/${channelProductNo}`, fullProduct, { skipRateLimit: skipRL });
+  try {
+    const result = await naverApi('PUT', `/v2/products/channel-products/${channelProductNo}`, fullProduct, { skipRateLimit: skipRL });
 
-  return {
-    success: true,
-    channelProductNo,
-    originProductNo,
-    newPrice,
-    result,
-  };
+    return {
+      success: true,
+      channelProductNo,
+      originProductNo,
+      newPrice,
+      result,
+    };
+  } catch (err: any) {
+    // 품절 상품 감지: 400 + statusType NotValidEnum
+    const msg = err.message || '';
+    if (msg.includes('400') && msg.includes('statusType') && msg.includes('NotValidEnum')) {
+      return {
+        success: false,
+        reason: 'OUT_OF_STOCK',
+        message: '품절 상품',
+        channelProductNo,
+        originProductNo,
+        newPrice,
+      };
+    }
+    throw err;
+  }
 }
