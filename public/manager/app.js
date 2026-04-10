@@ -3189,16 +3189,79 @@ function buildPOListPanel() {
   h += '<input type="date" id="po-order-items-date-to" value="' + _itemsDateTo + '" onchange="localStorage.setItem(\'mw_po_items_date_to\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
   h += '<button class="po-hdr-btn po-hdr-sync" onclick="startTtiOrderItemsSync()">↻ 밀워키 주문내역 동기화</button>';
   h += '<button id="po-save-btn" class="po-save-btn" onclick="savePoConfirmed()" style="background:#185FA5;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">💾 저장</button>';
+
+  // ⚙ 컬럼 표시 설정 (드롭다운 컨테이너 — position:relative)
+  var _poCols = [
+    { key:'date',         name:'날짜' },
+    { key:'type',         name:'구분' },
+    { key:'majorCategory',name:'대분류' },
+    { key:'manageCode',   name:'관리코드' },
+    { key:'code',         name:'코드' },
+    { key:'model',        name:'모델명' },
+    { key:'qty',          name:'수량' },
+    { key:'supplyPrice',  name:'공급가' },
+    { key:'costPrice',    name:'매입원가' },
+    { key:'amount',       name:'금액' },
+    { key:'ttiStatus',    name:'TTI상태' },
+    { key:'ttiAction',    name:'액션' },
+    { key:'ttiOrderNo',   name:'주문번호' },
+    { key:'erpStatus',    name:'경영박사' }
+  ];
+  var _poVisCols = {};
+  try { _poVisCols = JSON.parse(localStorage.getItem('po_confirm_visible_cols') || '{}') || {}; } catch(e) { _poVisCols = {}; }
+  h += '<div style="position:relative">';
+  h += '<button id="po-col-settings-btn" onclick="togglePoColSettings(event)" title="컬럼 표시 설정" style="background:#2A2D33;border:1px solid #555;color:#fff;width:28px;height:28px;border-radius:4px;cursor:pointer;font-size:14px;padding:0;display:inline-flex;align-items:center;justify-content:center">⚙</button>';
+  h += '<div id="po-col-settings-dropdown" style="display:none;position:absolute;top:100%;right:0;margin-top:6px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px 16px;min-width:180px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.15)">';
+  h += '<div style="font-size:13px;font-weight:500;color:#1A1D23;padding-bottom:6px;border-bottom:1px solid #eee;margin-bottom:6px">컬럼 표시 설정</div>';
+  _poCols.forEach(function(c) {
+    var checked = _poVisCols[c.key] !== false; // 기본 true
+    h += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#1A1D23;padding:4px 0;cursor:pointer">'
+       + '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="togglePoConfirmCol(\'' + c.key + '\', this.checked)">'
+       + '<span>' + c.name + '</span>'
+       + '</label>';
+  });
+  h += '</div>'; // #po-col-settings-dropdown
+  h += '</div>'; // position:relative wrapper
   h += '</div></div>';
+
+  // 컬럼 가시성 제어 스타일 (localStorage의 hidden 컬럼만 display:none)
+  var _hiddenCss = _poCols.filter(function(c) { return _poVisCols[c.key] === false; }).map(function(c) {
+    return '#po-list-table [data-col="' + c.key + '"]{display:none !important}';
+  }).join('');
+  h += '<style id="po-col-vis-style">' + _hiddenCss + '</style>';
+
+  // 대분류 뱃지 컬러 맵 (밀워키 단가표의 getCategoryColor와 동일)
+  var _poCatColor = {
+    '파워툴':   { bg:'#DBEAFE', color:'#1E40AF' },
+    '수공구':   { bg:'#D1FAE5', color:'#065F46' },
+    '악세사리': { bg:'#FEF3C7', color:'#92400E' },
+    '악세서리': { bg:'#FEF3C7', color:'#92400E' },
+    '액세서리': { bg:'#FEF3C7', color:'#92400E' },
+    '팩아웃':   { bg:'#FCE7F3', color:'#9D174D' },
+    '드릴비트': { bg:'#E0E7FF', color:'#3730A3' }
+  };
 
   // 발주확정 panel-body: padding 제거 (다크 헤더와 테이블 헤더 밀착 + 테이블 풀폭)
   h += '<div class="po-panel-body" style="padding:0"><table id="po-list-table" class="po-table"><thead><tr>';
   h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
-  h += '<th>날짜</th><th>구분</th><th>관리코드</th><th>코드</th><th style="min-width:180px">모델명</th><th class="num">수량</th><th class="num">공급가</th><th class="num">매입원가</th><th class="num">금액</th><th class="center">TTI상태</th><th class="center">액션</th><th class="center">주문번호</th><th class="center">경영박사</th>';
+  h += '<th data-col="date">날짜</th>';
+  h += '<th data-col="type">구분</th>';
+  h += '<th data-col="majorCategory" style="width:70px">대분류</th>';
+  h += '<th data-col="manageCode">관리코드</th>';
+  h += '<th data-col="code">코드</th>';
+  h += '<th data-col="model" style="min-width:180px">모델명</th>';
+  h += '<th data-col="qty" class="num">수량</th>';
+  h += '<th data-col="supplyPrice" class="num">공급가</th>';
+  h += '<th data-col="costPrice" class="num">매입원가</th>';
+  h += '<th data-col="amount" class="num">금액</th>';
+  h += '<th data-col="ttiStatus" class="center">TTI상태</th>';
+  h += '<th data-col="ttiAction" class="center">액션</th>';
+  h += '<th data-col="ttiOrderNo" class="center">주문번호</th>';
+  h += '<th data-col="erpStatus" class="center">경영박사</th>';
   h += '</tr></thead><tbody id="po-list-body">';
 
   if (filtered.length === 0) {
-    h += '<tr><td colspan="14" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
+    h += '<tr><td colspan="15" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
   } else {
     filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
     window._poListItems = [];
@@ -3229,6 +3292,12 @@ function buildPOListPanel() {
       });
       var _dispManage = _matched ? (_matched.manageCode || '-') : '-';
       var _dispCode = _matched ? (_matched.code || '-') : '-';
+      // 대분류 뱃지 (밀워키 단가표 4색 팔레트 동일)
+      var _dispCat = _matched ? (_matched.category || '') : '';
+      var _cc = _poCatColor[_dispCat] || { bg:'#F3F4F6', color:'#374151' };
+      var _catBadge = _dispCat
+        ? '<span style="background:' + _cc.bg + ';color:' + _cc.color + ';padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">' + _dispCat + '</span>'
+        : '<span style="color:#9BA3B2;font-size:11px">-</span>';
       // 금액 = ttiOrderAmount 우선, 없으면 매입원가 × 수량
       var _displayAmt = item.ttiOrderAmount || (item.costPrice && item.costPrice > 0 ? item.costPrice * (item.qty || 0) : 0);
 
@@ -3255,19 +3324,20 @@ function buildPOListPanel() {
       var _tdS = 'font-size:13px;padding:10px 6px;';
       h += '<tr style="' + rowStyle + '">';
       h += '<td class="center" style="padding:10px 6px"><input type="checkbox" class="po-history-checkbox" data-id="' + item.id + '" onchange="this.closest(\'tr\').style.background=this.checked?\'#E6F1FB\':\'\'"></td>';
-      h += '<td style="' + _tdS + 'white-space:nowrap;' + textDeco + '">' + dateStr + '</td>';
-      h += '<td style="' + _tdS + '">' + typeBadge + '</td>';
-      h += '<td style="' + _tdS + 'color:#5A6070;' + textDeco + '">' + _dispManage + '</td>';
-      h += '<td style="' + _tdS + 'color:#5A6070;' + textDeco + '">' + _dispCode + '</td>';
-      h += '<td style="' + _tdS + 'max-width:180px;overflow:hidden;text-overflow:ellipsis;' + textDeco + '" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
-      h += '<td class="num" style="' + _tdS + textDeco + '">' + (item.qty || 0) + '</td>';
-      h += '<td class="num" style="' + _tdS + textDeco + '">' + fmtPO(item.supplyPrice) + '</td>';
-      h += '<td class="num" style="' + _tdS + textDeco + '">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
-      h += '<td class="num" style="' + _tdS + 'font-weight:600;' + textDeco + '">' + (_displayAmt > 0 ? fmtPO(_displayAmt) : '-') + '</td>';
-      h += '<td class="center" style="padding:10px 6px">' + ttiStatusBadge + '</td>';
-      h += '<td class="center" style="padding:10px 6px">' + ttiActionBtn + '</td>';
-      h += '<td class="center" style="padding:10px 6px">' + orderNoDisp + '</td>';
-      h += '<td class="center" style="padding:10px 6px">' + erpBadge + '</td>';
+      h += '<td data-col="date" style="' + _tdS + 'white-space:nowrap;' + textDeco + '">' + dateStr + '</td>';
+      h += '<td data-col="type" style="' + _tdS + '">' + typeBadge + '</td>';
+      h += '<td data-col="majorCategory" class="center" style="padding:10px 6px">' + _catBadge + '</td>';
+      h += '<td data-col="manageCode" style="' + _tdS + 'color:#5A6070;' + textDeco + '">' + _dispManage + '</td>';
+      h += '<td data-col="code" style="' + _tdS + 'color:#5A6070;' + textDeco + '">' + _dispCode + '</td>';
+      h += '<td data-col="model" style="' + _tdS + 'max-width:180px;overflow:hidden;text-overflow:ellipsis;' + textDeco + '" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
+      h += '<td data-col="qty" class="num" style="' + _tdS + textDeco + '">' + (item.qty || 0) + '</td>';
+      h += '<td data-col="supplyPrice" class="num" style="' + _tdS + textDeco + '">' + fmtPO(item.supplyPrice) + '</td>';
+      h += '<td data-col="costPrice" class="num" style="' + _tdS + textDeco + '">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
+      h += '<td data-col="amount" class="num" style="' + _tdS + 'font-weight:600;' + textDeco + '">' + (_displayAmt > 0 ? fmtPO(_displayAmt) : '-') + '</td>';
+      h += '<td data-col="ttiStatus" class="center" style="padding:10px 6px">' + ttiStatusBadge + '</td>';
+      h += '<td data-col="ttiAction" class="center" style="padding:10px 6px">' + ttiActionBtn + '</td>';
+      h += '<td data-col="ttiOrderNo" class="center" style="padding:10px 6px">' + orderNoDisp + '</td>';
+      h += '<td data-col="erpStatus" class="center" style="padding:10px 6px">' + erpBadge + '</td>';
       h += '</tr>';
     });
   }
@@ -3485,6 +3555,49 @@ function registerErpFromList() {
 // Phase 3 예정: mw_orders 반영, 원가계산, 프로모션 탭 분류, 버튼 → '경박 매입등록'으로 변환
 function savePoConfirmed() {
   alert('저장 기능 — 다음 세션에서 구현 예정');
+}
+
+// ====== 발주확정 테이블 컬럼 표시 설정 ======
+var _poColSettingsOutsideHandler = null;
+function togglePoColSettings(ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault && ev.preventDefault(); }
+  var dd = document.getElementById('po-col-settings-dropdown');
+  if (!dd) return;
+  var isVisible = dd.style.display === 'block';
+  if (isVisible) {
+    dd.style.display = 'none';
+    if (_poColSettingsOutsideHandler) {
+      document.removeEventListener('click', _poColSettingsOutsideHandler);
+      _poColSettingsOutsideHandler = null;
+    }
+  } else {
+    dd.style.display = 'block';
+    _poColSettingsOutsideHandler = function(e) {
+      var dd2 = document.getElementById('po-col-settings-dropdown');
+      var btn2 = document.getElementById('po-col-settings-btn');
+      if (!dd2) return;
+      if (dd2.contains(e.target) || (btn2 && btn2.contains(e.target))) return;
+      dd2.style.display = 'none';
+      document.removeEventListener('click', _poColSettingsOutsideHandler);
+      _poColSettingsOutsideHandler = null;
+    };
+    setTimeout(function() {
+      document.addEventListener('click', _poColSettingsOutsideHandler);
+    }, 0);
+  }
+}
+
+function togglePoConfirmCol(col, visible) {
+  var cur = {};
+  try { cur = JSON.parse(localStorage.getItem('po_confirm_visible_cols') || '{}') || {}; } catch(e) { cur = {}; }
+  cur[col] = !!visible;
+  localStorage.setItem('po_confirm_visible_cols', JSON.stringify(cur));
+  var styleEl = document.getElementById('po-col-vis-style');
+  if (!styleEl) return;
+  var hiddenCss = Object.keys(cur).filter(function(k) { return cur[k] === false; }).map(function(k) {
+    return '#po-list-table [data-col="' + k + '"]{display:none !important}';
+  }).join('');
+  styleEl.textContent = hiddenCss;
 }
 
 function togglePOListAll(el) {
