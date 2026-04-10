@@ -12087,11 +12087,7 @@ function buildPLProductRow(p, rowIndex) {
         });
         if (_matched) {
           var rs = _poCumulPromoRowStyles[pi] || _poCumulPromoRowStyles[0];
-          var _rate = '';
-          var _matchedPr = cp.products.find(function(pr) { return (code && normalizeTtiCode(pr.ttiNum) === code) || (p.code && pr.ttiNum === p.code); });
-          var _rateVal = parseFloat((_matchedPr && _matchedPr.discountRate) || cp.autoDiscountRate) || 0;
-          if (_rateVal > 0) _rate = ' ' + (_rateVal % 1 === 0 ? _rateVal.toFixed(0) : parseFloat(_rateVal.toFixed(2))) + '%';
-          promoBadge = '<span style="background:' + rs.tagBg + ';color:' + rs.tagColor + ';font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px">누적' + _rate + '</span>';
+          promoBadge = '<span style="background:' + rs.tagBg + ';color:' + rs.tagColor + ';font-size:13px;font-weight:700;padding:2px 4px;border-radius:3px">누적</span>';
           break;
         }
       }
@@ -12106,10 +12102,13 @@ function buildPLProductRow(p, rowIndex) {
   else if (stockStatus === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
   else stockIcon = '<span style="color:#B4B2A9">-</span>';
 
-  // S재고/B재고
+  // S재고/B재고 — 뱃지 스타일
   var sb = _getPLStock(p);
-  var sHtml = sb.s === '-' ? '<span style="color:#B4B2A9">-</span>' : '<span style="color:#1D9E75;font-weight:600">' + sb.s + '</span>';
-  var bHtml = sb.b === '-' ? '<span style="color:#B4B2A9">-</span>' : '<span style="color:#185FA5;font-weight:600">' + sb.b + '</span>';
+  var sHtml, bHtml;
+  if (sb.s === '-') { sHtml = '<span style="color:#999">-</span>'; }
+  else { var _sOp = parseInt(sb.s) === 0 ? 'opacity:0.5;' : ''; sHtml = '<span style="display:inline-block;background:#E1F5EE;color:#085041;font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;border:1px solid #9FE1CB;min-width:24px;text-align:center;' + _sOp + '">' + sb.s + '</span>'; }
+  if (sb.b === '-') { bHtml = '<span style="color:#999">-</span>'; }
+  else { var _bOp = parseInt(sb.b) === 0 ? 'opacity:0.5;' : ''; bHtml = '<span style="display:inline-block;background:#E6F1FB;color:#0C447C;font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;border:1px solid #85B7EB;min-width:24px;text-align:center;' + _bOp + '">' + sb.b + '</span>'; }
 
   // 소진(stock_c) 제품 비활성화 — 일반주문과 동일 input 스타일
   var _isSoldOut = stockStatus === 'c';
@@ -12142,6 +12141,20 @@ function _plMatchesCat(p, cat) {
   return true;
 }
 
+// 파워툴 시리즈 정렬 순서: M18→0, M12→1, 나머지→2
+function _plSeriesOrder(model) {
+  var code = ((model || '').split('/')[0] || '').trim();
+  if (code.startsWith('M18')) return 0;
+  if (code.startsWith('M12')) return 1;
+  return 2;
+}
+// 시리즈 라벨명
+function _plSeriesLabel(order) {
+  if (order === 0) return 'M18 시리즈';
+  if (order === 1) return 'M12 시리즈';
+  return '충전기/배터리';
+}
+
 function filterPLProducts() {
   var search = (document.getElementById('pl-prod-search') || {}).value || '';
   search = search.toLowerCase().trim();
@@ -12155,7 +12168,16 @@ function filterPLProducts() {
     }
     return true;
   });
-  _plFilteredProducts.sort(function(a, b) { return (a.model || '').localeCompare(b.model || '', 'ko'); });
+  // 파워툴 탭: M18 → M12 → 나머지 순서, 그 외 탭: 모델명 알파벳순
+  if (_plActiveCat === '파워툴') {
+    _plFilteredProducts.sort(function(a, b) {
+      var oa = _plSeriesOrder(a.model), ob = _plSeriesOrder(b.model);
+      if (oa !== ob) return oa - ob;
+      return (a.model || '').localeCompare(b.model || '', 'ko');
+    });
+  } else {
+    _plFilteredProducts.sort(function(a, b) { return (a.model || '').localeCompare(b.model || '', 'ko'); });
+  }
   renderPLProductRows();
 }
 
@@ -12164,7 +12186,18 @@ function renderPLProductRows() {
   if (!body) return;
   _plRenderedCount = Math.min(50, _plFilteredProducts.length);
   var html = '';
-  for (var i = 0; i < _plRenderedCount; i++) { html += buildPLProductRow(_plFilteredProducts[i], i); }
+  var _prevSeries = -1;
+  for (var i = 0; i < _plRenderedCount; i++) {
+    // 파워툴 탭: 시리즈 구분 라벨 삽입
+    if (_plActiveCat === '파워툴') {
+      var _curSeries = _plSeriesOrder(_plFilteredProducts[i].model);
+      if (_curSeries !== _prevSeries) {
+        html += '<tr><td colspan="12" style="font-size:10px;color:#999;padding:6px 8px;background:#FAFBFC;font-weight:500">\u2014 ' + _plSeriesLabel(_curSeries) + ' \u2014</td></tr>';
+        _prevSeries = _curSeries;
+      }
+    }
+    html += buildPLProductRow(_plFilteredProducts[i], i);
+  }
   if (_plFilteredProducts.length === 0) {
     html = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#9BA3B2">검색 결과가 없습니다</td></tr>';
   }
@@ -12187,7 +12220,18 @@ function onPLProductScroll() {
     if (!body) return;
     var end = Math.min(_plRenderedCount + 100, _plFilteredProducts.length);
     var html = '';
-    for (var i = _plRenderedCount; i < end; i++) { html += buildPLProductRow(_plFilteredProducts[i], i); }
+    // 이전 시리즈 판정 (추가 로드 시 연속 라벨 판단)
+    var _prevS = _plRenderedCount > 0 ? _plSeriesOrder(_plFilteredProducts[_plRenderedCount - 1].model) : -1;
+    for (var i = _plRenderedCount; i < end; i++) {
+      if (_plActiveCat === '파워툴') {
+        var _curS = _plSeriesOrder(_plFilteredProducts[i].model);
+        if (_curS !== _prevS) {
+          html += '<tr><td colspan="12" style="font-size:10px;color:#999;padding:6px 8px;background:#FAFBFC;font-weight:500">\u2014 ' + _plSeriesLabel(_curS) + ' \u2014</td></tr>';
+          _prevS = _curS;
+        }
+      }
+      html += buildPLProductRow(_plFilteredProducts[i], i);
+    }
     body.insertAdjacentHTML('beforeend', html);
     _plRenderedCount = end;
   }
