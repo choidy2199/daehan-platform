@@ -11172,7 +11172,11 @@ function syncOrderItems(items, dateFrom, dateTo) {
 
   items.forEach(function(item) {
     var normCode = normalizeTtiCode(item.productCode || '');
-    var key = (item.orderNo || '') + '|' + normCode;
+    // 고유키: 주문번호 + 제품코드 + 수량 + 총금액 (같은 주문·제품이 다른 수량으로 존재 시 구분)
+    var _unitP = item.unitPrice || 0;
+    var _tAmt = item.supplyPrice || (_unitP * (item.qty || 0)) || 0;
+    var key = (item.orderNo || '') + '|' + normCode + '|' + (item.qty || 0) + '|' + _tAmt;
+    var legacyKey = (item.orderNo || '') + '|' + normCode;
     var matchedProd = _prodByCode[normCode] || null;
 
     // type/subtab 분류 (프로모션 값 기준)
@@ -11194,9 +11198,10 @@ function syncOrderItems(items, dateFrom, dateTo) {
     var _qty = item.qty || 0;
     var _totalAmount = item.supplyPrice || (_unitPrice * _qty) || 0;
 
-    var entry = _existingKeys[key];
+    var entry = _existingKeys[key] || _existingKeys[legacyKey] || null;
     if (entry) {
-      // 업데이트
+      // 업데이트 (레거시 키 → 신규 키로 마이그레이션)
+      entry.ttiOrderItemKey = key;
       entry.date = isoDate;
       entry.type = type;
       entry.subtab = subtab;
@@ -11268,11 +11273,17 @@ function syncOrderItems(items, dateFrom, dateTo) {
   save('mw_po_history', history);
   console.log('[Phase2] 아이템별 주문내역 동기화:', created, '건 추가,', updated, '건 갱신');
 
-  // 발주확정 탭 테이블 새로고침
-  var confirmedContent = document.getElementById('po-content-confirmed');
-  if (confirmedContent) {
-    confirmedContent.innerHTML = buildPOListPanel();
+  // 매출카드 + 발주확정 탭 전체 새로고침 (renderPOTab → calcPOSalesData 포함)
+  var kpiRow = document.querySelector('.po-kpi-row');
+  if (kpiRow) {
+    renderPOTab();
     initColumnResize('po-list-table');
+  } else {
+    var confirmedContent = document.getElementById('po-content-confirmed');
+    if (confirmedContent) {
+      confirmedContent.innerHTML = buildPOListPanel();
+      initColumnResize('po-list-table');
+    }
   }
 
   alert('아이템별 주문내역 동기화 완료: ' + items.length + '건 (' + created + '건 추가, ' + updated + '건 갱신)');
