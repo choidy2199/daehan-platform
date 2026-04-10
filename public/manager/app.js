@@ -3269,7 +3269,7 @@ function buildPOListPanel() {
       window._poListItems.push(item);
       var _poIdx = window._poListItems.length - 1;
       var d = new Date(item.date);
-      var dateStr = String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      var dateStr = (d.getMonth() + 1) + '월' + d.getDate() + '일';
       // 구분 뱃지 — ttiPromotion 우선, 없으면 type 기반
       var typeBadge;
       var _badgePad = 'padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600';
