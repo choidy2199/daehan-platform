@@ -2549,6 +2549,68 @@ function _commPeriodLabel(promo) {
   return sm === em ? sm + '월' : sm + '~' + em + '월';
 }
 
+// 리베이트 설정 팝업: 진행 중 커머셜 프로모션 자동반영 행 렌더
+function _renderCommAutoRows() {
+  var arContainer = document.getElementById('os-ar-auto');
+  var volContainer = document.getElementById('os-vol-auto');
+  if (!arContainer || !volContainer) return;
+  arContainer.innerHTML = '';
+  volContainer.innerHTML = '';
+
+  var promos = _getCommercialPromos();
+  var today = new Date(); today.setHours(0,0,0,0);
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var hasAny = false;
+
+  promos.forEach(function(promo) {
+    var s = new Date(promo.startDate); s.setHours(0,0,0,0);
+    var e = new Date(promo.endDate); e.setHours(23,59,59,999);
+    if (today < s || today > e) return; // 진행 중이 아니면 스킵
+
+    var sales = 0;
+    history.forEach(function(item) {
+      var d = new Date(item.date);
+      if (d >= s && d <= e) sales += (item.amount || 0);
+    });
+    var tierInfo = _findCommercialTier(promo, sales);
+    var rate = (tierInfo.current && tierInfo.current.rate != null) ? tierInfo.current.rate : 0;
+    var dt = promo.discountType || 'ar';
+
+    var dtBadge = dt === 'ar'
+      ? '<span style="background:#FDF6E3;color:#7A5C00;font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;border:1px solid #D4A843;white-space:nowrap">AR</span>'
+      : '<span style="background:#E6F1FB;color:#0C447C;font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;border:1px solid #85B7EB;white-space:nowrap">물량</span>';
+
+    var rowHtml = '<div style="display:flex;gap:6px;align-items:center;padding:5px 0;border-bottom:0.5px solid #eee">';
+    rowHtml += dtBadge;
+    rowHtml += '<input value="' + (promo.name || '').replace(/"/g, '&quot;') + '" readonly style="flex:1;height:32px;font-size:12px;padding:0 8px;border:1px solid #eee;border-radius:4px;background:#F0F1F3;color:#666;cursor:not-allowed">';
+    rowHtml += '<input value="' + rate + '" readonly style="width:60px;height:32px;font-size:12px;text-align:right;padding:0 8px;border:1px solid #eee;border-radius:4px;background:#F0F1F3;color:#666;cursor:not-allowed">';
+    rowHtml += '<span style="font-size:12px;color:#5A6070">%</span>';
+    rowHtml += '<span style="font-size:12px;color:#999" title="커머셜 프로모션에서 자동반영">🔒</span>';
+    rowHtml += '</div>';
+
+    if (dt === 'ar') arContainer.insertAdjacentHTML('beforeend', rowHtml);
+    else volContainer.insertAdjacentHTML('beforeend', rowHtml);
+    hasAny = true;
+  });
+
+  // 자동반영 뱃지 + 안내문구 (진행 중 프로모션이 있을 때만)
+  if (hasAny) {
+    var badge = '<span style="display:inline-block;background:#E1F5EE;color:#085041;font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;border:1px solid #9FE1CB;margin-left:6px">자동반영</span>';
+    var notice = '<div style="font-size:11px;color:#999;margin-bottom:4px">커머셜 프로모션 관리에서 달성된 할인율이 자동 반영됩니다</div>';
+    if (arContainer.innerHTML) arContainer.insertAdjacentHTML('afterbegin', notice);
+    if (volContainer.innerHTML) volContainer.insertAdjacentHTML('afterbegin', notice);
+    // AR 섹션 타이틀에 뱃지 추가
+    if (arContainer.innerHTML) {
+      var arTitle = arContainer.previousElementSibling;
+      if (arTitle && !arTitle.querySelector('.comm-auto-badge')) arTitle.insertAdjacentHTML('beforeend', '<span class="comm-auto-badge">' + badge + '</span>');
+    }
+    if (volContainer.innerHTML) {
+      var volTitle = volContainer.previousElementSibling;
+      if (volTitle && !volTitle.querySelector('.comm-auto-badge')) volTitle.insertAdjacentHTML('beforeend', '<span class="comm-auto-badge">' + badge + '</span>');
+    }
+  }
+}
+
 function calcPOSalesData() {
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   var now = new Date();
@@ -8691,6 +8753,9 @@ function showSettingsModal() {
     if (vln) vln.value = (volP[j] && volP[j].name) || '';
     if (vlr) vlr.value = (volP[j] && volP[j].rate) || '';
   }
+
+  // 커머셜 프로모션 자동반영 행 (진행 중인 프로모션 → AR/물량 섹션에 readonly 표시)
+  _renderCommAutoRows();
 
   // 기본 탭: 밀워키 리베이트
   switchSettingsTab('rebate');
