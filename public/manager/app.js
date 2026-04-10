@@ -3534,9 +3534,10 @@ function changePOListFilter(val) {
     _dateFrom = _fmt(_monday);
     _dateTo = _todayStr;
   } else if (val === 'month') {
-    // 이번달 1일 ~ 오늘
+    // 이번달 1일 ~ 월 말일
     _dateFrom = _today.getFullYear() + '-' + String(_today.getMonth() + 1).padStart(2, '0') + '-01';
-    _dateTo = _todayStr;
+    var _lastDay = new Date(_today.getFullYear(), _today.getMonth() + 1, 0);
+    _dateTo = _fmt(_lastDay);
   }
   localStorage.setItem('mw_po_items_date_from', _dateFrom);
   localStorage.setItem('mw_po_items_date_to', _dateTo);
@@ -11178,9 +11179,12 @@ function syncOrderItems(items, dateFrom, dateTo) {
     var isoDate = (item.orderDate || '').replace(/\./g, '-');
     if (isoDate && isoDate.length === 10) isoDate += 'T00:00:00';
 
-    var _supply = item.supplyPrice || 0;
+    // TTI 필드 매핑:
+    //   TTI 단가(unitPrice) = 제품 1개 가격 → 대한데브 supplyPrice
+    //   TTI 공급가(supplyPrice) = 수량×단가 = 총 금액 → 대한데브 amount
+    var _unitPrice = item.unitPrice || 0;
     var _qty = item.qty || 0;
-    var _amount = _supply * _qty;
+    var _totalAmount = item.supplyPrice || (_unitPrice * _qty) || 0;
 
     var entry = _existingKeys[key];
     if (entry) {
@@ -11189,13 +11193,13 @@ function syncOrderItems(items, dateFrom, dateTo) {
       entry.type = type;
       entry.subtab = subtab;
       entry.qty = _qty;
-      entry.supplyPrice = _supply;
-      entry.amount = _amount;
+      entry.supplyPrice = _unitPrice;      // 1개 가격
+      entry.amount = _totalAmount;         // 총 금액 (수량 × 단가)
       entry.ttiOrderNo = item.orderNo || entry.ttiOrderNo;
       entry.ttiOrderDate = item.orderDate || entry.ttiOrderDate;
-      entry.ttiOrderAmount = _amount;
-      entry.ttiUnitPrice = item.unitPrice || 0;
-      entry.ttiSupplyPrice = _supply;
+      entry.ttiOrderAmount = _totalAmount; // TTI 주문 총 금액
+      entry.ttiUnitPrice = _unitPrice;     // TTI 단가 원본
+      entry.ttiSupplyPrice = _totalAmount; // TTI 공급가 원본 (이름 유지 = 총 금액)
       entry.ttiPromotion = promo;
       entry.ttiItemType = item.itemType || '';
       entry.ttiBrand = item.brand || '';
@@ -11225,9 +11229,9 @@ function syncOrderItems(items, dateFrom, dateTo) {
         model: matchedProd ? (matchedProd.model || '') : (item.modelName || ''),
         category: matchedProd ? (matchedProd.category || '') : '',
         qty: _qty,
-        supplyPrice: _supply,
-        costPrice: Math.round(calcOrderCost(_supply, matchedProd ? (matchedProd.category || '') : '')),
-        amount: _amount,
+        supplyPrice: _unitPrice,  // 1개 가격 (TTI 단가)
+        costPrice: Math.round(calcOrderCost(_unitPrice, matchedProd ? (matchedProd.category || '') : '')),  // 1개 기준 원가
+        amount: _totalAmount,     // 총 금액 (TTI 공급가 = 수량 × 단가)
         orderNumber: '',
         dryRun: false,
         erpStatus: 'external',
@@ -11235,9 +11239,9 @@ function syncOrderItems(items, dateFrom, dateTo) {
         ttiOrderNo: item.orderNo || '',
         ttiOrderDate: item.orderDate || '',
         ttiOrderStatus: '주문접수',
-        ttiOrderAmount: _amount,
-        ttiUnitPrice: item.unitPrice || 0,
-        ttiSupplyPrice: _supply,
+        ttiOrderAmount: _totalAmount,   // TTI 주문 총 금액
+        ttiUnitPrice: _unitPrice,       // TTI 단가 원본 (1개)
+        ttiSupplyPrice: _totalAmount,   // TTI 공급가 원본 (총 금액, 이름 유지)
         ttiPromotion: promo,
         ttiItemType: item.itemType || '',
         ttiBrand: item.brand || '',
