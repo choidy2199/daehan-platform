@@ -355,7 +355,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-card-row5-fill { height:100%; border-radius:1px; }
 
 .po-card-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; display:inline-block; }
-.po-card-tag { font-size:9px; font-weight:600; padding:2px 6px; border-radius:3px; }
+.po-card-tag { font-size:12px; font-weight:600; padding:2px 8px; border-radius:4px; }
 .po-card-badge { font-size:9px; padding:2px 5px; border-radius:3px; background:#FAEEDA; color:#412402; font-weight:600; }
 
 .period-badge { font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; white-space:nowrap; }
