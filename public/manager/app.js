@@ -3266,7 +3266,10 @@ function renderPOTab() {
     html += '<div class="po-card-row5"><div class="po-card-row5-fill" style="width:' + _cardPct + '%;background:' + pal.main + '"></div></div>';
     html += '</div>';
   });
+  html += '<div style="display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center">';
   html += '<div class="po-promo-add" onclick="addCumulativePromo()">+</div>';
+  html += '<div onclick="removeCumulativePromo()" style="width:36px;height:36px;border-radius:8px;background:#FCEBEB;border:1px solid #F09595;color:#A32D2D;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:700;font-family:Pretendard,sans-serif">−</div>';
+  html += '</div>';
 
   html += '</div></div>'; // .po-section-cards, .po-section-box
 
@@ -4306,10 +4309,12 @@ function openCumulativePromoModal(index) {
   h += '</div>'; // 바디 끝
 
   // 푸터
-  h += '<div style="border-top:1px solid #DDE1EB;padding:12px 16px;display:flex;justify-content:flex-end;gap:8px">';
+  h += '<div style="border-top:1px solid #DDE1EB;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">';
+  h += '<button onclick="deleteCumulativePromo(' + index + ')" style="background:#E24B4A;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">삭제</button>';
+  h += '<div style="display:flex;gap:8px">';
   h += '<button onclick="document.getElementById(\'po-cumul-modal\').remove()" style="background:#fff;color:#5A6070;border:1px solid #DDE1EB;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;font-family:Pretendard,sans-serif">닫기</button>';
   h += '<button onclick="saveCumulativePromo(' + index + ')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">저장</button>';
-  h += '</div>';
+  h += '</div></div>';
 
   h += '</div>';
   modal.innerHTML = h;
@@ -4734,6 +4739,34 @@ function addCumulativePromo() {
   renderPOTab();
   // 바로 모달 열기
   setTimeout(function() { openCumulativePromoModal(idx); }, 100);
+}
+
+// 누적프로모션 마지막 항목 제거 (- 버튼)
+function removeCumulativePromo() {
+  var promos = _getCumulPromos();
+  if (promos.length === 0) { toast('삭제할 프로모션이 없습니다'); return; }
+  var last = promos[promos.length - 1];
+  var isEmpty = (!last.name || last.name === '새 프로모션') && (!last.products || last.products.length === 0);
+  if (!isEmpty) { alert('데이터가 있는 프로모션은 내부 삭제 버튼을 사용하세요'); return; }
+  promos.pop();
+  save('mw_cumulative_promos', promos);
+  renderPOTab();
+  toast('빈 프로모션이 삭제되었습니다');
+}
+
+// 누적프로모션 개별 삭제 (모달 내부 삭제 버튼)
+function deleteCumulativePromo(index) {
+  var promos = _getCumulPromos();
+  var promo = promos[index];
+  if (!promo) return;
+  var name = promo.name || '프로모션 ' + (index + 1);
+  if (!confirm('\'' + name + '\' 프로모션을 삭제하시겠습니까?')) return;
+  promos.splice(index, 1);
+  save('mw_cumulative_promos', promos);
+  var modal = document.getElementById('po-cumul-modal');
+  if (modal) modal.remove();
+  renderPOTab();
+  toast('\'' + name + '\' 프로모션이 삭제되었습니다');
 }
 
 // ========================================
