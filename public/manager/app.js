@@ -11946,6 +11946,84 @@ function handleTtiScrapeResult(data) {
 // (handleTtiPromoResult 제거됨 — 온라인주문내역 Remark로 대체)
 
 // TTI 코드 정규화 (앞자리 0 제거)
+// ========================================
+// 세트↔베어툴 자동 매칭 엔진
+// ========================================
+function buildSetBearPairs() {
+  var products = DB.products || [];
+  var total = products.length;
+  var skipped = 0;    // 하이픈 없어서 스킵
+  var setOnly = 0;    // 세트만 (베어 없음)
+  var bareOnly = 0;   // 베어만 (세트 없음)
+  var paired = 0;     // 매칭 성공 쌍
+
+  // Step 1: 모델코드 추출 + 베이스/타입 분류 + 그룹핑
+  var groups = {}; // { base: { sets: [idx...], bares: [idx...] } }
+
+  products.forEach(function(p, idx) {
+    var model = p.model || '';
+    // 슬래시 앞 모델코드만 추출 ("M18 FID3-502X / 설명" → "M18 FID3-502X")
+    var slashIdx = model.indexOf(' / ');
+    var modelCode = slashIdx >= 0 ? model.substring(0, slashIdx).trim() : model.trim();
+    if (!modelCode) { p.productType = 'unknown'; skipped++; return; }
+
+    // 마지막 하이픈 찾기
+    var lastDash = modelCode.lastIndexOf('-');
+    if (lastDash < 0) { p.productType = 'unknown'; skipped++; return; }
+
+    var base = modelCode.substring(0, lastDash);   // 하이픈 앞 = 베이스
+    var suffix = modelCode.substring(lastDash + 1); // 하이픈 뒤
+
+    if (!base || !suffix) { p.productType = 'unknown'; skipped++; return; }
+
+    // 첫 글자 "0" → 베어, 아니면 세트
+    var isBare = suffix.charAt(0) === '0';
+    p.productType = isBare ? 'bare' : 'set';
+
+    if (!groups[base]) groups[base] = { sets: [], bares: [] };
+    if (isBare) groups[base].bares.push(idx);
+    else groups[base].sets.push(idx);
+  });
+
+  // Step 2: 그룹 내 매칭
+  Object.keys(groups).forEach(function(base) {
+    var g = groups[base];
+    if (g.sets.length > 0 && g.bares.length > 0) {
+      // 양쪽 다 있음 → 매칭
+      // 세트 → pairCodes에 베어 전체, 베어 → pairCodes에 세트 전체
+      var setCodes = g.sets.map(function(i) { return products[i].code; });
+      var bareCodes = g.bares.map(function(i) { return products[i].code; });
+
+      g.sets.forEach(function(i) { products[i].pairCodes = bareCodes; });
+      g.bares.forEach(function(i) { products[i].pairCodes = setCodes; });
+
+      paired += Math.min(g.sets.length, g.bares.length);
+    } else if (g.sets.length > 0) {
+      // 세트만 있음
+      g.sets.forEach(function(i) { products[i].pairCodes = null; });
+      setOnly += g.sets.length;
+    } else {
+      // 베어만 있음
+      g.bares.forEach(function(i) { products[i].pairCodes = null; });
+      bareOnly += g.bares.length;
+    }
+  });
+
+  // Step 3: 저장 + 동기화
+  save('mw_products', products);
+
+  // Step 4: 콘솔 리포트
+  console.log('=== 세트↔베어툴 매칭 결과 ===');
+  console.log('전체 제품:', total);
+  console.log('매칭 성공 쌍:', paired);
+  console.log('세트만 (베어 없음):', setOnly);
+  console.log('베어만 (세트 없음):', bareOnly);
+  console.log('하이픈 없어 스킵:', skipped);
+  console.log('=============================');
+
+  return { total: total, paired: paired, setOnly: setOnly, bareOnly: bareOnly, skipped: skipped };
+}
+
 function normalizeTtiCode(code) {
   return String(code || '').replace(/^0+/, '');
 }
