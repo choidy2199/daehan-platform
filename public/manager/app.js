@@ -2614,6 +2614,258 @@ function calcPOSalesData() {
   };
 }
 
+// ========================================
+// 매출카드 상세 매입내역 팝업
+// ========================================
+function openPoSalesDetailPopup(category) {
+  var now = new Date();
+  var isQuarter = (category === '수공구');
+  var quarterRange = getQuarterRange(now);
+  var monthRange = getMonthRange(now);
+
+  // 카테고리별 스타일
+  var _styles = {
+    '파워툴': { color:'#185FA5', bg:'#E6F1FB', badge:'월', badgeBg:'#E6F1FB', badgeColor:'#0C447C' },
+    '수공구': { color:'#1D9E75', bg:'#E1F5EE', badge:'분기', badgeBg:'#E1F5EE', badgeColor:'#085041' },
+    '팩아웃': { color:'#D4537E', bg:'#FCE7F3', badge:'월', badgeBg:'#FCE7F3', badgeColor:'#9D174D' }
+  };
+  var sty = _styles[category] || _styles['파워툴'];
+
+  // 카테고리 매칭 (calcPOSalesData와 동일 — item.category 우선, catMap 폴백)
+  var catMap = {};
+  (DB.products || []).forEach(function(p) {
+    if (p.ttiNum) { catMap[p.ttiNum] = p.category || ''; catMap[normalizeTtiCode(p.ttiNum)] = p.category || ''; }
+    if (p.code) catMap[p.code] = p.category || '';
+  });
+  function _getCat(item) {
+    var _normTti = item.ttiNum ? normalizeTtiCode(item.ttiNum) : '';
+    return item.category || catMap[_normTti] || catMap[item.ttiNum] || catMap[item.manageCode] || '';
+  }
+  function _matchCat(cat) {
+    if (category === '수공구') return cat === '수공구' || cat === '악세사리' || cat === '악세서리' || cat === '액세서리';
+    return cat === category;
+  }
+
+  // 데이터 필터
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var range = isQuarter ? quarterRange : monthRange;
+  var filtered = history.filter(function(item) {
+    if (item.dryRun) return false;
+    var isNormal = item.subtab ? item.subtab === 'normal' : item.type === 'normal';
+    if (!isNormal) return false;
+    var d = new Date(item.date);
+    if (d < range.start || d > range.end) return false;
+    return _matchCat(_getCat(item));
+  });
+  filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+
+  // 날짜 포맷 (기존 패턴)
+  function _fmtDate(dateStr) {
+    var d = new Date(dateStr);
+    return (d.getMonth() + 1) + '월' + d.getDate() + '일';
+  }
+
+  // 대분류 뱃지 색상 (기존 패턴)
+  var _catColors = {
+    '파워툴':{ bg:'#DBEAFE', color:'#1E40AF' }, '수공구':{ bg:'#D1FAE5', color:'#065F46' },
+    '악세사리':{ bg:'#FEF3C7', color:'#92400E' }, '악세서리':{ bg:'#FEF3C7', color:'#92400E' },
+    '액세서리':{ bg:'#FEF3C7', color:'#92400E' }, '팩아웃':{ bg:'#FCE7F3', color:'#9D174D' },
+    '드릴비트':{ bg:'#E0E7FF', color:'#3730A3' }
+  };
+  var _badgePad = 'padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600';
+
+  // 구분 뱃지
+  function _typeBadge(item) {
+    var promo = item.ttiPromotion || '';
+    if (!promo || promo === '일반') return '<span style="background:#EAECF2;color:#5A6070;' + _badgePad + '">일반</span>';
+    return '<span style="background:#EEEDFE;color:#3C3489;' + _badgePad + '">' + promo + '</span>';
+  }
+  function _catBadge(cat) {
+    var cc = _catColors[cat] || { bg:'#F3F4F6', color:'#374151' };
+    return cat ? '<span style="background:' + cc.bg + ';color:' + cc.color + ';' + _badgePad + '">' + cat + '</span>' : '-';
+  }
+
+  // 테이블 행 생성
+  function _buildRows(items) {
+    if (items.length === 0) return '<tr><td colspan="6" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">해당 기간 매입내역이 없습니다</td></tr>';
+    var h = '';
+    items.forEach(function(item) {
+      h += '<tr>';
+      h += '<td style="white-space:nowrap">' + _fmtDate(item.date) + '</td>';
+      h += '<td>' + _typeBadge(item) + '</td>';
+      h += '<td class="center">' + _catBadge(_getCat(item)) + '</td>';
+      h += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
+      h += '<td class="num">' + fmtPO(item.supplyPrice) + '</td>';
+      h += '<td class="num" style="font-weight:600">' + fmtPO(item.amount) + '</td>';
+      h += '</tr>';
+    });
+    return h;
+  }
+
+  // 소계 계산
+  function _sumAmount(items) { var s = 0; items.forEach(function(i) { s += (i.amount || 0); }); return s; }
+
+  // ── HTML 생성 ──
+  var popup = document.getElementById('po-sales-detail-popup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'po-sales-detail-popup';
+    popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);max-width:700px;width:90vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden';
+    document.body.appendChild(popup);
+    // ESC 닫기
+    popup._escHandler = function(e) { if (e.key === 'Escape') closePoSalesDetailPopup(); };
+    document.addEventListener('keydown', popup._escHandler);
+    // 바깥 클릭 닫기
+    popup._outsideHandler = function(e) { if (!popup.contains(e.target) && !e.target.closest('.po-card-cell')) closePoSalesDetailPopup(); };
+    setTimeout(function() { document.addEventListener('click', popup._outsideHandler); }, 100);
+  }
+
+  var h = '';
+  // 헤더
+  var _title = category === '수공구' ? '수공구&액세서리 매입내역' : category + ' 매입내역';
+  h += '<div id="po-sdp-header" style="background:#1A1D23;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">';
+  h += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:700">' + _title + '</span>';
+  h += '<span style="background:' + sty.badgeBg + ';color:' + sty.badgeColor + ';padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600">' + sty.badge + '</span></div>';
+  h += '<button onclick="closePoSalesDetailPopup()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px">✕</button>';
+  h += '</div>';
+
+  // 수공구: 분기 월 탭
+  if (isQuarter) {
+    var qStart = quarterRange.start.getMonth();
+    var activeMonth = now.getMonth();
+    var _tabColors = ['#185FA5', '#1D9E75', '#D4537E'];
+    h += '<div id="po-sdp-tabs" style="display:flex;gap:4px;padding:8px 16px;background:#F5F5F5;flex-shrink:0">';
+    for (var mi = 0; mi < 3; mi++) {
+      var _m = qStart + mi;
+      var _active = _m === activeMonth;
+      h += '<button class="po-sdp-tab" data-month="' + _m + '" onclick="_switchPoSdpMonth(' + _m + ')" style="padding:6px 14px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;';
+      h += _active ? 'background:#1A1D23;color:#fff' : 'background:#fff;color:#5A6070;border:1px solid #DDE1EB';
+      h += '">' + (_m + 1) + '월</button>';
+    }
+    h += '</div>';
+  }
+
+  // 테이블 영역
+  h += '<div id="po-sdp-body" style="flex:1;overflow-y:auto;min-height:0;padding:0">';
+  if (isQuarter) {
+    // 현재 월 데이터만 먼저 표시
+    var curMonthItems = filtered.filter(function(item) { var d = new Date(item.date); return d.getMonth() === now.getMonth(); });
+    h += _buildPoSdpTable(curMonthItems);
+  } else {
+    h += _buildPoSdpTable(filtered);
+  }
+  h += '</div>';
+
+  // 하단 소계
+  h += '<div id="po-sdp-footer" style="flex-shrink:0">';
+  if (isQuarter) {
+    var curMonthItems2 = filtered.filter(function(item) { var d = new Date(item.date); return d.getMonth() === now.getMonth(); });
+    var _mSum = _sumAmount(curMonthItems2);
+    var _qSum = _sumAmount(filtered);
+    h += '<div style="background:' + sty.bg + ';padding:10px 16px;display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:' + sty.badgeColor + '">';
+    h += '<span id="po-sdp-month-label">' + (now.getMonth() + 1) + '월 소계 (' + curMonthItems2.length + '건)</span>';
+    h += '<span id="po-sdp-month-sum">' + fmtPO(_mSum) + '원</span></div>';
+    h += '<div style="background:#1A1D23;padding:10px 16px;display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#fff">';
+    var _qLabel = Math.floor(quarterRange.start.getMonth() / 3) + 1;
+    h += '<span>' + _qLabel + '분기 합계 (' + (quarterRange.start.getMonth() + 1) + '월~' + (quarterRange.end.getMonth() + 1) + '월)</span>';
+    h += '<span>' + fmtPO(_qSum) + '원</span></div>';
+  } else {
+    var _mSum2 = _sumAmount(filtered);
+    h += '<div style="background:' + sty.bg + ';padding:10px 16px;display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:' + sty.badgeColor + '">';
+    h += '<span>' + (now.getMonth() + 1) + '월 소계 (' + filtered.length + '건)</span>';
+    h += '<span>' + fmtPO(_mSum2) + '원</span></div>';
+  }
+  h += '</div>';
+
+  popup.innerHTML = h;
+  popup.style.display = 'flex';
+  // 드래그
+  var hdr = document.getElementById('po-sdp-header');
+  if (hdr) _makeDraggable(popup, hdr);
+
+  // 수공구 탭 전환용 데이터를 window에 저장
+  if (isQuarter) {
+    window._poSdpData = { filtered: filtered, category: category, sty: sty, quarterRange: quarterRange };
+  }
+}
+
+function _buildPoSdpTable(items) {
+  var _badgePad = 'padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600';
+  var _catColors = {
+    '파워툴':{ bg:'#DBEAFE', color:'#1E40AF' }, '수공구':{ bg:'#D1FAE5', color:'#065F46' },
+    '악세사리':{ bg:'#FEF3C7', color:'#92400E' }, '악세서리':{ bg:'#FEF3C7', color:'#92400E' },
+    '액세서리':{ bg:'#FEF3C7', color:'#92400E' }, '팩아웃':{ bg:'#FCE7F3', color:'#9D174D' },
+    '드릴비트':{ bg:'#E0E7FF', color:'#3730A3' }
+  };
+  var catMap = {};
+  (DB.products || []).forEach(function(p) {
+    if (p.ttiNum) { catMap[p.ttiNum] = p.category || ''; catMap[normalizeTtiCode(p.ttiNum)] = p.category || ''; }
+    if (p.code) catMap[p.code] = p.category || '';
+  });
+  function _getCat(item) {
+    var _normTti = item.ttiNum ? normalizeTtiCode(item.ttiNum) : '';
+    return item.category || catMap[_normTti] || catMap[item.ttiNum] || catMap[item.manageCode] || '';
+  }
+  function _fmtDate(dateStr) { var d = new Date(dateStr); return (d.getMonth()+1)+'월'+d.getDate()+'일'; }
+
+  var h = '<table class="po-table" style="width:100%"><thead><tr>';
+  h += '<th>날짜</th><th>구분</th><th class="center">대분류</th><th>모델명</th><th class="num">공급가</th><th class="num">금액</th>';
+  h += '</tr></thead><tbody>';
+  if (items.length === 0) {
+    h += '<tr><td colspan="6" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">해당 기간 매입내역이 없습니다</td></tr>';
+  } else {
+    items.forEach(function(item) {
+      var promo = item.ttiPromotion || '';
+      var typeBadge = (!promo || promo === '일반')
+        ? '<span style="background:#EAECF2;color:#5A6070;' + _badgePad + '">일반</span>'
+        : '<span style="background:#EEEDFE;color:#3C3489;' + _badgePad + '">' + promo + '</span>';
+      var cat = _getCat(item);
+      var cc = _catColors[cat] || { bg:'#F3F4F6', color:'#374151' };
+      var catBadge = cat ? '<span style="background:' + cc.bg + ';color:' + cc.color + ';' + _badgePad + '">' + cat + '</span>' : '-';
+      h += '<tr>';
+      h += '<td style="white-space:nowrap">' + _fmtDate(item.date) + '</td>';
+      h += '<td>' + typeBadge + '</td>';
+      h += '<td class="center">' + catBadge + '</td>';
+      h += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
+      h += '<td class="num">' + fmtPO(item.supplyPrice) + '</td>';
+      h += '<td class="num" style="font-weight:600">' + fmtPO(item.amount) + '</td>';
+      h += '</tr>';
+    });
+  }
+  h += '</tbody></table>';
+  return h;
+}
+
+function _switchPoSdpMonth(m) {
+  var data = window._poSdpData;
+  if (!data) return;
+  var monthItems = data.filtered.filter(function(item) { var d = new Date(item.date); return d.getMonth() === m; });
+  var body = document.getElementById('po-sdp-body');
+  if (body) body.innerHTML = _buildPoSdpTable(monthItems);
+  // 탭 활성 스타일
+  document.querySelectorAll('.po-sdp-tab').forEach(function(btn) {
+    var bm = parseInt(btn.getAttribute('data-month'));
+    btn.style.background = bm === m ? '#1A1D23' : '#fff';
+    btn.style.color = bm === m ? '#fff' : '#5A6070';
+    btn.style.border = bm === m ? 'none' : '1px solid #DDE1EB';
+  });
+  // 소계 업데이트
+  var _sum = 0; monthItems.forEach(function(i) { _sum += (i.amount || 0); });
+  var label = document.getElementById('po-sdp-month-label');
+  var sumEl = document.getElementById('po-sdp-month-sum');
+  if (label) label.textContent = (m + 1) + '월 소계 (' + monthItems.length + '건)';
+  if (sumEl) sumEl.textContent = fmtPO(_sum) + '원';
+}
+
+function closePoSalesDetailPopup() {
+  var popup = document.getElementById('po-sales-detail-popup');
+  if (popup) {
+    popup.style.display = 'none';
+    if (popup._escHandler) document.removeEventListener('keydown', popup._escHandler);
+    if (popup._outsideHandler) document.removeEventListener('click', popup._outsideHandler);
+  }
+}
+
 // 검색 자동완성 초기화
 function initPOAutocomplete(inputId, onSelect) {
   var input = document.getElementById(inputId);
@@ -2747,7 +2999,7 @@ function renderPOTab() {
   html += '<div class="po-section-cards">';
 
   // 파워툴
-  html += '<div class="po-card-cell">';
+  html += '<div class="po-card-cell" style="cursor:pointer" onclick="openPoSalesDetailPopup(\'파워툴\')">';
   html += '<div class="po-card-row1"><span style="color:#185FA5">파워툴</span> <span class="po-card-tag" style="background:#E6F1FB;color:#0C447C">월</span></div>';
   html += '<div class="po-card-row2">' + fmtPO(salesData.powerTool) + '</div>';
   html += '<div class="po-card-row3">목표 - · 0%</div>';
@@ -2761,7 +3013,7 @@ function renderPOTab() {
   var _htPct = _htMax.amount > 0 ? Math.min(100, Math.round(salesData.handTool / _htMax.amount * 100)) : 0;
   var _htShortage = Math.max(0, _htMax.amount - salesData.handTool);
   var _htDone = salesData.handTool >= _htMax.amount;
-  html += '<div class="po-card-cell">';
+  html += '<div class="po-card-cell" style="cursor:pointer" onclick="openPoSalesDetailPopup(\'수공구\')">';
   html += '<div class="po-card-row1"><span style="color:#1D9E75">수공구</span> <span class="po-card-tag" style="background:#E1F5EE;color:#085041">분기</span></div>';
   html += '<div class="po-card-row2">' + fmtPO(salesData.handTool) + '</div>';
   html += '<div class="po-card-row3">목표 ' + _htMax.rate + '% (' + fmtPO(_htMax.amount) + '원)</div>';
@@ -2775,7 +3027,7 @@ function renderPOTab() {
   var _pkPct = _pkMax.amount > 0 ? Math.min(100, Math.round(salesData.packout / _pkMax.amount * 100)) : 0;
   var _pkShortage = Math.max(0, _pkMax.amount - salesData.packout);
   var _pkDone = salesData.packout >= _pkMax.amount;
-  html += '<div class="po-card-cell">';
+  html += '<div class="po-card-cell" style="cursor:pointer" onclick="openPoSalesDetailPopup(\'팩아웃\')">';
   html += '<div class="po-card-row1"><span style="color:#D4537E">팩아웃</span> <span class="po-card-tag" style="background:#FCE7F3;color:#9D174D">월</span></div>';
   html += '<div class="po-card-row2">' + fmtPO(salesData.packout) + '</div>';
   html += '<div class="po-card-row3">목표 ' + _pkMax.rate + '% (' + fmtPO(_pkMax.amount) + '원)</div>';
