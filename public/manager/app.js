@@ -12014,8 +12014,11 @@ function buildPLProductPanel() {
   html += '</div></div>';
 
   // 검색바 영역 (background:#fff + z-index:5 → 스크롤 시 내용 안 비침)
-  html += '<div class="po-filter-row" style="background:#fff;position:relative;z-index:5">';
-  html += '<input type="search" placeholder="코드, 모델명 검색" id="pl-prod-search" autocomplete="off" oninput="filterPLProducts()">';
+  html += '<div class="po-filter-row" style="background:#fff;position:relative;z-index:5;gap:8px">';
+  html += '<input type="search" placeholder="코드, 모델명 검색" id="pl-prod-search" autocomplete="off" oninput="filterPLProducts()" style="flex:1">';
+  html += '<select id="pl-series-filter" onchange="filterPLProducts()" style="height:30px;border:0.5px solid #ddd;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif;min-width:100px">';
+  html += '<option value="all">전체 중분류</option><option value="M18">M18</option><option value="M12">M12</option><option value="battery">충전기/배터리</option><option value="L4">L4</option><option value="MX">MX</option>';
+  html += '</select>';
   html += '</div>';
 
   // 테이블 wrapper (padding:0 + overflow-y:auto + flex:1 → 이 div만 스크롤)
@@ -12120,7 +12123,8 @@ function buildPLProductRow(p, rowIndex) {
   tr += '<td class="center">' + promoBadge + '</td>';
   tr += '<td>' + (p.orderNum || '-') + '</td>';
   tr += '<td>' + (p.code || '-') + '</td>';
-  tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
+  var _plIndent = (_plActiveCat === '파워툴' && p.productType === 'bare') ? 'padding-left:20px;' : '';
+  tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;text-align:left;' + _plIndent + '" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
   tr += '<td class="center">' + sHtml + '</td>';
   tr += '<td class="center">' + bHtml + '</td>';
@@ -12141,38 +12145,70 @@ function _plMatchesCat(p, cat) {
   return true;
 }
 
-// 파워툴 시리즈 정렬 순서: M18→0, M12→1, 나머지→2
+// 파워툴 시리즈 정렬 순서: M18→0, M12→1, 충전기/배터리→2, L4→3, MX→4, 기타→5
 function _plSeriesOrder(model) {
-  var code = ((model || '').split('/')[0] || '').trim();
+  var code = ((model || '').split('/')[0] || '').trim().toUpperCase();
   if (code.startsWith('M18')) return 0;
   if (code.startsWith('M12')) return 1;
-  return 2;
+  if (code.startsWith('C12') || code.startsWith('C18') || code.indexOf('충전') >= 0 || code.indexOf('배터리') >= 0) return 2;
+  if (code.startsWith('L4')) return 3;
+  if (code.startsWith('MX')) return 4;
+  return 5;
 }
 // 시리즈 라벨명
 function _plSeriesLabel(order) {
-  if (order === 0) return 'M18 시리즈';
-  if (order === 1) return 'M12 시리즈';
-  return '충전기/배터리';
+  var labels = ['M18', 'M12', '충전기/배터리', 'L4', 'MX', '기타'];
+  return labels[order] || '기타';
+}
+// 시리즈 필터 매칭 (중분류 드롭다운)
+function _plMatchesSeries(model, filterVal) {
+  if (filterVal === 'all') return true;
+  var order = _plSeriesOrder(model);
+  if (filterVal === 'M18') return order === 0;
+  if (filterVal === 'M12') return order === 1;
+  if (filterVal === 'battery') return order === 2;
+  if (filterVal === 'L4') return order === 3;
+  if (filterVal === 'MX') return order === 4;
+  return true;
+}
+// 베이스 모델명 추출 (마지막 하이픈 앞) — buildSetBearPairs와 동일 로직
+function _plBaseModel(model) {
+  var slashIdx = (model || '').indexOf(' / ');
+  var modelCode = slashIdx >= 0 ? model.substring(0, slashIdx).trim() : (model || '').trim();
+  var lastDash = modelCode.lastIndexOf('-');
+  return lastDash > 0 ? modelCode.substring(0, lastDash) : modelCode;
 }
 
 function filterPLProducts() {
   var search = (document.getElementById('pl-prod-search') || {}).value || '';
   search = search.toLowerCase().trim();
+  var seriesFilter = (document.getElementById('pl-series-filter') || {}).value || 'all';
 
   _plFilteredProducts = (DB.products || []).filter(function(p) {
     if (p.discontinued) return false;
     if (!_plMatchesCat(p, _plActiveCat)) return false;
+    // 파워툴 탭: 중분류 필터
+    if (_plActiveCat === '파워툴' && !_plMatchesSeries(p.model, seriesFilter)) return false;
     if (search) {
       var text = ((p.code || '') + ' ' + (p.ttiNum || '') + ' ' + (p.model || '') + ' ' + (p.detail || '') + ' ' + (p.orderNum || '')).toLowerCase();
       if (!text.includes(search)) return false;
     }
     return true;
   });
-  // 파워툴 탭: M18 → M12 → 나머지 순서, 그 외 탭: 모델명 알파벳순
+  // 파워툴 탭: 대분류(시리즈) → 소분류(세트/베어 쌍 그룹) 정렬
   if (_plActiveCat === '파워툴') {
     _plFilteredProducts.sort(function(a, b) {
+      // 1. 대분류 순서
       var oa = _plSeriesOrder(a.model), ob = _plSeriesOrder(b.model);
       if (oa !== ob) return oa - ob;
+      // 2. 베이스 모델명 그룹핑
+      var ba = _plBaseModel(a.model), bb = _plBaseModel(b.model);
+      var bc = ba.localeCompare(bb, 'ko');
+      if (bc !== 0) return bc;
+      // 3. 같은 베이스: 세트 먼저(0), 베어 나중(1), unknown(2)
+      var ta = a.productType === 'set' ? 0 : (a.productType === 'bare' ? 1 : 2);
+      var tb = b.productType === 'set' ? 0 : (b.productType === 'bare' ? 1 : 2);
+      if (ta !== tb) return ta - tb;
       return (a.model || '').localeCompare(b.model || '', 'ko');
     });
   } else {
@@ -12192,7 +12228,7 @@ function renderPLProductRows() {
     if (_plActiveCat === '파워툴') {
       var _curSeries = _plSeriesOrder(_plFilteredProducts[i].model);
       if (_curSeries !== _prevSeries) {
-        html += '<tr><td colspan="12" style="font-size:10px;color:#999;padding:6px 8px;background:#FAFBFC;font-weight:500">\u2014 ' + _plSeriesLabel(_curSeries) + ' \u2014</td></tr>';
+        html += '<tr><td colspan="12" style="font-size:11px;color:#666;padding:5px 10px;background:#F0F1F3;font-weight:600;text-align:left">' + _plSeriesLabel(_curSeries) + '</td></tr>';
         _prevSeries = _curSeries;
       }
     }
