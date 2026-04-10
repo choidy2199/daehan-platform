@@ -2888,7 +2888,7 @@ function renderPOTab() {
   html += '</div>'; // .po-top-row
 
   // 탭 콘텐츠 영역
-  html += '<div id="po-tab-contents" style="padding:8px 12px">';
+  html += '<div id="po-tab-contents" style="padding:8px 12px;flex:1;min-height:0;display:flex;flex-direction:column">';
 
   // 일반주문 탭
   html += '<div id="po-content-normal" class="po-tab-content" style="display:' + (activeSubTab === 'normal' ? 'grid' : 'none') + ';grid-template-columns:1fr 1fr;gap:10px;">';
@@ -2902,7 +2902,7 @@ function renderPOTab() {
   html += '</div>';
 
   // 밀워키 발주확정 탭 (기존 "발주 리스트" — 이름/ID만 변경)
-  html += '<div id="po-content-confirmed" class="po-tab-content" style="display:' + (activeSubTab === 'confirmed' ? 'block' : 'none') + '">';
+  html += '<div id="po-content-confirmed" class="po-tab-content" style="display:' + (activeSubTab === 'confirmed' ? 'flex' : 'none') + ';flex-direction:column;flex:1;min-height:0">';
   html += buildPOListPanel();
   html += '</div>';
 
@@ -3119,7 +3119,7 @@ function switchPOSubTab(tabName) {
   var content = document.getElementById('po-content-' + tabName);
   // grid 표시 대상: normal, foc, package, kit + 동적 T 프로모션 탭 (promo-*)
   var isGridTab = tabName === 'normal' || tabName === 'foc' || tabName === 'package' || tabName === 'kit' || tabName.indexOf('promo-') === 0;
-  if (content) content.style.display = isGridTab ? 'grid' : 'block';
+  if (content) content.style.display = isGridTab ? 'grid' : (tabName === 'confirmed' ? 'flex' : 'block');
 
   document.querySelectorAll('.po-top-row .po-subtab[data-tab]').forEach(function(btn) {
     var id = btn.getAttribute('data-tab');
@@ -3180,7 +3180,7 @@ function buildPOListPanel() {
   // 저장된 종료일이 오늘 이전이면 오늘로 갱신 (web-ui-patterns 1.3)
   if (_itemsDateTo < _todayStr) _itemsDateTo = _todayStr;
 
-  h += '<div class="po-panel" style="max-height:calc(100vh - 120px);overflow-y:auto">';
+  h += '<div class="po-panel" style="flex:1;min-height:0">';
   h += '<div class="po-panel-header"><span>밀워키 발주확정</span><div style="display:flex;gap:6px;align-items:center">';
   h += '<button class="po-hdr-btn po-hdr-del" onclick="deleteSelectedPOHistory()">선택 삭제</button>';
   h += '<select id="po-list-filter" class="po-hdr-select" onchange="changePOListFilter(this.value)">';
