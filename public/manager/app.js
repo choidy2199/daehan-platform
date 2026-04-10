@@ -11989,6 +11989,7 @@ function _initPLTab() {
   }
   // 컬럼 리사이즈 초기화 (좌측 테이블)
   initColumnResize('pl-prod-table');
+  console.log('initColumnResize pl-prod-table 완료');
   initPOAutocomplete('pl-cart-search', function(p) { addToPLCartDirect(p); });
   renderPLCartTable();
   // 카테고리 탭 활성 표시
@@ -12000,7 +12001,7 @@ function _initPLTab() {
 
 // 좌측 패널: 제품 목록 (일반주문 buildPOProductPanel과 동일 구조)
 function buildPLProductPanel() {
-  var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
+  var html = '<div class="po-panel" style="font-family:\'Pretendard\',-apple-system,sans-serif;max-height:calc(100vh - 260px)">';
   html += '<div class="po-panel-header"><span>제품 목록<span class="po-header-count" id="pl-prod-count">0건</span></span>';
   // 카테고리 탭 (다크 헤더 내 배치 — 디자인 시스템 filter-tab in dark header)
   html += '<div style="display:flex;gap:2px;margin-left:16px">';
@@ -12011,13 +12012,13 @@ function buildPLProductPanel() {
   });
   html += '</div></div>';
 
-  // 필터 행 (일반주문과 동일 구조)
-  html += '<div class="po-filter-row">';
+  // 검색바 영역 (background:#fff + z-index:5 → 스크롤 시 내용 안 비침)
+  html += '<div class="po-filter-row" style="background:#fff;position:relative;z-index:5">';
   html += '<input type="search" placeholder="코드, 모델명 검색" id="pl-prod-search" autocomplete="off" oninput="filterPLProducts()">';
   html += '</div>';
 
-  // 테이블 (po-table, table-layout:fixed — 디자인 시스템 컬럼 너비 가이드 준수)
-  html += '<div class="po-panel-body" id="pl-prod-scroll">';
+  // 테이블 wrapper (padding:0 + overflow-y:auto + flex:1 → 이 div만 스크롤)
+  html += '<div class="po-panel-body" id="pl-prod-scroll" style="padding:0">';
   html += '<table class="po-table" id="pl-prod-table" style="table-layout:fixed"><thead><tr>';
   html += '<th class="center" style="width:36px">No</th>';
   html += '<th class="center" style="width:36px">누적</th>';
@@ -12204,30 +12205,30 @@ function switchPLCat(cat) {
   filterPLProducts();
 }
 
-// 우측 패널: 주문 목록
+// 우측 패널: 주문 목록 (일반주문 buildPOOrderPanel과 100% 동일 구조)
 function buildPLOrderPanel() {
-  var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
+  var html = '<div class="po-panel" style="font-family:\'Pretendard\',-apple-system,sans-serif;max-height:calc(100vh - 260px)">';
   html += '<div class="po-panel-header"><span>주문 목록<span class="po-header-count" id="pl-cart-count-header">0건</span></span>';
   html += '<button style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="clearPLCart()">비우기</button>';
   html += '</div>';
 
-  // 제품등록 검색행
+  // 제품등록 검색행 (스크롤 바깥 고정)
   html += '<div class="po-register-row" style="background:#fff;flex-shrink:0">';
   html += '<span style="font-size:12px;font-weight:600;color:#5A6070;white-space:nowrap">제품등록 :</span>';
   html += '<input type="search" placeholder="상품번호, 모델명 검색 → Enter" id="pl-cart-search" autocomplete="off" onkeydown="if(event.key===\'Enter\')addPLCartItem()">';
   html += '<button class="po-register-btn" onclick="addPLCartItem()">+ 등록</button>';
   html += '</div>';
 
-  // 테이블
-  html += '<div class="po-panel-body">';
+  // 테이블 (po-panel-body가 스크롤 컨테이너 → thead sticky 동작)
+  html += '<div class="po-panel-body" style="padding:0">';
   html += '<table class="po-table"><thead><tr>';
   html += '<th class="center" style="width:36px">누적</th><th>프로모션번호</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
   html += '</tr></thead><tbody id="pl-cart-body">';
   html += '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   html += '</tbody></table></div>';
 
-  // 합계
-  html += '<div class="po-summary">';
+  // 합계 (flex-shrink:0 → 항상 하단 고정)
+  html += '<div class="po-summary" style="flex-shrink:0">';
   html += '<div class="po-summary-row"><span class="po-summary-label">공급가 합계 <span class="po-summary-count" id="pl-cart-count-label"></span></span><span class="po-summary-value" id="pl-cart-supply-total">0원</span></div>';
   html += '<div class="po-summary-row po-summary-tax"><span class="po-summary-label">부가세 (10%)</span><span class="po-summary-value" id="pl-cart-vat">0원</span></div>';
   html += '<div class="po-summary-row po-summary-total"><span class="po-summary-label">총 합계</span><span class="po-summary-value" id="pl-cart-grand-total">0원</span></div>';

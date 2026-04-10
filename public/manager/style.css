@@ -433,6 +433,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .po-table td { height:36px; padding:8px 10px; text-align:center; font-weight:400; font-size:13px; color:#1A1D23; border-bottom:1px solid #F0F2F7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .po-table .num { text-align:right; }
 .po-table .center { text-align:center; }
+.po-table tbody tr:nth-child(even) td { background:#FAFBFC; }
 .po-table tr:hover td { background:#F4F6FA; }
 .po-cart-btn { width:24px; height:24px; border-radius:4px; border:1px solid #DDE1EB; background:#fff; cursor:pointer; font-size:12px; display:inline-flex; align-items:center; justify-content:center; }
 .po-cart-btn:hover { background:#E6F1FB; border-color:#185FA5; }
