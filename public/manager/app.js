@@ -2538,10 +2538,13 @@ function calcPOSalesData() {
   var monthRange = getMonthRange(now);
   var quarterRange = getQuarterRange(now);
 
-  // 제품 → 카테고리 맵
+  // 제품 → 카테고리 맵 (원본 키 + normalizeTtiCode 버전 양쪽 등록)
   var catMap = {};
   (DB.products || []).forEach(function(p) {
-    if (p.ttiNum) catMap[p.ttiNum] = p.category || '';
+    if (p.ttiNum) {
+      catMap[p.ttiNum] = p.category || '';
+      catMap[normalizeTtiCode(p.ttiNum)] = p.category || '';
+    }
     if (p.code) catMap[p.code] = p.category || '';
   });
 
@@ -2551,7 +2554,9 @@ function calcPOSalesData() {
     if (item.dryRun) return;
     var d = new Date(item.date);
     var amt = item.amount || 0;
-    var cat = catMap[item.ttiNum] || catMap[item.manageCode] || '';
+    // 카테고리 우선순위: item.category > normalizeTtiCode 매칭 > 원본 ttiNum > manageCode
+    var _normTti = item.ttiNum ? normalizeTtiCode(item.ttiNum) : '';
+    var cat = item.category || catMap[_normTti] || catMap[item.ttiNum] || catMap[item.manageCode] || '';
     // 일반주문 여부: subtab 필드 있으면 사용, 없으면 type으로 판별 (레거시 호환)
     var isNormal = item.subtab ? item.subtab === 'normal' : item.type === 'normal';
 
@@ -3242,7 +3247,8 @@ function buildPOListPanel() {
   };
 
   // 발주확정 panel-body: padding 제거 (다크 헤더와 테이블 헤더 밀착 + 테이블 풀폭)
-  h += '<div class="po-panel-body" style="padding:0"><table id="po-list-table" class="po-table"><thead><tr>';
+  // thead tr에 명시적 sticky (CSS .po-table th 패턴과 동일, JS translateY 금지)
+  h += '<div class="po-panel-body" style="padding:0"><table id="po-list-table" class="po-table"><thead><tr style="position:sticky;top:0;z-index:10;background:#F5F5F5">';
   h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
   h += '<th data-col="date">날짜</th>';
   h += '<th data-col="type">구분</th>';
@@ -11220,7 +11226,7 @@ function syncOrderItems(items, dateFrom, dateTo) {
         category: matchedProd ? (matchedProd.category || '') : '',
         qty: _qty,
         supplyPrice: _supply,
-        costPrice: 0,
+        costPrice: Math.round(calcOrderCost(_supply, matchedProd ? (matchedProd.category || '') : '')),
         amount: _amount,
         orderNumber: '',
         dryRun: false,
