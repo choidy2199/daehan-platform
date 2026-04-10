@@ -3282,7 +3282,7 @@ function buildPOListPanel() {
       } else if (item.type === 'normal') typeBadge = '<span style="background:#EAECF2;color:#5A6070;' + _badgePad + '">일반</span>';
       else if (item.type === 'foc') typeBadge = '<span style="background:#FBEAF0;color:#72243E;' + _badgePad + '">FOC</span>';
       else typeBadge = '<span style="background:#EEEDFE;color:#3C3489;' + _badgePad + '">' + item.type + '</span>';
-      var erpBadge = item.erpStatus === 'done' ? '<span style="background:#E1F5EE;color:#085041;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">등록완료</span>' : '<span style="background:#FAEEDA;color:#633806;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500">미등록</span>';
+      var erpBadge = item.erpStatus === 'done' ? '<span style="background:#E1F5EE;color:#085041;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">등록완료</span>' : '<span style="background:#FAEEDA;color:#633806;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">미등록</span>';
 
       // mw_products에서 코드/관리코드 매칭 (ttiNum 기준)
       var _pCode = item.ttiNum || item.manageCode || '';
@@ -3296,7 +3296,7 @@ function buildPOListPanel() {
       var _dispCat = _matched ? (_matched.category || '') : '';
       var _cc = _poCatColor[_dispCat] || { bg:'#F3F4F6', color:'#374151' };
       var _catBadge = _dispCat
-        ? '<span style="background:' + _cc.bg + ';color:' + _cc.color + ';padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">' + _dispCat + '</span>'
+        ? '<span style="background:' + _cc.bg + ';color:' + _cc.color + ';padding:4px 10px;border-radius:4px;font-size:12px;font-weight:600">' + _dispCat + '</span>'
         : '<span style="color:#9BA3B2;font-size:11px">-</span>';
       // 금액 = ttiOrderAmount 우선, 없으면 매입원가 × 수량
       var _displayAmt = item.ttiOrderAmount || (item.costPrice && item.costPrice > 0 ? item.costPrice * (item.qty || 0) : 0);
@@ -3304,9 +3304,9 @@ function buildPOListPanel() {
       // TTI 상태
       var ttiStatus = item.ttiOrderStatus || '';
       var ttiStatusBadge = '';
-      if (ttiStatus === '주문접수') ttiStatusBadge = '<span style="font-size:10px;padding:2px 8px;background:#dcfce7;color:#166534;border-radius:4px;font-weight:500">주문접수</span>';
-      else if (ttiStatus === '주문취소') ttiStatusBadge = '<span style="font-size:10px;padding:2px 8px;background:#fecaca;color:#991b1b;border-radius:4px;font-weight:500">주문취소</span>';
-      else ttiStatusBadge = '<span style="font-size:10px;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:4px;font-weight:500">미동기화</span>';
+      if (ttiStatus === '주문접수') ttiStatusBadge = '<span style="font-size:12px;padding:4px 10px;background:#dcfce7;color:#166534;border-radius:4px;font-weight:600">주문접수</span>';
+      else if (ttiStatus === '주문취소') ttiStatusBadge = '<span style="font-size:12px;padding:4px 10px;background:#fecaca;color:#991b1b;border-radius:4px;font-weight:600">주문취소</span>';
+      else ttiStatusBadge = '<span style="font-size:12px;padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:4px;font-weight:600">미동기화</span>';
 
       // TTI 액션
       var ttiActionBtn = '';
