@@ -3879,7 +3879,66 @@ function registerErpFromList() {
 
 // Phase 3 예정: mw_orders 반영, 원가계산, 프로모션 탭 분류, 버튼 → '경박 매입등록'으로 변환
 function savePoConfirmed() {
-  alert('저장 기능 — 다음 세션에서 구현 예정');
+  _invalidateCumulDCCache();
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  if (history.length === 0) { toast('저장할 발주 데이터가 없습니다'); return; }
+
+  // Step 1: costPrice 최신값으로 재계산 (누적DC 포함)
+  var costUpdated = 0;
+  history.forEach(function(item) {
+    if (item.dryRun) return;
+    if (!item.supplyPrice) return;
+    var cat = item.category || '';
+    var ttiNum = item.ttiNum || '';
+    var newCost = Math.round(calcOrderCost(item.supplyPrice, cat, ttiNum));
+    if (newCost !== item.costPrice) {
+      item.costPrice = newCost;
+      costUpdated++;
+    }
+  });
+
+  // Step 2: 제품별(ttiNum 기준) 가중평균 계산
+  var groups = {}; // { normTtiNum: { totalCost, totalQty, items:[] } }
+  history.forEach(function(item) {
+    if (item.dryRun) return;
+    var ttiNum = item.ttiNum || '';
+    if (!ttiNum) return;
+    var norm = normalizeTtiCode(ttiNum);
+    if (!norm) return;
+    if (!groups[norm]) groups[norm] = { totalCost: 0, totalQty: 0 };
+    var qty = item.qty || 0;
+    var cost = item.costPrice || 0;
+    groups[norm].totalCost += cost * qty;
+    groups[norm].totalQty += qty;
+  });
+
+  // Step 3: mw_products에 costPriceP 저장
+  var prodUpdated = 0;
+  var nowStr = new Date().toISOString().slice(0, 10);
+  (DB.products || []).forEach(function(p) {
+    if (!p.ttiNum) return;
+    var norm = normalizeTtiCode(p.ttiNum);
+    var g = groups[norm];
+    if (!g || g.totalQty === 0) return;
+    p.costPriceP = Math.round(g.totalCost / g.totalQty);
+    p.costPricePQty = g.totalQty;
+    p.costPricePTotal = Math.round(g.totalCost);
+    p.costPricePDate = nowStr;
+    prodUpdated++;
+  });
+
+  // Step 4: 저장
+  save('mw_po_history', history);
+  if (prodUpdated > 0) save(KEYS.products, DB.products);
+
+  // Step 5: 발주확정 테이블 새로고침
+  var confirmedContent = document.getElementById('po-content-confirmed');
+  if (confirmedContent) {
+    confirmedContent.innerHTML = buildPOListPanel();
+    initColumnResize('po-list-table');
+  }
+
+  toast('저장 완료 — ' + prodUpdated + '개 제품 원가P 업데이트' + (costUpdated > 0 ? ', ' + costUpdated + '건 원가 재계산' : ''));
 }
 
 // ====== 발주확정 테이블 컬럼 표시 설정 ======
