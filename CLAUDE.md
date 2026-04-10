@@ -310,6 +310,35 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
     · 외부 클릭 닫힘 + 페이지 로드 시 자동 복원
   - 💾 저장 버튼 신규 (savePoConfirmed placeholder, Phase 3 대기)
 
+- [2026-04-11] 누적 프로모션 삭제 기능
+  - 카드 영역: + 버튼 아래 − 버튼 추가 (빈 프로모션만 삭제)
+  - 모달 푸터: 좌측 삭제 버튼 추가 (confirm 후 개별 삭제)
+  - removeCumulativePromo(): 마지막 빈 프로모션 삭제
+  - deleteCumulativePromo(): confirm 후 해당 프로모션 완전 삭제 + UI 갱신
+
+- [2026-04-11] 네이버 가격전송 품절 상품 감지 — OUT_OF_STOCK 분리 표시
+  - naver.ts: PUT 400 + statusType NotValidEnum → OUT_OF_STOCK 반환 (throw 안 함)
+  - API route: 품절 응답 200으로 전달 (fast path + legacy path)
+  - 단건 전송(_pdPriceSync): 품절 시 주황 버튼 + 안내 알림
+  - 일괄 전송: 품절 별도 카운트 (🚫 품절: N건) + 주황 사유 텍스트
+  - 결과 화면 하단 품절 안내 메시지 추가
+
+- [2026-04-11] 매출카드 월/분기 뱃지 사이즈업
+  - .po-card-tag: font-size 9→12px, padding 2x6→2x8, border-radius 3→4
+
+- [2026-04-11] 누적 할인 remark 기반 적용 — normal만 누적DC, PACKAGE/T6 등은 AR만
+  - calcOrderCost: 4번째 파라미터 remark 추가, normal 아니면 누적DC 스킵
+  - buildPOListPanel/savePoConfirmed/syncOrderItems: ttiPromotion 전달
+  - _cumulBadgeHtml: remark가 normal 아니면 뱃지 표시 안 함
+  - 매출카드 팝업: isCumul 판정에 remark 체크 추가
+
+- [2026-04-11] 세트↔베어툴 자동 매칭 엔진 buildSetBearPairs()
+  - 모델코드 마지막 하이픈 기준 세트/베어 판별 (0=베어, 그외=세트)
+  - 베이스 모델명 그룹핑 → 쌍 매칭
+  - pairCodes (배열): 복수 매칭 지원 (S재고/B재고 합산용)
+  - productType: set/bare/unknown
+  - 콘솔 리포트 (전체/매칭성공/세트만/베어만/스킵)
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인
