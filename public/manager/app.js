@@ -3116,6 +3116,20 @@ function openCostPricePPopup(ttiNum, modelName) {
       } else if (_arPct > 0) {
         discountLabel = '<span style="color:#666;font-size:11px">AR ' + parseFloat(_arPct.toFixed(1)) + '%</span>';
       }
+      // 커머셜 프로모션 할인 표시 (진행 중인 프로모션)
+      var _commPromosCpp = _getCommercialPromos();
+      var _itemDate = new Date(item.date); _itemDate.setHours(0,0,0,0);
+      _commPromosCpp.forEach(function(cp) {
+        var _cpS = new Date(cp.startDate); _cpS.setHours(0,0,0,0);
+        var _cpE = new Date(cp.endDate); _cpE.setHours(23,59,59,999);
+        if (_itemDate < _cpS || _itemDate > _cpE) return;
+        var _cpSales = _calcCommercialSales(cp);
+        var _cpTier = _findCommercialTier(cp, _cpSales);
+        var _cpRate = (_cpTier.current && _cpTier.current.rate > 0) ? _cpTier.current.rate : 0;
+        if (_cpRate <= 0) return;
+        var _cpType = (cp.discountType || 'ar') === 'volume' ? '커머셜물량' : '커머셜AR';
+        discountLabel += '<div style="color:#185FA5;font-size:11px;font-weight:500">' + _cpType + ' ' + _cpRate + '%</div>';
+      });
 
       var dateStr = (d.getMonth() + 1) + '월' + d.getDate() + '일';
       h += '<tr' + (isCumul ? ' style="background:#FAFFF5"' : '') + '>';
