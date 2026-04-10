@@ -1866,8 +1866,8 @@ function renderCatalog() {
         var _ttiEsc = (p.ttiNum || '').replace(/'/g, "\\'");
         var _modelEsc = (p.model || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return '<td class="num" style="padding:4px 3px">'
-          + '<div onclick="openCostPricePPopup(\'' + _ttiEsc + '\',\'' + _modelEsc + '\')" style="background:#FFF3E0;border:1px solid #EF9F27;border-radius:6px;padding:4px 10px;cursor:pointer;text-align:right">'
-          + '<div style="font-size:14px;font-weight:500;color:#854F0B">' + fmt(_cpp) + '</div>'
+          + '<div onclick="openCostPricePPopup(\'' + _ttiEsc + '\',\'' + _modelEsc + '\')" data-mb-border="#EF9F27" style="cursor:pointer;background:#FFF3E0;border-radius:6px;padding:4px 6px;text-align:center;border:1px solid #EF9F27;transition:border-color 0.15s" onmouseenter="this.style.borderColor=\'#1A1D23\'" onmouseleave="this.style.borderColor=this.getAttribute(\'data-mb-border\')">'
+          + '<div style="font-size:15px;font-weight:700;color:#854F0B;line-height:1.2">' + fmt(_cpp) + '</div>'
           + marginLine
           + '</div></td>';
       })()}
@@ -4064,15 +4064,34 @@ function savePoConfirmed() {
   save('mw_po_history', history);
   if (prodUpdated > 0) save(KEYS.products, DB.products);
 
-  // Step 5: 발주확정 테이블 새로고침
-  var confirmedContent = document.getElementById('po-content-confirmed');
-  if (confirmedContent) {
-    confirmedContent.innerHTML = buildPOListPanel();
-    initColumnResize('po-list-table');
+  // Step 5: 발주확정 테이블 바디 비우기 (저장 완료 표시)
+  var listBody = document.getElementById('po-list-body');
+  if (listBody) {
+    listBody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:#9BA3B2;font-size:13px">저장 완료. 새 데이터를 동기화하세요.</td></tr>';
   }
 
-  toast('저장 완료 — ' + prodUpdated + '개 제품 원가P 업데이트' + (costUpdated > 0 ? ', ' + costUpdated + '건 원가 재계산' : ''));
+  // Step 6: 저장 버튼 → "경영박사 매입입력" 으로 변경
+  var saveBtn = document.getElementById('po-save-btn');
+  if (saveBtn) {
+    saveBtn.textContent = '경영박사 매입입력';
+    saveBtn.style.background = '#6C47B8';
+    saveBtn.onclick = function() {
+      alert('경영박사 매입전표 등록은 준비 중입니다');
+      if (_erpReminderTimer) { clearTimeout(_erpReminderTimer); _erpReminderTimer = null; }
+    };
+  }
+
+  // Step 7: 10분 경고 타이머
+  if (_erpReminderTimer) clearTimeout(_erpReminderTimer);
+  _erpReminderTimer = setTimeout(function() {
+    alert('밀워키 매입전표를 경영박사에 전송하지 않으셨습니다. 전송하세요.');
+    _erpReminderTimer = null;
+  }, 600000);
+
+  // Step 8: alert (사용자 확인까지 유지)
+  alert('저장되었습니다. 경영박사에 매입전표 입력하세요.');
 }
+var _erpReminderTimer = null;
 
 // ====== 발주확정 테이블 컬럼 표시 설정 ======
 var _poColSettingsOutsideHandler = null;
@@ -11640,6 +11659,14 @@ function startTtiOrderSync() {
 
 // Phase 2: TTI 아이템별 주문내역 동기화 요청 (order_list_sub_new.html)
 function startTtiOrderItemsSync() {
+  // 타이머 해제 + 저장 버튼 복원
+  if (_erpReminderTimer) { clearTimeout(_erpReminderTimer); _erpReminderTimer = null; }
+  var _sBtn = document.getElementById('po-save-btn');
+  if (_sBtn) {
+    _sBtn.textContent = '💾 저장';
+    _sBtn.style.background = '#185FA5';
+    _sBtn.onclick = function() { savePoConfirmed(); };
+  }
   if (!window._daehanExtensionReady) {
     alert('크롬 확장 프로그램이 설치되어 있지 않습니다.');
     return;
