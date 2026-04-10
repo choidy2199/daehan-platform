@@ -3180,7 +3180,7 @@ function buildPOListPanel() {
   // 저장된 종료일이 오늘 이전이면 오늘로 갱신 (web-ui-patterns 1.3)
   if (_itemsDateTo < _todayStr) _itemsDateTo = _todayStr;
 
-  h += '<div class="po-panel" style="max-height:none;overflow:visible">';
+  h += '<div class="po-panel" style="max-height:calc(100vh - 120px);overflow-y:auto">';
   h += '<div class="po-panel-header"><span>밀워키 발주확정</span><div style="display:flex;gap:6px;align-items:center">';
   h += '<button class="po-hdr-btn po-hdr-del" onclick="deleteSelectedPOHistory()">선택 삭제</button>';
   h += '<select id="po-list-filter" class="po-hdr-select" onchange="changePOListFilter(this.value)">';
@@ -3249,7 +3249,7 @@ function buildPOListPanel() {
   // 발주확정 panel-body: padding 제거 (다크 헤더와 테이블 헤더 밀착 + 테이블 풀폭)
   // padding-bottom:60px → 마지막 행 아래 여백 확보 (스크롤 시 잘림 방지)
   // thead tr에 명시적 sticky (CSS .po-table th 패턴과 동일, JS translateY 금지)
-  h += '<div class="po-panel-body" style="padding:0 0 60px 0;overflow:visible"><table id="po-list-table" class="po-table"><thead><tr style="position:sticky;top:0;z-index:10;background:#F5F5F5">';
+  h += '<div class="po-panel-body" style="padding:0 0 60px 0"><table id="po-list-table" class="po-table"><thead><tr style="position:sticky;top:0;z-index:10;background:#F5F5F5">';
   h += '<th class="center" style="width:30px"><input type="checkbox" onchange="togglePOListAll(this)"></th>';
   h += '<th data-col="date">날짜</th>';
   h += '<th data-col="type">구분</th>';
