@@ -2624,19 +2624,24 @@ function calcPOSalesData() {
 // 누적프로모션 대상 판별 헬퍼
 // ========================================
 function _isCumulTarget(item) {
+  if (!item) return null;
   var promos = JSON.parse(localStorage.getItem('mw_cumulative_promos') || 'null');
   if (!promos || !Array.isArray(promos)) return null;
   var _normTti = item.ttiNum ? normalizeTtiCode(item.ttiNum) : '';
   var _normManage = item.manageCode ? normalizeTtiCode(item.manageCode) : '';
   var _modelKey = item.model ? '_model_' + item.model.toLowerCase() : '';
+  if (!_normTti && !_normManage && !_modelKey) return null;
   for (var pi = 0; pi < promos.length; pi++) {
     var cp = promos[pi];
     if (!cp.products || !Array.isArray(cp.products)) continue;
+    // 프로모션 레벨 자동 할인율 (product에 개별 할인율 없을 때 폴백)
+    var _promoAutoRate = parseFloat(cp.autoDiscountRate) || 0;
     for (var j = 0; j < cp.products.length; j++) {
       var pr = cp.products[j];
       var _normPr = pr.ttiNum ? normalizeTtiCode(pr.ttiNum) : '';
       if ((_normTti && _normPr === _normTti) || (_normManage && _normPr === _normManage) || (_modelKey && pr.model && '_model_' + pr.model.toLowerCase() === _modelKey)) {
-        return { index: pi, name: cp.name || '', discountRate: parseFloat(pr.discountRate) || 0 };
+        var _rate = parseFloat(pr.discountRate) || _promoAutoRate;
+        return { index: pi, name: cp.name || '', discountRate: _rate };
       }
     }
   }
@@ -2660,9 +2665,10 @@ function _getCumulDCMap() {
   if (!promos || !Array.isArray(promos)) return _cumulDCCache;
   promos.forEach(function(cp) {
     if (!cp.products || !Array.isArray(cp.products)) return;
+    var _promoAutoRate = parseFloat(cp.autoDiscountRate) || 0;
     cp.products.forEach(function(pr) {
       if (pr.ttiNum) {
-        var rate = parseFloat(pr.discountRate) || 0;
+        var rate = parseFloat(pr.discountRate) || _promoAutoRate;
         if (rate > 0) _cumulDCCache[normalizeTtiCode(pr.ttiNum)] = rate;
       }
     });
@@ -3650,7 +3656,7 @@ function buildPOListPanel() {
       h += '<td data-col="model" style="' + _tdS + 'max-width:180px;overflow:hidden;text-overflow:ellipsis;' + textDeco + '" title="' + (item.model || '').replace(/"/g, '&quot;') + '">' + (item.model || '-') + '</td>';
       h += '<td data-col="qty" class="num" style="' + _tdS + textDeco + '">' + (item.qty || 0) + '</td>';
       h += '<td data-col="supplyPrice" class="num" style="' + _tdS + textDeco + '">' + fmtPO(item.supplyPrice) + '</td>';
-      h += '<td data-col="costPrice" class="num" style="' + _tdS + textDeco + '">' + (item.costPrice ? fmtPO(item.costPrice) : '-') + '</td>';
+      h += '<td data-col="costPrice" class="num" style="' + _tdS + textDeco + '">' + (item.supplyPrice ? fmtPO(Math.round(calcOrderCost(item.supplyPrice, item.category || _dispCat || '', item.ttiNum || ''))) : '-') + '</td>';
       h += '<td data-col="amount" class="num" style="' + _tdS + 'font-weight:600;' + textDeco + '">' + (_displayAmt > 0 ? fmtPO(_displayAmt) : '-') + '</td>';
       h += '<td data-col="ttiStatus" class="center" style="padding:10px 6px">' + ttiStatusBadge + '</td>';
       h += '<td data-col="ttiAction" class="center" style="padding:10px 6px">' + ttiActionBtn + '</td>';
