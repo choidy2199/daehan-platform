@@ -1851,25 +1851,25 @@ function renderCatalog() {
       <td class="num">${fmt(p.supplyPrice)}</td>
       <td class="num">${fmt(p.cost)}</td>
       ${(function() {
-        if (!_costP) {
+        var _cpp = p.costPriceP || 0;
+        if (!_cpp) {
           return '<td class="num" style="background:#FEFAFA;color:#9BA3B2">-</td>';
         }
-        var code = String(p.code);
-        // 공급가 대비 마진
         var supply = p.supplyPrice || 0;
         var marginLine = '';
         if (supply > 0) {
-          var diff = _costP - supply;
+          var diff = supply - _cpp;
           var rate = (diff / supply) * 100;
-          var col = diff >= 0 ? '#1D9E75' : '#CC2222';
-          var sign = diff >= 0 ? '+' : '';
-          marginLine = '<div style="font-size:11px;font-weight:500;color:' + col + ';margin-top:1px">' + rate.toFixed(1) + '% ' + sign + fmt(diff) + '</div>';
+          var col = diff >= 0 ? '#BA7517' : '#CC2222';
+          marginLine = '<div style="font-size:11px;font-weight:500;color:' + col + ';margin-top:1px">' + rate.toFixed(1) + '% ' + (diff >= 0 ? '-' : '+') + fmt(Math.abs(diff)) + '</div>';
         }
-        return '<td class="num" style="background:#FEFAFA">'
-          + '<div><span style="color:#CC2222;font-weight:700">' + fmt(_costP) + '</span> '
-          + '<span onclick="showPromoPop(event,\'' + code + '\')" style="display:inline-block;background:#CC2222;color:white;font-size:10px;font-weight:700;padding:1px 4px;border-radius:3px;cursor:pointer;vertical-align:middle">P</span></div>'
+        var _ttiEsc = (p.ttiNum || '').replace(/'/g, "\\'");
+        var _modelEsc = (p.model || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return '<td class="num" style="padding:4px 3px">'
+          + '<div onclick="openCostPricePPopup(\'' + _ttiEsc + '\',\'' + _modelEsc + '\')" style="background:#FFF3E0;border:1px solid #EF9F27;border-radius:6px;padding:4px 10px;cursor:pointer;text-align:right">'
+          + '<div style="font-size:14px;font-weight:500;color:#854F0B">' + fmt(_cpp) + '</div>'
           + marginLine
-          + '</td>';
+          + '</div></td>';
       })()}
       ${(function() {
         var priceA = p.priceA || 0;
@@ -2928,6 +2928,139 @@ function closePoSalesDetailPopup() {
     popup.style.display = 'none';
     if (popup._escHandler) document.removeEventListener('keydown', popup._escHandler);
     if (popup._outsideHandler) document.removeEventListener('click', popup._outsideHandler);
+  }
+}
+
+// ========================================
+// 원가P 매입이력 팝업
+// ========================================
+function openCostPricePPopup(ttiNum, modelName) {
+  var norm = normalizeTtiCode(ttiNum);
+  if (!norm) return;
+  var product = (DB.products || []).find(function(p) { return p.ttiNum && normalizeTtiCode(p.ttiNum) === norm; });
+  var _cpp = product ? (product.costPriceP || 0) : 0;
+  var _cppQty = product ? (product.costPricePQty || 0) : 0;
+  var _cppTotal = product ? (product.costPricePTotal || 0) : 0;
+
+  // mw_po_history에서 해당 제품 필터
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var items = history.filter(function(item) {
+    if (item.dryRun) return false;
+    var _n = item.ttiNum ? normalizeTtiCode(item.ttiNum) : '';
+    return _n === norm;
+  });
+  items.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+
+  var _badgePad = 'padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600';
+  var _settings = DB.settings || {};
+  var _arPct = ((_settings.quarterDC || 0) + (_settings.yearDC || 0)) * 100;
+
+  // 팝업 생성/재사용
+  var popup = document.getElementById('cost-price-p-popup');
+  if (!popup) {
+    popup = document.createElement('div');
+    popup.id = 'cost-price-p-popup';
+    popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);max-width:700px;width:90vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden';
+    document.body.appendChild(popup);
+    popup._escHandler = function(e) { if (e.key === 'Escape') closeCostPricePPopup(); };
+    document.addEventListener('keydown', popup._escHandler);
+  }
+
+  var h = '';
+  // 헤더
+  var _shortModel = modelName ? (modelName.length > 30 ? modelName.substring(0, 30) + '...' : modelName) : ttiNum;
+  h += '<div id="cpp-header" style="background:#1A1D23;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">';
+  h += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px;font-weight:700">' + _shortModel + ' 매입이력</span>';
+  h += '<span style="background:#FFF3E0;color:#854F0B;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600;border:1px solid #EF9F27">원가P</span></div>';
+  h += '<button onclick="closeCostPricePPopup()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px">✕</button>';
+  h += '</div>';
+
+  // 3카드
+  h += '<div style="display:flex;gap:10px;padding:12px 16px;background:#FAFAFA;flex-shrink:0">';
+  h += '<div style="flex:1;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#9BA3B2;margin-bottom:4px">누적 매입수량</div><div style="font-size:20px;font-weight:500;color:#1A1D23">' + fmtPO(_cppQty) + '<span style="font-size:12px;color:#9BA3B2"> 개</span></div></div>';
+  h += '<div style="flex:1;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#9BA3B2;margin-bottom:4px">누적 매입금액</div><div style="font-size:20px;font-weight:500;color:#1A1D23">' + fmtPO(_cppTotal) + '<span style="font-size:12px;color:#9BA3B2"> 원</span></div></div>';
+  h += '<div style="flex:1;background:#FFF3E0;border:1px solid #EF9F27;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#854F0B;margin-bottom:4px">가중평균 원가P</div><div style="font-size:20px;font-weight:500;color:#854F0B">' + fmtPO(_cpp) + '<span style="font-size:12px;color:#BA7517"> 원</span></div></div>';
+  h += '</div>';
+
+  // 테이블
+  h += '<div style="flex:1;overflow-y:auto;min-height:0;padding:0">';
+  h += '<table class="po-table" style="width:100%"><thead><tr><th>날짜</th><th>구분</th><th class="num">매입단가</th><th class="num">수량</th><th class="num">매입금액</th><th class="center">할인</th></tr></thead><tbody>';
+
+  if (items.length === 0) {
+    h += '<tr><td colspan="6" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">매입이력이 없습니다</td></tr>';
+  } else {
+    // 분기별 소계 집계
+    var _qSums = {};
+    items.forEach(function(item) {
+      var d = new Date(item.date);
+      var cost = item.costPrice || 0;
+      var qty = item.qty || 0;
+      var cumul = _isCumulTarget(item);
+      var isCumul = !!cumul;
+
+      // 분기키
+      var qKey = d.getFullYear() + 'Q' + (Math.floor(d.getMonth() / 3) + 1);
+      if (!_qSums[qKey]) _qSums[qKey] = { qty: 0, amount: 0, label: '' };
+      _qSums[qKey].qty += qty;
+      _qSums[qKey].amount += cost * qty;
+      _qSums[qKey].label = (Math.floor(d.getMonth() / 3) + 1) + '분기';
+
+      // 구분 뱃지
+      var promo = item.ttiPromotion || '';
+      var typeBadge = (!promo || promo === '일반')
+        ? '<span style="background:#EAECF2;color:#5A6070;' + _badgePad + '">일반</span>'
+        : '<span style="background:#EEEDFE;color:#3C3489;' + _badgePad + '">' + promo + '</span>';
+      typeBadge += _cumulBadgeHtml(item);
+
+      // 할인 표시
+      var discountLabel = '';
+      if (isCumul && cumul.discountRate > 0) {
+        var totalPct = _arPct + cumul.discountRate;
+        discountLabel = '<span style="color:#065F46;font-size:11px;font-weight:500">AR+누적 ' + parseFloat(totalPct.toFixed(1)) + '%</span>';
+      } else if (_arPct > 0) {
+        discountLabel = '<span style="color:#666;font-size:11px">AR ' + parseFloat(_arPct.toFixed(1)) + '%</span>';
+      }
+
+      var dateStr = (d.getMonth() + 1) + '월' + d.getDate() + '일';
+      h += '<tr' + (isCumul ? ' style="background:#FAFFF5"' : '') + '>';
+      h += '<td style="white-space:nowrap">' + dateStr + '</td>';
+      h += '<td style="white-space:nowrap">' + typeBadge + '</td>';
+      h += '<td class="num">' + fmtPO(cost) + '</td>';
+      h += '<td class="num">' + qty + '</td>';
+      h += '<td class="num" style="font-weight:600">' + fmtPO(cost * qty) + '</td>';
+      h += '<td class="center">' + discountLabel + '</td>';
+      h += '</tr>';
+    });
+  }
+  h += '</tbody></table></div>';
+
+  // 분기별 소계
+  if (items.length > 0) {
+    var _qKeys = Object.keys(_qSums).sort();
+    _qKeys.forEach(function(qk) {
+      var qs = _qSums[qk];
+      h += '<div style="background:#F0F9FF;border:1px solid #BAE6FD;padding:8px 16px;display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#0369A1">';
+      h += '<span>' + qs.label + ' 소계 (' + qs.qty + '개)</span><span>' + fmtPO(qs.amount) + '원</span></div>';
+    });
+  }
+
+  // 최하단 다크바
+  h += '<div style="background:#1A1D23;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-radius:0 0 12px 12px;flex-shrink:0">';
+  h += '<span style="color:#9BA3B2;font-size:12px">가중평균 원가P (' + fmtPO(_cppQty) + '개 / ' + fmtPO(_cppTotal) + '원)</span>';
+  h += '<span style="color:#EF9F27;font-size:16px;font-weight:500">' + fmtPO(_cpp) + '원</span>';
+  h += '</div>';
+
+  popup.innerHTML = h;
+  popup.style.display = 'flex';
+  var hdr = document.getElementById('cpp-header');
+  if (hdr) _makeDraggable(popup, hdr);
+}
+
+function closeCostPricePPopup() {
+  var popup = document.getElementById('cost-price-p-popup');
+  if (popup) {
+    popup.style.display = 'none';
+    if (popup._escHandler) document.removeEventListener('keydown', popup._escHandler);
   }
 }
 
