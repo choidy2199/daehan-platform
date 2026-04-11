@@ -218,7 +218,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .section-body { background: var(--tl-bg); padding: 16px; }
 
 /* 서브탭 래퍼(판매/설정 등)도 flex 확장 */
-.tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section):not([style*="display:none"]) { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section):not(.kakao-top-row):not([style*="display:none"]) { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: 0; overflow: hidden; }
 .tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type > .section-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .tab-content.active > div:not(.sub-tabs):not(.kpi-row):not(.section) > .section:last-of-type > .section-body > .table-scroll { flex: 1; overflow-y: auto; overflow-x: auto; min-height: 0; max-height: none !important; }
