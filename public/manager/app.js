@@ -15450,8 +15450,12 @@ function renderKakaoTab() {
   html += '</div>';
 
   // 나머지 2개 탭 — placeholder
+  // 공지발송 탭
+  html += '<div id="kakao-content-broadcast" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-broadcast' ? 'block' : 'none') + '">';
+  html += _buildKakaoBroadcast();
+  html += '</div>';
+
   var placeholderTabs = [
-    { id: 'broadcast', label: '공지발송' },
     { id: 'logs',      label: '대화로그' }
   ];
   placeholderTabs.forEach(function(t) {
@@ -15485,7 +15489,7 @@ function switchKakaoSubTab(tabId) {
   document.querySelectorAll('.kakao-tab-content').forEach(function(el) { el.style.display = 'none'; });
   var suffix = tabId.replace('kakao-', '');
   var content = document.getElementById('kakao-content-' + suffix);
-  if (content) content.style.display = (suffix === 'dashboard' || suffix === 'rooms' || suffix === 'templates' || suffix === 'tracking') ? 'block' : 'flex';
+  if (content) content.style.display = (suffix === 'dashboard' || suffix === 'rooms' || suffix === 'templates' || suffix === 'tracking' || suffix === 'broadcast') ? 'block' : 'flex';
 
   // 버튼 활성 상태
   document.querySelectorAll('.kakao-top-row .kakao-subtab').forEach(function(btn) {
@@ -15590,6 +15594,206 @@ function _kakaoKpiCard(label, value, sub, color, isAlert) {
   h += '<div class="kakao-kpi-sub">' + sub + '</div>';
   h += '</div>';
   return h;
+}
+
+// ========================================
+// 카카오톡 — 공지발송 탭
+// ========================================
+
+var _bcSelectedRooms = [];
+var _bcAttachedFiles = [];
+
+function _buildKakaoBroadcast() {
+  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  var activeRooms = rooms.filter(function(r) { return r.botActive; });
+  var history = JSON.parse(localStorage.getItem('mw_bot_broadcasts') || '[]');
+  _bcSelectedRooms = activeRooms.map(function(r) { return r.roomName; }); // 기본: 전체선택
+  _bcAttachedFiles = [];
+
+  var html = '';
+
+  // ── A. 헤더 ──
+  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
+  html += '<span>공지 일괄발송</span>';
+  html += '</div>';
+
+  // ── B. 좌우 2열 ──
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#fff;border:1px solid #E2E5EB;border-top:none">';
+
+  // 좌측: 공지 내용
+  html += '<div style="padding:16px;border-right:1px solid #E2E5EB">';
+  html += '<label style="font-size:12px;font-weight:600;color:#1A1D23;margin-bottom:6px;display:block;font-family:Pretendard,sans-serif">공지 내용</label>';
+  html += '<textarea id="bc-content" rows="8" placeholder="공지 내용을 입력하세요..." oninput="_updateBcPreview()" style="width:100%;padding:10px 12px;font-size:13px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif;resize:vertical;box-sizing:border-box;line-height:1.6"></textarea>';
+
+  html += '<label style="font-size:12px;font-weight:600;color:#1A1D23;margin:12px 0 6px;display:block;font-family:Pretendard,sans-serif">사진 / 파일 첨부</label>';
+  html += '<div id="bc-dropzone" onclick="document.getElementById(\'bc-file-input\').click()" style="border:2px dashed #D1D5DB;border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#FAFBFC;transition:border-color .15s">';
+  html += '<div style="font-size:12px;color:#5A6070;font-family:Pretendard,sans-serif">클릭하여 파일 선택 또는 드래그 앤 드롭</div>';
+  html += '<div style="font-size:11px;color:#9BA3B2;margin-top:4px;font-family:Pretendard,sans-serif">이미지(JPG,PNG) / 문서(PDF,XLSX) / 최대 10MB</div>';
+  html += '</div>';
+  html += '<input type="file" id="bc-file-input" multiple accept=".jpg,.jpeg,.png,.pdf,.xlsx" style="display:none" onchange="_handleBcFileSelect(this)">';
+  html += '<div id="bc-file-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>';
+  html += '</div>';
+
+  // 우측: 발송 대상 + 미리보기
+  html += '<div style="padding:16px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  html += '<label style="font-size:12px;font-weight:600;color:#1A1D23;font-family:Pretendard,sans-serif">발송 대상 톡방 선택</label>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<a href="javascript:void(0)" onclick="_bcSelectAll(true)" style="font-size:11px;color:#185FA5;text-decoration:none;font-family:Pretendard,sans-serif">전체선택</a>';
+  html += '<a href="javascript:void(0)" onclick="_bcSelectAll(false)" style="font-size:11px;color:#8B8FA3;text-decoration:none;font-family:Pretendard,sans-serif">전체해제</a>';
+  html += '</div></div>';
+
+  html += '<div id="bc-room-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;max-height:120px;overflow-y:auto">';
+  if (activeRooms.length === 0) {
+    html += '<span style="font-size:12px;color:#8B8FA3;font-family:Pretendard,sans-serif">활성 톡방이 없습니다</span>';
+  } else {
+    activeRooms.forEach(function(r) {
+      var name = (r.roomName || '').replace(/★[^★]*★\s*/, '') || r.customerName || '톡방';
+      html += '<span class="bc-room-chip bc-room-selected" data-room="' + (r.roomName || '') + '" onclick="_toggleBcRoom(this)" style="cursor:pointer">';
+      html += '<span class="bc-chip-dot">●</span> ' + name + '</span>';
+    });
+  }
+  html += '</div>';
+
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  html += '<label style="font-size:12px;font-weight:600;color:#1A1D23;font-family:Pretendard,sans-serif">발송 미리보기</label>';
+  html += '<span id="bc-count-label" style="font-size:11px;color:#8B8FA3;font-family:Pretendard,sans-serif">' + activeRooms.length + '개 톡방 중 ' + activeRooms.length + '개 선택</span>';
+  html += '</div>';
+  html += '<div id="bc-preview" style="border-left:3px solid #185FA5;background:#F7F8FA;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#3A3F4B;line-height:1.6;font-family:Pretendard,sans-serif;min-height:60px">';
+  html += '<span style="color:#9BA3B2">공지 내용을 입력하면 미리보기가 표시됩니다</span>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>'; // grid
+
+  // ── C. 하단 버튼 ──
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #E2E5EB;border-top:none;border-radius:0 0 8px 8px;padding:12px 16px">';
+  html += '<span style="font-size:11px;color:#9BA3B2;font-family:Pretendard,sans-serif">발송 후 취소 불가</span>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<button onclick="alert(\'임시저장 — 추후 구현\')" style="background:#fff;color:#5A6070;border:1px solid #D1D5DB;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">임시저장</button>';
+  html += '<button id="bc-send-btn" onclick="alert(\'공지발송 — 추후 구현\')" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">' + activeRooms.length + '개 톡방에 발송</button>';
+  html += '</div></div>';
+
+  // ── D. 발송 이력 ──
+  html += '<div style="margin-top:16px">';
+  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
+  html += '<span>발송 이력</span></div>';
+  html += '<div class="kakao-section" style="border-radius:0 0 8px 8px;border-top:none"><div class="kakao-section-body">';
+  html += '<table class="kakao-table"><thead><tr>';
+  html += '<th style="width:110px">날짜</th><th>내용</th><th style="width:80px">첨부</th><th style="width:100px">대상</th><th style="width:80px;text-align:center">결과</th>';
+  html += '</tr></thead><tbody>';
+
+  if (history.length === 0) {
+    html += '<tr><td colspan="5" class="kakao-empty">발송 이력이 없습니다</td></tr>';
+  } else {
+    history.forEach(function(h) {
+      var resultBadge = h.failCount > 0
+        ? '<span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:#FCEBEB;color:#CC2222">' + h.failCount + '건 실패</span>'
+        : '<span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:#E1F5EE;color:#085041">전체성공</span>';
+      html += '<tr>';
+      html += '<td style="font-size:12px;color:#5A6070">' + (h.date || '—') + '</td>';
+      html += '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (h.content || '—') + '</td>';
+      html += '<td style="font-size:12px">' + (h.files ? h.files + '개' : '—') + '</td>';
+      html += '<td style="font-size:12px">' + (h.target || '—') + '</td>';
+      html += '<td style="text-align:center">' + resultBadge + '</td>';
+      html += '</tr>';
+    });
+  }
+
+  html += '</tbody></table></div></div></div>';
+
+  return html;
+}
+
+function _toggleBcRoom(chip) {
+  var room = chip.getAttribute('data-room');
+  var idx = _bcSelectedRooms.indexOf(room);
+  if (idx >= 0) {
+    _bcSelectedRooms.splice(idx, 1);
+    chip.classList.remove('bc-room-selected');
+    chip.classList.add('bc-room-unselected');
+    chip.querySelector('.bc-chip-dot').textContent = '○';
+  } else {
+    _bcSelectedRooms.push(room);
+    chip.classList.remove('bc-room-unselected');
+    chip.classList.add('bc-room-selected');
+    chip.querySelector('.bc-chip-dot').textContent = '●';
+  }
+  _updateBcCountLabel();
+}
+
+function _bcSelectAll(select) {
+  var chips = document.querySelectorAll('.bc-room-chip');
+  _bcSelectedRooms = [];
+  chips.forEach(function(chip) {
+    var room = chip.getAttribute('data-room');
+    if (select) {
+      _bcSelectedRooms.push(room);
+      chip.classList.remove('bc-room-unselected');
+      chip.classList.add('bc-room-selected');
+      chip.querySelector('.bc-chip-dot').textContent = '●';
+    } else {
+      chip.classList.remove('bc-room-selected');
+      chip.classList.add('bc-room-unselected');
+      chip.querySelector('.bc-chip-dot').textContent = '○';
+    }
+  });
+  _updateBcCountLabel();
+}
+
+function _updateBcCountLabel() {
+  var total = document.querySelectorAll('.bc-room-chip').length;
+  var label = document.getElementById('bc-count-label');
+  if (label) label.textContent = total + '개 톡방 중 ' + _bcSelectedRooms.length + '개 선택';
+  var btn = document.getElementById('bc-send-btn');
+  if (btn) btn.textContent = _bcSelectedRooms.length + '개 톡방에 발송';
+}
+
+function _updateBcPreview() {
+  var content = (document.getElementById('bc-content') || {}).value || '';
+  var el = document.getElementById('bc-preview');
+  if (!el) return;
+  if (!content && _bcAttachedFiles.length === 0) {
+    el.innerHTML = '<span style="color:#9BA3B2">공지 내용을 입력하면 미리보기가 표시됩니다</span>';
+    return;
+  }
+  var lines = content.replace(/\n/g, '<br>');
+  if (_bcAttachedFiles.length > 0) {
+    lines += '<div style="margin-top:8px;font-size:11px;color:#5A6070">';
+    _bcAttachedFiles.forEach(function(f) { lines += '<div>📎 ' + f.name + '</div>'; });
+    lines += '</div>';
+  }
+  el.innerHTML = lines;
+}
+
+function _handleBcFileSelect(input) {
+  var files = input.files;
+  if (!files) return;
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    if (f.size > 10 * 1024 * 1024) { alert(f.name + ' — 10MB 초과'); continue; }
+    _bcAttachedFiles.push({ name: f.name, size: (f.size / 1024).toFixed(0) + 'KB' });
+  }
+  input.value = '';
+  _renderBcFileList();
+  _updateBcPreview();
+}
+
+function _removeBcFile(idx) {
+  _bcAttachedFiles.splice(idx, 1);
+  _renderBcFileList();
+  _updateBcPreview();
+}
+
+function _renderBcFileList() {
+  var el = document.getElementById('bc-file-list');
+  if (!el) return;
+  if (_bcAttachedFiles.length === 0) { el.innerHTML = ''; return; }
+  el.innerHTML = _bcAttachedFiles.map(function(f, i) {
+    return '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#F4F6FA;border:1px solid #E2E5EB;border-radius:16px;font-size:11px;color:#3A3F4B;font-family:Pretendard,sans-serif">'
+      + f.name + ' <span style="color:#9BA3B2">(' + f.size + ')</span>'
+      + ' <span onclick="_removeBcFile(' + i + ')" style="cursor:pointer;color:#CC2222;font-weight:700;margin-left:2px">✕</span></span>';
+  }).join('');
 }
 
 // ========================================
