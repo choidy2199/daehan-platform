@@ -16882,7 +16882,7 @@ async function _showNoticeDetail(id) {
 
   // 본문
   var contentHtml = (n.content || '').replace(/\n/g, '<br>');
-  h += '<div style="padding:24px 28px;font-size:15px;line-height:1.9;color:#333;min-height:160px;text-align:left !important;">' + contentHtml + '</div>';
+  h += '<div id="notice-detail-body" style="padding:24px 28px;font-size:15px;line-height:1.9;color:#333;min-height:160px;text-align:left !important;">' + contentHtml + '</div>';
 
   // 수정/삭제 (admin만)
   if (isAdmin) {
@@ -16912,6 +16912,17 @@ async function _showNoticeDetail(id) {
     });
   }
   _loadNoticeComments(id);
+
+  // 본문 이미지 스타일 적용
+  setTimeout(function() {
+    var imgs = container.querySelectorAll('#notice-detail-body img');
+    imgs.forEach(function(img) {
+      img.style.maxWidth = '100%';
+      img.style.borderRadius = '8px';
+      img.style.display = 'block';
+      img.style.margin = '8px 0';
+    });
+  }, 0);
 }
 
 // ── 댓글 함수들 ──
@@ -17037,56 +17048,179 @@ function _showNoticeWrite(editId) {
   if (editId) { n = _noticesData.find(function(x) { return x.id === editId; }); }
   var isEdit = !!n;
 
-  var html = '';
+  var h = '<div style="max-width:800px;margin:0 auto;display:block !important;text-align:left !important;">';
 
-  // ── 다크 헤더 ──
-  html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
-  html += '<button onclick="renderNoticeTab()" style="background:none;border:none;color:#fff;font-size:14px;cursor:pointer;padding:4px 8px;font-family:Pretendard,sans-serif;font-weight:500">← 목록</button>';
-  html += '<span style="font-size:15px;font-weight:600">' + (isEdit ? '글 수정' : '새 글 작성') + '</span>';
-  html += '</div>';
+  // 다크 헤더
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0;">';
+  h += '<button onclick="renderNoticeTab()" style="font-size:13px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
+  h += '<span style="font-size:16px;font-weight:500;">' + (isEdit ? '글 수정' : '새 글 작성') + '</span>';
+  h += '</div>';
 
-  // ── 폼 ──
-  html += '<div style="padding:20px">';
+  // 폼
+  h += '<div style="padding:20px 28px;text-align:left !important;">';
 
   // 분류 + 상단고정
-  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">';
-  html += '<div><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px">분류</label>';
-  html += '<select id="nw-category" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;min-width:120px">';
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;margin-bottom:16px;">';
+  h += '<div><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">분류</label>';
+  h += '<select id="nw-category" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;min-width:120px;">';
   ['update','bug','notice'].forEach(function(c) {
     var label = { update:'업데이트', bug:'오류개선', notice:'공지' }[c];
-    html += '<option value="' + c + '"' + (isEdit && n.category === c ? ' selected' : '') + '>' + label + '</option>';
+    h += '<option value="' + c + '"' + (isEdit && n.category === c ? ' selected' : '') + '>' + label + '</option>';
   });
-  html += '</select></div>';
-  html += '<label style="display:flex;align-items:center;gap:6px;margin-top:18px;font-size:13px;color:#1A1D23;cursor:pointer"><input type="checkbox" id="nw-pinned"' + (isEdit && n.pinned ? ' checked' : '') + '> 📌 상단고정</label>';
-  html += '</div>';
+  h += '</select></div>';
+  h += '<label style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;margin-top:18px;font-size:13px;color:#1A1D23;cursor:pointer;"><input type="checkbox" id="nw-pinned"' + (isEdit && n.pinned ? ' checked' : '') + '> 📌 상단고정</label>';
+  h += '</div>';
 
   // 제목
-  html += '<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px">제목</label>';
-  html += '<input type="text" id="nw-title" value="' + (isEdit ? (n.title || '').replace(/"/g, '&quot;') : '') + '" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box" placeholder="제목을 입력하세요"></div>';
+  h += '<div style="margin-bottom:16px;"><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">제목</label>';
+  h += '<input type="text" id="nw-title" value="' + (isEdit ? (n.title || '').replace(/"/g, '&quot;') : '') + '" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;" placeholder="제목을 입력하세요"></div>';
 
-  // 내용
-  html += '<div style="margin-bottom:16px"><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px">내용</label>';
-  html += '<textarea id="nw-content" style="width:100%;min-height:300px;border:1px solid #DDE1EB;border-radius:6px;padding:10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;resize:vertical;line-height:1.6" placeholder="내용을 입력하세요">' + (isEdit ? (n.content || '') : '') + '</textarea></div>';
+  // 내용 — contenteditable + 툴바
+  h += '<div style="margin-bottom:16px;">';
+  h += '<label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">내용</label>';
+
+  // 툴바
+  h += '<div id="nw-toolbar" style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:4px;padding:6px 8px;border:1px solid #DDE1EB;border-bottom:none;border-radius:6px 6px 0 0;background:#fafafa;">';
+  h += '<button type="button" onclick="document.execCommand(\'bold\')" title="굵게" style="width:28px;height:28px;border:none;background:transparent;cursor:pointer;font-size:14px;font-weight:700;border-radius:4px;font-family:serif;">B</button>';
+  h += '<button type="button" onclick="document.execCommand(\'italic\')" title="기울임" style="width:28px;height:28px;border:none;background:transparent;cursor:pointer;font-size:14px;font-style:italic;border-radius:4px;font-family:serif;">I</button>';
+  h += '<button type="button" onclick="document.execCommand(\'underline\')" title="밑줄" style="width:28px;height:28px;border:none;background:transparent;cursor:pointer;font-size:14px;text-decoration:underline;border-radius:4px;font-family:serif;">U</button>';
+  h += '<div style="width:1px;height:20px;background:#DDE1EB;margin:0 4px;"></div>';
+  h += '<button type="button" onclick="_nwInsertImage()" title="이미지 삽입" style="height:28px;padding:0 8px;border:none;background:transparent;cursor:pointer;font-size:13px;border-radius:4px;">🖼 이미지</button>';
+  h += '<input type="file" id="nw-file-input" accept="image/*" multiple style="display:none;" onchange="_nwHandleFileSelect(this.files)">';
+  h += '</div>';
+
+  // contenteditable 영역
+  var existingContent = isEdit ? (n.content || '') : '';
+  h += '<div id="nw-content" contenteditable="true" style="width:100%;min-height:300px;border:1px solid #DDE1EB;border-radius:0 0 6px 6px;padding:12px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;line-height:1.7;outline:none;overflow-y:auto;background:#fff;" data-placeholder="내용을 입력하세요...">' + existingContent + '</div>';
+  h += '</div>';
+
+  // 드롭존
+  h += '<div id="nw-dropzone" onclick="document.getElementById(\'nw-file-input\').click()" style="margin-bottom:16px;padding:16px;border:2px dashed #DDE1EB;border-radius:8px;text-align:center;cursor:pointer;color:#9BA3B2;font-size:13px;transition:border-color .2s;" onmouseover="this.style.borderColor=\'#185FA5\'" onmouseout="this.style.borderColor=\'#DDE1EB\'">';
+  h += '📎 파일을 드래그하거나 클릭하여 이미지 추가';
+  h += '</div>';
 
   // 버튼
-  html += '<div style="display:flex;justify-content:flex-end;gap:8px">';
-  html += '<button onclick="renderNoticeTab()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">취소</button>';
-  html += '<button onclick="_saveNotice(' + (isEdit ? n.id : 'null') + ')" style="background:#1A1D23;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">' + (isEdit ? '수정' : '등록') + '</button>';
-  html += '</div>';
+  h += '<div style="display:flex !important;flex-direction:row !important;justify-content:flex-end !important;gap:8px;">';
+  h += '<button onclick="renderNoticeTab()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">취소</button>';
+  h += '<button id="nw-submit-btn" onclick="_saveNotice(' + (isEdit ? n.id : 'null') + ')" style="background:#1A1D23;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">' + (isEdit ? '수정' : '등록') + '</button>';
+  h += '</div>';
 
-  html += '</div>';
+  h += '</div>'; // padding div
+  h += '</div>'; // wrapper
 
-  container.innerHTML = html;
+  container.innerHTML = h;
+
+  // contenteditable placeholder
+  var ce = document.getElementById('nw-content');
+  if (ce) {
+    if (!ce.textContent.trim() && !ce.querySelector('img')) ce.style.color = '#9BA3B2';
+    ce.addEventListener('focus', function() { if (ce.textContent === ce.getAttribute('data-placeholder')) { ce.innerHTML = ''; ce.style.color = '#1A1D23'; } });
+    ce.addEventListener('input', function() { ce.style.color = '#1A1D23'; });
+
+    // 드래그앤드롭
+    ce.addEventListener('dragover', function(e) { e.preventDefault(); ce.style.borderColor = '#185FA5'; });
+    ce.addEventListener('dragleave', function() { ce.style.borderColor = '#DDE1EB'; });
+    ce.addEventListener('drop', function(e) {
+      e.preventDefault(); ce.style.borderColor = '#DDE1EB';
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) _nwUploadFiles(e.dataTransfer.files);
+    });
+
+    // Ctrl+V 붙여넣기
+    ce.addEventListener('paste', function(e) {
+      var items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          e.preventDefault();
+          var file = items[i].getAsFile();
+          if (file) _nwUploadFiles([file]);
+          return;
+        }
+      }
+    });
+  }
+
+  // 드롭존 드래그앤드롭
+  var dz = document.getElementById('nw-dropzone');
+  if (dz) {
+    dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.style.borderColor = '#185FA5'; dz.style.background = '#F4F6FA'; });
+    dz.addEventListener('dragleave', function() { dz.style.borderColor = '#DDE1EB'; dz.style.background = 'transparent'; });
+    dz.addEventListener('drop', function(e) {
+      e.preventDefault(); dz.style.borderColor = '#DDE1EB'; dz.style.background = 'transparent';
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) _nwUploadFiles(e.dataTransfer.files);
+    });
+  }
+}
+
+// ── 이미지 업로드 헬퍼 ──
+
+function _nwInsertImage() {
+  document.getElementById('nw-file-input').click();
+}
+
+function _nwHandleFileSelect(files) {
+  _nwUploadFiles(files);
+  document.getElementById('nw-file-input').value = '';
+}
+
+async function _nwUploadFiles(files) {
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
+    if (!file.type.startsWith('image/')) continue;
+    var formData = new FormData();
+    formData.append('file', file);
+    try {
+      var res = await fetch('/api/notices/upload', { method: 'POST', body: formData });
+      var json = await res.json();
+      if (json.success && json.url) {
+        _nwInsertImageToEditor(json.url);
+      } else {
+        alert('이미지 업로드 실패: ' + (json.error || ''));
+      }
+    } catch(e) {
+      alert('이미지 업로드 실패: ' + e.message);
+    }
+  }
+}
+
+function _nwInsertImageToEditor(url) {
+  var ce = document.getElementById('nw-content');
+  if (!ce) return;
+  var wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:relative;display:inline-block;margin:8px 0;';
+  wrapper.contentEditable = 'false';
+  var img = document.createElement('img');
+  img.src = url;
+  img.style.cssText = 'max-width:100%;border-radius:8px;display:block;';
+  var delBtn = document.createElement('span');
+  delBtn.textContent = '✕';
+  delBtn.style.cssText = 'position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;';
+  delBtn.onclick = function() { wrapper.remove(); };
+  wrapper.appendChild(img);
+  wrapper.appendChild(delBtn);
+  ce.appendChild(wrapper);
+  ce.focus();
 }
 
 async function _saveNotice(editId) {
   var title = (document.getElementById('nw-title').value || '').trim();
-  var content = (document.getElementById('nw-content').value || '').trim();
+  var ceEl = document.getElementById('nw-content');
+  var content = ceEl ? ceEl.innerHTML.trim() : '';
+  // 빈 contenteditable 체크 (빈 텍스트 + 이미지 없음)
+  var hasText = ceEl && ceEl.textContent.trim().length > 0;
+  var hasImg = ceEl && ceEl.querySelector('img');
   var category = document.getElementById('nw-category').value;
   var pinned = document.getElementById('nw-pinned').checked;
 
   if (!title) { alert('제목을 입력해주세요.'); return; }
-  if (!content) { alert('내용을 입력해주세요.'); return; }
+  if (!hasText && !hasImg) { alert('내용을 입력해주세요.'); return; }
+  // ✕ 삭제 버튼 span 제거 (저장 전 정리)
+  if (ceEl) {
+    ceEl.querySelectorAll('span').forEach(function(sp) {
+      if (sp.textContent === '✕' && sp.style.position === 'absolute') sp.remove();
+    });
+    content = ceEl.innerHTML.trim();
+  }
 
   var author = (window.currentUser && window.currentUser.loginId) || 'admin';
 

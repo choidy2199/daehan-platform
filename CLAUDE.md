@@ -347,3 +347,8 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 5. 위 결과를 요약해서 현재 상태 브리핑
 
 원가계산 로직 전체 조사: docs/cost-calculation-report.md 참조
+
+## 검증 정보
+- URL: https://daehantool.dev
+- 로그인: admin / admin1234
+- 검증 방법: 메인 CLAUDE.md의 "검증 단계" 참조
