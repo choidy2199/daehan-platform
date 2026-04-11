@@ -1998,7 +1998,7 @@ var _tabIdMap = {
   'import-invoice':   { contentId: 'tab-import-invoice',   placeholder: true },
   'delivery':         { contentId: 'tab-delivery',         placeholder: true },
   'search':           { contentId: 'tab-estimate',         render: 'estimate' },
-  'kakao':            { contentId: 'tab-kakao',            placeholder: true },
+  'kakao':            { contentId: 'tab-kakao',            render: 'kakao' },
   'notice':           { contentId: 'tab-notice',           placeholder: true },
   'setting':          { contentId: 'tab-manage',           render: 'manage' }
 };
@@ -2058,6 +2058,7 @@ function switchTab(tab) {
       if (renderKey === 'estimate') { renderEstimateList(); if (!_estDateManuallySet) document.getElementById('est-date').value = getTodayStr(); }
       if (renderKey === 'general') renderGenProducts();
       if (renderKey === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
+      if (renderKey === 'kakao') renderKakaoTab();
       _renderedTabs[renderKey] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
@@ -15394,3 +15395,187 @@ window._testNaverPriceUpdate = async function(originProductNo, newPrice) {
     console.error('가격 수정 실패:', e);
   }
 };
+
+// ========================================
+// 카카오톡 탭 (서브탭 6개 + 대시보드)
+// ========================================
+
+var _kakaoSubTabs = [
+  { id: 'kakao-dashboard', label: '대시보드' },
+  { id: 'kakao-rooms',     label: '톡방관리' },
+  { id: 'kakao-templates', label: '템플릿' },
+  { id: 'kakao-tracking',  label: '송장/발송' },
+  { id: 'kakao-broadcast', label: '공지발송' },
+  { id: 'kakao-logs',      label: '대화로그' }
+];
+
+function renderKakaoTab() {
+  var container = document.getElementById('tab-kakao');
+  if (!container) return;
+
+  var activeSubTab = localStorage.getItem('mw_kakao_active_subtab') || 'kakao-dashboard';
+
+  var html = '';
+
+  // 서브탭 바
+  html += '<div class="kakao-top-row">';
+  _kakaoSubTabs.forEach(function(t) {
+    var isActive = t.id === activeSubTab;
+    html += '<button class="kakao-subtab ' + (isActive ? 'kakao-subtab-active' : 'kakao-subtab-inactive') + '" data-tab="' + t.id + '" onclick="switchKakaoSubTab(\'' + t.id + '\')">';
+    html += '<span class="kakao-subtab-dot"></span>' + t.label + '</button>';
+  });
+  html += '</div>';
+
+  // 탭 콘텐츠 영역
+  html += '<div class="kakao-tab-contents">';
+
+  // 대시보드 탭
+  html += '<div id="kakao-content-dashboard" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-dashboard' ? 'block' : 'none') + '">';
+  html += _buildKakaoDashboard();
+  html += '</div>';
+
+  // 나머지 5개 탭 — placeholder
+  var placeholderTabs = [
+    { id: 'rooms',     label: '톡방관리' },
+    { id: 'templates', label: '템플릿' },
+    { id: 'tracking',  label: '송장/발송' },
+    { id: 'broadcast', label: '공지발송' },
+    { id: 'logs',      label: '대화로그' }
+  ];
+  placeholderTabs.forEach(function(t) {
+    var show = activeSubTab === 'kakao-' + t.id ? 'flex' : 'none';
+    html += '<div id="kakao-content-' + t.id + '" class="kakao-tab-content" style="display:' + show + ';align-items:center;justify-content:center;min-height:300px">';
+    html += '<div style="text-align:center;color:#888;font-size:14px">';
+    html += '<div style="font-size:32px;margin-bottom:8px">🔧</div>';
+    html += '<div>' + t.label + ' — 준비 중입니다</div>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  html += '</div>'; // .kakao-tab-contents
+
+  container.innerHTML = html;
+
+  // 봇 토글 이벤트
+  var toggle = document.getElementById('kakao-bot-toggle');
+  if (toggle) {
+    toggle.addEventListener('change', function() {
+      var cfg = JSON.parse(localStorage.getItem('mw_bot_config') || '{}');
+      cfg.botEnabled = this.checked;
+      localStorage.setItem('mw_bot_config', JSON.stringify(cfg));
+      _updateBotStatusUI(this.checked);
+    });
+  }
+}
+
+function switchKakaoSubTab(tabId) {
+  // 콘텐츠 전환
+  document.querySelectorAll('.kakao-tab-content').forEach(function(el) { el.style.display = 'none'; });
+  var suffix = tabId.replace('kakao-', '');
+  var content = document.getElementById('kakao-content-' + suffix);
+  if (content) content.style.display = suffix === 'dashboard' ? 'block' : 'flex';
+
+  // 버튼 활성 상태
+  document.querySelectorAll('.kakao-top-row .kakao-subtab').forEach(function(btn) {
+    var id = btn.getAttribute('data-tab');
+    btn.className = 'kakao-subtab ' + (id === tabId ? 'kakao-subtab-active' : 'kakao-subtab-inactive');
+  });
+
+  localStorage.setItem('mw_kakao_active_subtab', tabId);
+}
+
+function _updateBotStatusUI(isOn) {
+  var dot = document.getElementById('kakao-bot-status-dot');
+  var text = document.getElementById('kakao-bot-status-text');
+  if (dot) dot.style.color = isOn ? '#1D9E75' : '#E8344E';
+  if (text) text.textContent = isOn ? '봇 정상 작동중' : '봇 정지됨';
+}
+
+function _buildKakaoDashboard() {
+  var cfg = JSON.parse(localStorage.getItem('mw_bot_config') || '{}');
+  var botOn = cfg.botEnabled !== false; // 기본 ON
+
+  var html = '';
+
+  // ── 헤더 영역 ──
+  html += '<div class="kakao-dash-header">';
+  html += '<div class="kakao-dash-title">카카오톡 봇 대시보드</div>';
+  html += '<div class="kakao-dash-status">';
+  html += '<span id="kakao-bot-status-dot" style="color:' + (botOn ? '#1D9E75' : '#E8344E') + '">●</span> ';
+  html += '<span id="kakao-bot-status-text">' + (botOn ? '봇 정상 작동중' : '봇 정지됨') + '</span>';
+  html += '<label class="kakao-toggle"><input type="checkbox" id="kakao-bot-toggle"' + (botOn ? ' checked' : '') + '><span class="kakao-toggle-slider"></span></label>';
+  html += '</div>';
+  html += '</div>';
+
+  // ── KPI 카드 4장 ──
+  html += '<div class="kakao-kpi-row">';
+
+  html += _kakaoKpiCard('오늘 수신', '0건', '어제 대비 +0', '#185FA5');
+  html += _kakaoKpiCard('자동응답 (봇)', '0건', '응답률 0%', '#1D9E75');
+  html += _kakaoKpiCard('미응답 (사람 필요)', '0건', 'AS 0 / 기타 0', '#E8344E', true);
+  html += _kakaoKpiCard('송장 전달', '0건', '오늘 발송 완료', '#185FA5');
+
+  html += '</div>';
+
+  // ── 중간 2단 영역 (톡방 현황 + 최근 대화) ──
+  html += '<div class="kakao-mid-row">';
+
+  // 좌측: 활성 톡방 현황
+  html += '<div class="kakao-section">';
+  html += '<div class="kakao-section-header">';
+  html += '<span>활성 톡방 현황</span>';
+  html += '<span class="kakao-section-sub">총 0개 / 봇 활성 0개</span>';
+  html += '</div>';
+  html += '<div class="kakao-section-body">';
+  html += '<table class="kakao-table"><thead><tr>';
+  html += '<th>톡방</th><th>거래처</th><th>오늘</th><th>상태</th>';
+  html += '</tr></thead><tbody>';
+  html += '<tr><td colspan="4" class="kakao-empty">등록된 톡방이 없습니다</td></tr>';
+  html += '</tbody></table>';
+  html += '</div>';
+  html += '</div>';
+
+  // 우측: 최근 대화 실시간
+  html += '<div class="kakao-section">';
+  html += '<div class="kakao-section-header">';
+  html += '<span>최근 대화 (실시간)</span>';
+  html += '<button class="kakao-btn-sm" onclick="alert(\'전체 대화 로그 — 추후 구현\')">전체보기</button>';
+  html += '</div>';
+  html += '<div class="kakao-section-body">';
+  html += '<table class="kakao-table"><thead><tr>';
+  html += '<th>시간</th><th>거래처</th><th>내용</th><th>상태</th>';
+  html += '</tr></thead><tbody>';
+  html += '<tr><td colspan="4" class="kakao-empty">대화 내역이 없습니다</td></tr>';
+  html += '</tbody></table>';
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>'; // .kakao-mid-row
+
+  // ── 하단: 미응답 건 ──
+  html += '<div class="kakao-section kakao-section-full">';
+  html += '<div class="kakao-section-header">';
+  html += '<span>미응답 건 (사람 처리 필요)</span>';
+  html += '<span class="kakao-section-sub">0건</span>';
+  html += '</div>';
+  html += '<div class="kakao-section-body">';
+  html += '<table class="kakao-table"><thead><tr>';
+  html += '<th>시간</th><th>톡방</th><th>발신자</th><th>내용</th><th>분류</th><th>처리</th>';
+  html += '</tr></thead><tbody>';
+  html += '<tr><td colspan="6" class="kakao-empty">미처리 건이 없습니다</td></tr>';
+  html += '</tbody></table>';
+  html += '</div>';
+  html += '</div>';
+
+  return html;
+}
+
+function _kakaoKpiCard(label, value, sub, color, isAlert) {
+  var valColor = isAlert && parseInt(value) > 0 ? '#E8344E' : color;
+  var h = '<div class="kakao-kpi-card">';
+  h += '<div class="kakao-kpi-label">' + label + '</div>';
+  h += '<div class="kakao-kpi-value" style="color:' + valColor + '">' + value + '</div>';
+  h += '<div class="kakao-kpi-sub">' + sub + '</div>';
+  h += '</div>';
+  return h;
+}
