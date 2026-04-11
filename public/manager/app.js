@@ -1698,7 +1698,8 @@ function _showIconEditModal(name) {
     + '<button class="icon-upload-btn" onclick="document.getElementById(\'icon-upload-input\').click()">이미지 선택</button>'
     + '<span class="icon-upload-name" id="icon-upload-name">' + (cur.customImage ? '커스텀 이미지 사용 중' : '선택된 파일 없음') + '</span>'
     + (cur.customImage ? '<button class="icon-upload-btn" onclick="_ieClearUpload()" style="color:#CC2222">삭제</button>' : '')
-    + '</div>';
+    + '</div>'
+    + '<div style="font-size:10px;color:#999;margin-top:4px">권장 200×200px, 큰 이미지는 자동 리사이즈됩니다</div>';
 
   modal.innerHTML = '<h3>' + name + ' 아이콘 편집</h3>'
     + '<label>색상</label>' + colorHtml
@@ -1731,9 +1732,28 @@ function _ieHandleUpload(input) {
   var reader = new FileReader();
   reader.onload = function(e) {
     var modal = document.getElementById('icon-edit-modal');
-    modal._pendingCustomImage = e.target.result;
     var nameEl = document.getElementById('icon-upload-name');
-    if (nameEl) nameEl.textContent = file.name;
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      var MAX = 200;
+      var result;
+      if (w > MAX || h > MAX) {
+        var ratio = Math.min(MAX / w, MAX / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        result = canvas.toDataURL('image/png');
+      } else {
+        result = e.target.result;
+      }
+      modal._pendingCustomImage = result;
+      if (nameEl) nameEl.textContent = file.name;
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
