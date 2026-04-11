@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { parseTablesFromXml } from '@/lib/erp';
 
 export const maxDuration = 60;
-
-const ERP_URL = process.env.ERP_URL || 'https://drws20.softcity.co.kr:1448/WS_shop.asmx';
-const ERP_USER_KEY = process.env.ERP_USER_KEY || '';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,6 +15,8 @@ interface Product {
   description?: string;
   manageCode?: string;
   supplyPrice?: number;
+  ttiStock?: string;
+  stock?: number;
   [key: string]: unknown;
 }
 
@@ -200,28 +198,12 @@ export async function POST(request: NextRequest) {
     const modelCode = getModelCode(product);
     const price = product.supplyPrice ? formatNumber(Number(product.supplyPrice)) : '0';
 
+    // 재고 판단: mw_products는 ttiStock(●/✕), mw_gen_products는 stock(숫자)
     let hasStock = false;
-    try {
-      const searchCode = (product.manageCode as string) || product.code;
-      if (searchCode && ERP_USER_KEY) {
-        const whereValue = `'${searchCode}'`;
-        const formBody = `cUserKey=${encodeURIComponent(ERP_USER_KEY)}&UrlEnc_WHERE=${encodeURIComponent(whereValue)}`;
-        const erpRes = await fetch(`${ERP_URL}/SelectItemUrlEnc`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formBody,
-        });
-        if (erpRes.ok) {
-          const xml = await erpRes.text();
-          const rows = parseTablesFromXml(xml);
-          if (rows.length > 0) {
-            const jego = parseInt(rows[0].JEGO || '0', 10);
-            hasStock = jego > 0;
-          }
-        }
-      }
-    } catch (erpErr) {
-      console.error('[bot/stock] ERP 재고조회 실패:', erpErr);
+    if (product.ttiStock !== undefined) {
+      hasStock = product.ttiStock === '●';
+    } else if (product.stock !== undefined) {
+      hasStock = Number(product.stock) > 0;
     }
 
     let reply: string;
