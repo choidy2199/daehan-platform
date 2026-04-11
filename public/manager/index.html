@@ -20,13 +20,13 @@
 
 <!-- ==================== TOP BAR: 로고 + 메뉴 ==================== -->
 <nav class="top-bar" id="top-bar">
-  <div class="top-bar-logo">
+  <div class="top-bar-logo" onclick="if(_activeWindow){_openWindows=[];_activeWindow=null;_saveWindowState();goDesktop();}" style="cursor:pointer">
     <span class="logo-daehan">DAEHAN</span><span class="logo-tool">TOOL</span>
   </div>
   <div class="top-bar-menu" id="top-bar-menu">
     <!-- 밀워키 (드롭다운) -->
     <div class="tb-menu tb-dropdown" data-menu="mw">
-      <span class="tb-dot" style="color:#FF8A8A">●</span> 밀워키
+      <span class="tb-dot" style="color:#FF5252">●</span> 밀워키
       <div class="tb-dropdown-panel">
         <div class="tb-dd-item" onclick="openWindow('단가표')">단가표</div>
         <div class="tb-dd-item" onclick="openWindow('발주')">발주</div>
