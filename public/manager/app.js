@@ -1620,6 +1620,9 @@ function focusWindow(name) {
 
   _activeWindow = name;
 
+  // 창 모드 전환 (불투명 다크)
+  document.body.classList.add('window-mode');
+
   // 바탕화면 숨기고 콘텐츠 표시
   var desktop = document.getElementById('desktop');
   var content = document.querySelector('.content');
@@ -1658,6 +1661,10 @@ function closeWindow(name) {
 // 바탕화면으로 이동 (창 닫지 않음)
 function goDesktop() {
   _activeWindow = null;
+
+  // 바탕화면 모드 전환 (글래스)
+  document.body.classList.remove('window-mode');
+
   var desktop = document.getElementById('desktop');
   var content = document.querySelector('.content');
   if (desktop) desktop.style.display = 'flex';
