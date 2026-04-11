@@ -15444,9 +15444,13 @@ function renderKakaoTab() {
   html += _buildKakaoTemplates();
   html += '</div>';
 
-  // 나머지 3개 탭 — placeholder
+  // 송장/발송 탭
+  html += '<div id="kakao-content-tracking" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-tracking' ? 'block' : 'none') + '">';
+  html += _buildKakaoTracking();
+  html += '</div>';
+
+  // 나머지 2개 탭 — placeholder
   var placeholderTabs = [
-    { id: 'tracking',  label: '송장/발송' },
     { id: 'broadcast', label: '공지발송' },
     { id: 'logs',      label: '대화로그' }
   ];
@@ -15481,7 +15485,7 @@ function switchKakaoSubTab(tabId) {
   document.querySelectorAll('.kakao-tab-content').forEach(function(el) { el.style.display = 'none'; });
   var suffix = tabId.replace('kakao-', '');
   var content = document.getElementById('kakao-content-' + suffix);
-  if (content) content.style.display = (suffix === 'dashboard' || suffix === 'rooms' || suffix === 'templates') ? 'block' : 'flex';
+  if (content) content.style.display = (suffix === 'dashboard' || suffix === 'rooms' || suffix === 'templates' || suffix === 'tracking') ? 'block' : 'flex';
 
   // 버튼 활성 상태
   document.querySelectorAll('.kakao-top-row .kakao-subtab').forEach(function(btn) {
@@ -15586,6 +15590,198 @@ function _kakaoKpiCard(label, value, sub, color, isAlert) {
   h += '<div class="kakao-kpi-sub">' + sub + '</div>';
   h += '</div>';
   return h;
+}
+
+// ========================================
+// 카카오톡 — 송장/발송 탭
+// ========================================
+
+var _KAKAO_CARRIERS = ['대신택배','대신화물','CJ대한통운','한진택배','롯데택배','경동화물','퀵'];
+
+function _buildKakaoTracking() {
+  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  var activeRooms = rooms.filter(function(r) { return r.botActive; });
+  var history = JSON.parse(localStorage.getItem('mw_bot_tracking') || '[]');
+
+  var html = '';
+
+  // ── A. 입력 폼 ──
+  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
+  html += '<span>송장번호 입력 → 카톡 자동 전달</span>';
+  html += '</div>';
+
+  html += '<div style="background:#fff;border:1px solid #E2E5EB;border-top:none;padding:16px;display:flex;flex-direction:column;gap:10px">';
+
+  // 1행: 거래처 + 택배사
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  html += '<div><label style="font-size:11px;font-weight:600;color:#5A6070;margin-bottom:4px;display:block;font-family:Pretendard,sans-serif">거래처(톡방)</label>';
+  html += '<select id="kt-room" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #E2E5EB;border-radius:6px;background:#fff;font-family:Pretendard,sans-serif" onchange="_updateKakaoTrackingPreview()">';
+  html += '<option value="">선택하세요</option>';
+  activeRooms.forEach(function(r) {
+    var label = (r.roomName || '').replace(/★[^★]*★\s*/, '') + (r.customerName ? ' → ' + r.customerName : '');
+    html += '<option value="' + (r.roomName || '') + '">' + label + '</option>';
+  });
+  html += '</select></div>';
+
+  html += '<div><label style="font-size:11px;font-weight:600;color:#5A6070;margin-bottom:4px;display:block;font-family:Pretendard,sans-serif">택배사</label>';
+  html += '<select id="kt-carrier" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #E2E5EB;border-radius:6px;background:#fff;font-family:Pretendard,sans-serif" onchange="_updateKakaoTrackingPreview()">';
+  _KAKAO_CARRIERS.forEach(function(c) { html += '<option value="' + c + '">' + c + '</option>'; });
+  html += '</select></div>';
+  html += '</div>';
+
+  // 2행: 수령인 + 송장번호
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  html += '<div><label style="font-size:11px;font-weight:600;color:#5A6070;margin-bottom:4px;display:block;font-family:Pretendard,sans-serif">수령인</label>';
+  html += '<input id="kt-receiver" type="text" placeholder="수령인명" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif;box-sizing:border-box" oninput="_updateKakaoTrackingPreview()" autocomplete="off"></div>';
+
+  html += '<div><label style="font-size:11px;font-weight:600;color:#5A6070;margin-bottom:4px;display:block;font-family:Pretendard,sans-serif">송장번호</label>';
+  html += '<input id="kt-tracking" type="text" placeholder="송장번호" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif;box-sizing:border-box" oninput="_updateKakaoTrackingPreview()" autocomplete="off"></div>';
+  html += '</div>';
+
+  // 3행: 제품 + 비고
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  html += '<div><label style="font-size:11px;font-weight:600;color:#5A6070;margin-bottom:4px;display:block;font-family:Pretendard,sans-serif">제품 <span style="color:#9BA3B2">(선택)</span></label>';
+  html += '<input id="kt-product" type="text" placeholder="제품명" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif;box-sizing:border-box" oninput="_updateKakaoTrackingPreview()" autocomplete="off"></div>';
+
+  html += '<div><label style="font-size:11px;font-weight:600;color:#5A6070;margin-bottom:4px;display:block;font-family:Pretendard,sans-serif">비고 <span style="color:#9BA3B2">(선택)</span></label>';
+  html += '<input id="kt-memo" type="text" placeholder="비고" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif;box-sizing:border-box" oninput="_updateKakaoTrackingPreview()" autocomplete="off"></div>';
+  html += '</div>';
+
+  html += '</div>';
+
+  // ── B. 미리보기 ──
+  html += '<div style="background:#F7F8FA;border:1px solid #E2E5EB;border-top:none;padding:12px 16px">';
+  html += '<div style="font-size:11px;font-weight:600;color:#8B8FA3;margin-bottom:6px;font-family:Pretendard,sans-serif">카톡 전송 미리보기</div>';
+  html += '<div id="kt-preview" style="border-left:3px solid #185FA5;background:#fff;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#3A3F4B;line-height:1.6;font-family:Pretendard,sans-serif;min-height:20px">';
+  html += '<span style="color:#9BA3B2">입력하면 미리보기가 표시됩니다</span>';
+  html += '</div>';
+  html += '</div>';
+
+  // ── C. 전송 버튼 ──
+  html += '<div style="background:#fff;border:1px solid #E2E5EB;border-top:none;border-radius:0 0 8px 8px;padding:12px 16px;display:flex;justify-content:flex-end">';
+  html += '<button onclick="_sendKakaoTracking()" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">카톡 전송</button>';
+  html += '</div>';
+
+  // ── D. 오늘 발송 이력 ──
+  var todayStr = new Date().toISOString().slice(0,10);
+  var todayHistory = history.filter(function(h) { return (h.date || '').slice(0,10) === todayStr; });
+
+  html += '<div style="margin-top:16px">';
+  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
+  html += '<span>오늘 발송 이력</span>';
+  html += '<span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.6)">' + todayHistory.length + '건</span>';
+  html += '</div>';
+
+  // 검색 + 기간 필터
+  html += '<div style="display:flex;gap:8px;padding:10px 14px;background:#fff;border:1px solid #E2E5EB;border-top:none">';
+  html += '<input type="text" id="kt-history-search" placeholder="거래처 또는 수령인 검색..." oninput="_filterKakaoTrackingHistory()" style="flex:1;padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif" autocomplete="off">';
+  html += '<select id="kt-history-period" onchange="_filterKakaoTrackingHistory()" style="padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif">';
+  html += '<option value="today">오늘</option><option value="7d">최근 7일</option><option value="30d">최근 30일</option>';
+  html += '</select></div>';
+
+  // 테이블
+  html += '<div class="kakao-section" style="border-radius:0 0 8px 8px;border-top:none">';
+  html += '<div class="kakao-section-body">';
+  html += '<table class="kakao-table" id="kt-history-table"><thead><tr>';
+  html += '<th style="width:70px">시간</th><th>거래처</th><th>수령인</th><th style="width:90px">택배사</th><th style="width:130px">송장번호</th><th>제품</th><th style="width:60px;text-align:center">카톡</th>';
+  html += '</tr></thead><tbody id="kt-history-tbody">';
+
+  if (history.length === 0) {
+    html += '<tr><td colspan="7" class="kakao-empty">발송 이력이 없습니다</td></tr>';
+  } else {
+    history.slice(0,50).forEach(function(h) {
+      html += _buildKakaoTrackingRow(h);
+    });
+  }
+
+  html += '</tbody></table></div></div>';
+  html += '</div>';
+
+  return html;
+}
+
+function _buildKakaoTrackingRow(h) {
+  var time = h.date ? new Date(h.date).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' }) : '—';
+  var statusMap = { sent:['전송완료','#E1F5EE','#085041'], failed:['전송실패','#FCEBEB','#CC2222'], pending:['대기','#F0F1F3','#5A6070'] };
+  var st = statusMap[h.status] || statusMap['pending'];
+  var row = '<tr>';
+  row += '<td style="font-size:12px;color:#5A6070">' + time + '</td>';
+  row += '<td>' + (h.room || '—') + '</td>';
+  row += '<td>' + (h.receiver || '—') + '</td>';
+  row += '<td>' + (h.carrier || '—') + '</td>';
+  row += '<td style="font-family:monospace;font-size:12px">' + (h.trackingNo || '—') + '</td>';
+  row += '<td>' + (h.product || '—') + '</td>';
+  row += '<td style="text-align:center"><span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + st[1] + ';color:' + st[2] + ';font-family:Pretendard,sans-serif">' + st[0] + '</span></td>';
+  row += '</tr>';
+  return row;
+}
+
+function _updateKakaoTrackingPreview() {
+  var receiver = (document.getElementById('kt-receiver') || {}).value || '';
+  var carrier = (document.getElementById('kt-carrier') || {}).value || '';
+  var tracking = (document.getElementById('kt-tracking') || {}).value || '';
+  var product = (document.getElementById('kt-product') || {}).value || '';
+  var memo = (document.getElementById('kt-memo') || {}).value || '';
+
+  var el = document.getElementById('kt-preview');
+  if (!el) return;
+
+  if (!receiver && !tracking) {
+    el.innerHTML = '<span style="color:#9BA3B2">입력하면 미리보기가 표시됩니다</span>';
+    return;
+  }
+
+  var lines = [];
+  if (receiver || carrier || tracking) lines.push((receiver || '___') + ' ' + carrier + ' ' + (tracking || '___'));
+  if (product) lines.push('제품: ' + product);
+  if (memo) lines.push('비고: ' + memo);
+  el.innerHTML = lines.join('<br>');
+}
+
+function _sendKakaoTracking() {
+  var room = (document.getElementById('kt-room') || {}).value;
+  var receiver = (document.getElementById('kt-receiver') || {}).value;
+  var tracking = (document.getElementById('kt-tracking') || {}).value;
+
+  if (!room) { alert('거래처(톡방)를 선택하세요.'); return; }
+  if (!receiver) { alert('수령인을 입력하세요.'); return; }
+  if (!tracking) { alert('송장번호를 입력하세요.'); return; }
+
+  alert('추후 구현 — NAS 봇서버 연동 필요');
+
+  // 입력 폼 초기화
+  ['kt-receiver','kt-tracking','kt-product','kt-memo'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  _updateKakaoTrackingPreview();
+}
+
+function _filterKakaoTrackingHistory() {
+  var query = (document.getElementById('kt-history-search') || {}).value.toLowerCase();
+  var period = (document.getElementById('kt-history-period') || {}).value;
+  var history = JSON.parse(localStorage.getItem('mw_bot_tracking') || '[]');
+
+  var now = new Date();
+  var cutoff = new Date();
+  if (period === 'today') cutoff.setHours(0,0,0,0);
+  else if (period === '7d') cutoff.setDate(now.getDate() - 7);
+  else if (period === '30d') cutoff.setDate(now.getDate() - 30);
+
+  var filtered = history.filter(function(h) {
+    var d = new Date(h.date || 0);
+    if (d < cutoff) return false;
+    if (query && !((h.room || '').toLowerCase().indexOf(query) >= 0 || (h.receiver || '').toLowerCase().indexOf(query) >= 0)) return false;
+    return true;
+  });
+
+  var tbody = document.getElementById('kt-history-tbody');
+  if (!tbody) return;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="kakao-empty">발송 이력이 없습니다</td></tr>';
+  } else {
+    tbody.innerHTML = filtered.map(function(h) { return _buildKakaoTrackingRow(h); }).join('');
+  }
 }
 
 // ========================================
