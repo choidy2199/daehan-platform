@@ -184,28 +184,20 @@ export async function POST(request: NextRequest) {
         const selectedModelCode = ctx.products[selectedIdx - 1];
         console.log(`[bot/message] 선택: ${selectedIdx}번 → ${selectedModelCode}`);
 
-        // 맥락 삭제
-        await deleteContext(room);
-
-        // 선택된 모델코드로 stock API 호출 (1건 매칭 기대)
+        // 선택된 모델코드로 stock API 호출 (1건 매칭 기대, 맥락은 유지 — 5분 TTL 자연 만료)
         const stockResult = await callStockApi(selectedModelCode, room, sender);
         return NextResponse.json({ success: true, reply: stockResult.reply });
       }
 
-      // 선택 판별 실패(0) → 맥락 삭제하고 새 검색으로
-      if (selectedIdx === 0) {
-        await deleteContext(room);
-      }
+      // 선택 판별 실패(0) → 맥락 유지한 채 새 검색으로 (5분 TTL 자연 만료)
     }
 
     // ─── Step 3: 제품 검색 ───
     const stockResult = await callStockApi(message, room, sender);
 
-    // ─── Step 4: 맥락 저장/삭제 ───
+    // ─── Step 4: 맥락 저장 (다건 매칭 시 교체, 그 외는 유지) ───
     if (stockResult.matched >= 2 && stockResult.products) {
       await saveContext(room, stockResult.products);
-    } else {
-      await deleteContext(room);
     }
 
     // ─── Step 5: 응답 ───
