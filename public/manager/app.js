@@ -15434,9 +15434,13 @@ function renderKakaoTab() {
   html += _buildKakaoDashboard();
   html += '</div>';
 
-  // 나머지 5개 탭 — placeholder
+  // 톡방관리 탭
+  html += '<div id="kakao-content-rooms" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-rooms' ? 'block' : 'none') + '">';
+  html += _buildKakaoRooms();
+  html += '</div>';
+
+  // 나머지 4개 탭 — placeholder
   var placeholderTabs = [
-    { id: 'rooms',     label: '톡방관리' },
     { id: 'templates', label: '템플릿' },
     { id: 'tracking',  label: '송장/발송' },
     { id: 'broadcast', label: '공지발송' },
@@ -15473,7 +15477,7 @@ function switchKakaoSubTab(tabId) {
   document.querySelectorAll('.kakao-tab-content').forEach(function(el) { el.style.display = 'none'; });
   var suffix = tabId.replace('kakao-', '');
   var content = document.getElementById('kakao-content-' + suffix);
-  if (content) content.style.display = suffix === 'dashboard' ? 'block' : 'flex';
+  if (content) content.style.display = (suffix === 'dashboard' || suffix === 'rooms') ? 'block' : 'flex';
 
   // 버튼 활성 상태
   document.querySelectorAll('.kakao-top-row .kakao-subtab').forEach(function(btn) {
@@ -15578,4 +15582,175 @@ function _kakaoKpiCard(label, value, sub, color, isAlert) {
   h += '<div class="kakao-kpi-sub">' + sub + '</div>';
   h += '</div>';
   return h;
+}
+
+// ========================================
+// 카카오톡 — 톡방관리 탭
+// ========================================
+
+function _buildKakaoRooms() {
+  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+
+  var html = '';
+
+  // ── 헤더 ──
+  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
+  html += '<span>톡방 — 거래처 매핑</span>';
+  html += '<button class="kakao-btn-sm" onclick="alert(\'톡방 추가 — 추후 구현\')">+ 톡방 추가</button>';
+  html += '</div>';
+
+  // ── 안내 배너 ──
+  html += '<div class="kakao-rooms-banner">';
+  html += '톡방에 봇이 초대된 후, 아래에서 거래처와 매핑하면 자동응답이 시작됩니다. 매핑되지 않은 톡방에서는 봇이 응답하지 않습니다.';
+  html += '</div>';
+
+  // ── 검색 + 필터 ──
+  html += '<div class="kakao-rooms-toolbar">';
+  html += '<input type="text" class="kakao-rooms-search" placeholder="톡방명 또는 거래처명 검색..." oninput="_filterKakaoRooms()" id="kakao-rooms-search" autocomplete="off">';
+  html += '<select class="kakao-rooms-filter" id="kakao-rooms-filter" onchange="_filterKakaoRooms()">';
+  html += '<option value="all">전체</option>';
+  html += '<option value="active">활성</option>';
+  html += '<option value="inactive">비활성</option>';
+  html += '<option value="unmapped">미매핑</option>';
+  html += '</select>';
+  html += '</div>';
+
+  // ── 테이블 ──
+  html += '<div class="kakao-section" style="border-radius:0 0 8px 8px;border-top:none">';
+  html += '<div class="kakao-section-body">';
+  html += '<table class="kakao-table" id="kakao-rooms-table"><thead><tr>';
+  html += '<th style="width:50px;text-align:center">봇</th>';
+  html += '<th>톡방명</th>';
+  html += '<th>매핑 거래처</th>';
+  html += '<th style="width:100px">경박 코드</th>';
+  html += '<th style="width:80px">담당자</th>';
+  html += '<th style="width:110px">최근 활동</th>';
+  html += '<th style="width:70px;text-align:center">상태</th>';
+  html += '<th style="width:60px;text-align:center">관리</th>';
+  html += '</tr></thead><tbody id="kakao-rooms-tbody">';
+
+  if (rooms.length === 0) {
+    html += '<tr><td colspan="8" class="kakao-empty">등록된 톡방이 없습니다</td></tr>';
+  } else {
+    rooms.forEach(function(r, i) {
+      html += _buildKakaoRoomRow(r, i);
+    });
+  }
+
+  html += '</tbody></table>';
+  html += '</div>';
+  html += '</div>';
+
+  // ── 하단 요약 ──
+  var cntActive = rooms.filter(function(r) { return r.status === 'active'; }).length;
+  var cntInactive = rooms.filter(function(r) { return r.status === 'inactive'; }).length;
+  var cntUnmapped = rooms.filter(function(r) { return r.status === 'unmapped' || !r.customerCode; }).length;
+
+  html += '<div class="kakao-rooms-summary">';
+  html += '<span>총 ' + rooms.length + '개 톡방 | 활성 ' + cntActive + '개 | 비활성 ' + cntInactive + '개 | 미매핑 ' + cntUnmapped + '개</span>';
+  html += '<span style="color:#8B8FA3;font-size:11px">경영박사 거래처 동기화: —</span>';
+  html += '</div>';
+
+  return html;
+}
+
+function _buildKakaoRoomRow(r, idx) {
+  var h = '<tr data-room-idx="' + idx + '">';
+
+  // 봇 토글
+  h += '<td style="text-align:center"><label class="kakao-toggle" style="width:34px;height:18px">';
+  h += '<input type="checkbox"' + (r.botActive ? ' checked' : '') + ' onchange="_toggleKakaoRoomBot(' + idx + ',this.checked)">';
+  h += '<span class="kakao-toggle-slider" style="border-radius:18px"></span>';
+  h += '</label></td>';
+
+  // 톡방명
+  h += '<td style="font-weight:500">' + (r.roomName || '—') + '</td>';
+
+  // 매핑 거래처
+  h += '<td>' + (r.customerName || '<span style="color:#8B8FA3">미매핑</span>') + '</td>';
+
+  // 경박 코드
+  h += '<td style="font-family:monospace;font-size:12px;color:#5A6070">' + (r.customerCode || '—') + '</td>';
+
+  // 담당자
+  h += '<td><select class="kakao-rooms-assignee" onchange="_changeKakaoRoomAssignee(' + idx + ',this.value)" style="font-size:12px;padding:2px 4px;border:1px solid #E2E5EB;border-radius:4px;background:#fff;font-family:Pretendard,sans-serif">';
+  ['admin', 'hwon', 'jyoung'].forEach(function(u) {
+    h += '<option value="' + u + '"' + (r.assignee === u ? ' selected' : '') + '>' + u + '</option>';
+  });
+  h += '</select></td>';
+
+  // 최근 활동
+  var lastAct = '—';
+  if (r.lastActivity) {
+    var d = new Date(r.lastActivity);
+    lastAct = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  h += '<td style="font-size:12px;color:#5A6070">' + lastAct + '</td>';
+
+  // 상태 뱃지
+  var statusMap = {
+    'active':   { cls: 'kakao-badge-green',  text: '활성' },
+    'inactive': { cls: 'kakao-badge-gray',   text: '비활성' },
+    'unmapped': { cls: 'kakao-badge-red',    text: '미매핑' },
+    'maintenance': { cls: 'kakao-badge-orange', text: '점검' }
+  };
+  var st = statusMap[r.status] || statusMap['unmapped'];
+  h += '<td style="text-align:center"><span class="kakao-badge ' + st.cls + '">' + st.text + '</span></td>';
+
+  // 관리 버튼
+  var btnLabel = (!r.customerCode || r.status === 'unmapped') ? '매핑' : '편집';
+  h += '<td style="text-align:center"><button class="kakao-btn-action" onclick="alert(\'' + btnLabel + ' — 추후 구현\')">' + btnLabel + '</button></td>';
+
+  h += '</tr>';
+  return h;
+}
+
+function _toggleKakaoRoomBot(idx, checked) {
+  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  if (rooms[idx]) {
+    rooms[idx].botActive = checked;
+    localStorage.setItem('mw_bot_rooms', JSON.stringify(rooms));
+  }
+}
+
+function _changeKakaoRoomAssignee(idx, val) {
+  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  if (rooms[idx]) {
+    rooms[idx].assignee = val;
+    localStorage.setItem('mw_bot_rooms', JSON.stringify(rooms));
+  }
+}
+
+function _filterKakaoRooms() {
+  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  var query = (document.getElementById('kakao-rooms-search').value || '').toLowerCase();
+  var filter = document.getElementById('kakao-rooms-filter').value;
+
+  var filtered = rooms.filter(function(r, i) {
+    // 텍스트 검색
+    if (query) {
+      var name = (r.roomName || '').toLowerCase();
+      var cust = (r.customerName || '').toLowerCase();
+      if (name.indexOf(query) === -1 && cust.indexOf(query) === -1) return false;
+    }
+    // 상태 필터
+    if (filter === 'active' && r.status !== 'active') return false;
+    if (filter === 'inactive' && r.status !== 'inactive') return false;
+    if (filter === 'unmapped' && r.status !== 'unmapped' && r.customerCode) return false;
+    return true;
+  });
+
+  var tbody = document.getElementById('kakao-rooms-tbody');
+  if (!tbody) return;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="kakao-empty">검색 결과가 없습니다</td></tr>';
+  } else {
+    var html = '';
+    // 원본 인덱스 유지
+    rooms.forEach(function(r, i) {
+      if (filtered.indexOf(r) !== -1) html += _buildKakaoRoomRow(r, i);
+    });
+    tbody.innerHTML = html;
+  }
 }
