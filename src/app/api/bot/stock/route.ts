@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { selectItem } from '@/lib/erp';
+import { parseTablesFromXml } from '@/lib/erp';
 
 export const maxDuration = 60;
+
+const ERP_URL = process.env.ERP_URL || 'https://drws20.softcity.co.kr:1448/WS_shop.asmx';
+const ERP_USER_KEY = process.env.ERP_USER_KEY || '';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -200,10 +203,22 @@ export async function POST(request: NextRequest) {
     let hasStock = false;
     try {
       const searchCode = (product.manageCode as string) || product.code;
-      const erpResults = await selectItem(searchCode);
-      if (erpResults.length > 0) {
-        const jego = parseInt(erpResults[0].JEGO || '0', 10);
-        hasStock = jego > 0;
+      if (searchCode && ERP_USER_KEY) {
+        const whereValue = `'${searchCode}'`;
+        const formBody = `cUserKey=${encodeURIComponent(ERP_USER_KEY)}&UrlEnc_WHERE=${encodeURIComponent(whereValue)}`;
+        const erpRes = await fetch(`${ERP_URL}/SelectItemUrlEnc`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formBody,
+        });
+        if (erpRes.ok) {
+          const xml = await erpRes.text();
+          const rows = parseTablesFromXml(xml);
+          if (rows.length > 0) {
+            const jego = parseInt(rows[0].JEGO || '0', 10);
+            hasStock = jego > 0;
+          }
+        }
       }
     } catch (erpErr) {
       console.error('[bot/stock] ERP 재고조회 실패:', erpErr);
