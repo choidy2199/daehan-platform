@@ -21,44 +21,59 @@ function formatNumber(n: number): string {
   return n.toLocaleString('ko-KR');
 }
 
-/** 제품의 표시명 (model 우선, name 폴백) */
-function getProductName(p: Product): string {
-  return p.model || p.name || p.code;
+/** model 필드에서 모델코드 추출 (첫 번째 / 앞 부분 trim) */
+function getModelCode(p: Product): string {
+  const model = p.model || p.name || p.code;
+  const slashIdx = model.indexOf('/');
+  return slashIdx > 0 ? model.substring(0, slashIdx).trim() : model.trim();
+}
+
+const STOPWORDS = new Set([
+  '가격', '얼마', '재고', '있나요', '있어요', '없나요', '부탁', '드립니다',
+  '확인', '문의', '주세요', '합니다', '요', '좀', '개',
+]);
+
+/**
+ * 메시지에서 토큰 추출 (stopwords 제거)
+ */
+function tokenize(message: string): { enTokens: string[]; koTokens: string[] } {
+  // 영문+숫자+하이픈 토큰
+  const enMatches = message.match(/[A-Za-z0-9][A-Za-z0-9\-]*/g) || [];
+  const enTokens = enMatches.map(t => t.toUpperCase());
+
+  // 한국어 토큰 (2글자 이상, stopwords 제외)
+  const koMatches = message.match(/[가-힣]+/g) || [];
+  const koTokens = koMatches.filter(t => t.length >= 2 && !STOPWORDS.has(t));
+
+  return { enTokens, koTokens };
 }
 
 /**
- * 메시지에서 제품 매칭
- * 우선순위: code 정확 포함 → 단어가 code에 포함 → 단어가 model/name에 포함
+ * 제품 매칭 — model 필드 대상으로만 매칭
  */
 function matchProducts(message: string, products: Product[]): Product[] {
-  const msgLower = message.toLowerCase();
-  const words = message.split(/\s+/).filter(w => w.length > 0);
+  const { enTokens, koTokens } = tokenize(message);
+  const allTokens = [...enTokens, ...koTokens];
 
-  // 1) code가 메시지에 정확히 포함 (대소문자 무시)
-  const exactCode = products.filter(p =>
-    p.code && msgLower.includes(p.code.toLowerCase())
-  );
-  if (exactCode.length > 0) return exactCode.slice(0, 3);
+  if (allTokens.length === 0) return [];
 
-  // 2) 메시지 단어가 code에 포함
-  const codeMatch = products.filter(p =>
-    p.code && words.some(w => p.code.toLowerCase().includes(w.toLowerCase()))
-  );
-  if (codeMatch.length > 0) return codeMatch.slice(0, 3);
-
-  // 3) 메시지의 모든 단어가 model 또는 name에 포함 (AND 매칭)
-  const modelName = products.filter(p => {
-    const text = getProductName(p).toLowerCase();
-    return words.every(w => text.includes(w.toLowerCase()));
+  // === 1단계: AND 매칭 (모든 유효 토큰이 model에 포함) ===
+  const andMatch = products.filter(p => {
+    const model = (p.model || '').toUpperCase();
+    return allTokens.every(t => model.includes(t.toUpperCase()));
   });
-  if (modelName.length > 0) return modelName.slice(0, 3);
+  if (andMatch.length > 0) return andMatch.slice(0, 5);
 
-  // 4) 메시지 단어 중 하나라도 model/name에 포함 (OR 매칭, 2글자 이상)
-  const partialMatch = products.filter(p => {
-    const text = getProductName(p).toLowerCase();
-    return words.filter(w => w.length >= 2).some(w => text.includes(w.toLowerCase()));
-  });
-  if (partialMatch.length > 0) return partialMatch.slice(0, 3);
+  // === 2단계: 가장 긴 토큰 1개로 부분 매칭 (3글자 이상) ===
+  const longTokens = allTokens.filter(t => t.length >= 3).sort((a, b) => b.length - a.length);
+  if (longTokens.length > 0) {
+    const best = longTokens[0].toUpperCase();
+    const partial = products.filter(p => {
+      const model = (p.model || '').toUpperCase();
+      return model.includes(best);
+    });
+    if (partial.length > 0) return partial.slice(0, 5);
+  }
 
   return [];
 }
@@ -112,9 +127,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2~3건 매칭
+    // 2건 이상 매칭
     if (matched.length >= 2) {
-      const lines = matched.map((p, i) => `${i + 1}. ${p.code} - ${getProductName(p)}`);
+      const lines = matched.map((p, i) => `${i + 1}. ${getModelCode(p)}`);
       const reply = `말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다.\n${lines.join('\n')}`;
       return NextResponse.json({
         success: true,
@@ -126,6 +141,7 @@ export async function POST(request: NextRequest) {
 
     // 1건 매칭 → ERP 재고 조회
     const product = matched[0];
+    const modelCode = getModelCode(product);
     const price = product.supplyPrice ? formatNumber(Number(product.supplyPrice)) : '0';
 
     let hasStock = false;
@@ -142,16 +158,16 @@ export async function POST(request: NextRequest) {
 
     let reply: string;
     if (hasStock) {
-      reply = `${product.code}\n가격은 ${price}원입니다.\n재고 있습니다.`;
+      reply = `모델 : ${modelCode}\n가격 : ${price}원\n재고있습니다.`;
     } else {
-      reply = `${product.code}\n가격은 ${price}원입니다.\n현재 품절입니다. 입고일정 확인후 말씀드리겠습니다.`;
+      reply = `모델 : ${modelCode}\n가격 : ${price}원\n현재 품절입니다. 입고일정 확인후 말씀드리겠습니다.`;
     }
 
     return NextResponse.json({
       success: true,
       reply,
       matched: 1,
-      product: { code: product.code, name: getProductName(product) },
+      product: { code: product.code, name: getModelCode(product) },
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
