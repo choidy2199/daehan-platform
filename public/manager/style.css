@@ -681,6 +681,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 
 /* 공지사항 — tab-content flex 무효화 */
 #tab-notice.active { display:block !important; overflow-y:auto; }
+.tab-content.active#tab-notice > div { flex:none !important; overflow:visible !important; min-height:0 !important; }
 
 /* 톡방관리 */
 .kakao-rooms-banner { background:#E1F5EE; color:#085041; font-size:12px; line-height:1.6; padding:10px 14px; border-left:3px solid #1D9E75; }
