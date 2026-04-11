@@ -28,10 +28,15 @@ function getModelCode(p: Product): string {
   return slashIdx > 0 ? model.substring(0, slashIdx).trim() : model.trim();
 }
 
-const STOPWORDS = new Set([
+const STOPWORDS = [
   '가격', '얼마', '재고', '있나요', '있어요', '없나요', '부탁', '드립니다',
-  '확인', '문의', '주세요', '합니다', '요', '좀', '개',
-]);
+  '확인', '문의', '주세요', '합니다', '요', '좀', '개', '알려', '보내',
+];
+
+/** 한국어 토큰이 stopword를 포함하거나 stopword에 포함되면 제거 */
+function isStopword(token: string): boolean {
+  return STOPWORDS.some(sw => token.includes(sw) || sw.includes(token));
+}
 
 /**
  * 메시지에서 토큰 추출 (stopwords 제거)
@@ -43,7 +48,7 @@ function tokenize(message: string): { enTokens: string[]; koTokens: string[] } {
 
   // 한국어 토큰 (2글자 이상, stopwords 제외)
   const koMatches = message.match(/[가-힣]+/g) || [];
-  const koTokens = koMatches.filter(t => t.length >= 2 && !STOPWORDS.has(t));
+  const koTokens = koMatches.filter(t => t.length >= 2 && !isStopword(t));
 
   return { enTokens, koTokens };
 }
