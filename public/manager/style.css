@@ -679,6 +679,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .kakao-btn-sm { font-size:11px; font-weight:600; padding:4px 10px; border-radius:4px; border:1px solid rgba(255,255,255,0.3); background:transparent; color:#fff; cursor:pointer; font-family:'Pretendard',sans-serif; }
 .kakao-btn-sm:hover { background:rgba(255,255,255,0.15); }
 
+/* 공지사항 — tab-content flex 무효화 */
+#tab-notice.active { display:block !important; overflow-y:auto; }
+
 /* 톡방관리 */
 .kakao-rooms-banner { background:#E1F5EE; color:#085041; font-size:12px; line-height:1.6; padding:10px 14px; border-left:3px solid #1D9E75; }
 .kakao-rooms-toolbar { display:flex; align-items:center; gap:8px; padding:10px 14px; background:#F4F6FA; border-bottom:1px solid #E2E5EB; }
