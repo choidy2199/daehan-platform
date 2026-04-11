@@ -1999,7 +1999,7 @@ var _tabIdMap = {
   'delivery':         { contentId: 'tab-delivery',         placeholder: true },
   'search':           { contentId: 'tab-estimate',         render: 'estimate' },
   'kakao':            { contentId: 'tab-kakao',            render: 'kakao' },
-  'notice':           { contentId: 'tab-notice',           placeholder: true },
+  'notice':           { contentId: 'tab-notice',           render: 'notice' },
   'setting':          { contentId: 'tab-manage',           render: 'manage' }
 };
 
@@ -2059,6 +2059,7 @@ function switchTab(tab) {
       if (renderKey === 'general') renderGenProducts();
       if (renderKey === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
       if (renderKey === 'kakao') renderKakaoTab();
+      if (renderKey === 'notice') renderNoticeTab();
       _renderedTabs[renderKey] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
@@ -16689,3 +16690,405 @@ function _deleteBotRoom(roomId) {
   document.getElementById('bot-room-popup').remove();
   toast('톡방 삭제 완료');
 }
+
+// ========================================
+// 공지사항 게시판
+// ========================================
+
+var _noticesData = [];
+var _noticeFilter = 'all';
+var _noticeSearch = '';
+var _noticeView = 'list'; // 'list' | 'detail' | 'write'
+var _noticeDetailId = null;
+var _noticeEditId = null;
+
+function _getReadNoticeIds() {
+  var uid = (window.currentUser && window.currentUser.loginId) || 'default';
+  try { return JSON.parse(localStorage.getItem('mw_notice_read_' + uid) || '[]'); } catch(e) { return []; }
+}
+function _markNoticeRead(id) {
+  var uid = (window.currentUser && window.currentUser.loginId) || 'default';
+  var read = _getReadNoticeIds();
+  if (read.indexOf(id) === -1) { read.push(id); localStorage.setItem('mw_notice_read_' + uid, JSON.stringify(read)); }
+}
+function _isAdmin() { return window.currentUser && window.currentUser.loginId === 'admin'; }
+
+function _noticeCatBadge(cat) {
+  var m = { 'update': { bg:'#E6F1FB', color:'#0C447C', text:'업데이트' }, 'bug': { bg:'#FCEBEB', color:'#791F1F', text:'오류개선' }, 'notice': { bg:'#FAEEDA', color:'#633806', text:'공지' } };
+  var s = m[cat] || m['update'];
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
+}
+
+function _noticeDateFmt(dateStr) {
+  var d = new Date(dateStr);
+  var now = new Date();
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  if (d.getFullYear() === now.getFullYear()) return mm + '.' + dd;
+  return d.getFullYear() + '.' + mm + '.' + dd;
+}
+
+async function _fetchNotices() {
+  try {
+    var res = await fetch('/api/notices');
+    var json = await res.json();
+    if (json.success) _noticesData = json.data || [];
+  } catch(e) { console.error('[Notices] fetch error', e); }
+}
+
+async function renderNoticeTab() {
+  await _fetchNotices();
+  var container = document.getElementById('tab-notice');
+  if (!container) return;
+  _noticeView = 'list';
+  _noticeDetailId = null;
+  _noticeEditId = null;
+  _renderNoticeList(container);
+}
+
+function _renderNoticeList(container) {
+  var readIds = _getReadNoticeIds();
+  var isAdmin = _isAdmin();
+
+  // 필터 + 검색 적용
+  var filtered = _noticesData.filter(function(n) {
+    if (_noticeFilter !== 'all' && n.category !== _noticeFilter) return false;
+    if (_noticeSearch) {
+      var q = _noticeSearch.toLowerCase();
+      if ((n.title || '').toLowerCase().indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+
+  var html = '';
+
+  // ── 다크 헤더 ──
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
+  html += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:600">공지사항</span><span style="font-size:12px;color:rgba(255,255,255,0.5)">' + _noticesData.length + '건</span></div>';
+  if (isAdmin) {
+    html += '<button onclick="_showNoticeWrite()" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">✚ 새 글 작성</button>';
+  }
+  html += '</div>';
+
+  // ── 필터 칩 + 검색 ──
+  html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid #DDE1EB;flex-wrap:wrap">';
+  ['all','update','bug','notice'].forEach(function(f) {
+    var label = { all:'전체', update:'업데이트', bug:'오류개선', notice:'공지' }[f];
+    var isActive = _noticeFilter === f;
+    var bg = isActive ? '#1A1D23' : '#fff';
+    var color = isActive ? '#fff' : '#5A6070';
+    var border = isActive ? '#1A1D23' : '#DDE1EB';
+    html += '<button onclick="_setNoticeFilter(\'' + f + '\')" style="background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';border-radius:6px;padding:4px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">' + label + '</button>';
+  });
+  html += '<div style="margin-left:auto"><input type="text" id="notice-search-input" value="' + (_noticeSearch || '') + '" placeholder="제목 검색..." style="width:180px;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:12px;font-family:Pretendard,sans-serif" autocomplete="off"></div>';
+  html += '</div>';
+
+  // ── 테이블 ──
+  html += '<div style="overflow-y:auto;max-height:calc(100vh - 200px)">';
+  html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
+  html += '<thead><tr>';
+  html += '<th style="width:50px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">No.</th>';
+  html += '<th style="width:80px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">분류</th>';
+  html += '<th style="padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;text-align:left">제목</th>';
+  html += '<th style="width:80px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">작성자</th>';
+  html += '<th style="width:100px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">날짜</th>';
+  html += '<th style="width:60px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">조회</th>';
+  html += '</tr></thead><tbody>';
+
+  if (filtered.length === 0) {
+    html += '<tr><td colspan="6" style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px">공지사항이 없습니다</td></tr>';
+  } else {
+    filtered.forEach(function(n, idx) {
+      var isUnread = readIds.indexOf(n.id) === -1;
+      var newDot = isUnread ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#CC2222;margin-left:6px;vertical-align:middle"></span>' : '';
+      var noCol = n.pinned ? '<span style="font-size:14px">📌</span>' : String(idx + 1);
+      html += '<tr onclick="_showNoticeDetail(' + n.id + ')" style="cursor:pointer;border-bottom:1px solid #F0F2F7" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">';
+      html += '<td style="text-align:center;padding:8px 10px;font-size:13px;color:#5A6070">' + noCol + '</td>';
+      html += '<td style="text-align:center;padding:8px 10px">' + _noticeCatBadge(n.category) + '</td>';
+      html += '<td style="padding:8px 10px;font-size:13px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left">' + (n.title || '') + newDot + '</td>';
+      html += '<td style="text-align:center;padding:8px 10px;font-size:12px;color:#5A6070">' + (n.author || 'admin') + '</td>';
+      html += '<td style="text-align:center;padding:8px 10px;font-size:12px;color:#5A6070">' + _noticeDateFmt(n.created_at) + '</td>';
+      html += '<td style="text-align:center;padding:8px 10px;font-size:12px;color:#5A6070">' + (n.views || 0) + '</td>';
+      html += '</tr>';
+    });
+  }
+  html += '</tbody></table></div>';
+
+  container.innerHTML = html;
+
+  // 검색 이벤트
+  var searchEl = document.getElementById('notice-search-input');
+  if (searchEl) {
+    var composing = false;
+    searchEl.addEventListener('compositionstart', function() { composing = true; });
+    searchEl.addEventListener('compositionend', function() { composing = false; _noticeSearch = searchEl.value; _renderNoticeList(container); });
+    searchEl.addEventListener('input', function() { if (!composing) { _noticeSearch = searchEl.value; _renderNoticeList(container); } });
+  }
+}
+
+function _setNoticeFilter(f) {
+  _noticeFilter = f;
+  var container = document.getElementById('tab-notice');
+  if (container) _renderNoticeList(container);
+}
+
+async function _showNoticeDetail(id) {
+  var n = _noticesData.find(function(x) { return x.id === id; });
+  if (!n) return;
+
+  // 조회수 +1
+  fetch('/api/notices/view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+  n.views = (n.views || 0) + 1;
+
+  // 읽음 처리
+  _markNoticeRead(id);
+  _updateNoticeBadge();
+
+  var container = document.getElementById('tab-notice');
+  if (!container) return;
+
+  var isAdmin = _isAdmin();
+  var fullDate = new Date(n.created_at);
+  var dateStr = fullDate.getFullYear() + '.' + String(fullDate.getMonth()+1).padStart(2,'0') + '.' + String(fullDate.getDate()).padStart(2,'0');
+
+  var html = '';
+
+  // ── 다크 헤더 ──
+  html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
+  html += '<button onclick="renderNoticeTab()" style="background:none;border:none;color:#fff;font-size:14px;cursor:pointer;padding:4px 8px;font-family:Pretendard,sans-serif;font-weight:500">← 목록</button>';
+  html += '<span style="font-size:15px;font-weight:600">공지사항</span>';
+  html += '</div>';
+
+  // ── 메타 영역 ──
+  html += '<div style="padding:20px 20px 12px;border-bottom:1px solid #DDE1EB">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+  html += _noticeCatBadge(n.category);
+  if (n.pinned) html += '<span style="font-size:14px">📌</span>';
+  html += '</div>';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between">';
+  html += '<h3 style="font-size:16px;font-weight:500;margin:0;color:#1A1D23">' + (n.title || '') + '</h3>';
+  if (isAdmin) {
+    html += '<div style="display:flex;gap:6px">';
+    html += '<button onclick="_showNoticeWrite(' + n.id + ')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">수정</button>';
+    html += '<button onclick="_deleteNotice(' + n.id + ')" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">삭제</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '<div style="margin-top:8px;font-size:12px;color:#9BA3B2">' + (n.author || 'admin') + ' · ' + dateStr + ' · 조회 ' + (n.views || 0) + '</div>';
+  html += '</div>';
+
+  // ── 본문 ──
+  var contentHtml = (n.content || '').replace(/\n/g, '<br>');
+  html += '<div style="padding:20px;font-size:14px;line-height:1.8;color:#1A1D23;min-height:200px">' + contentHtml + '</div>';
+
+  container.innerHTML = html;
+}
+
+function _showNoticeWrite(editId) {
+  var container = document.getElementById('tab-notice');
+  if (!container) return;
+
+  var n = null;
+  if (editId) { n = _noticesData.find(function(x) { return x.id === editId; }); }
+  var isEdit = !!n;
+
+  var html = '';
+
+  // ── 다크 헤더 ──
+  html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
+  html += '<button onclick="renderNoticeTab()" style="background:none;border:none;color:#fff;font-size:14px;cursor:pointer;padding:4px 8px;font-family:Pretendard,sans-serif;font-weight:500">← 목록</button>';
+  html += '<span style="font-size:15px;font-weight:600">' + (isEdit ? '글 수정' : '새 글 작성') + '</span>';
+  html += '</div>';
+
+  // ── 폼 ──
+  html += '<div style="padding:20px">';
+
+  // 분류 + 상단고정
+  html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">';
+  html += '<div><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px">분류</label>';
+  html += '<select id="nw-category" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;min-width:120px">';
+  ['update','bug','notice'].forEach(function(c) {
+    var label = { update:'업데이트', bug:'오류개선', notice:'공지' }[c];
+    html += '<option value="' + c + '"' + (isEdit && n.category === c ? ' selected' : '') + '>' + label + '</option>';
+  });
+  html += '</select></div>';
+  html += '<label style="display:flex;align-items:center;gap:6px;margin-top:18px;font-size:13px;color:#1A1D23;cursor:pointer"><input type="checkbox" id="nw-pinned"' + (isEdit && n.pinned ? ' checked' : '') + '> 📌 상단고정</label>';
+  html += '</div>';
+
+  // 제목
+  html += '<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px">제목</label>';
+  html += '<input type="text" id="nw-title" value="' + (isEdit ? (n.title || '').replace(/"/g, '&quot;') : '') + '" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box" placeholder="제목을 입력하세요"></div>';
+
+  // 내용
+  html += '<div style="margin-bottom:16px"><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px">내용</label>';
+  html += '<textarea id="nw-content" style="width:100%;min-height:300px;border:1px solid #DDE1EB;border-radius:6px;padding:10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;resize:vertical;line-height:1.6" placeholder="내용을 입력하세요">' + (isEdit ? (n.content || '') : '') + '</textarea></div>';
+
+  // 버튼
+  html += '<div style="display:flex;justify-content:flex-end;gap:8px">';
+  html += '<button onclick="renderNoticeTab()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">취소</button>';
+  html += '<button onclick="_saveNotice(' + (isEdit ? n.id : 'null') + ')" style="background:#1A1D23;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">' + (isEdit ? '수정' : '등록') + '</button>';
+  html += '</div>';
+
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+async function _saveNotice(editId) {
+  var title = (document.getElementById('nw-title').value || '').trim();
+  var content = (document.getElementById('nw-content').value || '').trim();
+  var category = document.getElementById('nw-category').value;
+  var pinned = document.getElementById('nw-pinned').checked;
+
+  if (!title) { alert('제목을 입력해주세요.'); return; }
+  if (!content) { alert('내용을 입력해주세요.'); return; }
+
+  var author = (window.currentUser && window.currentUser.loginId) || 'admin';
+
+  try {
+    if (editId) {
+      var res = await fetch('/api/notices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, category: category, title: title, content: content, pinned: pinned }) });
+      var json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      toast('글 수정 완료');
+      await _fetchNotices();
+      _showNoticeDetail(editId);
+    } else {
+      var res2 = await fetch('/api/notices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: category, title: title, content: content, pinned: pinned, author: author }) });
+      var json2 = await res2.json();
+      if (!json2.success) throw new Error(json2.error);
+      toast('글 등록 완료');
+      await _fetchNotices();
+      renderNoticeTab();
+    }
+    loadNoticePanel();
+  } catch(e) {
+    alert('저장 실패: ' + e.message);
+  }
+}
+
+async function _deleteNotice(id) {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  try {
+    var res = await fetch('/api/notices', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+    var json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    toast('글 삭제 완료');
+    await _fetchNotices();
+    renderNoticeTab();
+    loadNoticePanel();
+  } catch(e) {
+    alert('삭제 실패: ' + e.message);
+  }
+}
+
+// ========================================
+// 바탕화면 공지사항 패널
+// ========================================
+
+var _noticePanelTab = 'update'; // 'update' | 'bug'
+
+async function loadNoticePanel() {
+  if (_noticesData.length === 0) await _fetchNotices();
+  _renderNoticePanel();
+  _updateNoticeBadge();
+}
+
+function _renderNoticePanel() {
+  var listEl = document.getElementById('desktop-notice-list');
+  if (!listEl) return;
+
+  var readIds = _getReadNoticeIds();
+  var filtered = _noticesData.filter(function(n) { return n.category === _noticePanelTab; });
+  var top5 = filtered.slice(0, 5);
+
+  if (top5.length === 0) {
+    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#9BA3B2;font-size:12px">등록된 글이 없습니다</div>';
+    return;
+  }
+
+  var html = '';
+  top5.forEach(function(n) {
+    var isUnread = readIds.indexOf(n.id) === -1;
+    var dot = isUnread ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#CC2222;margin-right:6px;vertical-align:middle"></span>' : '';
+    html += '<div class="notice-item" onclick="_openNoticeFromPanel(' + n.id + ')" style="cursor:pointer">';
+    html += '<div>' + dot + _noticeCatBadge(n.category) + ' <span class="notice-title" style="font-size:13px">' + (n.title || '') + '</span></div>';
+    html += '<div class="notice-date">' + _noticeDateFmt(n.created_at) + '</div>';
+    html += '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
+function _openNoticeFromPanel(id) {
+  openWindow('공지');
+  setTimeout(function() { _showNoticeDetail(id); }, 200);
+}
+
+function _switchNoticePanelTab(tab) {
+  _noticePanelTab = tab;
+  // 탭 활성 상태 업데이트
+  document.querySelectorAll('.notice-tabs .notice-tab').forEach(function(el) {
+    el.classList.remove('active');
+    if ((tab === 'update' && el.textContent === '업데이트') || (tab === 'bug' && el.textContent === '오류개선')) {
+      el.classList.add('active');
+    }
+  });
+  _renderNoticePanel();
+}
+
+function _updateNoticeBadge() {
+  var badge = document.getElementById('notice-unread-badge');
+  if (!badge) return;
+  var readIds = _getReadNoticeIds();
+  var unread = _noticesData.filter(function(n) { return readIds.indexOf(n.id) === -1; }).length;
+  if (unread > 0) {
+    badge.textContent = unread;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ========================================
+// 공지사항 Realtime 구독
+// ========================================
+
+(function initNoticesRealtime() {
+  if (typeof supabase === 'undefined' || !supabase.createClient) return;
+  var SUPABASE_URL = 'https://vmbqutwrfzhruukerfkc.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtYnF1dHdyZnpocnV1a2VyZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Mzc5MjAsImV4cCI6MjA5MDIxMzkyMH0.-FI_3De1sRmAxLNQ8J45MT9hO9U9aSTchxBcq47_b-I';
+  var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  sbClient.channel('notices_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notices' }, function(payload) {
+      console.log('[Notices Realtime]', payload.eventType);
+      _fetchNotices().then(function() {
+        loadNoticePanel();
+        // 공지탭이 열려있으면 갱신
+        var noticeTab = document.getElementById('tab-notice');
+        if (noticeTab && noticeTab.style.display !== 'none' && noticeTab.innerHTML.indexOf('공지사항이 없습니다') !== -1 || noticeTab && noticeTab.style.display !== 'none') {
+          // 목록 화면일 때만 갱신 (상세/작성 중이면 건드리지 않음)
+          if (noticeTab.querySelector('[onclick*="_setNoticeFilter"]')) {
+            var c = document.getElementById('tab-notice');
+            if (c) _renderNoticeList(c);
+          }
+        }
+      });
+    })
+    .subscribe(function(status) {
+      console.log('[Notices Realtime] 구독:', status);
+    });
+})();
+
+// 바탕화면 패널 탭 이벤트 + 초기 로드
+document.addEventListener('DOMContentLoaded', function() {
+  // 패널 탭 클릭 이벤트
+  document.querySelectorAll('.notice-tabs .notice-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      if (tab.textContent === '업데이트') _switchNoticePanelTab('update');
+      else if (tab.textContent === '오류개선') _switchNoticePanelTab('bug');
+    });
+  });
+  // 초기 로드
+  loadNoticePanel();
+});

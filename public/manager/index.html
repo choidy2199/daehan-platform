@@ -71,7 +71,7 @@
     <div class="tb-sep"></div>
     <div class="tb-menu tb-solo" onclick="openWindow('카톡')"><span class="tb-dot" style="color:#D4537E">●</span> 카톡</div>
     <div class="tb-sep"></div>
-    <div class="tb-menu tb-solo" onclick="openWindow('공지')"><span class="tb-dot" style="color:#5DCAA5">●</span> 공지</div>
+    <div class="tb-menu tb-solo" onclick="openWindow('공지')"><span class="tb-dot" style="color:#5DCAA5">●</span> 공지<span id="notice-unread-badge" style="display:none;background:#CC2222;color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px;min-width:14px;text-align:center"></span></div>
     <div class="tb-menu-spacer"></div>
     <!-- 설정 (드롭다운) -->
     <div class="tb-menu tb-dropdown tb-setting" data-menu="setting">
@@ -104,26 +104,11 @@
       <h4>공지사항</h4>
       <div class="notice-tabs">
         <span class="notice-tab active">업데이트</span>
-        <span class="notice-tab">수정</span>
+        <span class="notice-tab">오류개선</span>
       </div>
     </div>
-    <div class="notice-list">
-      <div class="notice-item">
-        <div><span class="notice-badge nb-new">신규</span><span class="notice-title">커머셜 프로모션 원가P 자동반영</span></div>
-        <div class="notice-date">2026.04.11</div>
-      </div>
-      <div class="notice-item">
-        <div><span class="notice-badge nb-update">업데이트</span><span class="notice-title">발주리스트 탭 추가</span></div>
-        <div class="notice-date">2026.04.11</div>
-      </div>
-      <div class="notice-item">
-        <div><span class="notice-badge nb-update">업데이트</span><span class="notice-title">세트↔베어 자동 매칭</span></div>
-        <div class="notice-date">2026.04.11</div>
-      </div>
-      <div class="notice-item">
-        <div><span class="notice-badge nb-fix">수정</span><span class="notice-title">네이버 가격전송 속도 개선</span></div>
-        <div class="notice-date">2026.04.09</div>
-      </div>
+    <div class="notice-list" id="desktop-notice-list">
+      <div style="padding:20px;text-align:center;color:#9BA3B2;font-size:12px">불러오는 중...</div>
     </div>
   </div>
 </div>
@@ -765,9 +750,7 @@
 <div id="tab-import-invoice" class="tab-content">
   <div class="tab-placeholder">수입제품 · 인보이스 — 추후 구현 예정</div>
 </div>
-<div id="tab-notice" class="tab-content">
-  <div class="tab-placeholder">공지사항 — 추후 구현 예정</div>
-</div>
+<div id="tab-notice" class="tab-content"></div>
 <div id="tab-delivery" class="tab-content">
   <div class="tab-placeholder">택배 — 추후 구현 예정</div>
 </div>
