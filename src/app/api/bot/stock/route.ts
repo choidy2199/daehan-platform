@@ -14,6 +14,7 @@ interface Product {
   model?: string;
   name?: string;
   description?: string;
+  manageCode?: string;
   supplyPrice?: number;
   [key: string]: unknown;
 }
@@ -198,7 +199,8 @@ export async function POST(request: NextRequest) {
 
     let hasStock = false;
     try {
-      const erpResults = await selectItem(product.code);
+      const searchCode = (product.manageCode as string) || product.code;
+      const erpResults = await selectItem(searchCode);
       if (erpResults.length > 0) {
         const jego = parseInt(erpResults[0].JEGO || '0', 10);
         hasStock = jego > 0;
