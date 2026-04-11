@@ -187,7 +187,8 @@ export async function POST(request: NextRequest) {
     if (matched.length >= 2) {
       const lines = matched.map((p, i) => `${i + 1}. ${getModelCode(p)}`);
       const reply = `말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다.\n${lines.join('\n')}`;
-      return NextResponse.json({ success: true, reply, matched: matched.length, product: null });
+      const products = matched.map(p => getModelCode(p));
+      return NextResponse.json({ success: true, reply, matched: matched.length, product: null, products });
     }
 
     // 1건 매칭 → ERP 재고 조회
