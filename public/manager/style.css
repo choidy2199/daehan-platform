@@ -21,10 +21,10 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .top-bar-menu { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; height: 100%; }
 
 /* 메뉴 아이템 공통 */
-.tb-menu { padding: 0 12px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.75); cursor: pointer; white-space: nowrap; flex-shrink: 0; font-family: 'Pretendard', sans-serif; height: 100%; display: inline-flex; align-items: center; gap: 5px; position: relative; transition: color 0.15s, background 0.15s; user-select: none; }
+.tb-menu { padding: 0 14px; font-size: 14.5px; font-weight: 600; color: rgba(255,255,255,0.75); cursor: pointer; white-space: nowrap; flex-shrink: 0; font-family: 'Pretendard', sans-serif; height: 100%; display: inline-flex; align-items: center; gap: 5px; position: relative; transition: color 0.15s, background 0.15s; user-select: none; }
 .tb-menu:hover { color: #fff; background: rgba(255,255,255,0.08); }
 .tb-dot { font-size: 8px; line-height: 1; }
-.tb-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; align-self: center; }
+.tb-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; align-self: center; margin: 0 6px; }
 .tb-menu-spacer { flex: 1; min-width: 8px; }
 .tb-setting { font-weight: 700; }
 
@@ -57,7 +57,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .desktop { display: flex; gap: 24px; padding: 32px 40px 20px; min-height: calc(100vh - 84px); position: relative; background: linear-gradient(155deg, #0e4a6f 0%, #0c7b8a 15%, #14a49c 28%, #2dc4b4 40%, #58d5c8 50%, #88d4d8 58%, #b8c8e8 66%, #d4b8d8 74%, #e8a8c4 82%, #e8b0b8 88%, #d4a0c0 95%); }
 .desktop::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 45% 40%, rgba(80,220,210,0.25), transparent 55%), radial-gradient(ellipse at 70% 75%, rgba(220,160,200,0.2), transparent 50%), radial-gradient(ellipse at 20% 60%, rgba(20,100,180,0.15), transparent 50%); pointer-events: none; }
 .desktop-main { flex: 1; position: relative; z-index: 1; }
-.desktop-grid { display: grid; grid-template-columns: repeat(5, 80px); grid-auto-rows: 100px; gap: 4px 20px; }
+.desktop-grid { display: grid; grid-template-columns: repeat(10, 80px); grid-auto-rows: 110px; gap: 4px 20px; }
 
 /* 아이콘 */
 .fav-icon { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; padding: 8px 4px; border-radius: 10px; transition: all 0.2s; user-select: none; }
@@ -67,10 +67,11 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .fav-icon.bounce { animation: iconBounce 0.3s ease; }
 @keyframes iconBounce { 0% { transform: scale(1); } 30% { transform: scale(0.88); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 
-.fav-icon-box { width: 52px; height: 52px; border-radius: 13px; margin-bottom: 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; transition: box-shadow 0.2s; }
+.fav-icon-box { width: 64px; height: 64px; border-radius: 15px; margin-bottom: 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; transition: box-shadow 0.2s; }
 .fav-icon-box::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 45%; background: linear-gradient(to bottom, rgba(255,255,255,0.22), transparent); pointer-events: none; border-radius: 13px 13px 0 0; }
 .fav-icon-box::before { content: ''; position: absolute; inset: 0; border: 0.5px solid rgba(255,255,255,0.2); border-radius: 13px; pointer-events: none; z-index: 1; }
-.fav-icon-box svg { width: 24px; height: 24px; position: relative; z-index: 1; }
+.fav-icon-box svg { width: 30px; height: 30px; position: relative; z-index: 1; }
+.fav-icon-box img { width: 30px; height: 30px; border-radius: 4px; object-fit: contain; position: relative; z-index: 1; }
 .fav-icon-box.red    { background: linear-gradient(150deg, #c02a42, #E8344E); }
 .fav-icon-box.blue   { background: linear-gradient(150deg, #1c5aa2, #378ADD); }
 .fav-icon-box.green  { background: linear-gradient(150deg, #157a58, #1D9E75); }
@@ -79,24 +80,24 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .fav-icon-box.gray   { background: linear-gradient(150deg, #484845, #6E6E68); }
 .fav-icon-box.teal   { background: linear-gradient(150deg, #0e6e6e, #14a49c); }
 .fav-icon-box.pink   { background: linear-gradient(150deg, #993556, #D4537E); }
-.fav-icon-label { font-size: 11.5px; color: rgba(255,255,255,0.88); line-height: 1.25; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,0.6); font-family: 'Pretendard', sans-serif; font-weight: 600; }
+.fav-icon-label { font-size: 13px; color: rgba(255,255,255,0.88); line-height: 1.25; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,0.6); font-family: 'Pretendard', sans-serif; font-weight: 600; }
 
 /* ==================== 공지사항 패널 ==================== */
 .desktop-notice { width: 256px; background: rgba(255,255,255,0.93); border-radius: 12px; overflow: hidden; z-index: 1; backdrop-filter: blur(12px); border: 0.5px solid rgba(255,255,255,0.15); align-self: flex-start; }
 .notice-header { padding: 10px 14px; border-bottom: 0.5px solid #e5e5e5; display: flex; align-items: center; justify-content: space-between; }
-.notice-header h4 { font-size: 12px; font-weight: 500; margin: 0; color: #1A1D23; }
+.notice-header h4 { font-size: 14px; font-weight: 500; margin: 0; color: #1A1D23; }
 .notice-tabs { display: flex; gap: 3px; }
 .notice-tab { font-size: 10px; padding: 2px 7px; border-radius: 4px; cursor: pointer; color: #999; font-family: 'Pretendard', sans-serif; border: none; background: none; }
 .notice-tab.active { background: #1A1D23; color: #fff; }
 .notice-list { padding: 4px 0; }
 .notice-item { padding: 5px 12px; cursor: pointer; font-family: 'Pretendard', sans-serif; }
 .notice-item:hover { background: #f5f5f5; }
-.notice-badge { font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-right: 4px; font-weight: 500; }
+.notice-badge { font-size: 10.5px; padding: 2px 6px; border-radius: 3px; margin-right: 4px; font-weight: 500; }
 .nb-new { background: #FCEBEB; color: #A32D2D; }
 .nb-update { background: #E6F1FB; color: #185FA5; }
 .nb-fix { background: #EAF3DE; color: #3B6D11; }
-.notice-title { font-size: 11px; color: #1A1D23; }
-.notice-date { font-size: 9.5px; color: #999; margin-top: 1px; }
+.notice-title { font-size: 13px; color: #1A1D23; }
+.notice-date { font-size: 11px; color: #999; margin-top: 1px; }
 
 /* ==================== 컨텍스트 메뉴 ==================== */
 .ctx-menu { position: fixed; background: #fff; border: 0.5px solid #ddd; border-radius: 8px; padding: 3px; box-shadow: 0 6px 16px rgba(0,0,0,0.14); z-index: 9999; min-width: 148px; }
@@ -122,6 +123,23 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .icon-edit-btn:hover { background: #f5f5f5; }
 .icon-edit-btn.primary { background: #1A1D23; color: #fff; border-color: #1A1D23; }
 .icon-edit-btn.danger { background: #fff; color: #CC2222; border-color: #CC2222; }
+
+/* 아이콘 업로드 */
+.icon-upload-area { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.icon-upload-btn { padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; border: 0.5px solid #e5e5e5; background: #fff; color: #333; font-family: 'Pretendard', sans-serif; }
+.icon-upload-btn:hover { background: #f5f5f5; }
+.icon-upload-name { font-size: 10px; color: #999; }
+
+/* 드롭다운 별 표시 */
+.tb-dd-item { display: flex; align-items: center; justify-content: space-between; }
+.dd-star { font-size: 13px; cursor: pointer; flex-shrink: 0; margin-left: 8px; }
+.dd-star.on { color: #EF9F27; }
+.dd-star.off { color: #ccc; }
+
+/* 드롭다운 내 컨텍스트 메뉴 */
+.dd-context { position: absolute; left: 100%; top: 0; margin-left: 4px; background: #fff; border: 0.5px solid #ddd; border-radius: 8px; padding: 3px; box-shadow: 0 6px 16px rgba(0,0,0,0.14); min-width: 148px; z-index: 350; }
+.dd-context .ctx-item { font-size: 12px; padding: 6px 10px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 5px; color: #333; font-family: 'Pretendard', sans-serif; }
+.dd-context .ctx-item:hover { background: #f5f5f5; }
 
 /* 기존 nav 호환 (레거시 — 사용하지 않지만 참조 깨지지 않도록 유지) */
 .btn-ghost { background: rgba(255,255,255,0.15); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'Pretendard', sans-serif; transition: all 0.2s; }

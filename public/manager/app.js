@@ -1471,7 +1471,12 @@ function renderDesktop() {
     el.className = 'fav-icon';
     el.draggable = true;
     el.dataset.idx = index;
-    el.innerHTML = '<div class="fav-icon-box ' + _getIconColor(name) + '">' + _getIconSvg(name) + '</div>'
+    var overrides = _loadIconOverrides();
+    var customImg = overrides[name] && overrides[name].customImage;
+    var iconContent = customImg
+      ? '<img src="' + customImg + '">'
+      : _getIconSvg(name);
+    el.innerHTML = '<div class="fav-icon-box ' + _getIconColor(name) + '">' + iconContent + '</div>'
       + '<div class="fav-icon-label">' + name + '</div>';
     // 좌클릭 → 바운스 + openWindow
     el.addEventListener('click', function(e) {
@@ -1687,9 +1692,18 @@ function _showIconEditModal(name) {
   });
   shapeHtml += '</div>';
 
+  var uploadHtml = '<label>직접 업로드</label>'
+    + '<div class="icon-upload-area">'
+    + '<input type="file" id="icon-upload-input" accept="image/png,image/svg+xml,image/jpeg" style="display:none" onchange="_ieHandleUpload(this)">'
+    + '<button class="icon-upload-btn" onclick="document.getElementById(\'icon-upload-input\').click()">이미지 선택</button>'
+    + '<span class="icon-upload-name" id="icon-upload-name">' + (cur.customImage ? '커스텀 이미지 사용 중' : '선택된 파일 없음') + '</span>'
+    + (cur.customImage ? '<button class="icon-upload-btn" onclick="_ieClearUpload()" style="color:#CC2222">삭제</button>' : '')
+    + '</div>';
+
   modal.innerHTML = '<h3>' + name + ' 아이콘 편집</h3>'
     + '<label>색상</label>' + colorHtml
     + '<label>모양</label>' + shapeHtml
+    + uploadHtml
     + '<div class="icon-edit-actions">'
     + '<button class="icon-edit-btn danger" onclick="_ieRemoveFav(\'' + name + '\')">즐겨찾기 해제</button>'
     + '<div style="flex:1"></div>'
@@ -1711,10 +1725,37 @@ function _ieSelectShape(el, s) {
   el.classList.add('selected');
   document.getElementById('icon-edit-modal')._selectedShape = s;
 }
+function _ieHandleUpload(input) {
+  if (!input.files || !input.files[0]) return;
+  var file = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var modal = document.getElementById('icon-edit-modal');
+    modal._pendingCustomImage = e.target.result;
+    var nameEl = document.getElementById('icon-upload-name');
+    if (nameEl) nameEl.textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+}
+function _ieClearUpload() {
+  var modal = document.getElementById('icon-edit-modal');
+  modal._pendingCustomImage = null;
+  modal._clearCustomImage = true;
+  var nameEl = document.getElementById('icon-upload-name');
+  if (nameEl) nameEl.textContent = '선택된 파일 없음';
+}
 function _ieSave(name) {
   var modal = document.getElementById('icon-edit-modal');
   var overrides = _loadIconOverrides();
-  overrides[name] = { color: modal._selectedColor, shape: modal._selectedShape };
+  var entry = { color: modal._selectedColor, shape: modal._selectedShape };
+  if (modal._pendingCustomImage) {
+    entry.customImage = modal._pendingCustomImage;
+  } else if (modal._clearCustomImage) {
+    // 삭제 요청 — customImage 제거
+  } else if (overrides[name] && overrides[name].customImage) {
+    entry.customImage = overrides[name].customImage;
+  }
+  overrides[name] = entry;
   _saveIconOverrides(overrides);
   _ieClose();
   renderDesktop();
@@ -1798,20 +1839,69 @@ function _closeAllDropdowns() {
   });
 })();
 
-// 드롭다운 서브탭 + 단독 메뉴 우클릭 → 즐겨찾기 등록/해제
+// 드롭다운 서브탭 ★/☆ 별 표시 + 우클릭 인라인 컨텍스트 메뉴
+function _removeInlineCtx() { document.querySelectorAll('.dd-context').forEach(function(c) { c.remove(); }); }
+
+function _updateDdStars() {
+  var favs = _loadFavorites();
+  document.querySelectorAll('.tb-dd-item').forEach(function(item) {
+    var m = (item.getAttribute('onclick') || '').match(/openWindow\('([^']+)'/);
+    if (!m) return;
+    var name = m[1];
+    var star = item.querySelector('.dd-star');
+    if (!star) {
+      star = document.createElement('span');
+      item.appendChild(star);
+    }
+    var isFav = favs.indexOf(name) >= 0;
+    star.className = 'dd-star ' + (isFav ? 'on' : 'off');
+    star.textContent = isFav ? '★' : '☆';
+  });
+}
+
 (function _initMenuContextMenu() {
-  // 드롭다운 서브탭
+  // 초기 별 표시
+  _updateDdStars();
+
+  // 드롭다운 서브탭 우클릭
   document.querySelectorAll('.tb-dd-item').forEach(function(item) {
     item.addEventListener('contextmenu', function(e) {
       e.preventDefault();
       e.stopPropagation();
-      _closeAllDropdowns();
-      // onclick에서 openWindow('이름') 추출
+      _removeInlineCtx();
       var m = (item.getAttribute('onclick') || '').match(/openWindow\('([^']+)'/);
-      if (m) showContextMenu(e.pageX, e.pageY, m[1]);
+      if (!m) return;
+      var itemName = m[1];
+      var favs = _loadFavorites();
+      var isFav = favs.indexOf(itemName) >= 0;
+
+      var ctx = document.createElement('div');
+      ctx.className = 'dd-context';
+      ctx.innerHTML = '<div class="ctx-item" data-action="fav"><span style="color:#EF9F27">' + (isFav ? '★' : '☆') + '</span> ' + (isFav ? '즐겨찾기 해제' : '즐겨찾기 등록') + '</div>'
+        + '<div class="ctx-item" data-action="open">열기</div>';
+      item.style.position = 'relative';
+      item.appendChild(ctx);
+
+      ctx.querySelector('[data-action="fav"]').addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        var f = _loadFavorites();
+        var idx = f.indexOf(itemName);
+        if (idx >= 0) f.splice(idx, 1); else f.push(itemName);
+        _saveFavorites(f);
+        renderDesktop();
+        ctx.remove();
+        _updateDdStars();
+      });
+      ctx.querySelector('[data-action="open"]').addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        ctx.remove();
+        _closeAllDropdowns();
+        openWindow(itemName);
+      });
     });
   });
-  // 단독 메뉴
+
+  // 단독 메뉴 우클릭
   document.querySelectorAll('.tb-solo').forEach(function(item) {
     item.addEventListener('contextmenu', function(e) {
       e.preventDefault();
@@ -1820,6 +1910,9 @@ function _closeAllDropdowns() {
       if (m) showContextMenu(e.pageX, e.pageY, m[1]);
     });
   });
+
+  // 바깥 클릭으로 인라인 컨텍스트 닫기
+  document.addEventListener('click', function() { _removeInlineCtx(); });
 })();
 
 // ======================== TAB SWITCHING ========================
