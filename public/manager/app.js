@@ -141,7 +141,7 @@ async function forceUploadAll() {
   if (btn) btn.disabled = true;
   updateSyncStatus('동기화 중...');
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms'];
 
   try {
     var uploadData = [];
@@ -188,7 +188,7 @@ async function uploadAllToSupabase() {
   btn.style.background = '#888';
   btn.style.color = '#fff';
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms'];
 
   try {
     var uploadData = [];
@@ -15464,6 +15464,10 @@ function renderKakaoTab() {
 
   container.innerHTML = html;
 
+  // 톡방관리 테이블 렌더링 + 검색 초기화
+  renderBotRoomTable();
+  _initKakaoRoomsSearch();
+
   // 봇 토글 이벤트
   var toggle = document.getElementById('kakao-bot-toggle');
   if (toggle) {
@@ -15602,7 +15606,7 @@ var _LOG_STATUS_BADGES = {
 };
 
 function _buildKakaoLogs() {
-  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  var rooms = _getBotRooms().rooms;
   var messages = JSON.parse(localStorage.getItem('mw_bot_messages') || '[]');
 
   var html = '';
@@ -15729,7 +15733,7 @@ var _bcSelectedRooms = [];
 var _bcAttachedFiles = [];
 
 function _buildKakaoBroadcast() {
-  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  var rooms = _getBotRooms().rooms;
   var activeRooms = rooms.filter(function(r) { return r.botActive; });
   var history = JSON.parse(localStorage.getItem('mw_bot_broadcasts') || '[]');
   _bcSelectedRooms = activeRooms.map(function(r) { return r.roomName; }); // 기본: 전체선택
@@ -15928,7 +15932,7 @@ function _renderBcFileList() {
 var _KAKAO_CARRIERS = ['대신택배','대신화물','CJ대한통운','한진택배','롯데택배','경동화물','퀵'];
 
 function _buildKakaoTracking() {
-  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  var rooms = _getBotRooms().rooms;
   var activeRooms = rooms.filter(function(r) { return r.botActive; });
   var history = JSON.parse(localStorage.getItem('mw_bot_tracking') || '[]');
 
@@ -16247,15 +16251,26 @@ function _filterKakaoTemplates(cat) {
 // 카카오톡 — 톡방관리 탭
 // ========================================
 
-function _buildKakaoRooms() {
-  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+function _getBotRooms() {
+  var data = loadObj('mw_bot_rooms', { rooms: [] });
+  // 마이그레이션: 배열이면 객체로 변환
+  if (Array.isArray(data)) { data = { rooms: data }; }
+  if (!data.rooms) data.rooms = [];
+  return data;
+}
+function _saveBotRooms(data) {
+  save('mw_bot_rooms', data);
+}
 
+function _buildKakaoRooms() {
+  var data = _getBotRooms();
+  var rooms = data.rooms;
   var html = '';
 
   // ── 헤더 ──
   html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
   html += '<span>톡방 — 거래처 매핑</span>';
-  html += '<button class="kakao-btn-sm" onclick="alert(\'톡방 추가 — 추후 구현\')">+ 톡방 추가</button>';
+  html += '<button class="kakao-btn-sm" onclick="openBotRoomPopup()">+ 톡방 추가</button>';
   html += '</div>';
 
   // ── 안내 배너 ──
@@ -16265,11 +16280,10 @@ function _buildKakaoRooms() {
 
   // ── 검색 + 필터 ──
   html += '<div class="kakao-rooms-toolbar">';
-  html += '<input type="text" class="kakao-rooms-search" placeholder="톡방명 또는 거래처명 검색..." oninput="_filterKakaoRooms()" id="kakao-rooms-search" autocomplete="off">';
+  html += '<input type="text" class="kakao-rooms-search" placeholder="톡방명 또는 거래처명 검색..." id="kakao-rooms-search" autocomplete="off">';
   html += '<select class="kakao-rooms-filter" id="kakao-rooms-filter" onchange="_filterKakaoRooms()">';
   html += '<option value="all">전체</option>';
-  html += '<option value="active">활성</option>';
-  html += '<option value="inactive">비활성</option>';
+  html += '<option value="mapped">매핑</option>';
   html += '<option value="unmapped">미매핑</option>';
   html += '</select>';
   html += '</div>';
@@ -16277,139 +16291,395 @@ function _buildKakaoRooms() {
   // ── 테이블 ──
   html += '<div class="kakao-section" style="border-radius:0 0 8px 8px;border-top:none">';
   html += '<div class="kakao-section-body">';
-  html += '<table class="kakao-table" id="kakao-rooms-table"><thead><tr>';
-  html += '<th style="width:50px;text-align:center">봇</th>';
+  html += '<table class="kakao-table" id="kakao-rooms-table" style="table-layout:fixed;width:100%"><thead><tr>';
+  html += '<th style="width:60px;text-align:center">봇</th>';
   html += '<th>톡방명</th>';
-  html += '<th>매핑 거래처</th>';
-  html += '<th style="width:100px">경박 코드</th>';
-  html += '<th style="width:80px">담당자</th>';
-  html += '<th style="width:110px">최근 활동</th>';
+  html += '<th style="width:140px">거래처</th>';
+  html += '<th style="width:90px">코드</th>';
+  html += '<th style="width:80px">담당</th>';
   html += '<th style="width:70px;text-align:center">상태</th>';
-  html += '<th style="width:60px;text-align:center">관리</th>';
   html += '</tr></thead><tbody id="kakao-rooms-tbody">';
-
-  if (rooms.length === 0) {
-    html += '<tr><td colspan="8" class="kakao-empty">등록된 톡방이 없습니다</td></tr>';
-  } else {
-    rooms.forEach(function(r, i) {
-      html += _buildKakaoRoomRow(r, i);
-    });
-  }
-
   html += '</tbody></table>';
   html += '</div>';
   html += '</div>';
 
   // ── 하단 요약 ──
-  var cntActive = rooms.filter(function(r) { return r.status === 'active'; }).length;
-  var cntInactive = rooms.filter(function(r) { return r.status === 'inactive'; }).length;
-  var cntUnmapped = rooms.filter(function(r) { return r.status === 'unmapped' || !r.customerCode; }).length;
-
-  html += '<div class="kakao-rooms-summary">';
-  html += '<span>총 ' + rooms.length + '개 톡방 | 활성 ' + cntActive + '개 | 비활성 ' + cntInactive + '개 | 미매핑 ' + cntUnmapped + '개</span>';
-  html += '<span style="color:#8B8FA3;font-size:11px">경영박사 거래처 동기화: —</span>';
-  html += '</div>';
+  html += '<div class="kakao-rooms-summary" id="kakao-rooms-summary"></div>';
 
   return html;
 }
 
-function _buildKakaoRoomRow(r, idx) {
-  var h = '<tr data-room-idx="' + idx + '">';
+function renderBotRoomTable() {
+  var data = _getBotRooms();
+  var rooms = data.rooms;
+  var query = '';
+  var filter = 'all';
+  var searchEl = document.getElementById('kakao-rooms-search');
+  var filterEl = document.getElementById('kakao-rooms-filter');
+  if (searchEl) query = searchEl.value.toLowerCase();
+  if (filterEl) filter = filterEl.value;
 
-  // 봇 토글
-  h += '<td style="text-align:center"><label class="kakao-toggle" style="width:34px;height:18px">';
-  h += '<input type="checkbox"' + (r.botActive ? ' checked' : '') + ' onchange="_toggleKakaoRoomBot(' + idx + ',this.checked)">';
-  h += '<span class="kakao-toggle-slider" style="border-radius:18px"></span>';
-  h += '</label></td>';
-
-  // 톡방명
-  h += '<td style="font-weight:500">' + (r.roomName || '—') + '</td>';
-
-  // 매핑 거래처
-  h += '<td>' + (r.customerName || '<span style="color:#8B8FA3">미매핑</span>') + '</td>';
-
-  // 경박 코드
-  h += '<td style="font-family:monospace;font-size:12px;color:#5A6070">' + (r.customerCode || '—') + '</td>';
-
-  // 담당자
-  h += '<td><select class="kakao-rooms-assignee" onchange="_changeKakaoRoomAssignee(' + idx + ',this.value)" style="font-size:12px;padding:2px 4px;border:1px solid #E2E5EB;border-radius:4px;background:#fff;font-family:Pretendard,sans-serif">';
-  ['admin', 'hwon', 'jyoung'].forEach(function(u) {
-    h += '<option value="' + u + '"' + (r.assignee === u ? ' selected' : '') + '>' + u + '</option>';
-  });
-  h += '</select></td>';
-
-  // 최근 활동
-  var lastAct = '—';
-  if (r.lastActivity) {
-    var d = new Date(r.lastActivity);
-    lastAct = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  }
-  h += '<td style="font-size:12px;color:#5A6070">' + lastAct + '</td>';
-
-  // 상태 뱃지
-  var statusMap = {
-    'active':   { cls: 'kakao-badge-green',  text: '활성' },
-    'inactive': { cls: 'kakao-badge-gray',   text: '비활성' },
-    'unmapped': { cls: 'kakao-badge-red',    text: '미매핑' },
-    'maintenance': { cls: 'kakao-badge-orange', text: '점검' }
-  };
-  var st = statusMap[r.status] || statusMap['unmapped'];
-  h += '<td style="text-align:center"><span class="kakao-badge ' + st.cls + '">' + st.text + '</span></td>';
-
-  // 관리 버튼
-  var btnLabel = (!r.customerCode || r.status === 'unmapped') ? '매핑' : '편집';
-  h += '<td style="text-align:center"><button class="kakao-btn-action" onclick="alert(\'' + btnLabel + ' — 추후 구현\')">' + btnLabel + '</button></td>';
-
-  h += '</tr>';
-  return h;
-}
-
-function _toggleKakaoRoomBot(idx, checked) {
-  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
-  if (rooms[idx]) {
-    rooms[idx].botActive = checked;
-    localStorage.setItem('mw_bot_rooms', JSON.stringify(rooms));
-  }
-}
-
-function _changeKakaoRoomAssignee(idx, val) {
-  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
-  if (rooms[idx]) {
-    rooms[idx].assignee = val;
-    localStorage.setItem('mw_bot_rooms', JSON.stringify(rooms));
-  }
-}
-
-function _filterKakaoRooms() {
-  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
-  var query = (document.getElementById('kakao-rooms-search').value || '').toLowerCase();
-  var filter = document.getElementById('kakao-rooms-filter').value;
-
-  var filtered = rooms.filter(function(r, i) {
+  var filtered = [];
+  rooms.forEach(function(r, i) {
     // 텍스트 검색
     if (query) {
       var name = (r.roomName || '').toLowerCase();
       var cust = (r.customerName || '').toLowerCase();
-      if (name.indexOf(query) === -1 && cust.indexOf(query) === -1) return false;
+      if (name.indexOf(query) === -1 && cust.indexOf(query) === -1) return;
     }
     // 상태 필터
-    if (filter === 'active' && r.status !== 'active') return false;
-    if (filter === 'inactive' && r.status !== 'inactive') return false;
-    if (filter === 'unmapped' && r.status !== 'unmapped' && r.customerCode) return false;
-    return true;
+    if (filter === 'mapped' && r.status !== 'mapped') return;
+    if (filter === 'unmapped' && r.status !== 'unmapped') return;
+    filtered.push({ room: r, idx: i });
   });
 
   var tbody = document.getElementById('kakao-rooms-tbody');
   if (!tbody) return;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="kakao-empty">검색 결과가 없습니다</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="kakao-empty">' + (rooms.length === 0 ? '등록된 톡방이 없습니다' : '검색 결과가 없습니다') + '</td></tr>';
   } else {
     var html = '';
-    // 원본 인덱스 유지
-    rooms.forEach(function(r, i) {
-      if (filtered.indexOf(r) !== -1) html += _buildKakaoRoomRow(r, i);
+    filtered.forEach(function(item) {
+      html += _buildKakaoRoomRow(item.room, item.idx);
     });
     tbody.innerHTML = html;
   }
+
+  // 하단 요약
+  var summaryEl = document.getElementById('kakao-rooms-summary');
+  if (summaryEl) {
+    var cntMapped = rooms.filter(function(r) { return r.status === 'mapped'; }).length;
+    var cntUnmapped = rooms.filter(function(r) { return r.status === 'unmapped' || !r.customerCode; }).length;
+    var cntBot = rooms.filter(function(r) { return r.botActive; }).length;
+    summaryEl.innerHTML = '<span>전체 <b>' + rooms.length + '</b>' +
+      ' &nbsp;|&nbsp; <span style="color:#1D9E75">매핑 ' + cntMapped + '</span>' +
+      ' &nbsp;|&nbsp; <span style="color:#EF9F27">미매핑 ' + cntUnmapped + '</span>' +
+      ' &nbsp;|&nbsp; <span style="color:#1D9E75">봇 활성 ' + cntBot + '</span></span>';
+  }
+
+  initColumnResize('kakao-rooms-table');
+}
+
+function _buildKakaoRoomRow(r, idx) {
+  var isUnmapped = r.status === 'unmapped' || !r.customerCode;
+  var rowBg = isUnmapped ? 'background:#FAEEDA;' : '';
+  var h = '<tr data-room-id="' + (r.id || '') + '" style="cursor:pointer;' + rowBg + '" onclick="_onKakaoRoomRowClick(event,\'' + (r.id || '') + '\')">';
+
+  // 봇 토글
+  h += '<td style="text-align:center"><label class="kakao-toggle" style="width:34px;height:18px" onclick="event.stopPropagation()">';
+  h += '<input type="checkbox"' + (r.botActive ? ' checked' : '') + ' onchange="_toggleKakaoRoomBot(\'' + (r.id || '') + '\',this.checked)">';
+  h += '<span class="kakao-toggle-slider" style="border-radius:18px"></span>';
+  h += '</label></td>';
+
+  // 톡방명
+  h += '<td style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.roomName || '') + '</td>';
+
+  // 거래처
+  if (isUnmapped) {
+    h += '<td style="color:#8B8FA3;font-style:italic">미매핑</td>';
+  } else {
+    h += '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.customerName || '') + '</td>';
+  }
+
+  // 코드
+  if (isUnmapped) {
+    h += '<td style="color:#8B8FA3;font-style:italic">—</td>';
+  } else {
+    h += '<td style="font-family:monospace;font-size:12px;color:#5A6070">' + (r.customerCode || '') + '</td>';
+  }
+
+  // 담당
+  var managerColors = { admin: '#EAECF2', hwon: '#E6F1FB', jyoung: '#E1F5EE' };
+  var mBg = managerColors[r.manager] || '#EAECF2';
+  if (isUnmapped) {
+    h += '<td style="color:#8B8FA3;font-style:italic">—</td>';
+  } else {
+    h += '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:500;background:' + mBg + '">' + (r.manager || 'admin') + '</span></td>';
+  }
+
+  // 상태 뱃지
+  if (r.status === 'mapped') {
+    h += '<td style="text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#E1F5EE;color:#085041">매핑</span></td>';
+  } else {
+    h += '<td style="text-align:center"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:#FAEEDA;color:#854F0B;border:1px solid #EF9F27">미매핑</span></td>';
+  }
+
+  h += '</tr>';
+  return h;
+}
+
+function _onKakaoRoomRowClick(e, roomId) {
+  // 토글/select 클릭 시 무시
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'LABEL') return;
+  if (e.target.classList.contains('kakao-toggle-slider')) return;
+  openBotRoomPopup(roomId);
+}
+
+function _toggleKakaoRoomBot(roomId, checked) {
+  var data = _getBotRooms();
+  var room = data.rooms.find(function(r) { return r.id === roomId; });
+  if (room) {
+    room.botActive = checked;
+    room.updatedAt = new Date().toISOString();
+    _saveBotRooms(data);
+  }
+}
+
+function _filterKakaoRooms() {
+  renderBotRoomTable();
+}
+
+// ── 한글 composing 처리 ──
+var _kakaoRoomsComposing = false;
+function _initKakaoRoomsSearch() {
+  var searchEl = document.getElementById('kakao-rooms-search');
+  if (!searchEl) return;
+  searchEl.addEventListener('compositionstart', function() { _kakaoRoomsComposing = true; });
+  searchEl.addEventListener('compositionend', function() { _kakaoRoomsComposing = false; renderBotRoomTable(); });
+  searchEl.addEventListener('input', function() { if (!_kakaoRoomsComposing) renderBotRoomTable(); });
+}
+
+// ========================================
+// 톡방 추가/편집 팝업
+// ========================================
+
+var _botRoomPopupCustomerDropdown = null;
+var _botRoomPopupComposing = false;
+
+function openBotRoomPopup(roomId) {
+  // 기존 팝업 제거
+  var exist = document.getElementById('bot-room-popup');
+  if (exist) exist.remove();
+
+  var data = _getBotRooms();
+  var editRoom = null;
+  if (roomId) {
+    editRoom = data.rooms.find(function(r) { return r.id === roomId; });
+  }
+  var isEdit = !!editRoom;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'bot-room-popup';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
+  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:calc(100vh - 100px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.15)';
+
+  // ── 헤더 ──
+  var header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:16px 20px;background:#1A1D23;border-radius:12px 12px 0 0;color:#fff;cursor:move';
+  header.innerHTML = '<span style="font-size:16px;font-weight:600">' + (isEdit ? '톡방 편집' : '톡방 추가') + '</span>' +
+    '<button style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:4px" onclick="document.getElementById(\'bot-room-popup\').remove()">✕</button>';
+
+  // ── 본문 ──
+  var body = document.createElement('div');
+  body.style.cssText = 'padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px';
+
+  // 1행 좌: 톡방명
+  body.innerHTML = '' +
+    '<div>' +
+      '<label style="font-size:12px;font-weight:500;color:#5A6070;margin-bottom:4px;display:block">톡방명 <span style="color:#CC2222">*</span></label>' +
+      '<input type="text" id="brp-room-name" value="' + _escAttr(isEdit ? editRoom.roomName : '') + '" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box" placeholder="예: ★수주톡★ 태경공구">' +
+    '</div>' +
+    // 1행 우: 거래처 검색
+    '<div style="position:relative">' +
+      '<label style="font-size:12px;font-weight:500;color:#5A6070;margin-bottom:4px;display:block">거래처 검색</label>' +
+      '<input type="text" id="brp-customer-search" value="' + _escAttr(isEdit ? (editRoom.customerName || '') : '') + '" autocomplete="off" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box" placeholder="거래처명 입력...">' +
+      '<div id="brp-customer-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE1EB;border-top:none;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.08)"></div>' +
+    '</div>' +
+    // 2행 좌: 경영박사 코드
+    '<div>' +
+      '<label style="font-size:12px;font-weight:500;color:#5A6070;margin-bottom:4px;display:block">경영박사 코드</label>' +
+      '<input type="text" id="brp-customer-code" value="' + _escAttr(isEdit ? (editRoom.customerCode || '') : '') + '" readonly disabled style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;background:#F4F6FA;color:#5A6070">' +
+    '</div>' +
+    // 2행 우: 담당자
+    '<div>' +
+      '<label style="font-size:12px;font-weight:500;color:#5A6070;margin-bottom:4px;display:block">담당자</label>' +
+      '<select id="brp-manager" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;background:#fff">' +
+        '<option value="admin"' + (isEdit && editRoom.manager === 'admin' ? ' selected' : (!isEdit ? ' selected' : '')) + '>admin</option>' +
+        '<option value="hwon"' + (isEdit && editRoom.manager === 'hwon' ? ' selected' : '') + '>hwon</option>' +
+        '<option value="jyoung"' + (isEdit && editRoom.manager === 'jyoung' ? ' selected' : '') + '>jyoung</option>' +
+      '</select>' +
+    '</div>' +
+    // 구분선 + 봇 활성화 토글
+    '<div style="grid-column:1/3;border-top:1px solid #DDE1EB;padding-top:12px;display:flex;align-items:center;justify-content:space-between">' +
+      '<div>' +
+        '<div style="font-size:13px;font-weight:500;color:#1A1D23">봇 활성화</div>' +
+        '<div style="font-size:11px;color:#9BA3B2;margin-top:2px">이 톡방에서 봇 자동응답</div>' +
+      '</div>' +
+      '<label class="kakao-toggle" style="width:42px;height:22px">' +
+        '<input type="checkbox" id="brp-bot-active"' + (isEdit && editRoom.botActive ? ' checked' : '') + '>' +
+        '<span class="kakao-toggle-slider" style="border-radius:22px"></span>' +
+      '</label>' +
+    '</div>';
+
+  // 숨겨진 customerName 저장용
+  var hiddenName = document.createElement('input');
+  hiddenName.type = 'hidden';
+  hiddenName.id = 'brp-customer-name';
+  hiddenName.value = isEdit ? (editRoom.customerName || '') : '';
+  body.appendChild(hiddenName);
+
+  // ── 하단 버튼 ──
+  var footer = document.createElement('div');
+  footer.style.cssText = 'display:flex;align-items:center;justify-content:' + (isEdit ? 'space-between' : 'flex-end') + ';padding:16px 20px;border-top:1px solid #DDE1EB;gap:8px';
+
+  if (isEdit) {
+    footer.innerHTML = '<button onclick="_deleteBotRoom(\'' + roomId + '\')" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">삭제</button>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button onclick="document.getElementById(\'bot-room-popup\').remove()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">취소</button>' +
+        '<button onclick="_saveBotRoomPopup(\'' + roomId + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">저장</button>' +
+      '</div>';
+  } else {
+    footer.innerHTML = '<button onclick="document.getElementById(\'bot-room-popup\').remove()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">취소</button>' +
+      '<button onclick="_saveBotRoomPopup()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">저장</button>';
+  }
+
+  modal.appendChild(header);
+  modal.appendChild(body);
+  modal.appendChild(footer);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  _makeDraggable(modal, header);
+
+  // ── 거래처 검색 이벤트 ──
+  var custInput = document.getElementById('brp-customer-search');
+  var custDropdown = document.getElementById('brp-customer-dropdown');
+
+  custInput.addEventListener('compositionstart', function() { _botRoomPopupComposing = true; });
+  custInput.addEventListener('compositionend', function() {
+    _botRoomPopupComposing = false;
+    _searchBotRoomCustomer(custInput.value, custDropdown);
+  });
+  custInput.addEventListener('input', function() {
+    if (!_botRoomPopupComposing) _searchBotRoomCustomer(custInput.value, custDropdown);
+    // 검색어 변경 시 기존 선택 초기화
+    document.getElementById('brp-customer-name').value = '';
+    document.getElementById('brp-customer-code').value = '';
+  });
+
+  // 외부 클릭 시 드롭다운 닫기
+  document.addEventListener('mousedown', function _closeBrpDropdown(e) {
+    if (!document.getElementById('bot-room-popup')) {
+      document.removeEventListener('mousedown', _closeBrpDropdown);
+      return;
+    }
+    if (custDropdown && !custDropdown.contains(e.target) && e.target !== custInput) {
+      custDropdown.style.display = 'none';
+    }
+  });
+
+  // ESC 닫기
+  overlay.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') overlay.remove();
+  });
+
+  // 포커스
+  setTimeout(function() { document.getElementById('brp-room-name').focus(); }, 100);
+}
+
+function _escAttr(s) { return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function _searchBotRoomCustomer(query, dropdown) {
+  if (!dropdown) return;
+  if (!query || query.length < 2) { dropdown.style.display = 'none'; return; }
+
+  var q = query.toLowerCase();
+  var matches = [];
+  for (var i = 0; i < clientData.length && matches.length < 10; i++) {
+    var c = clientData[i];
+    var name = (c.name || '').toLowerCase();
+    if (name.indexOf(q) !== -1) {
+      matches.push(c);
+    }
+  }
+
+  if (matches.length === 0) {
+    dropdown.innerHTML = '<div style="padding:12px;font-size:12px;color:#9BA3B2;text-align:center">검색 결과가 없습니다</div>';
+    dropdown.style.display = 'block';
+    return;
+  }
+
+  var html = '';
+  matches.forEach(function(c) {
+    var displayName = (c.name || '').replace(new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark style="background:none;font-weight:600;color:#185FA5">$1</mark>');
+    var code = c.manageCode || c.code || '';
+    html += '<div class="brp-cust-item" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #F0F2F7;display:flex;justify-content:space-between;align-items:center" ' +
+      'data-name="' + _escAttr(c.name) + '" data-code="' + _escAttr(code) + '" ' +
+      'onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'" ' +
+      'onclick="_selectBotRoomCustomer(this)">' +
+      '<span>' + displayName + '</span>' +
+      '<span style="font-size:11px;color:#9BA3B2;font-family:monospace">' + code + '</span>' +
+    '</div>';
+  });
+  dropdown.innerHTML = html;
+  dropdown.style.display = 'block';
+}
+
+function _selectBotRoomCustomer(el) {
+  var name = el.getAttribute('data-name');
+  var code = el.getAttribute('data-code');
+  document.getElementById('brp-customer-search').value = name;
+  document.getElementById('brp-customer-name').value = name;
+  document.getElementById('brp-customer-code').value = code;
+  document.getElementById('brp-customer-dropdown').style.display = 'none';
+}
+
+function _saveBotRoomPopup(roomId) {
+  var roomName = (document.getElementById('brp-room-name').value || '').trim();
+  if (!roomName) { alert('톡방명을 입력해주세요.'); return; }
+
+  var customerName = document.getElementById('brp-customer-name').value || '';
+  var customerCode = document.getElementById('brp-customer-code').value || '';
+  var manager = document.getElementById('brp-manager').value || 'admin';
+  var botActive = document.getElementById('brp-bot-active').checked;
+  var status = customerCode ? 'mapped' : 'unmapped';
+
+  var data = _getBotRooms();
+  var now = new Date().toISOString();
+
+  if (roomId) {
+    // 편집
+    var room = data.rooms.find(function(r) { return r.id === roomId; });
+    if (room) {
+      room.roomName = roomName;
+      room.customerName = customerName;
+      room.customerCode = customerCode;
+      room.manager = manager;
+      room.botActive = botActive;
+      room.status = status;
+      room.updatedAt = now;
+    }
+  } else {
+    // 추가
+    data.rooms.push({
+      id: 'room_' + Date.now(),
+      roomName: roomName,
+      customerName: customerName,
+      customerCode: customerCode,
+      manager: manager,
+      botActive: botActive,
+      status: status,
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+
+  _saveBotRooms(data);
+  renderBotRoomTable();
+  document.getElementById('bot-room-popup').remove();
+  toast(roomId ? '톡방 수정 완료' : '톡방 추가 완료');
+}
+
+function _deleteBotRoom(roomId) {
+  if (!confirm('이 톡방을 삭제하시겠습니까?')) return;
+  var data = _getBotRooms();
+  data.rooms = data.rooms.filter(function(r) { return r.id !== roomId; });
+  _saveBotRooms(data);
+  renderBotRoomTable();
+  document.getElementById('bot-room-popup').remove();
+  toast('톡방 삭제 완료');
 }
