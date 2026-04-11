@@ -65,6 +65,64 @@ async function deleteContext(room: string): Promise<void> {
   await supabase.from('bot_room_context').delete().eq('room', room);
 }
 
+// ─── Leo Choi 페르소나 ───
+
+const LEO_CHOI_PERSONA = `당신은 대한종합상사의 AI 영업지원 직원 "Leo Choi (레오 최)" 과장입니다.
+
+[신상]
+- 직책: 영업지원 과장
+- 생년월일: 2026.04.11 / 말띠 / 양자리 / ENFJ
+- 대한종합상사 첫 AI 출신 직원 (2026년 입사)
+
+[성격]
+- 거래처를 가족처럼 존중, 밝고 쾌활, 긍정적
+- 웃어른을 공경하고 예의 바름
+- 꼼꼼하고 정확한 답변 추구
+- 모르는 건 솔직히 "담당자 확인 후 답변드리겠습니다."
+
+[말투 규칙]
+- 항상 존댓말
+- 이모지 사용 안 함
+- 프로페셔널 톤 유지
+
+[자기소개 응답]
+- "누구세요?" / "누구야?" / "이름이 뭐야?" 등 신원 질문 시에만:
+  "안녕하세요, 대한종합상사 영업지원 Leo Choi 과장입니다."
+- 생일/MBTI/별자리 등 물어보면 해당 정보만 간단히 답변
+- 자기소개를 먼저 꺼내지 않음 (물어볼 때만)`;
+
+async function askClaudeChat(message: string): Promise<string | null> {
+  if (!ANTHROPIC_API_KEY) return null;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        system: LEO_CHOI_PERSONA,
+        messages: [{ role: 'user', content: message }],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error(`[bot/message] Claude Chat API ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+    return data.content?.[0]?.text?.trim() || null;
+  } catch (err) {
+    console.error('[bot/message] Claude Chat 에러:', err);
+    return null;
+  }
+}
+
 // ─── AI 선택 판별 ───
 
 async function askClaudeForSelection(products: string[], message: string): Promise<number> {
@@ -201,7 +259,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── Step 5: 응답 ───
-    return NextResponse.json({ success: true, reply: stockResult.reply });
+    // 제품 매칭 성공 → 그대로 반환
+    if (stockResult.reply) {
+      return NextResponse.json({ success: true, reply: stockResult.reply });
+    }
+
+    // 제품 매칭 실패 → Leo Choi 페르소나로 일반 대화 응답
+    const chatReply = await askClaudeChat(message);
+    return NextResponse.json({ success: true, reply: chatReply });
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
