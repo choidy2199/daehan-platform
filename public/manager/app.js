@@ -1371,25 +1371,50 @@ function debounce(fn, delay) {
 
 // ======================== WINDOW MANAGEMENT ========================
 
-// 윈도우 이름 → 탭 ID 매핑
+// SVG 아이콘 라이브러리
+var _svgIcons = {
+  '단가표': '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#fff" stroke-width="1.5"/><line x1="3" y1="9" x2="21" y2="9" stroke="#fff" stroke-width="1.5"/><line x1="3" y1="15" x2="21" y2="15" stroke="#fff" stroke-width="1.5"/><line x1="9" y1="3" x2="9" y2="21" stroke="#fff" stroke-width="1.5"/></svg>',
+  '발주': '<svg viewBox="0 0 24 24" fill="none"><path d="M21 10V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l2-1.14" stroke="#fff" stroke-width="1.5"/><polyline points="7.5 4.21 12 6.81 16.5 4.21" stroke="#fff" stroke-width="1.5"/><line x1="12" y1="6.81" x2="12" y2="12" stroke="#fff" stroke-width="1.5"/><path d="M17 21l5-5m0 4.5V16h-4.5" stroke="#fff" stroke-width="1.5"/></svg>',
+  '세트및분해': '<svg viewBox="0 0 24 24" fill="none"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke="#fff" stroke-width="1.5"/></svg>',
+  '일반단가표': '<svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="#fff" stroke-width="1.5"/><polyline points="14 2 14 8 20 8" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="13" x2="16" y2="13" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="17" x2="13" y2="17" stroke="#fff" stroke-width="1.5"/></svg>',
+  '매출': '<svg viewBox="0 0 24 24" fill="none"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" stroke="#fff" stroke-width="1.5"/><polyline points="16 7 22 7 22 13" stroke="#fff" stroke-width="1.5"/></svg>',
+  '매입': '<svg viewBox="0 0 24 24" fill="none"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7" stroke="#fff" stroke-width="1.5"/><polyline points="16 17 22 17 22 11" stroke="#fff" stroke-width="1.5"/></svg>',
+  '견적': '<svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="#fff" stroke-width="1.5"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#fff" stroke-width="1.5"/></svg>',
+  '온라인': '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="21" r="1" stroke="#fff" stroke-width="1.5"/><circle cx="20" cy="21" r="1" stroke="#fff" stroke-width="1.5"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="#fff" stroke-width="1.5"/></svg>',
+  '마케팅': '<svg viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="#fff" stroke-width="1.5"/></svg>',
+  '제품': '<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="#fff" stroke-width="1.5"/><path d="M16 7V5a4 4 0 00-8 0v2" stroke="#fff" stroke-width="1.5"/></svg>',
+  '수입계산기': '<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="2" width="16" height="20" rx="2" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="6" x2="16" y2="6" stroke="#fff" stroke-width="1.5"/><rect x="7" y="10" width="3" height="2" rx="0.5" stroke="#fff" stroke-width="1"/><rect x="14" y="10" width="3" height="2" rx="0.5" stroke="#fff" stroke-width="1"/><rect x="7" y="14" width="3" height="2" rx="0.5" stroke="#fff" stroke-width="1"/><rect x="14" y="14" width="3" height="2" rx="0.5" stroke="#fff" stroke-width="1"/></svg>',
+  '인보이스': '<svg viewBox="0 0 24 24" fill="none"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2-3-2z" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="8" x2="16" y2="8" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="12" x2="16" y2="12" stroke="#fff" stroke-width="1.5"/></svg>',
+  '택배': '<svg viewBox="0 0 24 24" fill="none"><rect x="1" y="6" width="15" height="13" rx="1" stroke="#fff" stroke-width="1.5"/><path d="M16 10h4l3 4v5h-7V10z" stroke="#fff" stroke-width="1.5"/><circle cx="7" cy="19" r="2" stroke="#fff" stroke-width="1.5"/><circle cx="19" cy="19" r="2" stroke="#fff" stroke-width="1.5"/></svg>',
+  '검색': '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="#fff" stroke-width="1.5"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="#fff" stroke-width="1.5"/></svg>',
+  '카톡': '<svg viewBox="0 0 24 24" fill="none"><path d="M12 3C6.48 3 2 6.58 2 11c0 2.83 1.88 5.32 4.7 6.72L5.7 21l4.08-2.12c.72.12 1.46.12 2.22.12 5.52 0 10-3.58 10-8s-4.48-8-10-8z" stroke="#fff" stroke-width="1.5"/></svg>',
+  '공지': '<svg viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="#fff" stroke-width="1.5"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="#fff" stroke-width="1.5"/></svg>',
+  '설정': '<svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3" stroke="#fff" stroke-width="1.5"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" stroke="#fff" stroke-width="1.5"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="#fff" stroke-width="1.5"/></svg>',
+  '밀워키 리베이트': '<svg viewBox="0 0 24 24" fill="none"><line x1="12" y1="1" x2="12" y2="23" stroke="#fff" stroke-width="1.5"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="#fff" stroke-width="1.5"/></svg>',
+  '온라인 수수료': '<svg viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="2.5" stroke="#fff" stroke-width="1.5"/><circle cx="16" cy="16" r="2.5" stroke="#fff" stroke-width="1.5"/><line x1="19" y1="5" x2="5" y2="19" stroke="#fff" stroke-width="1.5"/></svg>',
+  '데이터관리': '<svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3" stroke="#fff" stroke-width="1.5"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" stroke="#fff" stroke-width="1.5"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="#fff" stroke-width="1.5"/></svg>',
+  'API관리': '<svg viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="#fff" stroke-width="1.5"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="#fff" stroke-width="1.5"/></svg>'
+};
+
+// 윈도우 이름 → 탭 ID + 색상 매핑
 var _windowConfig = {
-  '단가표':     { tabId: 'mw-price',       icon: '📊', gradient: 'linear-gradient(135deg, #E8344E, #C0392B)' },
-  '발주':       { tabId: 'mw-order',       icon: '📦', gradient: 'linear-gradient(135deg, #E8344E, #C0392B)' },
-  '세트및분해': { tabId: 'mw-set',         icon: '🔧', gradient: 'linear-gradient(135deg, #E8344E, #C0392B)' },
-  '일반단가표': { tabId: 'gen-price',      icon: '📋', gradient: 'linear-gradient(135deg, #D4A843, #B8860B)' },
-  '매출':       { tabId: 'gen-trade',      icon: '📈', gradient: 'linear-gradient(135deg, #D4A843, #B8860B)' },
-  '매입':       { tabId: 'gen-trade',      icon: '📉', gradient: 'linear-gradient(135deg, #D4A843, #B8860B)' },
-  '견적':       { tabId: 'search',         icon: '✏️', gradient: 'linear-gradient(135deg, #D4A843, #B8860B)' },
-  '온라인':     { tabId: 'sales-online',   icon: '🛒', gradient: 'linear-gradient(135deg, #7F77DD, #534AB7)' },
-  '마케팅':     { tabId: 'sales-marketing',icon: '📣', gradient: 'linear-gradient(135deg, #7F77DD, #534AB7)' },
-  '제품':       { tabId: 'import-product', icon: '🌐', gradient: 'linear-gradient(135deg, #14A49C, #0F6E56)' },
-  '수입계산기': { tabId: 'import-calc',    icon: '🧮', gradient: 'linear-gradient(135deg, #14A49C, #0F6E56)' },
-  '인보이스':   { tabId: 'import-invoice', icon: '📄', gradient: 'linear-gradient(135deg, #14A49C, #0F6E56)' },
-  '택배':       { tabId: 'delivery',       icon: '🚚', gradient: 'linear-gradient(135deg, #14a49c, #0F6E56)' },
-  '검색':       { tabId: 'search',         icon: '🔍', gradient: 'linear-gradient(135deg, #9B93FF, #7F77DD)' },
-  '카톡':       { tabId: 'kakao',          icon: '💬', gradient: 'linear-gradient(135deg, #E87FAD, #D4537E)' },
-  '공지':       { tabId: 'notice',         icon: '📢', gradient: 'linear-gradient(135deg, #7FE0C0, #5DCAA5)' },
-  '설정':       { tabId: 'setting',        icon: '⚙️', gradient: 'linear-gradient(135deg, #8891A1, #5A6070)' }
+  '단가표':     { tabId: 'mw-price',       color: 'red' },
+  '발주':       { tabId: 'mw-order',       color: 'red' },
+  '세트및분해': { tabId: 'mw-set',         color: 'red' },
+  '일반단가표': { tabId: 'gen-price',      color: 'orange' },
+  '매출':       { tabId: 'gen-trade',      color: 'orange' },
+  '매입':       { tabId: 'gen-trade',      color: 'orange' },
+  '견적':       { tabId: 'search',         color: 'orange' },
+  '온라인':     { tabId: 'sales-online',   color: 'purple' },
+  '마케팅':     { tabId: 'sales-marketing',color: 'purple' },
+  '제품':       { tabId: 'import-product', color: 'teal' },
+  '수입계산기': { tabId: 'import-calc',    color: 'teal' },
+  '인보이스':   { tabId: 'import-invoice', color: 'teal' },
+  '택배':       { tabId: 'delivery',       color: 'teal' },
+  '검색':       { tabId: 'search',         color: 'purple' },
+  '카톡':       { tabId: 'kakao',          color: 'pink' },
+  '공지':       { tabId: 'notice',         color: 'green' },
+  '설정':       { tabId: 'setting',        color: 'gray' }
 };
 
 var _openWindows = [];    // 열린 창 이름 목록 (순서 유지)
@@ -1409,43 +1434,112 @@ function _loadFavorites() {
   return _defaultFavorites.slice();
 }
 
-// 바탕화면 렌더링
+// 아이콘 오버라이드 로드/저장
+function _getOverridesKey() {
+  var u = window.currentUser && window.currentUser.loginId || 'default';
+  return 'mw_desktop_icon_overrides_' + u;
+}
+function _loadIconOverrides() {
+  try { return JSON.parse(localStorage.getItem(_getOverridesKey())) || {}; } catch(e) { return {}; }
+}
+function _saveIconOverrides(o) { localStorage.setItem(_getOverridesKey(), JSON.stringify(o)); }
+function _saveFavorites(favs) { localStorage.setItem(_getFavoritesKey(), JSON.stringify(favs)); }
+
+function _getIconSvg(name) {
+  var overrides = _loadIconOverrides();
+  if (overrides[name] && overrides[name].shape && _svgIcons[overrides[name].shape]) return _svgIcons[overrides[name].shape];
+  return _svgIcons[name] || _svgIcons['설정'];
+}
+function _getIconColor(name) {
+  var overrides = _loadIconOverrides();
+  if (overrides[name] && overrides[name].color) return overrides[name].color;
+  var cfg = _windowConfig[name];
+  return cfg ? cfg.color : 'gray';
+}
+
+// 바탕화면 렌더링 (드래그 + 우클릭 + 바운스)
+var _dragIdx = null;
 function renderDesktop() {
   var grid = document.getElementById('desktop-grid');
   if (!grid) return;
   var favs = _loadFavorites();
   grid.innerHTML = '';
-  favs.forEach(function(name) {
+  favs.forEach(function(name, index) {
     var cfg = _windowConfig[name];
     if (!cfg) return;
-    var icon = document.createElement('div');
-    icon.className = 'desktop-icon';
-    icon.onclick = function() { openWindow(name); };
-    icon.innerHTML = '<div class="desktop-icon-img" style="background:' + cfg.gradient + '">' + cfg.icon + '</div>'
-      + '<div class="desktop-icon-label">' + name + '</div>';
-    grid.appendChild(icon);
+    var el = document.createElement('div');
+    el.className = 'fav-icon';
+    el.draggable = true;
+    el.dataset.idx = index;
+    el.innerHTML = '<div class="fav-icon-box ' + _getIconColor(name) + '">' + _getIconSvg(name) + '</div>'
+      + '<div class="fav-icon-label">' + name + '</div>';
+    // 좌클릭 → 바운스 + openWindow
+    el.addEventListener('click', function(e) {
+      if (e.button !== 0) return;
+      el.classList.add('bounce');
+      setTimeout(function() { el.classList.remove('bounce'); }, 300);
+      setTimeout(function() { openWindow(name); }, 180);
+    });
+    // 우클릭 → 아이콘 편집
+    el.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      _showIconEditModal(name);
+    });
+    // 드래그
+    el.addEventListener('dragstart', function(e) {
+      _dragIdx = index;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', function() {
+      el.classList.remove('dragging');
+      _dragIdx = null;
+      grid.querySelectorAll('.fav-icon').forEach(function(x) { x.classList.remove('dragover'); });
+    });
+    el.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      if (parseInt(el.dataset.idx) !== _dragIdx) el.classList.add('dragover');
+    });
+    el.addEventListener('dragleave', function() { el.classList.remove('dragover'); });
+    el.addEventListener('drop', function(e) {
+      e.preventDefault();
+      el.classList.remove('dragover');
+      var to = parseInt(el.dataset.idx);
+      if (_dragIdx === null || _dragIdx === to) return;
+      var item = favs.splice(_dragIdx, 1)[0];
+      favs.splice(to, 0, item);
+      _saveFavorites(favs);
+      renderDesktop();
+      var landed = grid.querySelectorAll('.fav-icon')[to];
+      if (landed) { landed.classList.add('bounce'); setTimeout(function() { landed.classList.remove('bounce'); }, 300); }
+    });
+    grid.appendChild(el);
   });
 }
 
+// 탭바 도트 색상
+var _dotColors = { red:'#E8344E', orange:'#B8860B', purple:'#534AB7', teal:'#14a49c', green:'#5DCAA5', pink:'#D4537E', gray:'#6E6E68', blue:'#378ADD' };
+
 // 탭바 렌더링
 function _renderTabBar() {
-  var bar = document.getElementById('tab-bar');
   var items = document.getElementById('tab-bar-items');
-  if (!bar || !items) return;
+  if (!items) return;
+  var homeBtn = document.querySelector('.tab-bar-home');
+  if (homeBtn) homeBtn.classList.toggle('active', !_activeWindow);
+
+  items.innerHTML = '';
   if (_openWindows.length === 0) {
-    bar.style.display = 'none';
+    items.innerHTML = '<span style="font-size:11px;color:rgba(255,255,255,0.35);padding:0 8px">바탕화면</span>';
     return;
   }
-  bar.style.display = 'flex';
-  items.innerHTML = '';
-  var homeBtn = document.querySelector('.tab-bar-home');
-  if (homeBtn) {
-    homeBtn.classList.toggle('active', !_activeWindow);
-  }
   _openWindows.forEach(function(name) {
+    var cfg = _windowConfig[name];
+    var dotColor = cfg ? (_dotColors[cfg.color] || '#999') : '#999';
     var el = document.createElement('div');
     el.className = 'tab-bar-item' + (name === _activeWindow ? ' active' : '');
-    el.innerHTML = '<span onclick="focusWindow(\'' + name + '\')">' + name + '</span>'
+    el.innerHTML = '<span class="tb-dot" style="color:' + dotColor + '">●</span>'
+      + '<span onclick="focusWindow(\'' + name + '\')" style="cursor:pointer">' + name + '</span>'
       + '<span class="tab-bar-close" onclick="event.stopPropagation();closeWindow(\'' + name + '\')" title="닫기">✕</span>';
     items.appendChild(el);
   });
@@ -1538,6 +1632,106 @@ function goDesktop() {
   _renderTabBar();
 }
 
+// ==================== 컨텍스트 메뉴 (즐겨찾기 등록/해제) ====================
+function showContextMenu(x, y, itemName) {
+  var menu = document.getElementById('context-menu');
+  if (!menu) return;
+  var favs = _loadFavorites();
+  var isFav = favs.indexOf(itemName) >= 0;
+  menu.innerHTML = '<div class="ctx-item" onclick="_ctxToggleFav(\'' + itemName + '\')">'
+    + (isFav ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 등록') + '</div>'
+    + '<div class="ctx-item" onclick="_ctxOpen(\'' + itemName + '\')">열기</div>';
+  menu.style.display = 'block';
+  menu.style.left = Math.min(x, window.innerWidth - 160) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 80) + 'px';
+}
+function _ctxToggleFav(name) {
+  _hideContextMenu();
+  var favs = _loadFavorites();
+  var idx = favs.indexOf(name);
+  if (idx >= 0) { favs.splice(idx, 1); }
+  else { favs.push(name); }
+  _saveFavorites(favs);
+  renderDesktop();
+}
+function _ctxOpen(name) { _hideContextMenu(); openWindow(name); }
+function _hideContextMenu() {
+  var menu = document.getElementById('context-menu');
+  if (menu) menu.style.display = 'none';
+}
+document.addEventListener('click', _hideContextMenu);
+
+// ==================== 아이콘 편집 모달 ====================
+var _iconColors = ['red','blue','green','orange','purple','gray','teal','pink'];
+function _showIconEditModal(name) {
+  var overlay = document.getElementById('icon-edit-overlay');
+  var modal = document.getElementById('icon-edit-modal');
+  if (!overlay || !modal) return;
+  var overrides = _loadIconOverrides();
+  var cur = overrides[name] || {};
+  var curColor = cur.color || (_windowConfig[name] ? _windowConfig[name].color : 'gray');
+  var curShape = cur.shape || name;
+
+  var colorHtml = '<div class="icon-color-picker">';
+  _iconColors.forEach(function(c) {
+    colorHtml += '<div class="icon-color-opt' + (c === curColor ? ' selected' : '') + '" data-color="' + c + '" onclick="_ieSelectColor(this,\'' + c + '\')">'
+      + '<div class="icon-color-inner fav-icon-box ' + c + '" style="width:18px;height:18px;border-radius:5px;position:static;overflow:visible"></div></div>';
+  });
+  colorHtml += '</div>';
+
+  var shapeNames = Object.keys(_svgIcons);
+  var shapeHtml = '<div class="icon-shape-grid">';
+  shapeNames.forEach(function(s) {
+    var svg = _svgIcons[s].replace(/#fff/g, '#333');
+    shapeHtml += '<div class="icon-shape-opt' + (s === curShape ? ' selected' : '') + '" data-shape="' + s + '" onclick="_ieSelectShape(this,\'' + s + '\')" title="' + s + '">' + svg + '</div>';
+  });
+  shapeHtml += '</div>';
+
+  modal.innerHTML = '<h3>' + name + ' 아이콘 편집</h3>'
+    + '<label>색상</label>' + colorHtml
+    + '<label>모양</label>' + shapeHtml
+    + '<div class="icon-edit-actions">'
+    + '<button class="icon-edit-btn danger" onclick="_ieRemoveFav(\'' + name + '\')">즐겨찾기 해제</button>'
+    + '<div style="flex:1"></div>'
+    + '<button class="icon-edit-btn" onclick="_ieClose()">취소</button>'
+    + '<button class="icon-edit-btn primary" onclick="_ieSave(\'' + name + '\')">저장</button>'
+    + '</div>';
+  modal._selectedColor = curColor;
+  modal._selectedShape = curShape;
+  overlay.style.display = 'block';
+  modal.style.display = 'block';
+}
+function _ieSelectColor(el, c) {
+  el.closest('.icon-color-picker').querySelectorAll('.icon-color-opt').forEach(function(o) { o.classList.remove('selected'); });
+  el.classList.add('selected');
+  document.getElementById('icon-edit-modal')._selectedColor = c;
+}
+function _ieSelectShape(el, s) {
+  el.closest('.icon-shape-grid').querySelectorAll('.icon-shape-opt').forEach(function(o) { o.classList.remove('selected'); });
+  el.classList.add('selected');
+  document.getElementById('icon-edit-modal')._selectedShape = s;
+}
+function _ieSave(name) {
+  var modal = document.getElementById('icon-edit-modal');
+  var overrides = _loadIconOverrides();
+  overrides[name] = { color: modal._selectedColor, shape: modal._selectedShape };
+  _saveIconOverrides(overrides);
+  _ieClose();
+  renderDesktop();
+}
+function _ieRemoveFav(name) {
+  _ieClose();
+  var favs = _loadFavorites();
+  var idx = favs.indexOf(name);
+  if (idx >= 0) { favs.splice(idx, 1); _saveFavorites(favs); renderDesktop(); }
+}
+function _ieClose() {
+  var overlay = document.getElementById('icon-edit-overlay');
+  var modal = document.getElementById('icon-edit-modal');
+  if (overlay) overlay.style.display = 'none';
+  if (modal) modal.style.display = 'none';
+}
+
 // ESC 키로 현재 창 닫기
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && _activeWindow) {
@@ -1601,6 +1795,30 @@ function _closeAllDropdowns() {
     }
     // 외부 클릭 → 모든 드롭다운 닫기
     _closeAllDropdowns();
+  });
+})();
+
+// 드롭다운 서브탭 + 단독 메뉴 우클릭 → 즐겨찾기 등록/해제
+(function _initMenuContextMenu() {
+  // 드롭다운 서브탭
+  document.querySelectorAll('.tb-dd-item').forEach(function(item) {
+    item.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      _closeAllDropdowns();
+      // onclick에서 openWindow('이름') 추출
+      var m = (item.getAttribute('onclick') || '').match(/openWindow\('([^']+)'/);
+      if (m) showContextMenu(e.pageX, e.pageY, m[1]);
+    });
+  });
+  // 단독 메뉴
+  document.querySelectorAll('.tb-solo').forEach(function(item) {
+    item.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var m = (item.getAttribute('onclick') || '').match(/openWindow\('([^']+)'/);
+      if (m) showContextMenu(e.pageX, e.pageY, m[1]);
+    });
   });
 })();
 

@@ -88,15 +88,51 @@
 </nav>
 
 <!-- ==================== TAB BAR: 열린 창 목록 ==================== -->
-<div class="tab-bar" id="tab-bar" style="display:none">
-  <div class="tab-bar-home" onclick="goDesktop()" title="바탕화면">🏠</div>
+<div class="tab-bar" id="tab-bar">
+  <span class="tab-bar-label">열린 창</span>
   <div class="tab-bar-items" id="tab-bar-items"></div>
+  <div class="tab-bar-home" onclick="goDesktop()" title="바탕화면"><svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="#fff" stroke-width="2"/><polyline points="9 22 9 12 15 12 15 22" stroke="#fff" stroke-width="2"/></svg> 홈</div>
 </div>
 
-<!-- ==================== DESKTOP: 바탕화면 (즐겨찾기 아이콘) ==================== -->
+<!-- ==================== DESKTOP: 바탕화면 ==================== -->
 <div id="desktop" class="desktop" style="display:none">
-  <div class="desktop-grid" id="desktop-grid"></div>
+  <div class="desktop-main">
+    <div class="desktop-grid" id="desktop-grid"></div>
+  </div>
+  <div class="desktop-notice">
+    <div class="notice-header">
+      <h4>공지사항</h4>
+      <div class="notice-tabs">
+        <span class="notice-tab active">업데이트</span>
+        <span class="notice-tab">수정</span>
+      </div>
+    </div>
+    <div class="notice-list">
+      <div class="notice-item">
+        <div><span class="notice-badge nb-new">신규</span><span class="notice-title">커머셜 프로모션 원가P 자동반영</span></div>
+        <div class="notice-date">2026.04.11</div>
+      </div>
+      <div class="notice-item">
+        <div><span class="notice-badge nb-update">업데이트</span><span class="notice-title">발주리스트 탭 추가</span></div>
+        <div class="notice-date">2026.04.11</div>
+      </div>
+      <div class="notice-item">
+        <div><span class="notice-badge nb-update">업데이트</span><span class="notice-title">세트↔베어 자동 매칭</span></div>
+        <div class="notice-date">2026.04.11</div>
+      </div>
+      <div class="notice-item">
+        <div><span class="notice-badge nb-fix">수정</span><span class="notice-title">네이버 가격전송 속도 개선</span></div>
+        <div class="notice-date">2026.04.09</div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<!-- 컨텍스트 메뉴 -->
+<div id="context-menu" class="ctx-menu" style="display:none;"></div>
+<!-- 아이콘 편집 모달 -->
+<div id="icon-edit-overlay" class="icon-edit-overlay" style="display:none;"></div>
+<div id="icon-edit-modal" class="icon-edit-modal" style="display:none;"></div>
 
 <div class="content">
 
