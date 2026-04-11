@@ -16700,6 +16700,8 @@ function _deleteBotRoom(roomId) {
 
 var _noticesData = [];
 var _noticesCache = null;
+var _lastNoticeSyncTs = 0;
+var _lastCommentSyncTs = 0;
 var _noticeFilter = 'all';
 var _noticeSearch = '';
 var _noticeView = 'list'; // 'list' | 'detail' | 'write'
@@ -16981,6 +16983,7 @@ async function _postNoticeComment(noticeId) {
     var res = await fetch('/api/notices/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notice_id: noticeId, author: author, content: content }) });
     var json = await res.json();
     if (!json.success) throw new Error(json.error);
+    _lastCommentSyncTs = Date.now();
     input.value = '';
     _loadNoticeComments(noticeId);
   } catch(e) { alert('댓글 등록 실패: ' + e.message); }
@@ -16992,6 +16995,7 @@ async function _deleteNoticeComment(commentId, noticeId) {
     var res = await fetch('/api/notices/comments', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: commentId, author: author }) });
     var json = await res.json();
     if (!json.success) throw new Error(json.error);
+    _lastCommentSyncTs = Date.now();
     _loadNoticeComments(noticeId);
   } catch(e) { alert('댓글 삭제 실패: ' + e.message); }
 }
@@ -17063,6 +17067,7 @@ async function _saveNotice(editId) {
       var json = await res.json();
       if (!json.success) throw new Error(json.error);
       toast('글 수정 완료');
+      _lastNoticeSyncTs = Date.now();
       _noticesCache = null;
       await _fetchNotices();
       _showNoticeDetail(editId);
@@ -17071,6 +17076,7 @@ async function _saveNotice(editId) {
       var json2 = await res2.json();
       if (!json2.success) throw new Error(json2.error);
       toast('글 등록 완료');
+      _lastNoticeSyncTs = Date.now();
       _noticesCache = null;
       await _fetchNotices();
       renderNoticeTab();
@@ -17088,6 +17094,7 @@ async function _deleteNotice(id) {
     var json = await res.json();
     if (!json.success) throw new Error(json.error);
     toast('글 삭제 완료');
+    _lastNoticeSyncTs = Date.now();
     _noticesCache = null;
     await _fetchNotices();
     renderNoticeTab();
@@ -17177,6 +17184,11 @@ function _updateNoticeBadge() {
   sbClient.channel('notices_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notices' }, function(payload) {
       console.log('[Notices Realtime]', payload.eventType);
+      // 본인이 방금 저장한 변경이면 무시
+      if (Date.now() - _lastNoticeSyncTs < 3000) {
+        console.log('[Notices Realtime] 본인 저장 → 무시');
+        return;
+      }
       _noticesCache = null;
       _fetchNotices().then(function() {
         loadNoticePanel();
@@ -17204,6 +17216,11 @@ function _updateNoticeBadge() {
   sbClient.channel('notice_comments_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notice_comments' }, function(payload) {
       console.log('[Comments Realtime]', payload.eventType);
+      // 본인이 방금 저장한 변경이면 무시
+      if (Date.now() - _lastCommentSyncTs < 3000) {
+        console.log('[Comments Realtime] 본인 저장 → 무시');
+        return;
+      }
       // 현재 상세보기 중인 공지의 댓글이면 갱신
       if (_noticeDetailId) {
         var changedNoticeId = payload.new ? payload.new.notice_id : (payload.old ? payload.old.notice_id : null);
