@@ -15455,18 +15455,10 @@ function renderKakaoTab() {
   html += _buildKakaoBroadcast();
   html += '</div>';
 
-  var placeholderTabs = [
-    { id: 'logs',      label: '대화로그' }
-  ];
-  placeholderTabs.forEach(function(t) {
-    var show = activeSubTab === 'kakao-' + t.id ? 'flex' : 'none';
-    html += '<div id="kakao-content-' + t.id + '" class="kakao-tab-content" style="display:' + show + ';align-items:center;justify-content:center;min-height:300px">';
-    html += '<div style="text-align:center;color:#888;font-size:14px">';
-    html += '<div style="font-size:32px;margin-bottom:8px">🔧</div>';
-    html += '<div>' + t.label + ' — 준비 중입니다</div>';
-    html += '</div>';
-    html += '</div>';
-  });
+  // 대화로그 탭
+  html += '<div id="kakao-content-logs" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-logs' ? 'block' : 'none') + '">';
+  html += _buildKakaoLogs();
+  html += '</div>';
 
   html += '</div>'; // .kakao-tab-contents
 
@@ -15489,7 +15481,7 @@ function switchKakaoSubTab(tabId) {
   document.querySelectorAll('.kakao-tab-content').forEach(function(el) { el.style.display = 'none'; });
   var suffix = tabId.replace('kakao-', '');
   var content = document.getElementById('kakao-content-' + suffix);
-  if (content) content.style.display = (suffix === 'dashboard' || suffix === 'rooms' || suffix === 'templates' || suffix === 'tracking' || suffix === 'broadcast') ? 'block' : 'flex';
+  if (content) content.style.display = 'block';
 
   // 버튼 활성 상태
   document.querySelectorAll('.kakao-top-row .kakao-subtab').forEach(function(btn) {
@@ -15594,6 +15586,139 @@ function _kakaoKpiCard(label, value, sub, color, isAlert) {
   h += '<div class="kakao-kpi-sub">' + sub + '</div>';
   h += '</div>';
   return h;
+}
+
+// ========================================
+// 카카오톡 — 대화로그 탭
+// ========================================
+
+var _LOG_STATUS_BADGES = {
+  'bot':    { label:'봇응답',   bg:'#E1F5EE', color:'#085041' },
+  'ai':     { label:'AI매칭',   bg:'#F3EEFF', color:'#5B21B6' },
+  'receipt':{ label:'접수',     bg:'#E6F1FB', color:'#0C447C' },
+  'confirm':{ label:'확인질문', bg:'#FFF3E0', color:'#854F0B' },
+  'human':  { label:'사람필요', bg:'#FCEBEB', color:'#CC2222' },
+  'sent':   { label:'발송',     bg:'#F0F1F3', color:'#5A6070' }
+};
+
+function _buildKakaoLogs() {
+  var rooms = JSON.parse(localStorage.getItem('mw_bot_rooms') || '[]');
+  var messages = JSON.parse(localStorage.getItem('mw_bot_messages') || '[]');
+
+  var html = '';
+
+  // ── A. KPI 5장 ──
+  html += '<div class="kakao-kpi-row">';
+  html += _kakaoKpiCard('총 수신', '0건', '이번 주', '#185FA5');
+  html += _kakaoKpiCard('봇 자동응답', '0건', '응답률 0%', '#1D9E75');
+  html += _kakaoKpiCard('AI 매칭', '0건', '정확도 —', '#7C3AED');
+  html += _kakaoKpiCard('사람 처리', '0건', '대기 0건', '#E8344E', true);
+  html += _kakaoKpiCard('API 비용', '$0.00', '이번 주', '#5A6070');
+  html += '</div>';
+
+  // ── B. 필터 영역 ──
+  html += '<div style="display:flex;gap:8px;align-items:center;padding:10px 0;flex-wrap:wrap">';
+
+  html += '<select id="kl-room-filter" style="padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif">';
+  html += '<option value="all">전체 톡방</option>';
+  rooms.forEach(function(r) {
+    var name = (r.roomName || '').replace(/★[^★]*★\s*/, '') || r.customerName || '톡방';
+    html += '<option value="' + (r.roomName || '') + '">' + name + '</option>';
+  });
+  html += '</select>';
+
+  html += '<select id="kl-status-filter" style="padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif">';
+  html += '<option value="all">전체 상태</option>';
+  Object.keys(_LOG_STATUS_BADGES).forEach(function(k) { html += '<option value="' + k + '">' + _LOG_STATUS_BADGES[k].label + '</option>'; });
+  html += '</select>';
+
+  html += '<select id="kl-period-filter" style="padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif">';
+  html += '<option value="today">오늘</option><option value="7d">최근 7일</option><option value="30d">최근 30일</option>';
+  html += '</select>';
+
+  html += '<input type="text" id="kl-search" placeholder="메시지 내용 검색..." style="flex:1;min-width:150px;padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif" autocomplete="off">';
+
+  html += '<button onclick="alert(\'CSV 내보내기 — 추후 구현\')" style="padding:7px 14px;font-size:12px;font-weight:600;border:1px solid #D1D5DB;border-radius:6px;background:#fff;color:#5A6070;cursor:pointer;font-family:Pretendard,sans-serif;white-space:nowrap">CSV 내보내기</button>';
+  html += '</div>';
+
+  // ── C. 좌우 분할 ──
+  html += '<div style="display:grid;grid-template-columns:40% 60%;gap:0;border:1px solid #E2E5EB;border-radius:8px;overflow:hidden;min-height:360px">';
+
+  // 좌측: 대화 목록
+  html += '<div style="border-right:1px solid #E2E5EB;display:flex;flex-direction:column">';
+  html += '<div class="kakao-section-header" style="border-radius:0;margin-bottom:0;padding:8px 14px"><span style="font-size:12px">대화 목록</span></div>';
+  html += '<div id="kl-msg-list" style="flex:1;overflow-y:auto;background:#fff">';
+
+  if (messages.length === 0) {
+    html += '<div style="text-align:center;padding:40px 16px;color:#8B8FA3;font-size:13px;font-family:Pretendard,sans-serif">대화 내역이 없습니다</div>';
+  } else {
+    messages.slice(0,100).forEach(function(m, i) {
+      html += _buildKakaoLogItem(m, i);
+    });
+  }
+
+  html += '</div></div>';
+
+  // 우측: 대화 상세
+  html += '<div style="display:flex;flex-direction:column">';
+  html += '<div class="kakao-section-header" style="border-radius:0;margin-bottom:0;padding:8px 14px"><span style="font-size:12px">대화 상세</span></div>';
+  html += '<div id="kl-detail" style="flex:1;display:flex;align-items:center;justify-content:center;background:#FAFBFC">';
+  html += '<span style="color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif">좌측에서 대화를 선택하세요</span>';
+  html += '</div></div>';
+
+  html += '</div>'; // grid
+
+  // ── D. 하단 안내 ──
+  html += '<div style="text-align:center;padding:12px;font-size:11px;color:#9BA3B2;font-family:Pretendard,sans-serif">대화 로그는 봇 서버 연동 후 자동으로 기록됩니다.</div>';
+
+  return html;
+}
+
+function _buildKakaoLogItem(m, idx) {
+  var time = m.date ? new Date(m.date).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' }) : '—';
+  var st = _LOG_STATUS_BADGES[m.status] || _LOG_STATUS_BADGES['bot'];
+  var room = (m.room || '').replace(/★[^★]*★\s*/, '');
+  if (room.length > 8) room = room.slice(0,8) + '…';
+  var msg = (m.message || '').slice(0,30);
+  if ((m.message || '').length > 30) msg += '…';
+
+  var h = '<div class="kl-msg-item" data-idx="' + idx + '" onclick="_selectKakaoLog(' + idx + ')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #F0F1F3;cursor:pointer;transition:background .1s">';
+  h += '<span style="font-size:11px;color:#8B8FA3;white-space:nowrap;min-width:40px;font-family:Pretendard,sans-serif">' + time + '</span>';
+  h += '<span style="font-size:11px;font-weight:600;color:#1A1D23;white-space:nowrap;min-width:60px;font-family:Pretendard,sans-serif">' + (room || '—') + '</span>';
+  h += '<span style="flex:1;font-size:12px;color:#5A6070;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:Pretendard,sans-serif">' + (msg || '—') + '</span>';
+  h += '<span style="display:inline-flex;padding:2px 6px;border-radius:10px;font-size:9px;font-weight:600;white-space:nowrap;background:' + st.bg + ';color:' + st.color + ';font-family:Pretendard,sans-serif">' + st.label + '</span>';
+  h += '</div>';
+  return h;
+}
+
+function _selectKakaoLog(idx) {
+  // 하이라이트
+  document.querySelectorAll('.kl-msg-item').forEach(function(el) { el.style.background = ''; });
+  var items = document.querySelectorAll('.kl-msg-item');
+  if (items[idx]) items[idx].style.background = '#E6F1FB';
+
+  var messages = JSON.parse(localStorage.getItem('mw_bot_messages') || '[]');
+  var m = messages[idx];
+  var detail = document.getElementById('kl-detail');
+  if (!detail || !m) return;
+
+  var st = _LOG_STATUS_BADGES[m.status] || _LOG_STATUS_BADGES['bot'];
+  var h = '<div style="padding:16px;width:100%;box-sizing:border-box">';
+  h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">';
+  h += '<span style="font-size:12px;color:#8B8FA3;font-family:Pretendard,sans-serif">' + (m.date || '—') + '</span>';
+  h += '<span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + st.bg + ';color:' + st.color + ';font-family:Pretendard,sans-serif">' + st.label + '</span>';
+  h += '</div>';
+  h += '<div style="font-size:12px;color:#5A6070;margin-bottom:4px;font-family:Pretendard,sans-serif"><strong>톡방:</strong> ' + (m.room || '—') + '</div>';
+  h += '<div style="font-size:12px;color:#5A6070;margin-bottom:8px;font-family:Pretendard,sans-serif"><strong>발신:</strong> ' + (m.sender || '—') + '</div>';
+  h += '<div style="border-left:3px solid #185FA5;background:#F7F8FA;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#1A1D23;line-height:1.6;font-family:Pretendard,sans-serif;white-space:pre-wrap">' + (m.message || '') + '</div>';
+  if (m.aiAnalysis) {
+    h += '<div style="margin-top:12px;padding:10px 14px;background:#F3EEFF;border-radius:6px;font-size:12px;color:#5B21B6;line-height:1.5;font-family:Pretendard,sans-serif"><strong>AI 분석:</strong><br>' + m.aiAnalysis + '</div>';
+  }
+  h += '</div>';
+  detail.innerHTML = h;
+  detail.style.display = 'block';
+  detail.style.alignItems = 'flex-start';
+  detail.style.justifyContent = 'flex-start';
 }
 
 // ========================================

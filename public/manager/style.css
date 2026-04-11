@@ -702,3 +702,6 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .bc-room-unselected { background:#fff; color:#5A6070; border:1px solid #D1D5DB; }
 .bc-room-chip:hover { opacity:0.85; }
 .bc-chip-dot { font-size:8px; }
+
+/* 대화로그 — 목록 아이템 */
+.kl-msg-item:hover { background:#F4F6FA !important; }
