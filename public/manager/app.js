@@ -15439,9 +15439,13 @@ function renderKakaoTab() {
   html += _buildKakaoRooms();
   html += '</div>';
 
-  // 나머지 4개 탭 — placeholder
+  // 템플릿 탭
+  html += '<div id="kakao-content-templates" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-templates' ? 'block' : 'none') + '">';
+  html += _buildKakaoTemplates();
+  html += '</div>';
+
+  // 나머지 3개 탭 — placeholder
   var placeholderTabs = [
-    { id: 'templates', label: '템플릿' },
     { id: 'tracking',  label: '송장/발송' },
     { id: 'broadcast', label: '공지발송' },
     { id: 'logs',      label: '대화로그' }
@@ -15477,7 +15481,7 @@ function switchKakaoSubTab(tabId) {
   document.querySelectorAll('.kakao-tab-content').forEach(function(el) { el.style.display = 'none'; });
   var suffix = tabId.replace('kakao-', '');
   var content = document.getElementById('kakao-content-' + suffix);
-  if (content) content.style.display = (suffix === 'dashboard' || suffix === 'rooms') ? 'block' : 'flex';
+  if (content) content.style.display = (suffix === 'dashboard' || suffix === 'rooms' || suffix === 'templates') ? 'block' : 'flex';
 
   // 버튼 활성 상태
   document.querySelectorAll('.kakao-top-row .kakao-subtab').forEach(function(btn) {
@@ -15582,6 +15586,136 @@ function _kakaoKpiCard(label, value, sub, color, isAlert) {
   h += '<div class="kakao-kpi-sub">' + sub + '</div>';
   h += '</div>';
   return h;
+}
+
+// ========================================
+// 카카오톡 — 템플릿 탭
+// ========================================
+
+var _KAKAO_DEFAULT_TEMPLATES = [
+  { name:'재고있음 — 단가 포함', badge:'자동', category:'재고/단가', content:'{제품명} {단가}원 재고있습니다', trigger:'재고 확인 + 단가 문의 + 재고 있음', preview:'M18 FID3-502X (충전임팩트드라이버 5.0Ah 2팩)\n1,161,000원 재고있습니다' },
+  { name:'재고있음 — 단가 포함', badge:'자동', category:'재고/단가', content:'{제품명} {단가}원 재고있습니다', trigger:'재고 확인 + 재고 있음', preview:'M18 FUEL 해머드릴 (M18 FPD3-0X0)\n485,000원 재고있습니다' },
+  { name:'품절 — 본사재고 없음', badge:'자동', category:'재고/단가', content:'현재 {제품명} 품절입니다. 입고일정 확인후 말씀드리겠습니다.', trigger:'재고 확인 + 우리재고 0 + 밀워키재고 0', preview:'현재 M18 FUEL 원형톱 (M18 FCS66-0) 품절입니다. 입고일정 확인후 말씀드리겠습니다.' },
+  { name:'품절 — 발주후 출고가능', badge:'자동', category:'재고/단가', content:'현재 {제품명} 재고는 없지만 발주 가능합니다. 주문시 {입고예정} 출고됩니다.', trigger:'재고 확인 + 우리재고 0 + 밀워키재고 있음', preview:'현재 M18 FIW2F12-0X0 재고는 없지만 발주 가능합니다. 주문시 2~3일 내 출고됩니다.' },
+  { name:'확인질문 — 유사 제품', badge:'AI', category:'재고/단가', content:'말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다.\n{후보목록}', trigger:'AI 매칭 결과 2건 이상', preview:'말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다.\n1) M18 FID3-502X\n2) M18 FID3-0X0' },
+  { name:'직송 접수 확인', badge:'접수', category:'직송', content:'접수되었습니다. 송장번호는 나오는대로 전달드리겠습니다.', trigger:'직송 요청 파싱 성공', preview:'접수되었습니다. 송장번호는 나오는대로 전달드리겠습니다.' },
+  { name:'송장번호 전달', badge:'발송', category:'송장', content:'{수령인} {택배사} {송장번호}', trigger:'송장/발송 탭에서 입력 시', preview:'홍길동 CJ대한통운 123456789012' }
+];
+
+var _KAKAO_BADGE_COLORS = {
+  '자동': { bg:'#E1F5EE', color:'#085041', border:'#1D9E75' },
+  'AI':   { bg:'#F3EEFF', color:'#5B21B6', border:'#7C3AED' },
+  '접수': { bg:'#E6F1FB', color:'#0C447C', border:'#185FA5' },
+  '발송': { bg:'#F0F1F3', color:'#4B5563', border:'#6B7280' },
+  '사람': { bg:'#FDE8EB', color:'#9B1C31', border:'#E8344E' }
+};
+
+var _KAKAO_TEMPLATE_CATEGORIES = ['전체','재고/단가','직송','송장','AS/반품','기타'];
+
+function _initKakaoTemplates() {
+  if (localStorage.getItem('mw_bot_templates')) return;
+  localStorage.setItem('mw_bot_templates', JSON.stringify(_KAKAO_DEFAULT_TEMPLATES));
+}
+
+function _buildKakaoTemplates() {
+  _initKakaoTemplates();
+  var templates = JSON.parse(localStorage.getItem('mw_bot_templates') || '[]');
+
+  var html = '';
+
+  // ── 헤더 ──
+  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
+  html += '<span>응답 템플릿 관리</span>';
+  html += '<button class="kakao-btn-sm" onclick="alert(\'템플릿 추가 — 추후 구현\')">+ 템플릿 추가</button>';
+  html += '</div>';
+
+  // ── 카테고리 필터 탭 ──
+  var catCounts = {};
+  _KAKAO_TEMPLATE_CATEGORIES.forEach(function(c) { catCounts[c] = 0; });
+  templates.forEach(function(t) {
+    var cat = t.category || '기타';
+    if (catCounts[cat] !== undefined) catCounts[cat]++;
+    else catCounts['기타']++;
+  });
+  catCounts['전체'] = templates.length;
+
+  html += '<div style="display:flex;gap:6px;padding:12px 16px;background:#fff;border-left:1px solid #E2E5EB;border-right:1px solid #E2E5EB;flex-wrap:wrap">';
+  _KAKAO_TEMPLATE_CATEGORIES.forEach(function(cat, i) {
+    var isActive = i === 0;
+    html += '<button class="kakao-tpl-cat-btn' + (isActive ? ' kakao-tpl-cat-active' : '') + '" data-cat="' + cat + '" onclick="_filterKakaoTemplates(\'' + cat + '\')">';
+    html += cat + '(' + catCounts[cat] + ')';
+    html += '</button>';
+  });
+  html += '</div>';
+
+  // ── 카드 목록 ──
+  html += '<div id="kakao-tpl-cards" style="padding:12px 16px;background:#F7F8FA;border:1px solid #E2E5EB;border-top:none;border-radius:0 0 8px 8px;display:flex;flex-direction:column;gap:10px">';
+
+  if (templates.length === 0) {
+    html += '<div style="text-align:center;padding:40px;color:#8B8FA3;font-size:13px">등록된 템플릿이 없습니다</div>';
+  } else {
+    templates.forEach(function(t, idx) {
+      html += _buildKakaoTemplateCard(t, idx);
+    });
+  }
+
+  html += '</div>';
+
+  // ── 하단 요약 ──
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:12px;color:#5A6070;font-family:Pretendard,sans-serif">';
+  html += '<span>총 ' + templates.length + '개 템플릿</span>';
+  html += '</div>';
+
+  return html;
+}
+
+function _buildKakaoTemplateCard(t, idx) {
+  var badge = _KAKAO_BADGE_COLORS[t.badge] || _KAKAO_BADGE_COLORS['자동'];
+  var cat = t.category || '기타';
+
+  var h = '<div class="kakao-tpl-card" data-tpl-cat="' + cat + '">';
+
+  // 상단: 제목 + 뱃지 + 편집/삭제
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  h += '<div style="display:flex;align-items:center;gap:8px">';
+  h += '<span style="font-size:13px;font-weight:600;color:#1A1D23;font-family:Pretendard,sans-serif">' + t.name + '</span>';
+  h += '<span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + badge.bg + ';color:' + badge.color + ';border:1px solid ' + badge.border + ';font-family:Pretendard,sans-serif">' + t.badge + '</span>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:6px">';
+  h += '<button style="font-size:11px;color:#185FA5;background:none;border:1px solid #185FA5;border-radius:4px;padding:3px 8px;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500" onclick="alert(\'편집 — 추후 구현\')">편집</button>';
+  h += '<button style="font-size:11px;color:#CC2222;background:none;border:1px solid #CC2222;border-radius:4px;padding:3px 8px;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500" onclick="alert(\'삭제 — 추후 구현\')">삭제</button>';
+  h += '</div>';
+  h += '</div>';
+
+  // 본문: 변수 강조
+  var contentHtml = (t.content || '').replace(/\n/g, '<br>').replace(/\{([^}]+)\}/g, '<span style="background:#FFF3E0;color:#E65100;font-weight:600;padding:1px 4px;border-radius:3px;font-size:12px">{$1}</span>');
+  h += '<div style="font-size:13px;color:#3A3F4B;line-height:1.6;margin-bottom:6px;font-family:Pretendard,sans-serif">' + contentHtml + '</div>';
+
+  // 트리거
+  h += '<div style="font-size:11px;color:#8B8FA3;margin-bottom:8px;font-family:Pretendard,sans-serif">트리거: ' + (t.trigger || '—') + '</div>';
+
+  // 미리보기
+  if (t.preview) {
+    var previewHtml = (t.preview || '').replace(/\n/g, '<br>');
+    h += '<div style="border-left:3px solid #185FA5;background:#F7F8FA;padding:8px 12px;border-radius:0 4px 4px 0;font-size:12px;color:#3A3F4B;line-height:1.5;font-family:Pretendard,sans-serif">';
+    h += previewHtml;
+    h += '</div>';
+  }
+
+  h += '</div>';
+  return h;
+}
+
+function _filterKakaoTemplates(cat) {
+  // 버튼 활성화
+  document.querySelectorAll('.kakao-tpl-cat-btn').forEach(function(btn) {
+    btn.classList.toggle('kakao-tpl-cat-active', btn.getAttribute('data-cat') === cat);
+  });
+  // 카드 필터
+  document.querySelectorAll('.kakao-tpl-card').forEach(function(card) {
+    if (cat === '전체') { card.style.display = 'block'; return; }
+    card.style.display = card.getAttribute('data-tpl-cat') === cat ? 'block' : 'none';
+  });
 }
 
 // ========================================

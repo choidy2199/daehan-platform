@@ -687,3 +687,10 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .kakao-rooms-summary { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; font-size:12px; color:#5A6070; background:#F4F6FA; border-radius:0 0 8px 8px; border-top:1px solid #E2E5EB; margin-top:-1px; }
 .kakao-btn-action { font-size:11px; font-weight:600; padding:4px 10px; border-radius:4px; border:1px solid #E2E5EB; background:#fff; color:#1A1D23; cursor:pointer; font-family:'Pretendard',sans-serif; }
 .kakao-btn-action:hover { background:#F4F6FA; border-color:#C0C4CC; }
+
+/* 템플릿 탭 */
+.kakao-tpl-cat-btn { padding:5px 12px; font-size:12px; font-weight:500; border:1px solid #D1D5DB; border-radius:16px; background:#fff; color:#5A6070; cursor:pointer; font-family:'Pretendard',sans-serif; transition:all .15s; }
+.kakao-tpl-cat-btn:hover { background:#F4F6FA; border-color:#9BA3B2; }
+.kakao-tpl-cat-active { background:#1A1D23 !important; color:#fff !important; border-color:#1A1D23 !important; }
+.kakao-tpl-card { background:#fff; border:1px solid #E2E5EB; border-radius:8px; padding:14px 16px; transition:box-shadow .15s; }
+.kakao-tpl-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.06); }
