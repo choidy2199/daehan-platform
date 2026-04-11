@@ -1674,6 +1674,9 @@ function goDesktop() {
   document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
 
   _renderTabBar();
+
+  // 바탕화면 진입 시 읽지 않은 공지 팝업
+  setTimeout(function() { if (typeof _checkUnreadNoticePopup === 'function') _checkUnreadNoticePopup(); }, 500);
 }
 
 // ==================== 컨텍스트 메뉴 (즐겨찾기 등록/해제) ====================
@@ -16766,18 +16769,18 @@ function _renderNoticeList(container) {
     return true;
   });
 
-  var html = '';
+  var html = '<div style="max-width:900px;margin:0 auto;display:block !important;text-align:left !important;">';
 
   // ── 다크 헤더 ──
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
-  html += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:600">공지사항</span><span style="font-size:12px;color:rgba(255,255,255,0.5)">' + _noticesData.length + '건</span></div>';
+  html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
+  html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px"><span style="font-size:15px;font-weight:600">공지사항</span><span style="font-size:12px;color:rgba(255,255,255,0.5)">' + _noticesData.length + '건</span></div>';
   if (isAdmin) {
     html += '<button onclick="_showNoticeWrite()" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">✚ 새 글 작성</button>';
   }
   html += '</div>';
 
   // ── 필터 칩 + 검색 ──
-  html += '<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid #DDE1EB;flex-wrap:wrap">';
+  html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;padding:10px 16px;border-bottom:1px solid #DDE1EB;flex-wrap:wrap;">';
   ['all','update','bug','notice'].forEach(function(f) {
     var label = { all:'전체', update:'업데이트', bug:'오류개선', notice:'공지' }[f];
     var isActive = _noticeFilter === f;
@@ -16819,6 +16822,7 @@ function _renderNoticeList(container) {
     });
   }
   html += '</tbody></table></div>';
+  html += '</div>'; // wrapper 끝
 
   container.innerHTML = html;
 
@@ -16842,11 +16846,8 @@ async function _showNoticeDetail(id) {
   var n = _noticesData.find(function(x) { return x.id === id; });
   if (!n) return;
 
-  // 조회수 +1
   fetch('/api/notices/view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
   n.views = (n.views || 0) + 1;
-
-  // 읽음 처리
   _markNoticeRead(id);
   _updateNoticeBadge();
   _noticeDetailId = id;
@@ -16858,58 +16859,56 @@ async function _showNoticeDetail(id) {
   var fullDate = new Date(n.created_at);
   var dateStr = fullDate.getFullYear() + '.' + String(fullDate.getMonth()+1).padStart(2,'0') + '.' + String(fullDate.getDate()).padStart(2,'0');
 
-  var html = '';
+  var h = '<div style="max-width:800px;margin:0 auto;display:block !important;text-align:left !important;">';
 
-  // ── 다크 헤더 ──
-  html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
-  html += '<button onclick="renderNoticeTab()" style="background:none;border:none;color:#fff;font-size:14px;cursor:pointer;padding:4px 8px;font-family:Pretendard,sans-serif;font-weight:500">← 목록</button>';
-  html += '<span style="font-size:15px;font-weight:600">공지사항</span>';
-  html += '</div>';
+  // 다크 헤더
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0;">';
+  h += '<button onclick="renderNoticeTab()" style="font-size:13px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
+  h += '<span style="font-size:16px;font-weight:500;">공지사항</span>';
+  h += '</div>';
 
-  // ── 메타 영역 ──
-  html += '<div style="padding:24px 28px 16px;border-bottom:1px solid #DDE1EB">';
-  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
-  html += _noticeCatBadge(n.category);
-  if (n.pinned) html += '<span style="font-size:14px">📌</span>';
-  html += '</div>';
-  html += '<h3 style="font-size:20px;font-weight:500;margin:0 0 10px;color:#1A1D23">' + (n.title || '') + '</h3>';
-  html += '<div style="font-size:13px;color:#9BA3B2">' + (n.author || 'admin') + ' · ' + dateStr + ' · 조회 ' + (n.views || 0) + '</div>';
-  html += '</div>';
+  // 메타
+  h += '<div style="padding:24px 28px 0;text-align:left !important;">';
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:10px;margin-bottom:8px;">';
+  h += _noticeCatBadge(n.category);
+  if (n.pinned) h += '<span style="font-size:11px;color:#999;">📌 상단고정</span>';
+  h += '</div>';
+  h += '<div style="font-size:20px;font-weight:500;margin-bottom:10px;color:#1A1D23;">' + (n.title || '') + '</div>';
+  h += '<div style="font-size:13px;color:#999;display:flex !important;flex-direction:row !important;gap:16px;padding-bottom:16px;border-bottom:1px solid #eee;">';
+  h += '<span>' + (n.author || 'admin') + '</span><span>' + dateStr + '</span><span>조회 ' + (n.views || 0) + '</span>';
+  h += '</div></div>';
 
-  // ── 본문 ──
+  // 본문
   var contentHtml = (n.content || '').replace(/\n/g, '<br>');
-  html += '<div style="padding:24px 28px;font-size:15px;line-height:1.9;color:#1A1D23;min-height:160px">' + contentHtml + '</div>';
+  h += '<div style="padding:24px 28px;font-size:15px;line-height:1.9;color:#333;min-height:160px;text-align:left !important;">' + contentHtml + '</div>';
 
-  // ── 수정/삭제 버튼 (admin만) ──
+  // 수정/삭제 (admin만)
   if (isAdmin) {
-    html += '<div style="display:flex;justify-content:flex-end;gap:8px;padding:0 28px 20px">';
-    html += '<button onclick="_showNoticeWrite(' + n.id + ')" style="background:#fff;color:#5A6070;border:1px solid #DDE1EB;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">수정</button>';
-    html += '<button onclick="_deleteNotice(' + n.id + ')" style="background:#FCEBEB;color:#791F1F;border:1px solid #F09595;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">삭제</button>';
-    html += '</div>';
+    h += '<div style="padding:0 28px 20px;display:flex !important;flex-direction:row !important;justify-content:flex-end !important;gap:8px;border-bottom:1px solid #eee;">';
+    h += '<button onclick="_showNoticeWrite(' + n.id + ')" style="font-size:13px;padding:8px 20px;border-radius:6px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;font-family:Pretendard,sans-serif;">수정</button>';
+    h += '<button onclick="_deleteNotice(' + n.id + ')" style="font-size:13px;padding:8px 20px;border-radius:6px;border:1px solid #F09595;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
+    h += '</div>';
   }
 
-  // ── 댓글 영역 ──
-  html += '<div style="border-top:1px solid #DDE1EB;padding:20px 28px" id="notice-comments-area">';
-  html += '<div style="font-size:14px;font-weight:500;color:#1A1D23;margin-bottom:16px">댓글 <span id="notice-comment-count" style="color:#9BA3B2">0</span></div>';
-  html += '<div id="notice-comments-list"></div>';
-  // 입력
-  html += '<div style="display:flex;gap:8px;margin-top:16px">';
-  html += '<input type="text" id="notice-comment-input" placeholder="댓글을 입력하세요..." style="flex:1;font-size:14px;padding:10px 14px;border:1px solid #DDE1EB;border-radius:8px;font-family:Pretendard,sans-serif;box-sizing:border-box" autocomplete="off">';
-  html += '<button onclick="_postNoticeComment(' + n.id + ')" style="background:#1A1D23;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;white-space:nowrap">등록</button>';
-  html += '</div>';
-  html += '</div>';
+  // 댓글 영역
+  h += '<div style="padding:20px 28px;text-align:left !important;">';
+  h += '<div style="font-size:14px;font-weight:500;margin-bottom:16px;">댓글 <span id="notice-comment-count" style="color:#999;font-weight:400;">0</span></div>';
+  h += '<div id="notice-comments-list"></div>';
+  h += '<div style="margin-top:16px;display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;">';
+  h += '<input type="text" id="notice-comment-input" placeholder="댓글을 입력하세요..." autocomplete="off" style="flex:1;font-size:14px;padding:10px 14px;border-radius:8px;border:1px solid #ddd;background:#fff;min-width:0;font-family:Pretendard,sans-serif;box-sizing:border-box;">';
+  h += '<button onclick="_postNoticeComment(' + n.id + ')" style="font-size:13px;padding:10px 20px;border-radius:8px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-weight:500;white-space:nowrap;flex-shrink:0;font-family:Pretendard,sans-serif;">등록</button>';
+  h += '</div></div>';
 
-  container.innerHTML = html;
+  h += '</div>'; // wrapper 끝
 
-  // Enter키로 등록
+  container.innerHTML = h;
+
   var commentInput = document.getElementById('notice-comment-input');
   if (commentInput) {
     commentInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _postNoticeComment(n.id); }
     });
   }
-
-  // 댓글 로드
   _loadNoticeComments(id);
 }
 
@@ -16923,7 +16922,7 @@ var _commentAuthorMap = {
 
 function _commentAvatar(author) {
   var m = _commentAuthorMap[author] || { bg:'#EAECF2', color:'#5A6070', label: (author||'?').charAt(0) };
-  return '<div style="width:28px;height:28px;border-radius:50%;background:' + m.bg + ';color:' + m.color + ';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">' + m.label + '</div>';
+  return '<div style="width:28px;height:28px;border-radius:50%;background:' + m.bg + ';color:' + m.color + ';display:flex !important;align-items:center !important;justify-content:center !important;font-size:11px;font-weight:500;flex-shrink:0;">' + m.label + '</div>';
 }
 
 function _commentTimeFmt(dateStr) {
@@ -16936,8 +16935,7 @@ async function _loadNoticeComments(noticeId) {
     var res = await fetch('/api/notices/comments?notice_id=' + noticeId);
     var json = await res.json();
     if (!json.success) return;
-    var comments = json.data || [];
-    _renderNoticeComments(comments, noticeId);
+    _renderNoticeComments(json.data || [], noticeId);
   } catch(e) { console.error('[Comments] load error', e); }
 }
 
@@ -16948,7 +16946,7 @@ function _renderNoticeComments(comments, noticeId) {
   if (countEl) countEl.textContent = comments.length;
 
   if (comments.length === 0) {
-    listEl.innerHTML = '<div style="padding:12px 0;color:#9BA3B2;font-size:13px">아직 댓글이 없습니다</div>';
+    listEl.innerHTML = '<div style="font-size:13px;color:#999;padding:20px 0;text-align:center;">아직 댓글이 없습니다.</div>';
     return;
   }
 
@@ -16957,18 +16955,17 @@ function _renderNoticeComments(comments, noticeId) {
   comments.forEach(function(c) {
     var authorLabel = _commentAuthorMap[c.author] ? _commentAuthorMap[c.author].label : c.author;
     var isMine = c.author === currentUser;
-    html += '<div style="display:flex;gap:10px;padding:12px 0;border-top:1px solid #F0F2F7">';
+    html += '<div style="padding:14px 0;border-top:1px solid #eee;">';
+    html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:6px;">';
     html += _commentAvatar(c.author);
-    html += '<div style="flex:1;min-width:0">';
-    html += '<div style="display:flex;align-items:center;gap:8px">';
-    html += '<span style="font-size:13px;font-weight:500;color:#1A1D23">' + authorLabel + '</span>';
-    html += '<span style="font-size:11px;color:#9BA3B2">' + _commentTimeFmt(c.created_at) + '</span>';
+    html += '<span style="font-size:13px;font-weight:500;">' + authorLabel + '</span>';
+    html += '<span style="font-size:11px;color:#999;">' + _commentTimeFmt(c.created_at) + '</span>';
     if (isMine) {
-      html += '<span onclick="_deleteNoticeComment(' + c.id + ',' + noticeId + ')" style="font-size:11px;color:#A32D2D;cursor:pointer;margin-left:auto">삭제</span>';
+      html += '<span onclick="_deleteNoticeComment(' + c.id + ',' + noticeId + ')" style="font-size:11px;color:#A32D2D;cursor:pointer;margin-left:auto;">삭제</span>';
     }
     html += '</div>';
-    html += '<div style="font-size:14px;line-height:1.6;color:#1A1D23;margin-top:4px;padding-left:0">' + (c.content || '').replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
-    html += '</div></div>';
+    html += '<div style="font-size:14px;padding-left:36px;line-height:1.6;">' + (c.content || '').replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
+    html += '</div>';
   });
   listEl.innerHTML = html;
 }
@@ -17185,11 +17182,16 @@ function _updateNoticeBadge() {
         loadNoticePanel();
         // 공지탭이 열려있으면 갱신
         var noticeTab = document.getElementById('tab-notice');
-        if (noticeTab && noticeTab.style.display !== 'none' && noticeTab.innerHTML.indexOf('공지사항이 없습니다') !== -1 || noticeTab && noticeTab.style.display !== 'none') {
-          // 목록 화면일 때만 갱신 (상세/작성 중이면 건드리지 않음)
+        if (noticeTab && noticeTab.style.display !== 'none') {
           if (noticeTab.querySelector('[onclick*="_setNoticeFilter"]')) {
-            var c = document.getElementById('tab-notice');
-            if (c) _renderNoticeList(c);
+            _renderNoticeList(noticeTab);
+          }
+        }
+        // INSERT → 바탕화면이면 팝업 표시
+        if (payload.eventType === 'INSERT' && payload.new) {
+          var desktop = document.getElementById('desktop');
+          if (desktop && desktop.style.display !== 'none') {
+            _showNoticePopup(payload.new);
           }
         }
       });
@@ -17227,3 +17229,69 @@ document.addEventListener('DOMContentLoaded', function() {
   // 초기 로드
   loadNoticePanel();
 });
+
+// ========================================
+// 바탕화면 NEW 공지 팝업
+// ========================================
+
+function _showNoticePopup(notice) {
+  var existing = document.getElementById('notice-popup');
+  if (existing) existing.remove();
+
+  var catMap = { 'update': { bg:'#E6F1FB', color:'#0C447C', text:'업데이트' }, 'bug': { bg:'#FCEBEB', color:'#791F1F', text:'오류개선' }, 'notice': { bg:'#FAEEDA', color:'#633806', text:'공지' } };
+  var cat = catMap[notice.category] || catMap['update'];
+  var preview = (notice.content || '').replace(/\n/g, ' ').substring(0, 80);
+
+  var popup = document.createElement('div');
+  popup.id = 'notice-popup';
+  popup.style.cssText = 'position:fixed;right:24px;bottom:24px;width:320px;z-index:9999;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.15);background:#fff;transform:translateY(120%);transition:transform .3s ease;';
+
+  popup.innerHTML =
+    '<div style="padding:14px 16px;background:#E24B4A;display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="flex-shrink:0;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+      '<span style="font-size:14px;font-weight:500;color:#fff;">새로운 공지가 있습니다</span>' +
+      '<span style="margin-left:auto;font-size:12px;color:rgba(255,255,255,.7);">방금 전</span>' +
+    '</div>' +
+    '<div style="padding:16px;">' +
+      '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:8px;">' +
+        '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:' + cat.bg + ';color:' + cat.color + ';">' + cat.text + '</span>' +
+        '<span style="font-size:12px;color:#999;">' + (notice.author || 'admin') + '</span>' +
+      '</div>' +
+      '<div style="font-size:15px;font-weight:500;color:#1A1D23;margin-bottom:6px;">' + (notice.title || '') + '</div>' +
+      '<div style="font-size:13px;color:#666;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + preview + '</div>' +
+    '</div>' +
+    '<div style="padding:0 16px 16px;display:flex !important;flex-direction:row !important;gap:8px;">' +
+      '<button onclick="_confirmNoticePopup(' + notice.id + ')" style="flex:1;font-size:13px;padding:10px;border-radius:8px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-weight:500;font-family:Pretendard,sans-serif;">확인</button>' +
+      '<button onclick="_dismissNoticePopup()" style="flex:1;font-size:13px;padding:10px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;font-family:Pretendard,sans-serif;">나중에</button>' +
+    '</div>';
+
+  document.body.appendChild(popup);
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() { popup.style.transform = 'translateY(0)'; });
+  });
+}
+
+function _confirmNoticePopup(id) {
+  _markNoticeRead(id);
+  _updateNoticeBadge();
+  _dismissNoticePopup();
+  openWindow('공지');
+  setTimeout(function() { _showNoticeDetail(id); }, 300);
+}
+
+function _dismissNoticePopup() {
+  var popup = document.getElementById('notice-popup');
+  if (!popup) return;
+  popup.style.transform = 'translateY(120%)';
+  setTimeout(function() { if (popup.parentNode) popup.remove(); }, 350);
+}
+
+// 바탕화면 진입 시 읽지 않은 공지 팝업 표시
+function _checkUnreadNoticePopup() {
+  if (_noticesData.length === 0) return;
+  var readIds = _getReadNoticeIds();
+  var unread = _noticesData.filter(function(n) { return readIds.indexOf(n.id) === -1; });
+  if (unread.length > 0) {
+    _showNoticePopup(unread[0]);
+  }
+}

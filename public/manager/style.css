@@ -680,8 +680,8 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .kakao-btn-sm:hover { background:rgba(255,255,255,0.15); }
 
 /* 공지사항 — tab-content flex 무효화 */
-#tab-notice.active { display:block !important; overflow-y:auto; }
-#tab-notice > * { flex:none !important; min-height:auto !important; overflow:visible !important; flex-direction:row !important; }
+#tab-notice.tab-content.active { display:block !important; overflow-y:auto; }
+#tab-notice.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
 
 /* 톡방관리 */
 .kakao-rooms-banner { background:#E1F5EE; color:#085041; font-size:12px; line-height:1.6; padding:10px 14px; border-left:3px solid #1D9E75; }
