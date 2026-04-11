@@ -16462,7 +16462,7 @@ function openBotRoomPopup(roomId) {
   var overlay = document.createElement('div');
   overlay.id = 'bot-room-popup';
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
-  overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+  // 오버레이 클릭으로 닫지 않음 — ✕ 버튼 또는 ESC만 닫기
 
   var modal = document.createElement('div');
   modal.style.cssText = 'background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:calc(100vh - 100px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.15)';
