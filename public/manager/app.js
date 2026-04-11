@@ -16957,7 +16957,7 @@ function _renderNoticeComments(comments, noticeId) {
   comments.forEach(function(c) {
     var authorLabel = _commentAuthorMap[c.author] ? _commentAuthorMap[c.author].label : c.author;
     var isMine = c.author === currentUser;
-    html += '<div style="padding:14px 0;border-top:1px solid #eee;">';
+    html += '<div data-cid="' + c.id + '" style="padding:14px 0;border-top:1px solid #eee;">';
     html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:6px;">';
     html += _commentAvatar(c.author);
     html += '<span style="font-size:13px;font-weight:500;">' + authorLabel + '</span>';
@@ -16996,7 +16996,8 @@ async function _postNoticeComment(noticeId) {
       var emptyMsg = listEl.querySelector('div[style*="text-align:center"]');
       if (emptyMsg && emptyMsg.textContent.indexOf('아직') !== -1) listEl.innerHTML = '';
       var authorLabel = _commentAuthorMap[author] ? _commentAuthorMap[author].label : author;
-      var newHtml = '<div style="padding:14px 0;border-top:1px solid #eee;">';
+      var newCid = json.data ? json.data.id : 0;
+      var newHtml = '<div data-cid="' + newCid + '" style="padding:14px 0;border-top:1px solid #eee;">';
       newHtml += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:6px;">';
       newHtml += _commentAvatar(author);
       newHtml += '<span style="font-size:13px;font-weight:500;">' + authorLabel + '</span>';
@@ -17014,13 +17015,18 @@ async function _postNoticeComment(noticeId) {
 
 async function _deleteNoticeComment(commentId, noticeId) {
   var author = (window.currentUser && window.currentUser.loginId) || '';
+  // 낙관적: DOM에서 즉시 제거
+  var rows = document.querySelectorAll('#notice-comments-list > div[data-cid="' + commentId + '"]');
+  rows.forEach(function(el) { el.remove(); });
+  var countEl = document.getElementById('notice-comment-count');
+  if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent || '0') - 1);
+  // API 호출
+  _lastCommentSyncTs = Date.now();
   try {
     var res = await fetch('/api/notices/comments', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: commentId, author: author }) });
     var json = await res.json();
-    if (!json.success) throw new Error(json.error);
-    _lastCommentSyncTs = Date.now();
-    _loadNoticeComments(noticeId);
-  } catch(e) { alert('댓글 삭제 실패: ' + e.message); }
+    if (!json.success) console.error('댓글 삭제 실패:', json.error);
+  } catch(e) { console.error('댓글 삭제 실패:', e); }
 }
 
 function _showNoticeWrite(editId) {
@@ -17146,6 +17152,23 @@ function _renderNoticePanel() {
   var readIds = _getReadNoticeIds();
   var filtered = _noticesData.filter(function(n) { return n.category === _noticePanelTab; });
   var top5 = filtered.slice(0, 5);
+  var hasUnread = _noticesData.some(function(n) { return readIds.indexOf(n.id) === -1; });
+
+  // NEW 뱃지 (헤더에 표시)
+  var newBadge = document.getElementById('notice-panel-new');
+  if (!newBadge) {
+    var hdr = document.querySelector('.notice-header h4');
+    if (hdr) {
+      var sp = document.createElement('span');
+      sp.id = 'notice-panel-new';
+      sp.className = 'notice-blink';
+      sp.style.cssText = 'font-size:10px;padding:2px 8px;border-radius:4px;background:#E24B4A;color:#fff;font-weight:500;margin-left:6px;display:none;vertical-align:middle;';
+      sp.textContent = 'NEW';
+      hdr.appendChild(sp);
+      newBadge = sp;
+    }
+  }
+  if (newBadge) newBadge.style.display = hasUnread ? 'inline' : 'none';
 
   if (top5.length === 0) {
     listEl.innerHTML = '<div style="padding:20px;text-align:center;color:#9BA3B2;font-size:12px">등록된 글이 없습니다</div>';
@@ -17155,12 +17178,17 @@ function _renderNoticePanel() {
   var html = '';
   top5.forEach(function(n) {
     var isUnread = readIds.indexOf(n.id) === -1;
-    var dot = isUnread ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#CC2222;margin-right:6px;vertical-align:middle"></span>' : '';
-    html += '<div class="notice-item" onclick="_openNoticeFromPanel(' + n.id + ')" style="cursor:pointer">';
-    html += '<div>' + dot + _noticeCatBadge(n.category) + ' <span class="notice-title" style="font-size:13px">' + (n.title || '') + '</span></div>';
-    html += '<div class="notice-date">' + _noticeDateFmt(n.created_at) + '</div>';
+    var dotHtml = isUnread ? '<div class="notice-blink" style="width:7px;height:7px;border-radius:50%;background:#E24B4A;flex-shrink:0;"></div>' : '<div style="width:7px;flex-shrink:0;"></div>';
+    var titleColor = isUnread ? 'color:#1A1D23;' : 'color:#999;';
+    html += '<div onclick="_openNoticeFromPanel(' + n.id + ')" style="padding:8px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;" onmouseover="this.style.background=\'#f5f5f5\'" onmouseout="this.style.background=\'transparent\'">';
+    html += dotHtml;
+    html += _noticeCatBadge(n.category);
+    html += '<span style="font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + titleColor + '">' + (n.title || '') + '</span>';
+    html += '<span style="font-size:11px;color:#999;flex-shrink:0;">' + _noticeDateFmt(n.created_at) + '</span>';
     html += '</div>';
   });
+  // 모두 읽음 링크
+  html += '<div style="padding:6px 12px;text-align:right;"><span onclick="_markAllNoticesRead()" style="font-size:11px;color:#999;cursor:pointer;text-decoration:underline;">모두 읽음</span></div>';
   listEl.innerHTML = html;
 }
 
@@ -17179,6 +17207,14 @@ function _switchNoticePanelTab(tab) {
     }
   });
   _renderNoticePanel();
+}
+
+function _markAllNoticesRead() {
+  var uid = (window.currentUser && window.currentUser.loginId) || 'default';
+  var allIds = _noticesData.map(function(n) { return n.id; });
+  localStorage.setItem('mw_notice_read_' + uid, JSON.stringify(allIds));
+  _renderNoticePanel();
+  _updateNoticeBadge();
 }
 
 function _updateNoticeBadge() {
@@ -17274,34 +17310,42 @@ document.addEventListener('DOMContentLoaded', function() {
 // 바탕화면 NEW 공지 팝업
 // ========================================
 
-function _showNoticePopup(notice) {
+function _showNoticePopup(noticeOrNull) {
   var existing = document.getElementById('notice-popup');
   if (existing) existing.remove();
 
+  var readIds = _getReadNoticeIds();
+  var unread = _noticesData.filter(function(n) { return readIds.indexOf(n.id) === -1; });
+  if (unread.length === 0) return;
+
+  var latest = unread.slice(0, 3);
   var catMap = { 'update': { bg:'#E6F1FB', color:'#0C447C', text:'업데이트' }, 'bug': { bg:'#FCEBEB', color:'#791F1F', text:'오류개선' }, 'notice': { bg:'#FAEEDA', color:'#633806', text:'공지' } };
-  var cat = catMap[notice.category] || catMap['update'];
-  var preview = (notice.content || '').replace(/\n/g, ' ').substring(0, 80);
+
+  var itemsHtml = '';
+  latest.forEach(function(n) {
+    var cat = catMap[n.category] || catMap['update'];
+    itemsHtml += '<div style="padding:10px 0;border-bottom:1px solid #eee;">';
+    itemsHtml += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:4px;">';
+    itemsHtml += '<div style="width:7px;height:7px;border-radius:50%;background:#E24B4A;flex-shrink:0;"></div>';
+    itemsHtml += '<span style="font-size:11px;padding:3px 10px;border-radius:5px;font-weight:500;background:' + cat.bg + ';color:' + cat.color + ';">' + cat.text + '</span>';
+    itemsHtml += '<span style="font-size:12px;color:#999;">' + _noticeDateFmt(n.created_at) + '</span>';
+    itemsHtml += '</div>';
+    itemsHtml += '<div style="font-size:14px;font-weight:500;padding-left:15px;">' + (n.title || '') + '</div>';
+    itemsHtml += '</div>';
+  });
 
   var popup = document.createElement('div');
   popup.id = 'notice-popup';
-  popup.style.cssText = 'position:fixed;right:24px;bottom:24px;width:320px;z-index:9999;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.15);background:#fff;transform:translateY(120%);transition:transform .3s ease;';
-
+  popup.style.cssText = 'position:fixed;right:24px;bottom:24px;width:340px;z-index:9999;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.15);background:#fff;transform:translateY(120%);transition:transform .3s ease;';
   popup.innerHTML =
     '<div style="padding:14px 16px;background:#E24B4A;display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;">' +
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="flex-shrink:0;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" style="flex-shrink:0;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>' +
       '<span style="font-size:14px;font-weight:500;color:#fff;">새로운 공지가 있습니다</span>' +
-      '<span style="margin-left:auto;font-size:12px;color:rgba(255,255,255,.7);">방금 전</span>' +
+      '<span style="margin-left:auto;font-size:11px;color:rgba(255,255,255,.7);">' + unread.length + '건</span>' +
     '</div>' +
-    '<div style="padding:16px;">' +
-      '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:8px;">' +
-        '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:' + cat.bg + ';color:' + cat.color + ';">' + cat.text + '</span>' +
-        '<span style="font-size:12px;color:#999;">' + (notice.author || 'admin') + '</span>' +
-      '</div>' +
-      '<div style="font-size:15px;font-weight:500;color:#1A1D23;margin-bottom:6px;">' + (notice.title || '') + '</div>' +
-      '<div style="font-size:13px;color:#666;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + preview + '</div>' +
-    '</div>' +
+    '<div style="padding:16px;">' + itemsHtml + '</div>' +
     '<div style="padding:0 16px 16px;display:flex !important;flex-direction:row !important;gap:8px;">' +
-      '<button onclick="_confirmNoticePopup(' + notice.id + ')" style="flex:1;font-size:13px;padding:10px;border-radius:8px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-weight:500;font-family:Pretendard,sans-serif;">확인</button>' +
+      '<button onclick="_confirmNoticePopup()" style="flex:1;font-size:13px;padding:10px;border-radius:8px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-weight:500;font-family:Pretendard,sans-serif;">확인</button>' +
       '<button onclick="_dismissNoticePopup()" style="flex:1;font-size:13px;padding:10px;border-radius:8px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;font-family:Pretendard,sans-serif;">나중에</button>' +
     '</div>';
 
@@ -17311,12 +17355,20 @@ function _showNoticePopup(notice) {
   });
 }
 
-function _confirmNoticePopup(id) {
-  _markNoticeRead(id);
-  _updateNoticeBadge();
+function _confirmNoticePopup() {
+  var readIds = _getReadNoticeIds();
+  var unread = _noticesData.filter(function(n) { return readIds.indexOf(n.id) === -1; });
+  var latest = unread.slice(0, 3);
+  var uid = (window.currentUser && window.currentUser.loginId) || 'default';
+  latest.forEach(function(n) { if (readIds.indexOf(n.id) === -1) readIds.push(n.id); });
+  localStorage.setItem('mw_notice_read_' + uid, JSON.stringify(readIds));
   _dismissNoticePopup();
-  openWindow('공지');
-  setTimeout(function() { _showNoticeDetail(id); }, 300);
+  _updateNoticeBadge();
+  _renderNoticePanel();
+  if (latest.length > 0) {
+    openWindow('공지');
+    setTimeout(function() { _showNoticeDetail(latest[0].id); }, 300);
+  }
 }
 
 function _dismissNoticePopup() {
@@ -17326,12 +17378,11 @@ function _dismissNoticePopup() {
   setTimeout(function() { if (popup.parentNode) popup.remove(); }, 350);
 }
 
-// 바탕화면 진입 시 읽지 않은 공지 팝업 표시
 function _checkUnreadNoticePopup() {
   if (_noticesData.length === 0) return;
   var readIds = _getReadNoticeIds();
   var unread = _noticesData.filter(function(n) { return readIds.indexOf(n.id) === -1; });
   if (unread.length > 0) {
-    _showNoticePopup(unread[0]);
+    _showNoticePopup();
   }
 }

@@ -93,7 +93,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .fav-icon-label { font-size: 13px; color: rgba(255,255,255,0.88); line-height: 1.25; text-align: center; text-shadow: 0 1px 3px rgba(0,0,0,0.6); font-family: 'Pretendard', sans-serif; font-weight: 600; }
 
 /* ==================== 공지사항 패널 ==================== */
-.desktop-notice { width: 256px; background: rgba(255,255,255,0.93); border-radius: 12px; overflow: hidden; z-index: 1; backdrop-filter: blur(12px); border: 0.5px solid rgba(255,255,255,0.15); align-self: flex-start; }
+.desktop-notice { width: 420px; background: rgba(255,255,255,0.93); border-radius: 12px; overflow: hidden; z-index: 1; backdrop-filter: blur(12px); border: 0.5px solid rgba(255,255,255,0.15); align-self: flex-start; }
 .notice-header { padding: 10px 14px; border-bottom: 0.5px solid #e5e5e5; display: flex; align-items: center; justify-content: space-between; }
 .notice-header h4 { font-size: 14px; font-weight: 500; margin: 0; color: #1A1D23; }
 .notice-tabs { display: flex; gap: 3px; }
@@ -682,6 +682,10 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 /* 공지사항 — tab-content flex 무효화 */
 #tab-notice.tab-content.active { display:block !important; overflow-y:auto; }
 #tab-notice.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
+
+/* 공지 NEW 깜빡임 */
+@keyframes notice-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.notice-blink { animation: notice-blink 1s infinite; }
 
 /* 톡방관리 */
 .kakao-rooms-banner { background:#E1F5EE; color:#085041; font-size:12px; line-height:1.6; padding:10px 14px; border-left:3px solid #1D9E75; }
