@@ -16696,6 +16696,7 @@ function _deleteBotRoom(roomId) {
 // ========================================
 
 var _noticesData = [];
+var _noticesCache = null;
 var _noticeFilter = 'all';
 var _noticeSearch = '';
 var _noticeView = 'list'; // 'list' | 'detail' | 'write'
@@ -16732,20 +16733,23 @@ async function _fetchNotices() {
   try {
     var res = await fetch('/api/notices');
     var json = await res.json();
-    if (json.success) _noticesData = json.data || [];
+    if (json.success) { _noticesData = json.data || []; _noticesCache = _noticesData; }
   } catch(e) { console.error('[Notices] fetch error', e); }
 }
 
 function renderNoticeTab() {
   var container = document.getElementById('tab-notice');
   if (!container) return;
-  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px">불러오는 중...</div>';
   _noticeView = 'list';
   _noticeDetailId = null;
   _noticeEditId = null;
-  _fetchNotices().then(function() {
+  if (_noticesCache && _noticesCache.length > 0) {
+    _noticesData = _noticesCache;
     _renderNoticeList(container);
-  });
+  } else {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px">불러오는 중...</div>';
+    _fetchNotices().then(function() { _renderNoticeList(container); });
+  }
 }
 
 function _renderNoticeList(container) {
@@ -16845,6 +16849,7 @@ async function _showNoticeDetail(id) {
   // 읽음 처리
   _markNoticeRead(id);
   _updateNoticeBadge();
+  _noticeDetailId = id;
 
   var container = document.getElementById('tab-notice');
   if (!container) return;
@@ -16862,28 +16867,136 @@ async function _showNoticeDetail(id) {
   html += '</div>';
 
   // ── 메타 영역 ──
-  html += '<div style="padding:20px 20px 12px;border-bottom:1px solid #DDE1EB">';
-  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+  html += '<div style="padding:24px 28px 16px;border-bottom:1px solid #DDE1EB">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
   html += _noticeCatBadge(n.category);
   if (n.pinned) html += '<span style="font-size:14px">📌</span>';
   html += '</div>';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between">';
-  html += '<h3 style="font-size:16px;font-weight:500;margin:0;color:#1A1D23">' + (n.title || '') + '</h3>';
-  if (isAdmin) {
-    html += '<div style="display:flex;gap:6px">';
-    html += '<button onclick="_showNoticeWrite(' + n.id + ')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">수정</button>';
-    html += '<button onclick="_deleteNotice(' + n.id + ')" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">삭제</button>';
-    html += '</div>';
-  }
-  html += '</div>';
-  html += '<div style="margin-top:8px;font-size:12px;color:#9BA3B2">' + (n.author || 'admin') + ' · ' + dateStr + ' · 조회 ' + (n.views || 0) + '</div>';
+  html += '<h3 style="font-size:20px;font-weight:500;margin:0 0 10px;color:#1A1D23">' + (n.title || '') + '</h3>';
+  html += '<div style="font-size:13px;color:#9BA3B2">' + (n.author || 'admin') + ' · ' + dateStr + ' · 조회 ' + (n.views || 0) + '</div>';
   html += '</div>';
 
   // ── 본문 ──
   var contentHtml = (n.content || '').replace(/\n/g, '<br>');
-  html += '<div style="padding:20px;font-size:14px;line-height:1.8;color:#1A1D23;min-height:200px">' + contentHtml + '</div>';
+  html += '<div style="padding:24px 28px;font-size:15px;line-height:1.9;color:#1A1D23;min-height:160px">' + contentHtml + '</div>';
+
+  // ── 수정/삭제 버튼 (admin만) ──
+  if (isAdmin) {
+    html += '<div style="display:flex;justify-content:flex-end;gap:8px;padding:0 28px 20px">';
+    html += '<button onclick="_showNoticeWrite(' + n.id + ')" style="background:#fff;color:#5A6070;border:1px solid #DDE1EB;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">수정</button>';
+    html += '<button onclick="_deleteNotice(' + n.id + ')" style="background:#FCEBEB;color:#791F1F;border:1px solid #F09595;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">삭제</button>';
+    html += '</div>';
+  }
+
+  // ── 댓글 영역 ──
+  html += '<div style="border-top:1px solid #DDE1EB;padding:20px 28px" id="notice-comments-area">';
+  html += '<div style="font-size:14px;font-weight:500;color:#1A1D23;margin-bottom:16px">댓글 <span id="notice-comment-count" style="color:#9BA3B2">0</span></div>';
+  html += '<div id="notice-comments-list"></div>';
+  // 입력
+  html += '<div style="display:flex;gap:8px;margin-top:16px">';
+  html += '<input type="text" id="notice-comment-input" placeholder="댓글을 입력하세요..." style="flex:1;font-size:14px;padding:10px 14px;border:1px solid #DDE1EB;border-radius:8px;font-family:Pretendard,sans-serif;box-sizing:border-box" autocomplete="off">';
+  html += '<button onclick="_postNoticeComment(' + n.id + ')" style="background:#1A1D23;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;white-space:nowrap">등록</button>';
+  html += '</div>';
+  html += '</div>';
 
   container.innerHTML = html;
+
+  // Enter키로 등록
+  var commentInput = document.getElementById('notice-comment-input');
+  if (commentInput) {
+    commentInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _postNoticeComment(n.id); }
+    });
+  }
+
+  // 댓글 로드
+  _loadNoticeComments(id);
+}
+
+// ── 댓글 함수들 ──
+
+var _commentAuthorMap = {
+  admin:  { bg:'#FAEEDA', color:'#633806', label:'관리' },
+  hwon:   { bg:'#E6F1FB', color:'#0C447C', label:'혜원' },
+  jyoung: { bg:'#E1F5EE', color:'#085041', label:'지영' }
+};
+
+function _commentAvatar(author) {
+  var m = _commentAuthorMap[author] || { bg:'#EAECF2', color:'#5A6070', label: (author||'?').charAt(0) };
+  return '<div style="width:28px;height:28px;border-radius:50%;background:' + m.bg + ';color:' + m.color + ';display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">' + m.label + '</div>';
+}
+
+function _commentTimeFmt(dateStr) {
+  var d = new Date(dateStr);
+  return String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+async function _loadNoticeComments(noticeId) {
+  try {
+    var res = await fetch('/api/notices/comments?notice_id=' + noticeId);
+    var json = await res.json();
+    if (!json.success) return;
+    var comments = json.data || [];
+    _renderNoticeComments(comments, noticeId);
+  } catch(e) { console.error('[Comments] load error', e); }
+}
+
+function _renderNoticeComments(comments, noticeId) {
+  var listEl = document.getElementById('notice-comments-list');
+  var countEl = document.getElementById('notice-comment-count');
+  if (!listEl) return;
+  if (countEl) countEl.textContent = comments.length;
+
+  if (comments.length === 0) {
+    listEl.innerHTML = '<div style="padding:12px 0;color:#9BA3B2;font-size:13px">아직 댓글이 없습니다</div>';
+    return;
+  }
+
+  var currentUser = (window.currentUser && window.currentUser.loginId) || '';
+  var html = '';
+  comments.forEach(function(c) {
+    var authorLabel = _commentAuthorMap[c.author] ? _commentAuthorMap[c.author].label : c.author;
+    var isMine = c.author === currentUser;
+    html += '<div style="display:flex;gap:10px;padding:12px 0;border-top:1px solid #F0F2F7">';
+    html += _commentAvatar(c.author);
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
+    html += '<span style="font-size:13px;font-weight:500;color:#1A1D23">' + authorLabel + '</span>';
+    html += '<span style="font-size:11px;color:#9BA3B2">' + _commentTimeFmt(c.created_at) + '</span>';
+    if (isMine) {
+      html += '<span onclick="_deleteNoticeComment(' + c.id + ',' + noticeId + ')" style="font-size:11px;color:#A32D2D;cursor:pointer;margin-left:auto">삭제</span>';
+    }
+    html += '</div>';
+    html += '<div style="font-size:14px;line-height:1.6;color:#1A1D23;margin-top:4px;padding-left:0">' + (c.content || '').replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
+    html += '</div></div>';
+  });
+  listEl.innerHTML = html;
+}
+
+async function _postNoticeComment(noticeId) {
+  var input = document.getElementById('notice-comment-input');
+  if (!input) return;
+  var content = input.value.trim();
+  if (!content) return;
+
+  var author = (window.currentUser && window.currentUser.loginId) || 'admin';
+  try {
+    var res = await fetch('/api/notices/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notice_id: noticeId, author: author, content: content }) });
+    var json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    input.value = '';
+    _loadNoticeComments(noticeId);
+  } catch(e) { alert('댓글 등록 실패: ' + e.message); }
+}
+
+async function _deleteNoticeComment(commentId, noticeId) {
+  var author = (window.currentUser && window.currentUser.loginId) || '';
+  try {
+    var res = await fetch('/api/notices/comments', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: commentId, author: author }) });
+    var json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    _loadNoticeComments(noticeId);
+  } catch(e) { alert('댓글 삭제 실패: ' + e.message); }
 }
 
 function _showNoticeWrite(editId) {
@@ -16953,6 +17066,7 @@ async function _saveNotice(editId) {
       var json = await res.json();
       if (!json.success) throw new Error(json.error);
       toast('글 수정 완료');
+      _noticesCache = null;
       await _fetchNotices();
       _showNoticeDetail(editId);
     } else {
@@ -16960,6 +17074,7 @@ async function _saveNotice(editId) {
       var json2 = await res2.json();
       if (!json2.success) throw new Error(json2.error);
       toast('글 등록 완료');
+      _noticesCache = null;
       await _fetchNotices();
       renderNoticeTab();
     }
@@ -16976,6 +17091,7 @@ async function _deleteNotice(id) {
     var json = await res.json();
     if (!json.success) throw new Error(json.error);
     toast('글 삭제 완료');
+    _noticesCache = null;
     await _fetchNotices();
     renderNoticeTab();
     loadNoticePanel();
@@ -17064,6 +17180,7 @@ function _updateNoticeBadge() {
   sbClient.channel('notices_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'notices' }, function(payload) {
       console.log('[Notices Realtime]', payload.eventType);
+      _noticesCache = null;
       _fetchNotices().then(function() {
         loadNoticePanel();
         // 공지탭이 열려있으면 갱신
@@ -17079,6 +17196,22 @@ function _updateNoticeBadge() {
     })
     .subscribe(function(status) {
       console.log('[Notices Realtime] 구독:', status);
+    });
+
+  // 댓글 Realtime 구독
+  sbClient.channel('notice_comments_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'notice_comments' }, function(payload) {
+      console.log('[Comments Realtime]', payload.eventType);
+      // 현재 상세보기 중인 공지의 댓글이면 갱신
+      if (_noticeDetailId) {
+        var changedNoticeId = payload.new ? payload.new.notice_id : (payload.old ? payload.old.notice_id : null);
+        if (changedNoticeId === _noticeDetailId) {
+          _loadNoticeComments(_noticeDetailId);
+        }
+      }
+    })
+    .subscribe(function(status) {
+      console.log('[Comments Realtime] 구독:', status);
     });
 })();
 
