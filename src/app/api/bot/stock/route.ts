@@ -11,7 +11,8 @@ const supabase = createClient(
 
 interface Product {
   code: string;
-  name: string;
+  name?: string;
+  model?: string;
   supplyPrice?: number;
   [key: string]: unknown;
 }
@@ -20,9 +21,14 @@ function formatNumber(n: number): string {
   return n.toLocaleString('ko-KR');
 }
 
+/** 제품의 표시명 (model 우선, name 폴백) */
+function getProductName(p: Product): string {
+  return p.model || p.name || p.code;
+}
+
 /**
  * 메시지에서 제품 매칭
- * 우선순위: code 정확 포함 → 단어가 code에 포함 → 단어가 name에 포함
+ * 우선순위: code 정확 포함 → 단어가 code에 포함 → 단어가 model/name에 포함
  */
 function matchProducts(message: string, products: Product[]): Product[] {
   const msgLower = message.toLowerCase();
@@ -40,11 +46,19 @@ function matchProducts(message: string, products: Product[]): Product[] {
   );
   if (codeMatch.length > 0) return codeMatch.slice(0, 3);
 
-  // 3) 메시지 단어가 name에 포함
-  const nameMatch = products.filter(p =>
-    p.name && words.some(w => p.name.includes(w))
-  );
-  if (nameMatch.length > 0) return nameMatch.slice(0, 3);
+  // 3) 메시지의 모든 단어가 model 또는 name에 포함 (AND 매칭)
+  const modelName = products.filter(p => {
+    const text = getProductName(p).toLowerCase();
+    return words.every(w => text.includes(w.toLowerCase()));
+  });
+  if (modelName.length > 0) return modelName.slice(0, 3);
+
+  // 4) 메시지 단어 중 하나라도 model/name에 포함 (OR 매칭, 2글자 이상)
+  const partialMatch = products.filter(p => {
+    const text = getProductName(p).toLowerCase();
+    return words.filter(w => w.length >= 2).some(w => text.includes(w.toLowerCase()));
+  });
+  if (partialMatch.length > 0) return partialMatch.slice(0, 3);
 
   return [];
 }
@@ -100,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     // 2~3건 매칭
     if (matched.length >= 2) {
-      const lines = matched.map((p, i) => `${i + 1}. ${p.code} - ${p.name}`);
+      const lines = matched.map((p, i) => `${i + 1}. ${p.code} - ${getProductName(p)}`);
       const reply = `말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다.\n${lines.join('\n')}`;
       return NextResponse.json({
         success: true,
@@ -137,7 +151,7 @@ export async function POST(request: NextRequest) {
       success: true,
       reply,
       matched: 1,
-      product: { code: product.code, name: product.name },
+      product: { code: product.code, name: getProductName(product) },
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
