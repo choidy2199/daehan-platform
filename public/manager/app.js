@@ -16736,14 +16736,16 @@ async function _fetchNotices() {
   } catch(e) { console.error('[Notices] fetch error', e); }
 }
 
-async function renderNoticeTab() {
-  await _fetchNotices();
+function renderNoticeTab() {
   var container = document.getElementById('tab-notice');
   if (!container) return;
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px">불러오는 중...</div>';
   _noticeView = 'list';
   _noticeDetailId = null;
   _noticeEditId = null;
-  _renderNoticeList(container);
+  _fetchNotices().then(function() {
+    _renderNoticeList(container);
+  });
 }
 
 function _renderNoticeList(container) {
