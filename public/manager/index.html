@@ -18,44 +18,85 @@
   <input type="password" name="fake_pass_nope" tabindex="-1">
 </div>
 
-<nav class="top-nav">
-  <div class="nav-logo">(주)대한종합상사</div>
-  <div class="main-nav">
-    <!-- 밀워키 그룹 -->
-    <span class="nav-group-label nav-mw">밀워키</span>
-    <span class="nav-sub active" data-tab="mw-price" onclick="switchTab('mw-price')">단가표</span>
-    <span class="nav-sub" data-tab="mw-order" onclick="switchTab('mw-order')">발주</span>
-    <span class="nav-sub" data-tab="mw-set" onclick="switchTab('mw-set')">세트및분해</span>
-    <span class="nav-sep"></span>
-    <!-- 일반 그룹 -->
-    <span class="nav-group-label nav-gen">일반</span>
-    <span class="nav-sub" data-tab="gen-price" onclick="switchTab('gen-price')">단가표</span>
-    <span class="nav-sub" data-tab="gen-trade" onclick="switchTab('gen-trade')">매입,매출,견적서</span>
-    <span class="nav-sep"></span>
-    <!-- 판매관리 그룹 -->
-    <span class="nav-group-label nav-sales">판매관리</span>
-    <span class="nav-sub" data-tab="sales-online" onclick="switchTab('sales-online')">온라인판매</span>
-    <span class="nav-sub nav-sub-pending" data-tab="sales-marketing" onclick="switchTab('sales-marketing')">마케팅</span>
-    <span class="nav-sep"></span>
-    <!-- 수입제품 그룹 -->
-    <span class="nav-group-label nav-import">수입제품</span>
-    <span class="nav-sub" data-tab="import-product" onclick="switchTab('import-product')">제품</span>
-    <span class="nav-sub" data-tab="import-calc" onclick="switchTab('import-calc')">수입계산기</span>
-    <span class="nav-sub" data-tab="import-invoice" onclick="switchTab('import-invoice')">인보이스</span>
-    <span class="nav-sep"></span>
-    <!-- 단독 메뉴 (컬러 뱃지) -->
-    <span class="nav-group-label nav-delivery" data-tab="delivery" onclick="switchTab('delivery')">택배</span>
-    <span class="nav-sep"></span>
-    <span class="nav-group-label nav-search" data-tab="search" onclick="switchTab('search')">검색</span>
-    <span class="nav-sep"></span>
-    <span class="nav-group-label nav-kakao" data-tab="kakao" onclick="switchTab('kakao')">💬 카톡</span>
-    <span class="nav-spacer"></span>
-    <!-- 우측 영역 (공지사항 → 설정 → 경박) -->
-    <span class="nav-group-label nav-notice" data-tab="notice" onclick="switchTab('notice')">공지사항</span>
-    <span class="nav-solo nav-setting" data-tab="setting" onclick="switchTab('setting')">⚙ 설정</span>
-    <button class="nav-kb" onclick="syncInventory()">📦 경박</button>
+<!-- ==================== TOP BAR: 로고 + 메뉴 ==================== -->
+<nav class="top-bar" id="top-bar">
+  <div class="top-bar-logo">
+    <span class="logo-daehan">DAEHAN</span><span class="logo-tool">TOOL</span>
+  </div>
+  <div class="top-bar-menu" id="top-bar-menu">
+    <!-- 밀워키 (드롭다운) -->
+    <div class="tb-menu tb-dropdown" data-menu="mw">
+      <span class="tb-dot" style="color:#E8344E">●</span> 밀워키
+      <div class="tb-dropdown-panel">
+        <div class="tb-dd-item" onclick="openWindow('단가표')">단가표</div>
+        <div class="tb-dd-item" onclick="openWindow('발주')">발주</div>
+        <div class="tb-dd-item" onclick="openWindow('세트및분해')">세트및분해</div>
+      </div>
+    </div>
+    <div class="tb-sep"></div>
+    <!-- 일반 (드롭다운) -->
+    <div class="tb-menu tb-dropdown" data-menu="gen">
+      <span class="tb-dot" style="color:#B8860B">●</span> 일반
+      <div class="tb-dropdown-panel">
+        <div class="tb-dd-item" onclick="openWindow('일반단가표')">일반단가표</div>
+        <div class="tb-dd-item" onclick="openWindow('매출')">매출</div>
+        <div class="tb-dd-item" onclick="openWindow('매입')">매입</div>
+        <div class="tb-dd-item" onclick="openWindow('견적')">견적</div>
+      </div>
+    </div>
+    <div class="tb-sep"></div>
+    <!-- 판매 (드롭다운) -->
+    <div class="tb-menu tb-dropdown" data-menu="sales">
+      <span class="tb-dot" style="color:#534AB7">●</span> 판매
+      <div class="tb-dropdown-panel">
+        <div class="tb-dd-item" onclick="openWindow('온라인')">온라인</div>
+        <div class="tb-dd-item" onclick="openWindow('마케팅')">마케팅</div>
+      </div>
+    </div>
+    <div class="tb-sep"></div>
+    <!-- 수입 (드롭다운) -->
+    <div class="tb-menu tb-dropdown" data-menu="import">
+      <span class="tb-dot" style="color:#0F6E56">●</span> 수입
+      <div class="tb-dropdown-panel">
+        <div class="tb-dd-item" onclick="openWindow('제품')">제품</div>
+        <div class="tb-dd-item" onclick="openWindow('수입계산기')">수입계산기</div>
+        <div class="tb-dd-item" onclick="openWindow('인보이스')">인보이스</div>
+      </div>
+    </div>
+    <div class="tb-sep"></div>
+    <!-- 단독 메뉴 -->
+    <div class="tb-menu tb-solo" onclick="openWindow('택배')"><span class="tb-dot" style="color:#14a49c">●</span> 택배</div>
+    <div class="tb-sep"></div>
+    <div class="tb-menu tb-solo" onclick="openWindow('검색')"><span class="tb-dot" style="color:#7F77DD">●</span> 검색</div>
+    <div class="tb-sep"></div>
+    <div class="tb-menu tb-solo" onclick="openWindow('카톡')"><span class="tb-dot" style="color:#D4537E">●</span> 카톡</div>
+    <div class="tb-sep"></div>
+    <div class="tb-menu tb-solo" onclick="openWindow('공지')"><span class="tb-dot" style="color:#5DCAA5">●</span> 공지</div>
+    <div class="tb-menu-spacer"></div>
+    <!-- 설정 (드롭다운) -->
+    <div class="tb-menu tb-dropdown tb-setting" data-menu="setting">
+      ⚙ 설정
+      <div class="tb-dropdown-panel">
+        <div class="tb-dd-item" onclick="openWindow('설정','rebate')">밀워키 리베이트</div>
+        <div class="tb-dd-item" onclick="openWindow('설정','fee')">온라인 수수료</div>
+        <div class="tb-dd-item" onclick="openWindow('설정','data')">데이터관리</div>
+        <div class="tb-dd-item" onclick="openWindow('설정','api')">API관리</div>
+      </div>
+    </div>
+    <button class="tb-kb" onclick="syncInventory()">📦 경박</button>
   </div>
 </nav>
+
+<!-- ==================== TAB BAR: 열린 창 목록 ==================== -->
+<div class="tab-bar" id="tab-bar" style="display:none">
+  <div class="tab-bar-home" onclick="goDesktop()" title="바탕화면">🏠</div>
+  <div class="tab-bar-items" id="tab-bar-items"></div>
+</div>
+
+<!-- ==================== DESKTOP: 바탕화면 (즐겨찾기 아이콘) ==================== -->
+<div id="desktop" class="desktop" style="display:none">
+  <div class="desktop-grid" id="desktop-grid"></div>
+</div>
 
 <div class="content">
 

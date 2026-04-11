@@ -13,60 +13,56 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
   --tl-section-header: #1A1D23;
 }
 
-/* Nav */
-.top-nav { background: var(--tl-primary); height: 52px; display: flex; align-items: center; padding: 0 20px; gap: 12px; position: sticky; top: 0; z-index: 100; }
-.nav-logo { color: white; font-size: 14px; font-weight: 700; padding: 8px 12px; margin-right: 8px; white-space: nowrap; }
-.nav-tabs { display: flex; gap: 0; flex: 1; overflow-x: auto; align-items: stretch; }
-.nav-tab { background: transparent; color: rgba(255,255,255,0.7); border: none; border-radius: 6px; padding: 6px 10px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'Pretendard', sans-serif; white-space: nowrap; transition: all 0.2s; }
-.nav-tab.active, .nav-tab:hover { background: rgba(255,255,255,0.2); color: white; }
-/* Nav sector groups */
-.nav-sector { display: flex; align-items: center; gap: 3px; padding: 0 10px; height: 100%; }
-.nav-sector-label { font-size: 13px; font-weight: 500; padding: 2px 7px; border-radius: 3px; margin-right: 4px; white-space: nowrap; letter-spacing: 0.3px; }
-.nav-sector-milwaukee { border-bottom: 3px solid var(--tl-danger); }
-.label-milwaukee { background: var(--tl-danger); color: white; }
-.nav-sector-general { border-bottom: 3px solid var(--tl-warning); }
-.label-general { background: rgba(239,159,39,0.4); color: #FFD68A; }
-.nav-sector-sales { border-bottom: 3px solid var(--tl-success); }
-.label-sales { background: rgba(29,158,117,0.35); color: #A8F0D8; }
-.nav-sector-estimate { border-bottom: 3px solid #7F77DD; }
-.label-estimate { background: rgba(127,119,221,0.4); color: #CECBF6; }
-.nav-sector-manage { border-bottom: 3px solid #185FA5; }
-.label-manage { background: rgba(24,95,165,0.4); color: #B5D4F4; }
-.nav-divider { width: 1px; height: 30px; background: rgba(255,255,255,0.2); margin: 0 8px; flex-shrink: 0; align-self: center; }
+/* ==================== TOP BAR ==================== */
+.top-bar { background: #1A1D23; height: 48px; display: flex; align-items: center; padding: 0 16px; gap: 0; position: sticky; top: 0; z-index: 200; }
+.top-bar-logo { display: flex; align-items: center; gap: 4px; margin-right: 20px; flex-shrink: 0; }
+.logo-daehan { color: #fff; font-size: 16px; font-weight: 800; letter-spacing: 1px; font-family: 'Pretendard', sans-serif; }
+.logo-tool { color: #E8344E; font-size: 16px; font-weight: 800; letter-spacing: 1px; font-family: 'Pretendard', sans-serif; }
+.top-bar-menu { display: flex; align-items: center; gap: 0; flex: 1; min-width: 0; height: 100%; }
+
+/* 메뉴 아이템 공통 */
+.tb-menu { padding: 0 12px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.75); cursor: pointer; white-space: nowrap; flex-shrink: 0; font-family: 'Pretendard', sans-serif; height: 100%; display: inline-flex; align-items: center; gap: 5px; position: relative; transition: color 0.15s, background 0.15s; user-select: none; }
+.tb-menu:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.tb-dot { font-size: 8px; line-height: 1; }
+.tb-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.15); flex-shrink: 0; align-self: center; }
+.tb-menu-spacer { flex: 1; min-width: 8px; }
+.tb-setting { font-weight: 700; }
+
+/* 드롭다운 패널 */
+.tb-dropdown-panel { display: none; position: absolute; top: 100%; left: 0; background: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08); min-width: 140px; padding: 6px 0; z-index: 300; }
+.tb-dropdown.open > .tb-dropdown-panel { display: block; }
+.tb-dd-item { padding: 9px 18px; font-size: 13px; font-weight: 500; color: #1A1D23; cursor: pointer; white-space: nowrap; font-family: 'Pretendard', sans-serif; transition: background 0.1s; }
+.tb-dd-item:hover { background: #F4F6FA; color: var(--tl-primary); }
+
+/* 경박 버튼 */
+.tb-kb { padding: 6px 14px; font-size: 12px; font-weight: 700; color: #fff; background: #A32D2D; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; flex-shrink: 0; font-family: 'Pretendard', sans-serif; margin-left: 8px; }
+.tb-kb:hover { background: #BA3232; }
+
+/* ==================== TAB BAR (열린 창 목록) ==================== */
+.tab-bar { background: #2A2D33; height: 36px; display: flex; align-items: center; padding: 0 8px; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.tab-bar-home { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; border-radius: 4px; flex-shrink: 0; transition: background 0.15s; }
+.tab-bar-home:hover { background: rgba(255,255,255,0.1); }
+.tab-bar-home.active { background: var(--tl-primary); }
+.tab-bar-items { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; padding: 0 4px; }
+.tab-bar-item { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.6); cursor: pointer; border-radius: 4px; white-space: nowrap; font-family: 'Pretendard', sans-serif; transition: all 0.15s; flex-shrink: 0; }
+.tab-bar-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.06); }
+.tab-bar-item.active { color: #fff; background: rgba(255,255,255,0.12); }
+.tab-bar-close { font-size: 13px; color: #E8344E; cursor: pointer; margin-left: 2px; line-height: 1; opacity: 0.7; font-weight: 700; }
+.tab-bar-close:hover { opacity: 1; }
+
+/* ==================== DESKTOP (바탕화면) ==================== */
+.desktop { display: flex; align-items: center; justify-content: center; height: calc(100vh - 48px); background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #1a1d23 100%); padding: 40px; }
+.desktop-grid { display: grid; grid-template-columns: repeat(4, 100px); gap: 28px; justify-content: center; }
+.desktop-icon { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; padding: 12px 8px; border-radius: 12px; transition: all 0.2s; }
+.desktop-icon:hover { background: rgba(255,255,255,0.08); transform: translateY(-2px); }
+.desktop-icon-img { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+.desktop-icon-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.85); text-align: center; font-family: 'Pretendard', sans-serif; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+
+/* 기존 nav 호환 (레거시 — 사용하지 않지만 참조 깨지지 않도록 유지) */
 .btn-ghost { background: rgba(255,255,255,0.15); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.35); border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'Pretendard', sans-serif; transition: all 0.2s; }
 .btn-ghost:hover { background: rgba(255,255,255,0.3); }
-
-/* ==================== 메인 메뉴 (신규) ==================== */
-.main-nav { background: #2A2D33; padding: 6px 16px; display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; border-radius: 6px; height: 44px; }
-.nav-group-label { padding: 8px 14px; font-size: 13px; font-weight: 700; color: #fff; border-radius: 4px; white-space: nowrap; flex-shrink: 0; font-family: 'Pretendard', sans-serif; line-height: 1; display: inline-flex; align-items: center; }
-.nav-mw { background: #A32D2D; }
-.nav-gen { background: #B8860B; }
-.nav-sales { background: #534AB7; }
-.nav-import { background: #0F6E56; }
-/* 단독 메뉴 컬러 뱃지 (클릭 가능) */
-.nav-search { background: #185FA5; cursor: pointer; }
-.nav-notice { background: #854F0B; cursor: pointer; }
-.nav-delivery { background: #5F5E5A; cursor: pointer; }
-.nav-kakao { background: #F7E600; color: #3B1E1E; cursor: pointer; }
-.nav-search:hover, .nav-notice:hover, .nav-delivery:hover, .nav-kakao:hover { filter: brightness(1.15); }
-.nav-sub { padding: 8px 10px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.55); cursor: pointer; white-space: nowrap; flex-shrink: 0; border-radius: 4px; font-family: 'Pretendard', sans-serif; transition: color 0.15s, background 0.15s; }
-.nav-sub:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.05); }
-.nav-sub.active { color: #fff; background: rgba(255,255,255,0.12); }
-.nav-sub-pending { opacity: 0.4; cursor: not-allowed; }
-.nav-sub-pending:hover { background: transparent; color: rgba(255,255,255,0.55); }
-.nav-sep { width: 1px; height: 24px; background: rgba(255,255,255,0.12); margin: 0 6px; flex-shrink: 0; }
-.nav-spacer { flex: 1; min-width: 6px; }
-.nav-solo { padding: 8px 10px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.55); cursor: pointer; white-space: nowrap; flex-shrink: 0; border-radius: 4px; font-family: 'Pretendard', sans-serif; transition: color 0.15s, background 0.15s; }
-.nav-solo:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.05); }
-.nav-solo.active { color: #fff; background: rgba(255,255,255,0.12); }
-/* ⚙ 설정 — 강조 */
-.nav-setting { background: rgba(255,255,255,0.12); border-radius: 5px; color: #fff; font-size: 13px; font-weight: 600; padding: 8px 16px; cursor: pointer; }
-.nav-setting:hover { background: rgba(255,255,255,0.2); color: #fff; }
-.nav-setting.active { background: rgba(255,255,255,0.22); color: #fff; }
-
-/* 경박 버튼 (메인 메뉴 내부, 빨간 배경) */
-.nav-kb { padding: 8px 16px; font-size: 13px; font-weight: 700; color: #fff; background: #A32D2D; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; flex-shrink: 0; font-family: 'Pretendard', sans-serif; line-height: 1; }
-.nav-kb:hover { background: #BA3232; }
+/* 레거시 main-nav (hidden, switchTab 셀렉터 호환용) */
+.main-nav { display: none; }
 
 /* Placeholder 탭 콘텐츠 */
 .tab-placeholder { padding: 80px 40px; text-align: center; color: #888; font-size: 14px; font-family: 'Pretendard', sans-serif; }
@@ -115,7 +111,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #F4F6FA
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 
 /* Content — 전체 레이아웃을 뷰포트 높이에 맞춤 */
-.content { max-width: 100%; margin: 0 auto; padding: 16px 24px 8px; height: calc(100vh - 52px); display: flex; flex-direction: column; overflow: hidden; }
+.content { max-width: 100%; margin: 0 auto; padding: 16px 24px 8px; height: calc(100vh - 84px); display: flex; flex-direction: column; overflow: hidden; }
 .tab-content { display: none; }
 .tab-content.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 #tab-catalog.active { overflow: hidden; }

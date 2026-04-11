@@ -1369,6 +1369,241 @@ function debounce(fn, delay) {
   }
 })();
 
+// ======================== WINDOW MANAGEMENT ========================
+
+// 윈도우 이름 → 탭 ID 매핑
+var _windowConfig = {
+  '단가표':     { tabId: 'mw-price',       icon: '📊', gradient: 'linear-gradient(135deg, #E8344E, #C0392B)' },
+  '발주':       { tabId: 'mw-order',       icon: '📦', gradient: 'linear-gradient(135deg, #E8344E, #C0392B)' },
+  '세트및분해': { tabId: 'mw-set',         icon: '🔧', gradient: 'linear-gradient(135deg, #E8344E, #C0392B)' },
+  '일반단가표': { tabId: 'gen-price',      icon: '📋', gradient: 'linear-gradient(135deg, #D4A843, #B8860B)' },
+  '매출':       { tabId: 'gen-trade',      icon: '📈', gradient: 'linear-gradient(135deg, #D4A843, #B8860B)' },
+  '매입':       { tabId: 'gen-trade',      icon: '📉', gradient: 'linear-gradient(135deg, #D4A843, #B8860B)' },
+  '견적':       { tabId: 'search',         icon: '✏️', gradient: 'linear-gradient(135deg, #D4A843, #B8860B)' },
+  '온라인':     { tabId: 'sales-online',   icon: '🛒', gradient: 'linear-gradient(135deg, #7F77DD, #534AB7)' },
+  '마케팅':     { tabId: 'sales-marketing',icon: '📣', gradient: 'linear-gradient(135deg, #7F77DD, #534AB7)' },
+  '제품':       { tabId: 'import-product', icon: '🌐', gradient: 'linear-gradient(135deg, #14A49C, #0F6E56)' },
+  '수입계산기': { tabId: 'import-calc',    icon: '🧮', gradient: 'linear-gradient(135deg, #14A49C, #0F6E56)' },
+  '인보이스':   { tabId: 'import-invoice', icon: '📄', gradient: 'linear-gradient(135deg, #14A49C, #0F6E56)' },
+  '택배':       { tabId: 'delivery',       icon: '🚚', gradient: 'linear-gradient(135deg, #14a49c, #0F6E56)' },
+  '검색':       { tabId: 'search',         icon: '🔍', gradient: 'linear-gradient(135deg, #9B93FF, #7F77DD)' },
+  '카톡':       { tabId: 'kakao',          icon: '💬', gradient: 'linear-gradient(135deg, #E87FAD, #D4537E)' },
+  '공지':       { tabId: 'notice',         icon: '📢', gradient: 'linear-gradient(135deg, #7FE0C0, #5DCAA5)' },
+  '설정':       { tabId: 'setting',        icon: '⚙️', gradient: 'linear-gradient(135deg, #8891A1, #5A6070)' }
+};
+
+var _openWindows = [];    // 열린 창 이름 목록 (순서 유지)
+var _activeWindow = null; // 현재 활성 창 이름
+var _defaultFavorites = ['단가표','발주','일반단가표','온라인','검색','견적','매출','매입'];
+
+function _getFavoritesKey() {
+  var u = window.currentUser && window.currentUser.loginId || 'default';
+  return 'mw_desktop_favorites_' + u;
+}
+
+function _loadFavorites() {
+  try {
+    var saved = JSON.parse(localStorage.getItem(_getFavoritesKey()));
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+  } catch(e) {}
+  return _defaultFavorites.slice();
+}
+
+// 바탕화면 렌더링
+function renderDesktop() {
+  var grid = document.getElementById('desktop-grid');
+  if (!grid) return;
+  var favs = _loadFavorites();
+  grid.innerHTML = '';
+  favs.forEach(function(name) {
+    var cfg = _windowConfig[name];
+    if (!cfg) return;
+    var icon = document.createElement('div');
+    icon.className = 'desktop-icon';
+    icon.onclick = function() { openWindow(name); };
+    icon.innerHTML = '<div class="desktop-icon-img" style="background:' + cfg.gradient + '">' + cfg.icon + '</div>'
+      + '<div class="desktop-icon-label">' + name + '</div>';
+    grid.appendChild(icon);
+  });
+}
+
+// 탭바 렌더링
+function _renderTabBar() {
+  var bar = document.getElementById('tab-bar');
+  var items = document.getElementById('tab-bar-items');
+  if (!bar || !items) return;
+  if (_openWindows.length === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+  items.innerHTML = '';
+  var homeBtn = document.querySelector('.tab-bar-home');
+  if (homeBtn) {
+    homeBtn.classList.toggle('active', !_activeWindow);
+  }
+  _openWindows.forEach(function(name) {
+    var el = document.createElement('div');
+    el.className = 'tab-bar-item' + (name === _activeWindow ? ' active' : '');
+    el.innerHTML = '<span onclick="focusWindow(\'' + name + '\')">' + name + '</span>'
+      + '<span class="tab-bar-close" onclick="event.stopPropagation();closeWindow(\'' + name + '\')" title="닫기">✕</span>';
+    items.appendChild(el);
+  });
+}
+
+// 창 열기
+function openWindow(name, settingsSub) {
+  var cfg = _windowConfig[name];
+  if (!cfg) return;
+
+  // 드롭다운 닫기
+  _closeAllDropdowns();
+
+  // 이미 열린 창이면 포커스만
+  if (_openWindows.indexOf(name) >= 0) {
+    focusWindow(name);
+    if (settingsSub && name === '설정') {
+      switchSettingsMain(settingsSub);
+    }
+    return;
+  }
+
+  // 윈도우 목록에 추가
+  _openWindows.push(name);
+
+  // 활성화
+  focusWindow(name);
+
+  if (settingsSub && name === '설정') {
+    switchSettingsMain(settingsSub);
+  }
+
+  // localStorage 저장
+  _saveWindowState();
+}
+
+// 창 포커스 (전환)
+function focusWindow(name) {
+  var cfg = _windowConfig[name];
+  if (!cfg) return;
+
+  _activeWindow = name;
+
+  // 바탕화면 숨기고 콘텐츠 표시
+  var desktop = document.getElementById('desktop');
+  var content = document.querySelector('.content');
+  if (desktop) desktop.style.display = 'none';
+  if (content) content.style.display = 'flex';
+
+  // 기존 switchTab 호출
+  switchTab(cfg.tabId);
+
+  // 탭바 갱신
+  _renderTabBar();
+  _saveWindowState();
+}
+
+// 창 닫기
+function closeWindow(name) {
+  var idx = _openWindows.indexOf(name);
+  if (idx < 0) return;
+
+  _openWindows.splice(idx, 1);
+
+  if (_activeWindow === name) {
+    if (_openWindows.length > 0) {
+      // 마지막 열린 창으로 전환
+      focusWindow(_openWindows[_openWindows.length - 1]);
+    } else {
+      _activeWindow = null;
+      goDesktop();
+    }
+  }
+
+  _renderTabBar();
+  _saveWindowState();
+}
+
+// 바탕화면으로 이동 (창 닫지 않음)
+function goDesktop() {
+  _activeWindow = null;
+  var desktop = document.getElementById('desktop');
+  var content = document.querySelector('.content');
+  if (desktop) desktop.style.display = 'flex';
+  if (content) content.style.display = 'none';
+
+  // 모든 tab-content 비활성
+  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+
+  _renderTabBar();
+}
+
+// ESC 키로 현재 창 닫기
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && _activeWindow) {
+    // 모달이 열려있으면 ESC 무시 (모달 자체 핸들러가 처리)
+    var modals = document.querySelectorAll('.modal-bg');
+    for (var i = 0; i < modals.length; i++) {
+      var s = modals[i].style.display;
+      if (s && s !== 'none') return;
+    }
+    closeWindow(_activeWindow);
+  }
+});
+
+// 윈도우 상태 localStorage 저장/복원
+function _saveWindowState() {
+  localStorage.setItem('mw_open_windows', JSON.stringify(_openWindows));
+  localStorage.setItem('mw_active_window', _activeWindow || '');
+}
+
+function _restoreWindowState() {
+  try {
+    var saved = JSON.parse(localStorage.getItem('mw_open_windows'));
+    var active = localStorage.getItem('mw_active_window');
+    if (Array.isArray(saved) && saved.length > 0) {
+      saved.forEach(function(name) {
+        if (_windowConfig[name] && _openWindows.indexOf(name) < 0) {
+          _openWindows.push(name);
+        }
+      });
+      if (active && _openWindows.indexOf(active) >= 0) {
+        focusWindow(active);
+      } else {
+        focusWindow(_openWindows[_openWindows.length - 1]);
+      }
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+// 드롭다운 메뉴 관리
+function _closeAllDropdowns() {
+  document.querySelectorAll('.tb-dropdown.open').forEach(function(el) { el.classList.remove('open'); });
+}
+
+(function _initDropdowns() {
+  document.addEventListener('click', function(e) {
+    var dropdown = e.target.closest('.tb-dropdown');
+    if (dropdown) {
+      // 드롭다운 아이템 클릭이면 패널 닫기만 (openWindow가 처리)
+      if (e.target.closest('.tb-dd-item')) {
+        _closeAllDropdowns();
+        return;
+      }
+      // 토글
+      var wasOpen = dropdown.classList.contains('open');
+      _closeAllDropdowns();
+      if (!wasOpen) dropdown.classList.add('open');
+      e.stopPropagation();
+      return;
+    }
+    // 외부 클릭 → 모든 드롭다운 닫기
+    _closeAllDropdowns();
+  });
+})();
+
 // ======================== TAB SWITCHING ========================
 var _renderedTabs = {};
 
@@ -1409,12 +1644,8 @@ function switchTab(tab) {
   var meta = _tabIdMap[tab];
   if (!meta) return;
 
-  // 예정 탭(pending) 차단
-  var navEl = document.querySelector('.main-nav [data-tab="' + tab + '"]');
-  if (navEl && navEl.classList.contains('nav-sub-pending')) {
-    alert('준비 중입니다');
-    return;
-  }
+  // (레거시 main-nav는 hidden — navEl은 호환용으로 유지)
+  var navEl = null;
 
   var t0 = performance.now();
 
@@ -13576,19 +13807,6 @@ async function init() {
     localStorage.setItem('_migration_merge_model_desc_v1', String(Date.now()));
   })();
 
-  // 마지막 활성 탭 즉시 복원 (딜레이 없이)
-  var savedTab = localStorage.getItem('mw_active_tab');
-  if (savedTab && _legacyTabIdMap[savedTab]) savedTab = _legacyTabIdMap[savedTab];
-  var _savedMeta = savedTab && _tabIdMap[savedTab];
-  if (_savedMeta && savedTab !== 'mw-price' && document.getElementById(_savedMeta.contentId)) {
-    document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
-    document.querySelectorAll('.main-nav [data-tab]').forEach(function(t) { t.classList.remove('active'); });
-    document.getElementById(_savedMeta.contentId).classList.add('active');
-    var _savedNavEl = document.querySelector('.main-nav [data-tab="' + savedTab + '"]');
-    if (_savedNavEl) _savedNavEl.classList.add('active');
-    // localStorage 캐시 데이터로 즉시 렌더링되므로 tbody 비우기 불필요
-  }
-
   // 브라우저 자동완성 방지 — 즉시 + 100ms + 500ms
   clearSearchInputs();
   setTimeout(clearSearchInputs, 100);
@@ -13599,13 +13817,21 @@ async function init() {
   populateCatalogFilters();
   renderCatalog();
   _renderedTabs['catalog'] = true;
-  if (savedTab && savedTab !== 'mw-price') {
-    switchTab(savedTab);
-  }
   updateStatus();
   console.log('[PERF] init — step0 즉시 렌더링: ' + (performance.now() - _t).toFixed(0) + 'ms');
 
+  // 윈도우 상태 복원 또는 바탕화면 표시
+  var _windowRestored = _restoreWindowState();
+  if (!_windowRestored) {
+    // 이전 세션 윈도우 없음 → 바탕화면 표시
+    renderDesktop();
+    goDesktop();
+  } else {
+    renderDesktop();
+  }
+
   // 1. 백그라운드에서 Supabase 다운로드 → 변경분만 업데이트
+  var savedTab = localStorage.getItem('mw_active_tab');
   updateSyncStatus('동기화 중...');
   _bgSyncFromSupabase(savedTab);
 
