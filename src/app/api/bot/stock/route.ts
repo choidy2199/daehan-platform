@@ -21,11 +21,32 @@ function formatNumber(n: number): string {
   return n.toLocaleString('ko-KR');
 }
 
-/** model 필드에서 모델코드 추출 (첫 번째 / 앞 부분 trim) */
+/** model이 밀워키 모델코드(M숫자)로 시작하는지 확인 */
+function startsWithModelPrefix(text: string): boolean {
+  return /^[MC]\d/i.test(text.trim());
+}
+
+/**
+ * model 필드에서 모델코드 추출
+ * - "M18 FPD3-502X / 18V / ..." → "M18 FPD3-502X"
+ * - "49-16-2953 / M18 FID3 보호 커버" → "M18 FID3 보호 커버" (부품번호가 아닌 뒷부분)
+ */
 function getModelCode(p: Product): string {
   const model = p.model || p.name || p.code;
-  const slashIdx = model.indexOf('/');
-  return slashIdx > 0 ? model.substring(0, slashIdx).trim() : model.trim();
+  const parts = model.split('/').map(s => s.trim());
+
+  // 첫 파트가 밀워키 모델코드면 그대로 사용
+  if (parts.length >= 1 && startsWithModelPrefix(parts[0])) {
+    return parts[0];
+  }
+
+  // 첫 파트가 부품번호(숫자-숫자)면, 뒤에서 밀워키 모델 찾기
+  if (parts.length >= 2) {
+    const mPart = parts.find(pt => startsWithModelPrefix(pt));
+    if (mPart) return `${parts[0]} (${mPart})`;
+  }
+
+  return parts[0];
 }
 
 const STOPWORDS = [
@@ -53,6 +74,17 @@ function tokenize(message: string): { enTokens: string[]; koTokens: string[] } {
   return { enTokens, koTokens };
 }
 
+/** 본체(모델코드 시작) 우선, 액세서리(부품번호 시작) 후순위 정렬 */
+function sortByRelevance(products: Product[]): Product[] {
+  return [...products].sort((a, b) => {
+    const aIsModel = startsWithModelPrefix(a.model || '');
+    const bIsModel = startsWithModelPrefix(b.model || '');
+    if (aIsModel && !bIsModel) return -1;
+    if (!aIsModel && bIsModel) return 1;
+    return 0;
+  });
+}
+
 /**
  * 제품 매칭 — model 필드 대상으로만 매칭
  */
@@ -67,7 +99,7 @@ function matchProducts(message: string, products: Product[]): Product[] {
     const model = (p.model || '').toUpperCase();
     return allTokens.every(t => model.includes(t.toUpperCase()));
   });
-  if (andMatch.length > 0) return andMatch.slice(0, 5);
+  if (andMatch.length > 0) return sortByRelevance(andMatch).slice(0, 5);
 
   // === 2단계: 가장 긴 토큰 1개로 부분 매칭 (3글자 이상) ===
   const longTokens = allTokens.filter(t => t.length >= 3).sort((a, b) => b.length - a.length);
@@ -77,7 +109,7 @@ function matchProducts(message: string, products: Product[]): Product[] {
       const model = (p.model || '').toUpperCase();
       return model.includes(best);
     });
-    if (partial.length > 0) return partial.slice(0, 5);
+    if (partial.length > 0) return sortByRelevance(partial).slice(0, 5);
   }
 
   return [];
