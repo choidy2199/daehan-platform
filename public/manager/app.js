@@ -16771,7 +16771,7 @@ function _renderNoticeList(container) {
     return true;
   });
 
-  var html = '<div style="max-width:900px;margin:0 auto;display:block !important;text-align:left !important;">';
+  var html = '<div style="max-width:900px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // ── 다크 헤더 ──
   html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
@@ -16861,7 +16861,7 @@ async function _showNoticeDetail(id) {
   var fullDate = new Date(n.created_at);
   var dateStr = fullDate.getFullYear() + '.' + String(fullDate.getMonth()+1).padStart(2,'0') + '.' + String(fullDate.getDate()).padStart(2,'0');
 
-  var h = '<div style="max-width:800px;margin:0 auto;display:block !important;text-align:left !important;">';
+  var h = '<div style="max-width:800px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // 다크 헤더
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0;">';
@@ -16882,7 +16882,7 @@ async function _showNoticeDetail(id) {
 
   // 본문
   var contentHtml = (n.content || '').replace(/\n/g, '<br>');
-  h += '<div id="notice-detail-body" style="padding:24px 28px;font-size:15px;line-height:1.9;color:#333;min-height:160px;text-align:left !important;">' + contentHtml + '</div>';
+  h += '<div id="notice-detail-body" style="padding:24px 28px;font-size:15px;line-height:1.9;color:#333;min-height:160px;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;margin:20px 28px;">' + contentHtml + '</div>';
 
   // 수정/삭제 (admin만)
   if (isAdmin) {
@@ -17048,7 +17048,7 @@ function _showNoticeWrite(editId) {
   if (editId) { n = _noticesData.find(function(x) { return x.id === editId; }); }
   var isEdit = !!n;
 
-  var h = '<div style="max-width:800px;margin:0 auto;display:block !important;text-align:left !important;">';
+  var h = '<div style="max-width:800px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // 다크 헤더
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0;">';
