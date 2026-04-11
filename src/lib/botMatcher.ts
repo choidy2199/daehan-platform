@@ -175,53 +175,103 @@ export function matchProduct(keyword: string, allProducts: Product[]): MatchResu
   return { keyword, matched: true, products: mapped, count: mapped.length };
 }
 
+// ─── 힌트 필터 ───
+
+export function filterByHint(products: MatchedProduct[], hint: string): MatchedProduct[] {
+  if (!hint) return products;
+  const target = hint === 'set' ? '세트(배터리포함)' : hint === 'bare' ? '베어툴(본체만)' : '';
+  if (!target) return products;
+  const filtered = products.filter(p => p.label === target);
+  return filtered.length > 0 ? filtered : products;
+}
+
 // ─── 응답 포맷 ───
 
+/** 기존 전체 응답 (stock API 하위 호환용) */
 export function formatProductResponse(results: MatchResult[]): string {
-  const validResults = results.filter(r => r.matched || !r.matched); // 모든 결과 포함
-  if (validResults.length === 0) return '';
-
-  const isSingle = validResults.length === 1;
+  if (results.length === 0) return '';
+  const isSingle = results.length === 1;
   const lines: string[] = [];
-
-  for (const r of validResults) {
-    // 복수 제품일 때 키워드 헤더
+  for (const r of results) {
     if (!isSingle) lines.push(`[${r.keyword}]`);
-
     if (!r.matched) {
-      if (isSingle) {
-        lines.push(`"${r.keyword}" 제품은 정확한 모델명 확인부탁드립니다.`);
-      } else {
-        lines.push(`해당 제품은 정확한 모델명 확인부탁드립니다.`);
-      }
+      lines.push(isSingle ? `"${r.keyword}" 제품은 정확한 모델명 확인부탁드립니다.` : `해당 제품은 정확한 모델명 확인부탁드립니다.`);
+      if (!isSingle) lines.push('');
       continue;
     }
-
     if (r.count === 1) {
       const p = r.products[0];
-      const stockText = p.stock === '있음' ? '재고있습니다.'
-        : p.stock === '발주가능' ? '재고는 없지만 발주 가능합니다. 주문시 내일 출고됩니다.'
-        : '품절입니다. 입고일정 확인후 말씀드리겠습니다.';
-      lines.push(`모델 : ${p.model}`);
-      lines.push(`가격 : ${formatNumber(p.price)}원`);
-      lines.push(stockText);
+      const stockText = p.stock === '있음' ? '재고있습니다.' : p.stock === '발주가능' ? '재고는 없지만 발주 가능합니다. 주문시 내일 출고됩니다.' : '품절입니다. 입고일정 확인후 말씀드리겠습니다.';
+      lines.push(`모델 : ${p.model}`, `가격 : ${formatNumber(p.price)}원`, stockText);
     } else {
-      // 후보 여러개
-      if (isSingle) {
-        lines.push('말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다.');
-        lines.push('');
-      }
+      if (isSingle) { lines.push('말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다.', ''); }
       r.products.forEach((p, i) => {
         const stockMark = p.stock === '있음' ? '재고있습니다' : p.stock === '발주가능' ? '발주가능' : '품절';
         lines.push(`${i + 1}. ${p.model} ${formatNumber(p.price)}원 ${stockMark}`);
       });
     }
+    if (!isSingle) lines.push('');
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  return lines.join('\n');
+}
 
-    if (!isSingle) lines.push(''); // 제품 간 공백
+/** 확인 질문 (모델명만, 가격/재고 없음) */
+export function formatConfirmationQuestion(products: MatchedProduct[]): string {
+  const lines = products.map(p => p.model);
+  lines.push('위 제품이 맞으실까요?');
+  return lines.join('\n');
+}
+
+/** 가격만 응답 (재고 없음) */
+export function formatPriceResponse(products: MatchedProduct[]): string {
+  return products.map(p => `${p.model} ${formatNumber(p.price)}원`).join('\n');
+}
+
+/** 재고 응답 (주문 의사 확인 후) */
+export function formatStockResponse(products: MatchedProduct[]): string {
+  const lines = products.map(p => {
+    if (p.stock === '있음') return `${p.model} 재고있습니다`;
+    if (p.stock === '발주가능') return `${p.model} 발주 가능합니다`;
+    return `${p.model} 현재 품절입니다`;
+  });
+  const allOk = products.every(p => p.stock === '있음' || p.stock === '발주가능');
+  if (allOk) { lines.push('주문 넣어드리겠습니다'); }
+  else { lines.push('입고일정 확인후 말씀드리겠습니다'); }
+  return lines.join('\n');
+}
+
+/** 후보 나열 (힌트로도 1건 확정 못할 때) */
+export function formatCandidateList(results: MatchResult[]): string {
+  const isSingle = results.length === 1;
+  const lines: string[] = [];
+
+  if (isSingle) {
+    lines.push('말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다');
+    lines.push('');
+    results[0].products.forEach((p, i) => {
+      const lbl = p.label ? ` (${p.label.replace('(배터리포함)', '').replace('(본체만)', '')})` : '';
+      lines.push(`${i + 1}. ${p.model}${lbl}`);
+    });
+  } else {
+    for (const r of results) {
+      lines.push(`[${r.keyword}]`);
+      if (r.count === 1) {
+        lines.push(`모델 확인완료 ${r.products[0].model}`);
+      } else if (!r.matched) {
+        lines.push('정확한 모델명 확인부탁드립니다');
+      } else {
+        lines.push('');
+        r.products.forEach((p, i) => {
+          const lbl = p.label ? ` (${p.label.replace('(배터리포함)', '').replace('(본체만)', '')})` : '';
+          lines.push(`${i + 1}. ${p.model}${lbl}`);
+        });
+      }
+      lines.push('');
+    }
+    lines.push('어떤 제품이신지 확인부탁드립니다');
   }
 
-  // 마지막 빈 줄 제거
   while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
-
   return lines.join('\n');
 }
