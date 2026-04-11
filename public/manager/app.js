@@ -1396,25 +1396,25 @@ var _svgIcons = {
   'API관리': '<svg viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="#fff" stroke-width="1.5"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="#fff" stroke-width="1.5"/></svg>'
 };
 
-// 윈도우 이름 → 탭 ID + 색상 매핑
+// 윈도우 이름 → 탭 ID + 그룹 색상 매핑
 var _windowConfig = {
   '단가표':     { tabId: 'mw-price',       color: 'red' },
   '발주':       { tabId: 'mw-order',       color: 'red' },
   '세트및분해': { tabId: 'mw-set',         color: 'red' },
-  '일반단가표': { tabId: 'gen-price',      color: 'orange' },
-  '매출':       { tabId: 'gen-trade',      color: 'orange' },
-  '매입':       { tabId: 'gen-trade',      color: 'orange' },
-  '견적':       { tabId: 'search',         color: 'orange' },
-  '온라인':     { tabId: 'sales-online',   color: 'purple' },
-  '마케팅':     { tabId: 'sales-marketing',color: 'purple' },
-  '제품':       { tabId: 'import-product', color: 'teal' },
-  '수입계산기': { tabId: 'import-calc',    color: 'teal' },
-  '인보이스':   { tabId: 'import-invoice', color: 'teal' },
-  '택배':       { tabId: 'delivery',       color: 'teal' },
-  '검색':       { tabId: 'search',         color: 'purple' },
+  '일반단가표': { tabId: 'gen-price',      color: 'blue' },
+  '매출':       { tabId: 'gen-trade',      color: 'blue' },
+  '매입':       { tabId: 'gen-trade',      color: 'blue' },
+  '견적':       { tabId: 'search',         color: 'blue' },
+  '온라인':     { tabId: 'sales-online',   color: 'green' },
+  '마케팅':     { tabId: 'sales-marketing',color: 'green' },
+  '제품':       { tabId: 'import-product', color: 'purple' },
+  '수입계산기': { tabId: 'import-calc',    color: 'purple' },
+  '인보이스':   { tabId: 'import-invoice', color: 'purple' },
+  '택배':       { tabId: 'delivery',       color: 'gray' },
+  '검색':       { tabId: 'search',         color: 'gray' },
   '카톡':       { tabId: 'kakao',          color: 'pink' },
-  '공지':       { tabId: 'notice',         color: 'green' },
-  '설정':       { tabId: 'setting',        color: 'gray' }
+  '공지':       { tabId: 'notice',         color: 'orange' },
+  '설정':       { tabId: 'setting',        color: 'darkgray' }
 };
 
 var _openWindows = [];    // 열린 창 이름 목록 (순서 유지)
@@ -1457,74 +1457,106 @@ function _getIconColor(name) {
   return cfg ? cfg.color : 'gray';
 }
 
-// 바탕화면 렌더링 (드래그 + 우클릭 + 바운스)
+// 바탕화면 렌더링 (슬롯 기반 다중 행 + 드래그 + 우클릭 + 바운스)
 var _dragIdx = null;
+var _GRID_COLS = 10;
+
+// 최소 슬롯 수: 아이콘 수 + 1행 여유 (최소 20)
+function _ensureMinSlots(favs) {
+  var minSlots = Math.max(20, Math.ceil((favs.length) / _GRID_COLS + 1) * _GRID_COLS);
+  while (favs.length < minSlots) favs.push(null);
+  return favs;
+}
+
+// 기존 1차원 배열(null 없는) → 슬롯 배열로 마이그레이션
+function _loadFavoritesSlots() {
+  var favs = _loadFavorites();
+  // 이미 null 포함 배열이면 그대로 사용
+  var hasNull = false;
+  for (var i = 0; i < favs.length; i++) { if (favs[i] === null) { hasNull = true; break; } }
+  if (!hasNull) {
+    // 구 형식: 순수 이름 배열 → 슬롯 배열로 변환 (순서 유지)
+    favs = _ensureMinSlots(favs);
+  }
+  return _ensureMinSlots(favs);
+}
+
 function renderDesktop() {
   var grid = document.getElementById('desktop-grid');
   if (!grid) return;
-  var favs = _loadFavorites();
+  var slots = _loadFavoritesSlots();
   grid.innerHTML = '';
-  favs.forEach(function(name, index) {
-    var cfg = _windowConfig[name];
-    if (!cfg) return;
-    var el = document.createElement('div');
-    el.className = 'fav-icon';
-    el.draggable = true;
-    el.dataset.idx = index;
-    var overrides = _loadIconOverrides();
-    var customImg = overrides[name] && overrides[name].customImage;
-    var iconContent = customImg
-      ? '<img src="' + customImg + '">'
-      : _getIconSvg(name);
-    el.innerHTML = '<div class="fav-icon-box ' + _getIconColor(name) + '">' + iconContent + '</div>'
-      + '<div class="fav-icon-label">' + name + '</div>';
-    // 좌클릭 → 바운스 + openWindow
-    el.addEventListener('click', function(e) {
-      if (e.button !== 0) return;
-      el.classList.add('bounce');
-      setTimeout(function() { el.classList.remove('bounce'); }, 300);
-      setTimeout(function() { openWindow(name); }, 180);
-    });
-    // 우클릭 → 아이콘 편집
-    el.addEventListener('contextmenu', function(e) {
+
+  slots.forEach(function(name, index) {
+    var slot = document.createElement('div');
+    slot.className = 'desktop-slot';
+    slot.dataset.idx = index;
+
+    if (name && _windowConfig[name]) {
+      // 아이콘 있는 슬롯
+      var el = document.createElement('div');
+      el.className = 'fav-icon';
+      el.draggable = true;
+      var overrides = _loadIconOverrides();
+      var customImg = overrides[name] && overrides[name].customImage;
+      var iconContent = customImg ? '<img src="' + customImg + '">' : _getIconSvg(name);
+      el.innerHTML = '<div class="fav-icon-box ' + _getIconColor(name) + '">' + iconContent + '</div>'
+        + '<div class="fav-icon-label">' + name + '</div>';
+
+      el.addEventListener('click', function(e) {
+        if (e.button !== 0) return;
+        el.classList.add('bounce');
+        setTimeout(function() { el.classList.remove('bounce'); }, 300);
+        setTimeout(function() { openWindow(name); }, 180);
+      });
+      el.addEventListener('contextmenu', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        _showIconEditModal(name);
+      });
+      el.addEventListener('dragstart', function(e) {
+        _dragIdx = index;
+        el.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      el.addEventListener('dragend', function() {
+        el.classList.remove('dragging');
+        _dragIdx = null;
+        grid.querySelectorAll('.desktop-slot').forEach(function(s) { s.classList.remove('dragover'); });
+      });
+      slot.appendChild(el);
+    } else {
+      slot.classList.add('empty');
+    }
+
+    // 모든 슬롯(빈/채움)이 드롭 타겟
+    slot.addEventListener('dragover', function(e) {
       e.preventDefault();
-      e.stopPropagation();
-      _showIconEditModal(name);
+      if (parseInt(slot.dataset.idx) !== _dragIdx) slot.classList.add('dragover');
     });
-    // 드래그
-    el.addEventListener('dragstart', function(e) {
-      _dragIdx = index;
-      el.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    el.addEventListener('dragend', function() {
-      el.classList.remove('dragging');
-      _dragIdx = null;
-      grid.querySelectorAll('.fav-icon').forEach(function(x) { x.classList.remove('dragover'); });
-    });
-    el.addEventListener('dragover', function(e) {
+    slot.addEventListener('dragleave', function() { slot.classList.remove('dragover'); });
+    slot.addEventListener('drop', function(e) {
       e.preventDefault();
-      if (parseInt(el.dataset.idx) !== _dragIdx) el.classList.add('dragover');
-    });
-    el.addEventListener('dragleave', function() { el.classList.remove('dragover'); });
-    el.addEventListener('drop', function(e) {
-      e.preventDefault();
-      el.classList.remove('dragover');
-      var to = parseInt(el.dataset.idx);
+      slot.classList.remove('dragover');
+      var to = parseInt(slot.dataset.idx);
       if (_dragIdx === null || _dragIdx === to) return;
-      var item = favs.splice(_dragIdx, 1)[0];
-      favs.splice(to, 0, item);
-      _saveFavorites(favs);
+      // 스왑: from 슬롯 → null, to 슬롯 → 아이템 (기존 to 아이템은 from으로)
+      var fromItem = slots[_dragIdx];
+      var toItem = slots[to];
+      slots[_dragIdx] = toItem;
+      slots[to] = fromItem;
+      _saveFavorites(slots);
       renderDesktop();
-      var landed = grid.querySelectorAll('.fav-icon')[to];
-      if (landed) { landed.classList.add('bounce'); setTimeout(function() { landed.classList.remove('bounce'); }, 300); }
+      var landedSlot = grid.querySelectorAll('.desktop-slot')[to];
+      var landedIcon = landedSlot && landedSlot.querySelector('.fav-icon');
+      if (landedIcon) { landedIcon.classList.add('bounce'); setTimeout(function() { landedIcon.classList.remove('bounce'); }, 300); }
     });
-    grid.appendChild(el);
+
+    grid.appendChild(slot);
   });
 }
 
 // 탭바 도트 색상
-var _dotColors = { red:'#E8344E', orange:'#B8860B', purple:'#534AB7', teal:'#14a49c', green:'#5DCAA5', pink:'#D4537E', gray:'#6E6E68', blue:'#378ADD' };
+var _dotColors = { red:'#E24B4A', blue:'#378ADD', green:'#1D9E75', orange:'#EF9F27', purple:'#7F77DD', gray:'#888780', teal:'#14a49c', pink:'#D4537E', darkgray:'#444441' };
 
 // 탭바 렌더링
 function _renderTabBar() {
@@ -1641,7 +1673,7 @@ function goDesktop() {
 function showContextMenu(x, y, itemName) {
   var menu = document.getElementById('context-menu');
   if (!menu) return;
-  var favs = _loadFavorites();
+  var favs = _loadFavoritesSlots();
   var isFav = favs.indexOf(itemName) >= 0;
   menu.innerHTML = '<div class="ctx-item" onclick="_ctxToggleFav(\'' + itemName + '\')">'
     + (isFav ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기 등록') + '</div>'
@@ -1652,11 +1684,17 @@ function showContextMenu(x, y, itemName) {
 }
 function _ctxToggleFav(name) {
   _hideContextMenu();
-  var favs = _loadFavorites();
-  var idx = favs.indexOf(name);
-  if (idx >= 0) { favs.splice(idx, 1); }
-  else { favs.push(name); }
-  _saveFavorites(favs);
+  var slots = _loadFavoritesSlots();
+  var idx = slots.indexOf(name);
+  if (idx >= 0) {
+    slots[idx] = null; // 빈 슬롯으로
+  } else {
+    // 첫 번째 빈 슬롯에 추가
+    var emptyIdx = slots.indexOf(null);
+    if (emptyIdx >= 0) { slots[emptyIdx] = name; }
+    else { slots.push(name); }
+  }
+  _saveFavorites(slots);
   renderDesktop();
 }
 function _ctxOpen(name) { _hideContextMenu(); openWindow(name); }
@@ -1667,7 +1705,7 @@ function _hideContextMenu() {
 document.addEventListener('click', _hideContextMenu);
 
 // ==================== 아이콘 편집 모달 ====================
-var _iconColors = ['red','blue','green','orange','purple','gray','teal','pink'];
+var _iconColors = ['red','blue','green','orange','purple','gray','teal','pink','darkgray'];
 function _showIconEditModal(name) {
   var overlay = document.getElementById('icon-edit-overlay');
   var modal = document.getElementById('icon-edit-modal');
@@ -1782,9 +1820,9 @@ function _ieSave(name) {
 }
 function _ieRemoveFav(name) {
   _ieClose();
-  var favs = _loadFavorites();
-  var idx = favs.indexOf(name);
-  if (idx >= 0) { favs.splice(idx, 1); _saveFavorites(favs); renderDesktop(); }
+  var slots = _loadFavoritesSlots();
+  var idx = slots.indexOf(name);
+  if (idx >= 0) { slots[idx] = null; _saveFavorites(slots); renderDesktop(); }
 }
 function _ieClose() {
   var overlay = document.getElementById('icon-edit-overlay');
@@ -1863,7 +1901,7 @@ function _closeAllDropdowns() {
 function _removeInlineCtx() { document.querySelectorAll('.dd-context').forEach(function(c) { c.remove(); }); }
 
 function _updateDdStars() {
-  var favs = _loadFavorites();
+  var favs = _loadFavoritesSlots();
   document.querySelectorAll('.tb-dd-item').forEach(function(item) {
     var m = (item.getAttribute('onclick') || '').match(/openWindow\('([^']+)'/);
     if (!m) return;
@@ -1892,7 +1930,7 @@ function _updateDdStars() {
       var m = (item.getAttribute('onclick') || '').match(/openWindow\('([^']+)'/);
       if (!m) return;
       var itemName = m[1];
-      var favs = _loadFavorites();
+      var favs = _loadFavoritesSlots();
       var isFav = favs.indexOf(itemName) >= 0;
 
       var ctx = document.createElement('div');
@@ -1904,9 +1942,10 @@ function _updateDdStars() {
 
       ctx.querySelector('[data-action="fav"]').addEventListener('click', function(ev) {
         ev.stopPropagation();
-        var f = _loadFavorites();
+        var f = _loadFavoritesSlots();
         var idx = f.indexOf(itemName);
-        if (idx >= 0) f.splice(idx, 1); else f.push(itemName);
+        if (idx >= 0) { f[idx] = null; }
+        else { var ei = f.indexOf(null); if (ei >= 0) f[ei] = itemName; else f.push(itemName); }
         _saveFavorites(f);
         renderDesktop();
         ctx.remove();
