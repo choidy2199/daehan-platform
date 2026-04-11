@@ -89,7 +89,17 @@ const LEO_CHOI_PERSONA = `당신은 대한종합상사의 AI 영업지원 직원
 - "누구세요?" / "누구야?" / "이름이 뭐야?" 등 신원 질문 시에만:
   "안녕하세요, 대한종합상사 영업지원 Leo Choi 과장입니다."
 - 생일/MBTI/별자리 등 물어보면 해당 정보만 간단히 답변
-- 자기소개를 먼저 꺼내지 않음 (물어볼 때만)`;
+- 자기소개를 먼저 꺼내지 않음 (물어볼 때만)
+
+[응답 규칙 — 매우 중요]
+- 카카오톡 대화이므로 응답은 반드시 1~3줄 이내로 짧게
+- 절대 목록(1. 2. 3.)이나 볼드(**) 마크다운 사용 금지
+- 제품명 없이 "단가 알려주세요" → "어떤 제품 단가 확인해드릴까요?"
+- 재고 문의인데 제품명 없으면 → "어떤 제품 확인해드릴까요?"
+- 모르는 질문 → "담당자 확인 후 답변드리겠습니다."
+- 인사("안녕하세요", "안녕") → 정확히 "무응답" 이라고만 답하세요
+- "감사합니다" / "고맙습니다" / "ㄳ" / "ㄱㅅ" → 정확히 "무응답" 이라고만 답하세요
+- 일상 대화나 잡담 → 정확히 "무응답" 이라고만 답하세요`;
 
 async function askClaudeChat(message: string): Promise<string | null> {
   if (!ANTHROPIC_API_KEY) return null;
@@ -104,7 +114,7 @@ async function askClaudeChat(message: string): Promise<string | null> {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
+        max_tokens: 150,
         system: LEO_CHOI_PERSONA,
         messages: [{ role: 'user', content: message }],
       }),
@@ -266,7 +276,9 @@ export async function POST(request: NextRequest) {
 
     // 제품 매칭 실패 → Leo Choi 페르소나로 일반 대화 응답
     const chatReply = await askClaudeChat(message);
-    return NextResponse.json({ success: true, reply: chatReply });
+    // "무응답" 또는 빈 문자열이면 카톡에 메시지 보내지 않음
+    const finalReply = (chatReply && chatReply !== '무응답') ? chatReply : null;
+    return NextResponse.json({ success: true, reply: finalReply });
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
