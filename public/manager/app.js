@@ -16972,12 +16972,15 @@ function _renderNoticeComments(comments, noticeId) {
   listEl.innerHTML = html;
 }
 
+var _commentSubmitting = false;
 async function _postNoticeComment(noticeId) {
+  if (_commentSubmitting) return;
   var input = document.getElementById('notice-comment-input');
   if (!input) return;
   var content = input.value.trim();
   if (!content) return;
 
+  _commentSubmitting = true;
   var author = (window.currentUser && window.currentUser.loginId) || 'admin';
   try {
     var res = await fetch('/api/notices/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notice_id: noticeId, author: author, content: content }) });
@@ -16985,8 +16988,28 @@ async function _postNoticeComment(noticeId) {
     if (!json.success) throw new Error(json.error);
     _lastCommentSyncTs = Date.now();
     input.value = '';
-    _loadNoticeComments(noticeId);
+    // 낙관적 업데이트: DOM에 바로 추가
+    var listEl = document.getElementById('notice-comments-list');
+    var countEl = document.getElementById('notice-comment-count');
+    if (listEl) {
+      // "아직 댓글이 없습니다" 제거
+      var emptyMsg = listEl.querySelector('div[style*="text-align:center"]');
+      if (emptyMsg && emptyMsg.textContent.indexOf('아직') !== -1) listEl.innerHTML = '';
+      var authorLabel = _commentAuthorMap[author] ? _commentAuthorMap[author].label : author;
+      var newHtml = '<div style="padding:14px 0;border-top:1px solid #eee;">';
+      newHtml += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:6px;">';
+      newHtml += _commentAvatar(author);
+      newHtml += '<span style="font-size:13px;font-weight:500;">' + authorLabel + '</span>';
+      newHtml += '<span style="font-size:11px;color:#999;">' + _commentTimeFmt(new Date().toISOString()) + '</span>';
+      newHtml += '<span onclick="_deleteNoticeComment(' + (json.data ? json.data.id : 0) + ',' + noticeId + ')" style="font-size:11px;color:#A32D2D;cursor:pointer;margin-left:auto;">삭제</span>';
+      newHtml += '</div>';
+      newHtml += '<div style="font-size:14px;padding-left:36px;line-height:1.6;">' + content.replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
+      newHtml += '</div>';
+      listEl.insertAdjacentHTML('beforeend', newHtml);
+    }
+    if (countEl) countEl.textContent = parseInt(countEl.textContent || '0') + 1;
   } catch(e) { alert('댓글 등록 실패: ' + e.message); }
+  _commentSubmitting = false;
 }
 
 async function _deleteNoticeComment(commentId, noticeId) {
