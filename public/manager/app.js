@@ -16572,10 +16572,14 @@ function openBotRoomPopup(roomId) {
     }
   });
 
-  // ESC 닫기
-  overlay.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') overlay.remove();
-  });
+  // ESC 닫기 (document 레벨 — 포커스 위치 무관)
+  function _brpEscHandler(e) {
+    if (e.key === 'Escape' && document.getElementById('bot-room-popup')) {
+      document.getElementById('bot-room-popup').remove();
+      document.removeEventListener('keydown', _brpEscHandler);
+    }
+  }
+  document.addEventListener('keydown', _brpEscHandler);
 
   // 포커스
   setTimeout(function() { document.getElementById('brp-room-name').focus(); }, 100);
