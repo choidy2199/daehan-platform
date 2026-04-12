@@ -475,8 +475,14 @@
 <div id="tab-estimate" class="tab-content">
   <!-- 1번째 큰 메뉴: 제품 검색 추가 -->
   <div class="section">
-    <div class="section-header">
-      <span>제품검색</span>
+    <div class="section-header" id="est-section-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span>제품검색</span>
+        <span id="est-edit-selection-info" style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.6);display:none"></span>
+      </div>
+      <div id="est-header-actions" style="display:flex;gap:8px;align-items:center">
+        <button id="est-edit-btn" onclick="estToggleEditMode()" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">✎ 수정</button>
+      </div>
     </div>
     <div class="section-body" style="padding:12px">
       <input class="input" id="est-search" type="search" name="search_naf_est" placeholder="코드, 모델명, 제품설명 검색..." autocomplete="nope" data-form-type="other" data-lpignore="true" style="max-width:500px;margin-bottom:12px"
@@ -484,7 +490,7 @@
       <div id="est-search-results" class="table-scroll">
         <table class="data-table" id="est-search-table">
           <thead><tr>
-            <th style="width:90px"></th>
+            <th id="est-no-th" style="width:45px">No.</th>
             <th>코드</th>
             <th>관리코드</th>
             <th>대분류</th>
