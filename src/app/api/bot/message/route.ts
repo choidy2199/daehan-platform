@@ -362,7 +362,7 @@ export async function POST(request: NextRequest) {
 
     // 매칭 실패 시 → 점진적 토큰 축소 재시도
     if (!fullMatchResult.matched || fullMatchResult.count === 0) {
-      const retryStopwords = ['재고','있나요','있어','얼마','가격','단가','주문','보내','있습니까','알려주세요','확인','해주세요','부탁','합니다','주세요','몇개','몇대','문의','드립니다','요','좀','개','원','넣어','보내주세요','주세요','있어요','없나요','세트','베어','본체','세트로','알몸'];
+      const retryStopwords = ['재고','있나요','있어','얼마','가격','단가','주문','보내','있습니까','알려주세요','확인','해주세요','부탁','합니다','주세요','몇개','몇대','문의','드립니다','요','좀','개','원','넣어','보내주세요','주세요','있어요','없나요','세트','베어','본체','세트로','알몸','인치'];
       const words = message.match(/[A-Za-z0-9][\w-]*|[가-힣]{2,}/g) || [];
       const filtered = words.filter((w: string) => !retryStopwords.includes(w) && w.length >= 2);
 
@@ -381,7 +381,7 @@ export async function POST(request: NextRequest) {
       if (!fullMatchResult.matched || fullMatchResult.count === 0) {
         for (const word of filtered) {
           const result = matchProduct(word, allProducts);
-          if (result.matched && result.count > 0 && result.count <= 50) {
+          if (result.matched && result.count > 0) {
             fullMatchResult = result;
             console.log(`[bot] 단일 토큰 매칭 성공: "${word}" → ${result.count}건`);
             break;
