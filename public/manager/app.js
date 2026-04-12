@@ -16144,13 +16144,13 @@ async function loadBotApiCost() {
     // KPI 카드
     if (el('bot-cost-today-usd')) el('bot-cost-today-usd').textContent = fmt(p.today.cost);
     if (el('bot-cost-today-krw')) el('bot-cost-today-krw').textContent = krw(p.today.cost);
-    if (el('bot-count-today')) el('bot-count-today').textContent = p.today.count.toLocaleString() + '건';
+    if (el('bot-count-today')) el('bot-count-today').textContent = '대화 ' + p.today.count.toLocaleString() + '건';
     if (el('bot-cost-week-usd')) el('bot-cost-week-usd').textContent = fmt(p.week.cost);
     if (el('bot-cost-week-krw')) el('bot-cost-week-krw').textContent = krw(p.week.cost);
-    if (el('bot-count-week')) el('bot-count-week').textContent = p.week.count.toLocaleString() + '건';
+    if (el('bot-count-week')) el('bot-count-week').textContent = '대화 ' + p.week.count.toLocaleString() + '건';
     if (el('bot-cost-month-usd')) el('bot-cost-month-usd').textContent = fmt(p.month.cost);
     if (el('bot-cost-month-krw')) el('bot-cost-month-krw').textContent = krw(p.month.cost);
-    if (el('bot-count-month')) el('bot-count-month').textContent = p.month.count.toLocaleString() + '건';
+    if (el('bot-count-month')) el('bot-count-month').textContent = '대화 ' + p.month.count.toLocaleString() + '건';
 
     // 팝업 업데이트용 데이터 저장
     window._botApiData = { daily: daily, rate: rate, periods: p };
@@ -16188,18 +16188,19 @@ function openBotApiPopup() {
     + '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999">올해 누적</div><div style="font-size:18px;font-weight:500" id="popup-year-usd">$0.00</div><div style="font-size:12px;color:#185FA5;text-align:right" id="popup-year-krw">0원</div><div style="font-size:10px;color:#999" id="popup-year-count">0건</div></div>'
     + '</div>'
     // 토큰 사용량
-    + '<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:500;margin-bottom:8px">오늘 토큰 사용량</div>'
+    + '<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:500;margin-bottom:4px">오늘 대화 현황</div>'
+    + '<div style="font-size:13px;color:#888;margin-bottom:8px">오늘 총 <span style="font-weight:500;color:#1A1D23" id="popup-today-chat-count">0</span>건 대화</div>'
     + '<div style="display:flex;gap:16px">'
-    + '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">입력</span><span style="font-size:11px;color:#888" id="popup-tokens-input">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#378ADD;border-radius:2px;width:0%" id="popup-tokens-input-bar"></div></div></div>'
-    + '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">출력</span><span style="font-size:11px;color:#888" id="popup-tokens-output">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#1D9E75;border-radius:2px;width:0%" id="popup-tokens-output-bar"></div></div></div>'
+    + '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">보낸 글자</span><span style="font-size:11px;color:#888" id="popup-tokens-input">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#378ADD;border-radius:2px;width:0%" id="popup-tokens-input-bar"></div></div></div>'
+    + '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">받은 글자</span><span style="font-size:11px;color:#888" id="popup-tokens-output">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#1D9E75;border-radius:2px;width:0%" id="popup-tokens-output-bar"></div></div></div>'
     + '</div></div>'
     // 월별 테이블
     + '<div><div style="font-size:13px;font-weight:500;margin-bottom:10px">월별 내역</div>'
     + '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="border-bottom:0.5px solid #e0e0e0">'
     + '<th style="text-align:left;padding:8px 4px;color:#999;font-weight:400">월</th>'
-    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">건수</th>'
-    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">입력 토큰</th>'
-    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">출력 토큰</th>'
+    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">대화</th>'
+    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">보낸 글자</th>'
+    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">받은 글자</th>'
     + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">비용($)</th>'
     + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">비용(원)</th>'
     + '</tr></thead><tbody id="popup-monthly-tbody"></tbody><tfoot id="popup-monthly-tfoot"></tfoot></table>'
@@ -16231,16 +16232,17 @@ function _fillBotApiPopup() {
   if (el('popup-exchange-rate')) el('popup-exchange-rate').textContent = '적용 환율: 1$ = ' + rate.toLocaleString() + '원';
   if (el('popup-today-usd')) el('popup-today-usd').textContent = fmt(p.today.cost);
   if (el('popup-today-krw')) el('popup-today-krw').textContent = krw(p.today.cost);
-  if (el('popup-today-count')) el('popup-today-count').textContent = p.today.count.toLocaleString() + '건';
+  if (el('popup-today-count')) el('popup-today-count').textContent = '대화 ' + p.today.count.toLocaleString() + '건';
+  if (el('popup-today-chat-count')) el('popup-today-chat-count').textContent = p.today.count.toLocaleString();
   if (el('popup-week-usd')) el('popup-week-usd').textContent = fmt(p.week.cost);
   if (el('popup-week-krw')) el('popup-week-krw').textContent = krw(p.week.cost);
-  if (el('popup-week-count')) el('popup-week-count').textContent = p.week.count.toLocaleString() + '건';
+  if (el('popup-week-count')) el('popup-week-count').textContent = '대화 ' + p.week.count.toLocaleString() + '건';
   if (el('popup-month-usd')) el('popup-month-usd').textContent = fmt(p.month.cost);
   if (el('popup-month-krw')) el('popup-month-krw').textContent = krw(p.month.cost);
-  if (el('popup-month-count')) el('popup-month-count').textContent = p.month.count.toLocaleString() + '건';
+  if (el('popup-month-count')) el('popup-month-count').textContent = '대화 ' + p.month.count.toLocaleString() + '건';
   if (el('popup-year-usd')) el('popup-year-usd').textContent = fmt(p.year.cost);
   if (el('popup-year-krw')) el('popup-year-krw').textContent = krw(p.year.cost);
-  if (el('popup-year-count')) el('popup-year-count').textContent = p.year.count.toLocaleString() + '건';
+  if (el('popup-year-count')) el('popup-year-count').textContent = '대화 ' + p.year.count.toLocaleString() + '건';
   if (el('popup-tokens-input')) el('popup-tokens-input').textContent = p.today.inputTokens.toLocaleString();
   if (el('popup-tokens-output')) el('popup-tokens-output').textContent = p.today.outputTokens.toLocaleString();
   if (el('popup-tokens-input-bar')) el('popup-tokens-input-bar').style.width = Math.min(100, (p.today.inputTokens / 500000) * 100) + '%';
@@ -16303,14 +16305,14 @@ function _buildKakaoLogs() {
   html += '<div class="kakao-kpi-card" id="bot-api-cost-card" style="grid-column:span 1;min-width:0">';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
   html += '<span style="font-size:12px;color:#999">API 비용</span>';
-  html += '<span style="font-size:10px;color:#999;background:#f5f5f5;padding:2px 6px;border-radius:4px" id="bot-exchange-rate">1$ = —원</span>';
+  html += '<span style="font-size:10px;color:#fff;background:#E24B4A;padding:2px 8px;border-radius:10px;font-weight:500" id="bot-exchange-rate">1$ = —원</span>';
   html += '</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
   html += '<div><div style="font-size:11px;color:#999">오늘</div><div style="font-size:16px;font-weight:500" id="bot-cost-today-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-today-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-today">0건</div></div>';
   html += '<div style="border-left:0.5px solid #e0e0e0;padding-left:8px"><div style="font-size:11px;color:#999">이번 주</div><div style="font-size:16px;font-weight:500" id="bot-cost-week-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-week-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-week">0건</div></div>';
   html += '<div style="border-left:0.5px solid #e0e0e0;padding-left:8px"><div style="font-size:11px;color:#999">이번 달</div><div style="font-size:16px;font-weight:500" id="bot-cost-month-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-month-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-month">0건</div></div>';
   html += '</div>';
-  html += '<div style="text-align:right;margin-top:6px"><span style="font-size:11px;color:#185FA5;cursor:pointer" onclick="openBotApiPopup()">상세보기 ›</span></div>';
+  html += '<div style="text-align:right;margin-top:6px"><span style="font-size:11px;color:#fff;background:#185FA5;padding:3px 10px;border-radius:10px;font-weight:500;cursor:pointer" onclick="openBotApiPopup()">상세보기 ›</span></div>';
   html += '</div>';
   html += '</div>';
 
