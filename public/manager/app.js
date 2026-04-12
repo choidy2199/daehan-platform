@@ -15804,7 +15804,7 @@ var _LOG_STATUS_BADGES = {
 
 function _buildKakaoLogs() {
   var rooms = _getBotRooms().rooms;
-  var messages = JSON.parse(localStorage.getItem('mw_bot_messages') || '[]');
+  var messages = getBotMessages().messages;
 
   var html = '';
 
@@ -15898,7 +15898,7 @@ function _selectKakaoLog(idx) {
   var items = document.querySelectorAll('.kl-msg-item');
   if (items[idx]) items[idx].style.background = '#E6F1FB';
 
-  var messages = JSON.parse(localStorage.getItem('mw_bot_messages') || '[]');
+  var messages = getBotMessages().messages;
   var m = messages[idx];
   var detail = document.getElementById('kl-detail');
   if (!detail || !m) return;
@@ -15932,7 +15932,7 @@ var _bcAttachedFiles = [];
 function _buildKakaoBroadcast() {
   var rooms = _getBotRooms().rooms;
   var activeRooms = rooms.filter(function(r) { return r.botActive; });
-  var history = JSON.parse(localStorage.getItem('mw_bot_broadcasts') || '[]');
+  var history = getBotBroadcasts().broadcasts;
   _bcSelectedRooms = activeRooms.map(function(r) { return r.roomName; }); // 기본: 전체선택
   _bcAttachedFiles = [];
 
@@ -16131,7 +16131,7 @@ var _KAKAO_CARRIERS = ['대신택배','대신화물','CJ대한통운','한진택
 function _buildKakaoTracking() {
   var rooms = _getBotRooms().rooms;
   var activeRooms = rooms.filter(function(r) { return r.botActive; });
-  var history = JSON.parse(localStorage.getItem('mw_bot_tracking') || '[]');
+  var history = getBotTracking().records;
 
   var html = '';
 
@@ -16289,7 +16289,7 @@ function _sendKakaoTracking() {
 function _filterKakaoTrackingHistory() {
   var query = (document.getElementById('kt-history-search') || {}).value.toLowerCase();
   var period = (document.getElementById('kt-history-period') || {}).value;
-  var history = JSON.parse(localStorage.getItem('mw_bot_tracking') || '[]');
+  var history = getBotTracking().records;
 
   var now = new Date();
   var cutoff = new Date();
