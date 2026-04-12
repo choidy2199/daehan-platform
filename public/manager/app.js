@@ -1414,6 +1414,7 @@ var _windowConfig = {
   '검색':       { tabId: 'search',         color: 'gray' },
   '카톡':       { tabId: 'kakao',          color: 'pink' },
   '공지':       { tabId: 'notice',         color: 'orange' },
+  '백오더':     { tabId: 'backorder',      color: 'blue' },
   '설정':       { tabId: 'setting',        color: 'darkgray' }
 };
 
@@ -2003,6 +2004,7 @@ var _tabIdMap = {
   'search':           { contentId: 'tab-estimate',         render: 'estimate' },
   'kakao':            { contentId: 'tab-kakao',            render: 'kakao' },
   'notice':           { contentId: 'tab-notice',           render: 'notice' },
+  'backorder':        { contentId: 'tab-backorder',        render: 'backorder' },
   'setting':          { contentId: 'tab-manage',           render: 'manage' }
 };
 
@@ -2063,6 +2065,7 @@ function switchTab(tab) {
       if (renderKey === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
       if (renderKey === 'kakao') renderKakaoTab();
       if (renderKey === 'notice') renderNoticeTab();
+      if (renderKey === 'backorder') renderBackorderTab();
       if (renderKey === 'importCalc') renderImportCalcTab();
       _renderedTabs[renderKey] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
@@ -17943,6 +17946,8 @@ function _importAddCalc() {
   _importData.aid = newId;
   _importSaveData();
   _importRender();
+  var scrollEl = document.querySelector('.imc-scroll');
+  if (scrollEl) scrollEl.scrollTop = 0;
 }
 
 function _importDelCalc(id) {
@@ -18013,6 +18018,8 @@ function _importSaveCalc() {
   _importData.aid = newId;
   _importSaveData();
   _importRender();
+  var scrollEl = document.querySelector('.imc-scroll');
+  if (scrollEl) scrollEl.scrollTop = 0;
 }
 
 function _importExportExcel(c, cm) {
@@ -18414,7 +18421,7 @@ function _importDoRender() {
     h += '</div></div>'; // sec-body + sec
   }
 
-  container.innerHTML = '<div class="imc-wrap">' + h + '</div>';
+  container.innerHTML = '<div class="imc-wrap"><div class="imc-scroll">' + h + '</div></div>';
 
   // 포커스 복원
   if (focusId) {

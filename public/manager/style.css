@@ -683,6 +683,10 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #tab-notice.tab-content.active { display:block !important; overflow-y:auto; }
 #tab-notice.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
 
+/* 백오더 — tab-content flex 무효화 */
+#tab-backorder.tab-content.active { display:block !important; overflow-y:auto; }
+#tab-backorder.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
+
 /* 공지 NEW 깜빡임 */
 @keyframes notice-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 .notice-blink { animation: notice-blink 1s infinite; }
@@ -726,10 +730,12 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   --imc-blu: #185FA5; --imc-bluBg: #E6F1FB;
   --imc-hd: #1A1D23;
   --imc-row-even: #FAFBFC;
-  padding: 12px 16px; max-width: 1440px; margin: 0 auto;
   font-family: var(--imc-fn); font-size: 13px; line-height: 1.4; color: var(--imc-t1);
-  /* 스크롤 수정: line 221 와일드카드의 overflow:hidden override */
-  overflow-y: auto !important; overflow-x: hidden;
+  /* wildcard rule(line 221)이 flex:1 + overflow:hidden 부여 → 그대로 수용, 스크롤은 .imc-scroll에서 처리 */
+}
+.imc-scroll {
+  flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;
+  padding: 12px 16px; max-width: 1440px; margin: 0 auto;
 }
 .imc-wrap input, .imc-wrap select, .imc-wrap textarea {
   background: #fff; border: 1px solid var(--imc-bd); color: var(--imc-t1); border-radius: 6px;
