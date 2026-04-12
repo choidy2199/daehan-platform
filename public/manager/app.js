@@ -16724,12 +16724,12 @@ function _isAdmin() { return window.currentUser && window.currentUser.loginId ==
 function _noticeCatBadge(cat) {
   var m = { 'update': { bg:'#E6F1FB', color:'#0C447C', text:'업데이트' }, 'bug': { bg:'#FCEBEB', color:'#791F1F', text:'오류' }, 'improve': { bg:'#EEEDFE', color:'#3C3489', text:'개선' }, 'notice': { bg:'#FAEEDA', color:'#633806', text:'공지' } };
   var s = m[cat] || m['update'];
-  return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
 }
 function _noticeStatusBadge(status) {
   var m = { 'waiting': { bg:'#FAEEDA', color:'#633806', text:'대기' }, 'progress': { bg:'#E6F1FB', color:'#0C447C', text:'진행' }, 'done': { bg:'#E1F5EE', color:'#085041', text:'완료' }, 'hold': { bg:'#F1EFE8', color:'#444441', text:'보류' } };
   var s = m[status]; if (!s) return '';
-  return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
 }
 function _isBugOrImprove(cat) { return cat === 'bug' || cat === 'improve'; }
 
@@ -16807,9 +16807,9 @@ function _renderNoticeList(container) {
 
   // ── 다크 헤더 ──
   html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
-  html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px"><span style="font-size:15px;font-weight:600">공지사항</span><span style="font-size:12px;color:rgba(255,255,255,0.5)">' + _noticesData.length + '건</span></div>';
+  html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px"><span style="font-size:18px;font-weight:600">공지사항</span><span style="font-size:13px;color:rgba(255,255,255,0.5)">' + _noticesData.length + '건</span></div>';
   if (showWriteBtn) {
-    html += '<button onclick="_showNoticeWrite()" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">' + writeBtnText + '</button>';
+    html += '<button onclick="_showNoticeWrite()" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">' + writeBtnText + '</button>';
   }
   html += '</div>';
 
@@ -16823,11 +16823,11 @@ function _renderNoticeList(container) {
     var border = isActive ? '#1A1D23' : '#DDE1EB';
     var extra = '';
     if (f === 'bug_improve' && waitingCount > 0) {
-      extra = '<span style="font-size:10px;background:#E24B4A;color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px">' + waitingCount + '</span>';
+      extra = '<span style="font-size:11px;background:#E24B4A;color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px">' + waitingCount + '</span>';
     }
-    html += '<button onclick="_setNoticeFilter(\'' + f + '\')" style="display:flex !important;flex-direction:row !important;align-items:center !important;background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';border-radius:6px;padding:4px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">' + label + extra + '</button>';
+    html += '<button onclick="_setNoticeFilter(\'' + f + '\')" style="display:flex !important;flex-direction:row !important;align-items:center !important;background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';border-radius:6px;padding:4px 12px;font-size:13px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">' + label + extra + '</button>';
   });
-  html += '<div style="margin-left:auto"><input type="text" id="notice-search-input" value="' + (_noticeSearch || '') + '" placeholder="제목 검색..." style="width:180px;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:12px;font-family:Pretendard,sans-serif" autocomplete="off"></div>';
+  html += '<div style="margin-left:auto"><input type="text" id="notice-search-input" value="' + (_noticeSearch || '') + '" placeholder="제목 검색..." style="width:180px;height:34px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif" autocomplete="off"></div>';
   html += '</div>';
 
   // ── 상태 필터 행 (bug_improve 탭만) ──
@@ -16837,16 +16837,16 @@ function _renderNoticeList(container) {
     var cntProg = bugAll.filter(function(n) { return n.status === 'progress'; }).length;
     var cntDone = bugAll.filter(function(n) { return n.status === 'done'; }).length;
     html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;padding:8px 16px;border-bottom:1px solid #eee;background:#fafafa;">';
-    html += '<span style="font-size:11px;color:#999;">상태:</span>';
+    html += '<span style="font-size:12px;color:#999;">상태:</span>';
     ['all','waiting','progress','done'].forEach(function(s) {
       var label = { all:'전체', waiting:'대기', progress:'진행', done:'완료' }[s];
       var isAct = _noticeStatusFilter === s;
       var sbg = isAct ? '#1A1D23' : '#fff';
       var scolor = isAct ? '#fff' : '#5A6070';
       var sborder = isAct ? '#1A1D23' : '#DDE1EB';
-      html += '<button onclick="_setNoticeStatusFilter(\'' + s + '\')" style="background:' + sbg + ';color:' + scolor + ';border:1px solid ' + sborder + ';border-radius:6px;padding:3px 10px;font-size:11px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">' + label + '</button>';
+      html += '<button onclick="_setNoticeStatusFilter(\'' + s + '\')" style="background:' + sbg + ';color:' + scolor + ';border:1px solid ' + sborder + ';border-radius:6px;padding:3px 10px;font-size:12px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">' + label + '</button>';
     });
-    html += '<div style="margin-left:auto;display:flex !important;flex-direction:row !important;gap:8px;font-size:11px;">';
+    html += '<div style="margin-left:auto;display:flex !important;flex-direction:row !important;gap:8px;font-size:12px;">';
     html += '<span style="color:#633806">대기 ' + cntWait + '</span>';
     html += '<span style="color:#0C447C">진행 ' + cntProg + '</span>';
     html += '<span style="color:#085041">완료 ' + cntDone + '</span>';
@@ -16857,12 +16857,12 @@ function _renderNoticeList(container) {
   html += '<div style="overflow-y:auto;max-height:calc(100vh - 260px)">';
   html += '<table style="width:100%;border-collapse:collapse;table-layout:fixed">';
   html += '<thead><tr>';
-  html += '<th style="width:60px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">' + (isBugTab ? '상태' : 'No.') + '</th>';
-  html += '<th style="width:80px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">분류</th>';
-  html += '<th style="padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;text-align:left">제목</th>';
-  html += '<th style="width:80px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">작성자</th>';
-  html += '<th style="width:100px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">날짜</th>';
-  html += '<th style="width:60px;text-align:center;padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">조회</th>';
+  html += '<th style="width:60px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">' + (isBugTab ? '상태' : 'No.') + '</th>';
+  html += '<th style="width:80px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">분류</th>';
+  html += '<th style="padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;text-align:left">제목</th>';
+  html += '<th style="width:80px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">작성자</th>';
+  html += '<th style="width:100px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">날짜</th>';
+  html += '<th style="width:60px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">조회</th>';
   html += '</tr></thead><tbody>';
 
   if (filtered.length === 0) {
@@ -16885,12 +16885,12 @@ function _renderNoticeList(container) {
       }
 
       html += '<tr onclick="_showNoticeDetail(' + n.id + ')" style="cursor:pointer;border-bottom:1px solid #F0F2F7" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">';
-      html += '<td style="text-align:center;padding:8px 10px;font-size:13px;color:#5A6070">' + noCol + '</td>';
-      html += '<td style="text-align:center;padding:8px 10px">' + _noticeCatBadge(n.category) + '</td>';
-      html += '<td style="padding:8px 10px;font-size:13px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;' + titleStyle + '">' + (n.title || '') + newDot + '</td>';
-      html += '<td style="text-align:center;padding:8px 10px;font-size:12px;color:#5A6070">' + (n.author || 'admin') + '</td>';
-      html += '<td style="text-align:center;padding:8px 10px;font-size:12px;color:#5A6070">' + _noticeDateFmt(n.created_at) + '</td>';
-      html += '<td style="text-align:center;padding:8px 10px;font-size:12px;color:#5A6070">' + (n.views || 0) + '</td>';
+      html += '<td style="text-align:center;padding:10px 10px;font-size:14px;color:#5A6070">' + noCol + '</td>';
+      html += '<td style="text-align:center;padding:10px 10px">' + _noticeCatBadge(n.category) + '</td>';
+      html += '<td style="padding:10px 10px;font-size:14px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;' + titleStyle + '">' + (n.title || '') + newDot + '</td>';
+      html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.author || 'admin') + '</td>';
+      html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + _noticeDateFmt(n.created_at) + '</td>';
+      html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.views || 0) + '</td>';
       html += '</tr>';
     });
   }
@@ -16946,8 +16946,8 @@ async function _showNoticeDetail(id) {
 
   // 다크 헤더
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;padding:14px 20px;background:#1A1D23;color:#fff;">';
-  h += '<button onclick="renderNoticeTab()" style="font-size:13px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
-  h += '<span style="font-size:16px;font-weight:500;">공지사항</span>';
+  h += '<button onclick="renderNoticeTab()" style="font-size:14px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
+  h += '<span style="font-size:18px;font-weight:500;">공지사항</span>';
   h += '</div>';
 
   // 메타
@@ -16955,16 +16955,16 @@ async function _showNoticeDetail(id) {
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:10px;margin-bottom:8px;">';
   h += _noticeCatBadge(n.category);
   if (n.status) h += _noticeStatusBadge(n.status);
-  if (n.pinned) h += '<span style="font-size:11px;color:#999;">📌 상단고정</span>';
+  if (n.pinned) h += '<span style="font-size:12px;color:#999;">📌 상단고정</span>';
   h += '</div>';
-  h += '<div style="font-size:20px;font-weight:500;margin-bottom:10px;color:#1A1D23;">' + (n.title || '') + '</div>';
-  h += '<div style="font-size:13px;color:#999;display:flex !important;flex-direction:row !important;gap:16px;padding-bottom:16px;border-bottom:1px solid #eee;">';
+  h += '<div style="font-size:22px;font-weight:500;margin-bottom:10px;color:#1A1D23;">' + (n.title || '') + '</div>';
+  h += '<div style="font-size:14px;color:#999;display:flex !important;flex-direction:row !important;gap:16px;padding-bottom:16px;border-bottom:1px solid #eee;">';
   h += '<span>' + (n.author || 'admin') + '</span><span>' + dateStr + '</span><span>조회 ' + (n.views || 0) + '</span>';
   h += '</div></div>';
 
   // 본문
   var contentHtml = (n.content || '').replace(/\n/g, '<br>');
-  h += '<div id="notice-detail-body" style="padding:24px 28px;font-size:15px;line-height:1.9;color:#333;min-height:160px;text-align:left !important;">' + contentHtml + '</div>';
+  h += '<div id="notice-detail-body" style="padding:24px 28px;font-size:16px;line-height:1.9;color:#333;min-height:160px;text-align:left !important;">' + contentHtml + '</div>';
 
   // 수정/삭제 + 상태 변경
   var currentUserId = (window.currentUser && window.currentUser.loginId) || '';
@@ -16974,19 +16974,19 @@ async function _showNoticeDetail(id) {
   if (canEdit || (isAdmin && hasBugStatus)) {
     h += '<div style="padding:10px 28px 20px;display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;border-bottom:1px solid #eee;flex-wrap:wrap;">';
     if (isAdmin && hasBugStatus) {
-      h += '<span style="font-size:13px;color:#999;">상태:</span>';
-      h += '<select id="notice-status-sel" style="height:30px;border:1px solid #DDE1EB;border-radius:6px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif;">';
+      h += '<span style="font-size:14px;color:#999;">상태:</span>';
+      h += '<select id="notice-status-sel" style="height:30px;border:1px solid #DDE1EB;border-radius:6px;padding:0 8px;font-size:13px;font-family:Pretendard,sans-serif;">';
       ['waiting','progress','done','hold'].forEach(function(s) {
         var sl = { waiting:'대기', progress:'진행중', done:'완료', hold:'보류' }[s];
         h += '<option value="' + s + '"' + (n.status === s ? ' selected' : '') + '>' + sl + '</option>';
       });
       h += '</select>';
-      h += '<button onclick="_changeNoticeStatus(' + n.id + ')" style="font-size:12px;padding:5px 12px;border-radius:6px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">적용</button>';
+      h += '<button onclick="_changeNoticeStatus(' + n.id + ')" style="font-size:13px;padding:5px 12px;border-radius:6px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">적용</button>';
     }
     if (canEdit) {
       h += '<div style="margin-left:auto;display:flex !important;flex-direction:row !important;gap:8px;">';
-      h += '<button onclick="_showNoticeWrite(' + n.id + ')" style="font-size:13px;padding:8px 20px;border-radius:6px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;font-family:Pretendard,sans-serif;">수정</button>';
-      h += '<button onclick="_deleteNotice(' + n.id + ')" style="font-size:13px;padding:8px 20px;border-radius:6px;border:1px solid #F09595;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
+      h += '<button onclick="_showNoticeWrite(' + n.id + ')" style="font-size:14px;padding:8px 20px;border-radius:6px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;font-family:Pretendard,sans-serif;">수정</button>';
+      h += '<button onclick="_deleteNotice(' + n.id + ')" style="font-size:14px;padding:8px 20px;border-radius:6px;border:1px solid #F09595;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
       h += '</div>';
     }
     h += '</div>';
@@ -16994,11 +16994,11 @@ async function _showNoticeDetail(id) {
 
   // 댓글
   h += '<div style="padding:20px 28px;text-align:left !important;">';
-  h += '<div style="font-size:14px;font-weight:500;margin-bottom:16px;">댓글 <span id="notice-comment-count" style="color:#999;font-weight:400;">0</span></div>';
+  h += '<div style="font-size:15px;font-weight:500;margin-bottom:16px;">댓글 <span id="notice-comment-count" style="color:#999;font-weight:400;">0</span></div>';
   h += '<div id="notice-comments-list"></div>';
   h += '<div style="margin-top:16px;display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;">';
-  h += '<input type="text" id="notice-comment-input" placeholder="댓글을 입력하세요..." autocomplete="off" style="flex:1;font-size:14px;padding:10px 14px;border-radius:8px;border:1px solid #ddd;background:#fff;min-width:0;font-family:Pretendard,sans-serif;box-sizing:border-box;">';
-  h += '<button onclick="_postNoticeComment(' + n.id + ')" style="font-size:13px;padding:10px 20px;border-radius:8px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-weight:500;white-space:nowrap;flex-shrink:0;font-family:Pretendard,sans-serif;">등록</button>';
+  h += '<input type="text" id="notice-comment-input" placeholder="댓글을 입력하세요..." autocomplete="off" style="flex:1;font-size:15px;padding:10px 14px;border-radius:8px;border:1px solid #ddd;background:#fff;min-width:0;font-family:Pretendard,sans-serif;box-sizing:border-box;">';
+  h += '<button onclick="_postNoticeComment(' + n.id + ')" style="font-size:14px;padding:10px 20px;border-radius:8px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-weight:500;white-space:nowrap;flex-shrink:0;font-family:Pretendard,sans-serif;">등록</button>';
   h += '</div></div>';
 
   h += '</div>'; // 본문 영역 끝
@@ -17060,16 +17060,16 @@ function _renderNoticeSidebar(currentId, currentCategory) {
   var statusLabels = { waiting:'대기', progress:'진행', done:'완료', hold:'보류' };
 
   // 다크 헤더
-  var html = '<div style="padding:10px 14px;background:#1A1D23;color:#fff;font-size:13px;font-weight:500;display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;flex-shrink:0;">';
+  var html = '<div style="padding:10px 14px;background:#1A1D23;color:#fff;font-size:14px;font-weight:500;display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;flex-shrink:0;">';
   html += '<span>' + catGroupName + ' 글 목록</span>';
-  html += '<span style="font-size:11px;color:rgba(255,255,255,.5);">' + items.length + '건</span>';
+  html += '<span style="font-size:12px;color:rgba(255,255,255,.5);">' + items.length + '건</span>';
   html += '</div>';
 
   // 스크롤 영역
   html += '<div style="flex:1;overflow-y:auto;">';
 
   if (items.length === 0) {
-    html += '<div style="padding:20px;text-align:center;color:#999;font-size:12px;">글이 없습니다</div>';
+    html += '<div style="padding:20px;text-align:center;color:#999;font-size:13px;">글이 없습니다</div>';
   } else {
     items.forEach(function(n) {
       var isCur = n.id === currentId;
@@ -17080,20 +17080,20 @@ function _renderNoticeSidebar(currentId, currentCategory) {
       var ds = String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
 
       var wrapStyle = isCur
-        ? 'padding:10px 14px;background:#E6F1FB;border-left:3px solid #185FA5;border-bottom:1px solid #eee;cursor:pointer;'
-        : 'padding:10px 14px;border-bottom:1px solid #eee;cursor:pointer;';
-      var titleStyle = isCur ? 'font-size:12px;font-weight:500;color:#0C447C;'
-        : isDone ? 'font-size:12px;color:#999;text-decoration:line-through;'
-        : 'font-size:12px;color:#333;';
+        ? 'padding:12px 14px;background:#E6F1FB;border-left:3px solid #185FA5;border-bottom:1px solid #eee;cursor:pointer;'
+        : 'padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;';
+      var titleStyle = isCur ? 'font-size:13px;font-weight:500;color:#0C447C;'
+        : isDone ? 'font-size:13px;color:#999;text-decoration:line-through;'
+        : 'font-size:13px;color:#333;';
       var infoColor = isCur ? '#0C447C' : '#999';
 
-      var badges = '<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:' + cc.bg + ';color:' + cc.c + ';flex-shrink:0;' + (isCur ? 'border:0.5px solid ' + cc.c + ';' : '') + '">' + cl + '</span>';
+      var badges = '<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:' + cc.bg + ';color:' + cc.c + ';flex-shrink:0;' + (isCur ? 'border:0.5px solid ' + cc.c + ';' : '') + '">' + cl + '</span>';
       if (n.status && _isBugOrImprove(n.category)) {
         var sc = statusColors[n.status]; var sl = statusLabels[n.status];
-        if (sc) badges += ' <span style="font-size:10px;padding:2px 7px;border-radius:4px;background:' + sc.bg + ';color:' + sc.c + ';flex-shrink:0;">' + sl + '</span>';
+        if (sc) badges += ' <span style="font-size:11px;padding:2px 7px;border-radius:4px;background:' + sc.bg + ';color:' + sc.c + ';flex-shrink:0;">' + sl + '</span>';
       }
       var extras = '';
-      if (n.pinned) extras += '<span style="font-size:10px;color:#999;flex-shrink:0;">📌</span>';
+      if (n.pinned) extras += '<span style="font-size:11px;color:#999;flex-shrink:0;">📌</span>';
 
       html += '<div onclick="_showNoticeDetail(' + n.id + ')" style="' + wrapStyle + '">';
       html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:5px;">';
@@ -17101,7 +17101,7 @@ function _renderNoticeSidebar(currentId, currentCategory) {
       html += '<span style="' + titleStyle + 'flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (n.title || '') + '</span>';
       html += extras;
       html += '</div>';
-      html += '<div style="font-size:10px;color:' + infoColor + ';margin-top:4px;padding-left:2px;">' + (n.author || 'admin') + ' · ' + ds + '</div>';
+      html += '<div style="font-size:11px;color:' + infoColor + ';margin-top:4px;padding-left:2px;">' + (n.author || 'admin') + ' · ' + ds + '</div>';
       html += '</div>';
     });
   }
@@ -17120,7 +17120,7 @@ var _commentAuthorMap = {
 
 function _commentAvatar(author) {
   var m = _commentAuthorMap[author] || { bg:'#EAECF2', color:'#5A6070', label: (author||'?').charAt(0) };
-  return '<div style="width:28px;height:28px;border-radius:50%;background:' + m.bg + ';color:' + m.color + ';display:flex !important;align-items:center !important;justify-content:center !important;font-size:11px;font-weight:500;flex-shrink:0;">' + m.label + '</div>';
+  return '<div style="width:28px;height:28px;border-radius:50%;background:' + m.bg + ';color:' + m.color + ';display:flex !important;align-items:center !important;justify-content:center !important;font-size:12px;font-weight:500;flex-shrink:0;">' + m.label + '</div>';
 }
 
 function _commentTimeFmt(dateStr) {
@@ -17144,7 +17144,7 @@ function _renderNoticeComments(comments, noticeId) {
   if (countEl) countEl.textContent = comments.length;
 
   if (comments.length === 0) {
-    listEl.innerHTML = '<div style="font-size:13px;color:#999;padding:20px 0;text-align:center;">아직 댓글이 없습니다.</div>';
+    listEl.innerHTML = '<div style="font-size:14px;color:#999;padding:20px 0;text-align:center;">아직 댓글이 없습니다.</div>';
     return;
   }
 
@@ -17156,18 +17156,18 @@ function _renderNoticeComments(comments, noticeId) {
     html += '<div data-cid="' + c.id + '" style="padding:14px 0;border-top:1px solid #eee;">';
     html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:6px;">';
     html += _commentAvatar(c.author);
-    html += '<span style="font-size:13px;font-weight:500;">' + authorLabel + '</span>';
-    html += '<span style="font-size:11px;color:#999;">' + _commentTimeFmt(c.created_at) + '</span>';
+    html += '<span style="font-size:14px;font-weight:500;">' + authorLabel + '</span>';
+    html += '<span style="font-size:12px;color:#999;">' + _commentTimeFmt(c.created_at) + '</span>';
     if (isMine) {
-      html += '<span onclick="_deleteNoticeComment(' + c.id + ',' + noticeId + ')" style="font-size:11px;color:#A32D2D;cursor:pointer;margin-left:auto;">삭제</span>';
+      html += '<span onclick="_deleteNoticeComment(' + c.id + ',' + noticeId + ')" style="font-size:12px;color:#A32D2D;cursor:pointer;margin-left:auto;">삭제</span>';
     }
     html += '</div>';
     // 상태 변경 자동 댓글 — 특별 스타일
     var cText = (c.content || '');
     if (cText.indexOf('상태를 ') === 0 && cText.indexOf('(으)로 변경했습니다') !== -1) {
-      html += '<div style="font-size:13px;padding-left:36px;line-height:1.6;color:#999;font-style:italic;">' + cText.replace(/</g, '&lt;') + '</div>';
+      html += '<div style="font-size:14px;padding-left:36px;line-height:1.6;color:#999;font-style:italic;">' + cText.replace(/</g, '&lt;') + '</div>';
     } else {
-      html += '<div style="font-size:14px;padding-left:36px;line-height:1.6;">' + cText.replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
+      html += '<div style="font-size:15px;padding-left:36px;line-height:1.6;">' + cText.replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
     }
     html += '</div>';
   });
@@ -17202,11 +17202,11 @@ async function _postNoticeComment(noticeId) {
       var newHtml = '<div data-cid="' + newCid + '" style="padding:14px 0;border-top:1px solid #eee;">';
       newHtml += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;margin-bottom:6px;">';
       newHtml += _commentAvatar(author);
-      newHtml += '<span style="font-size:13px;font-weight:500;">' + authorLabel + '</span>';
-      newHtml += '<span style="font-size:11px;color:#999;">' + _commentTimeFmt(new Date().toISOString()) + '</span>';
-      newHtml += '<span onclick="_deleteNoticeComment(' + (json.data ? json.data.id : 0) + ',' + noticeId + ')" style="font-size:11px;color:#A32D2D;cursor:pointer;margin-left:auto;">삭제</span>';
+      newHtml += '<span style="font-size:14px;font-weight:500;">' + authorLabel + '</span>';
+      newHtml += '<span style="font-size:12px;color:#999;">' + _commentTimeFmt(new Date().toISOString()) + '</span>';
+      newHtml += '<span onclick="_deleteNoticeComment(' + (json.data ? json.data.id : 0) + ',' + noticeId + ')" style="font-size:12px;color:#A32D2D;cursor:pointer;margin-left:auto;">삭제</span>';
       newHtml += '</div>';
-      newHtml += '<div style="font-size:14px;padding-left:36px;line-height:1.6;">' + content.replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
+      newHtml += '<div style="font-size:15px;padding-left:36px;line-height:1.6;">' + content.replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
       newHtml += '</div>';
       listEl.insertAdjacentHTML('beforeend', newHtml);
     }
@@ -17246,7 +17246,7 @@ function _showNoticeWrite(editId) {
   h += '<button onclick="renderNoticeTab()" style="font-size:13px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
   var isBugMode = (_noticeFilter === 'bug_improve') || (isEdit && _isBugOrImprove(n.category));
   var headerTitle = isEdit ? '글 수정' : (isBugMode ? '오류/개선 작성' : '새 글 작성');
-  h += '<span style="font-size:16px;font-weight:500;">' + headerTitle + '</span>';
+  h += '<span style="font-size:18px;font-weight:500;">' + headerTitle + '</span>';
   h += '</div>';
 
   // 폼
@@ -17254,8 +17254,8 @@ function _showNoticeWrite(editId) {
 
   // 분류 + 상단고정
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;margin-bottom:16px;">';
-  h += '<div><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">분류</label>';
-  h += '<select id="nw-category" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;min-width:120px;">';
+  h += '<div><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">분류</label>';
+  h += '<select id="nw-category" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;min-width:120px;">';
   if (isBugMode) {
     // 오류/개선 모드
     ['bug','improve'].forEach(function(c) {
@@ -17271,17 +17271,17 @@ function _showNoticeWrite(editId) {
   }
   h += '</select></div>';
   if (!isBugMode) {
-    h += '<label style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;margin-top:18px;font-size:13px;color:#1A1D23;cursor:pointer;"><input type="checkbox" id="nw-pinned"' + (isEdit && n.pinned ? ' checked' : '') + '> 📌 상단고정</label>';
+    h += '<label style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;margin-top:18px;font-size:14px;color:#1A1D23;cursor:pointer;"><input type="checkbox" id="nw-pinned"' + (isEdit && n.pinned ? ' checked' : '') + '> 📌 상단고정</label>';
   }
   h += '</div>';
 
   // 제목
-  h += '<div style="margin-bottom:16px;"><label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">제목</label>';
-  h += '<input type="text" id="nw-title" value="' + (isEdit ? (n.title || '').replace(/"/g, '&quot;') : '') + '" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;" placeholder="제목을 입력하세요"></div>';
+  h += '<div style="margin-bottom:16px;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">제목</label>';
+  h += '<input type="text" id="nw-title" value="' + (isEdit ? (n.title || '').replace(/"/g, '&quot;') : '') + '" style="width:100%;height:38px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:16px;font-family:Pretendard,sans-serif;box-sizing:border-box;" placeholder="제목을 입력하세요"></div>';
 
   // 내용 — contenteditable + 툴바
   h += '<div style="margin-bottom:16px;">';
-  h += '<label style="font-size:12px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">내용</label>';
+  h += '<label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">내용</label>';
 
   // 툴바
   h += '<div id="nw-toolbar" style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:4px;padding:6px 8px;border:1px solid #DDE1EB;border-bottom:none;border-radius:6px 6px 0 0;background:#fafafa;">';
@@ -17295,18 +17295,18 @@ function _showNoticeWrite(editId) {
 
   // contenteditable 영역
   var existingContent = isEdit ? (n.content || '') : '';
-  h += '<div id="nw-content" contenteditable="true" style="width:100%;min-height:300px;border:1px solid #DDE1EB;border-radius:0 0 6px 6px;padding:12px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;line-height:1.7;outline:none;overflow-y:auto;background:#fff;" data-placeholder="내용을 입력하세요...">' + existingContent + '</div>';
+  h += '<div id="nw-content" contenteditable="true" style="width:100%;min-height:300px;border:1px solid #DDE1EB;border-radius:0 0 6px 6px;padding:12px;font-size:16px;font-family:Pretendard,sans-serif;box-sizing:border-box;line-height:1.7;outline:none;overflow-y:auto;background:#fff;" data-placeholder="내용을 입력하세요...">' + existingContent + '</div>';
   h += '</div>';
 
   // 드롭존
-  h += '<div id="nw-dropzone" onclick="document.getElementById(\'nw-file-input\').click()" style="margin-bottom:16px;padding:16px;border:2px dashed #DDE1EB;border-radius:8px;text-align:center;cursor:pointer;color:#9BA3B2;font-size:13px;transition:border-color .2s;" onmouseover="this.style.borderColor=\'#185FA5\'" onmouseout="this.style.borderColor=\'#DDE1EB\'">';
+  h += '<div id="nw-dropzone" onclick="document.getElementById(\'nw-file-input\').click()" style="margin-bottom:16px;padding:16px;border:2px dashed #DDE1EB;border-radius:8px;text-align:center;cursor:pointer;color:#9BA3B2;font-size:14px;transition:border-color .2s;" onmouseover="this.style.borderColor=\'#185FA5\'" onmouseout="this.style.borderColor=\'#DDE1EB\'">';
   h += '📎 파일을 드래그하거나 클릭하여 이미지 추가';
   h += '</div>';
 
   // 버튼
   h += '<div style="display:flex !important;flex-direction:row !important;justify-content:flex-end !important;gap:8px;">';
-  h += '<button onclick="renderNoticeTab()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">취소</button>';
-  h += '<button id="nw-submit-btn" onclick="_saveNotice(' + (isEdit ? n.id : 'null') + ')" style="background:#1A1D23;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">' + (isEdit ? '수정' : '등록') + '</button>';
+  h += '<button onclick="renderNoticeTab()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">취소</button>';
+  h += '<button id="nw-submit-btn" onclick="_saveNotice(' + (isEdit ? n.id : 'null') + ')" style="background:#1A1D23;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">' + (isEdit ? '수정' : '등록') + '</button>';
   h += '</div>';
 
   h += '</div>'; // padding div
@@ -18115,8 +18115,8 @@ function _importDoRender() {
   // 환율
   h += '<div class="imc-fgrp"><div class="imc-flbl">환율 (₩/$)</div>';
   if (cm && cm.aggRate > 0) {
-    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff0f0;border:1px solid #e8b0b0;border-radius:2px;height:100%;min-height:36px">';
-    h += '<span style="font-size:11px;color:#d42b2b;font-weight:700;text-transform:uppercase;letter-spacing:.04em">최종적용환율</span>';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#E6F1FB;border:1px solid #B0C4DE;border-radius:6px;height:100%;min-height:36px">';
+    h += '<span style="font-size:11px;color:#185FA5;font-weight:700;text-transform:uppercase;letter-spacing:.04em">최종적용환율</span>';
     h += '<span class="imc-num imc-red" style="font-size:16px;font-weight:800">' + _importK(cm.aggRate, 2) + ' ₩/$</span></div>';
   } else {
     h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid #d0d0d0;border-radius:2px;min-height:36px">';
@@ -18130,7 +18130,7 @@ function _importDoRender() {
   h += '<div class="imc-sec" style="margin-bottom:0">';
   h += '<div class="imc-sec-hd"><span>제품 인보이스</span>';
   h += '<div style="display:flex;gap:6px;align-items:center">';
-  if (!hasDb) h += '<span style="font-size:11px;color:#ffcccc">제품 DB를 먼저 등록하세요</span>';
+  if (!hasDb) h += '<span style="font-size:11px;color:#CC2222">제품 DB를 먼저 등록하세요</span>';
   h += '<button class="imc-btn imc-btn-yel imc-btn-xs" onclick="_importAddP()">＋ 행 추가</button></div></div>';
   h += '<div class="imc-ovx"><table class="imc-tbl"><thead><tr>';
   h += '<th style="min-width:110px;text-align:left;padding-left:12px">브랜드 선택</th>';
@@ -18140,14 +18140,14 @@ function _importDoRender() {
   h += '<th style="min-width:64px">총수량</th><th style="min-width:90px">기준가($)</th>';
   h += '<th style="min-width:96px">적용단가($)</th><th style="min-width:92px">소계($)</th>';
   h += '<th style="min-width:104px">소계(₩)</th><th style="min-width:104px">통관배분(₩)</th>';
-  h += '<th style="min-width:112px;color:#6ddba0">단가 VAT별도(₩)</th>';
-  h += '<th style="min-width:112px;color:#ff9999">단가 VAT포함(₩)</th>';
+  h += '<th style="min-width:112px;color:#1D9E75">단가 VAT별도(₩)</th>';
+  h += '<th style="min-width:112px;color:#CC2222">단가 VAT포함(₩)</th>';
   h += '<th style="width:34px"></th></tr></thead><tbody>';
 
   c.products.forEach(function(p, i) {
     var cp = cm ? cm.prods[i] : null;
     var mfb = p.brand ? _importItems.filter(function(it) { return it.brand === p.brand; }) : [];
-    var dbStyle = p.dbId ? 'background:#fffaed;border-color:#e0cc8a' : '';
+    var dbStyle = p.dbId ? 'background:#FAEEDA;border-color:#EF9F27' : '';
     h += '<tr>';
     // 브랜드
     h += '<td style="padding-left:12px">';
@@ -18180,7 +18180,7 @@ function _importDoRender() {
     // 총수량
     h += '<td class="imc-tr imc-num imc-mu" style="font-weight:600">' + (cp ? _importK(cp.qty) : '—') + '</td>';
     // 기준가
-    h += '<td><input type="number" data-imc-id="basePrice-' + p.id + '" value="' + (p.basePrice || '') + '" oninput="_importUpdP(' + p.id + ',\'basePrice\',this.value)"' + (p.dbId ? ' readonly' : '') + ' style="' + (p.dbId ? 'background:#fffaed;border-color:#e0cc8a;color:#c47a00;font-weight:700' : '') + '"/></td>';
+    h += '<td><input type="number" data-imc-id="basePrice-' + p.id + '" value="' + (p.basePrice || '') + '" oninput="_importUpdP(' + p.id + ',\'basePrice\',this.value)"' + (p.dbId ? ' readonly' : '') + ' style="' + (p.dbId ? 'background:#FAEEDA;border-color:#EF9F27;color:#EF9F27;font-weight:700' : '') + '"/></td>';
     // 적용단가
     h += '<td class="imc-tr imc-num imc-yel" style="font-weight:700">' + (cp && cp.qty > 0 ? _importU(cp.unitAfterDisc) : '—') + '</td>';
     // 소계$
@@ -18213,13 +18213,13 @@ function _importDoRender() {
   // ④ 할인율 + 팔렛 + 합계 4열
   h += '<div class="imc-disc-grid">';
   // 할인율
-  h += '<div class="imc-disc-cell" style="border-right:1px solid #e8b0b0">';
-  h += '<div style="flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#d42b2b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:1px">전체 할인율</div><div style="font-size:10px;color:#555">합계 기준 일괄</div></div>';
+  h += '<div class="imc-disc-cell" style="border-right:1px solid #DDE1EB">';
+  h += '<div style="flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#CC2222;text-transform:uppercase;letter-spacing:.04em;margin-bottom:1px">전체 할인율</div><div style="font-size:10px;color:#555">합계 기준 일괄</div></div>';
   h += '<div style="display:flex;align-items:center;gap:4px;margin-left:auto">';
-  h += '<input type="number" data-imc-id="discRate" value="' + c.discRate + '" oninput="_importUpd(\'discRate\',this.value)" style="width:56px;font-size:15px;font-weight:800;text-align:right;border-color:#e8b0b0;background:#fff;padding:4px 6px"/>';
-  h += '<span style="font-size:16px;font-weight:800;color:#d42b2b;flex-shrink:0">%</span></div></div>';
+  h += '<input type="number" data-imc-id="discRate" value="' + c.discRate + '" oninput="_importUpd(\'discRate\',this.value)" style="width:56px;font-size:15px;font-weight:800;text-align:right;border-color:#DDE1EB;background:#fff;padding:4px 6px"/>';
+  h += '<span style="font-size:16px;font-weight:800;color:#CC2222;flex-shrink:0">%</span></div></div>';
   // 할인금액
-  h += '<div class="imc-disc-cell" style="border-right:1px solid #e8b0b0;flex-direction:column;justify-content:center;align-items:flex-start">';
+  h += '<div class="imc-disc-cell" style="border-right:1px solid #DDE1EB;flex-direction:column;justify-content:center;align-items:flex-start">';
   h += '<div style="font-size:10px;color:#555;font-weight:600;text-transform:uppercase;margin-bottom:2px">할인 금액</div>';
   if (cm && _importNv(c.discRate) > 0) {
     h += '<div class="imc-num imc-red" style="font-size:13px;font-weight:800">−' + _importU(cm.discAmt) + '</div>';
@@ -18227,17 +18227,17 @@ function _importDoRender() {
   } else { h += '<div class="imc-mu" style="font-size:11px">—</div>'; }
   h += '</div>';
   // 팔렛
-  h += '<div class="imc-disc-cell" style="border-right:1px solid #e8b0b0">';
+  h += '<div class="imc-disc-cell" style="border-right:1px solid #DDE1EB">';
   h += '<div style="display:flex;gap:8px;align-items:flex-end">';
   h += '<div><div style="font-size:10px;font-weight:600;color:#555;text-transform:uppercase;margin-bottom:2px">팔렛 단가</div>';
-  h += '<div style="display:flex;align-items:center;gap:2px"><span style="color:#c47a00;font-weight:700;font-size:11px;flex-shrink:0">$</span>';
+  h += '<div style="display:flex;align-items:center;gap:2px"><span style="color:#EF9F27;font-weight:700;font-size:11px;flex-shrink:0">$</span>';
   h += '<input type="number" data-imc-id="palUnit" value="' + c.palUnit + '" oninput="_importUpd(\'palUnit\',this.value)" style="width:54px;font-size:12px;font-weight:600;padding:4px 6px;text-align:right"/></div></div>';
   h += '<div><div style="font-size:10px;font-weight:600;color:#555;text-transform:uppercase;margin-bottom:2px">할인</div>';
   h += '<div style="display:flex;align-items:center;gap:2px">';
   h += '<input type="number" data-imc-id="palDisc" value="' + c.palDisc + '" oninput="_importUpd(\'palDisc\',this.value)" style="width:38px;font-size:12px;font-weight:600;padding:4px 6px;text-align:right"/>';
   h += '<span style="font-size:11px;color:#555;flex-shrink:0">%</span></div></div></div>';
   if (cm) {
-    h += '<div style="margin-left:6px;border-left:1px dashed #e8b0b0;padding-left:8px">';
+    h += '<div style="margin-left:6px;border-left:1px dashed #DDE1EB;padding-left:8px">';
     h += '<div style="font-size:10px;color:#555;margin-bottom:1px">' + cm.sumPal + 'P × $' + c.palUnit + '</div>';
     h += '<div class="imc-num imc-yel" style="font-size:13px;font-weight:800">' + _importU(cm.palCost) + '</div>';
     h += '<div class="imc-num imc-mu" style="font-size:10px">' + _importK(cm.palCost * _importNv(c.rate)) + ' ₩</div></div>';
@@ -18245,7 +18245,7 @@ function _importDoRender() {
   h += '</div>';
   // 최종합계
   if (cm) {
-    h += '<div style="padding:7px 16px;background:#d42b2b;display:flex;flex-direction:column;justify-content:center">';
+    h += '<div style="padding:7px 16px;background:#185FA5;display:flex;flex-direction:column;justify-content:center">';
     h += '<div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">인보이스 최종 합계</div>';
     h += '<div class="imc-num" style="font-size:17px;font-weight:900;color:#fff;line-height:1.1">$' + _importK(cm.totalUSD) + '</div>';
     h += '<div class="imc-num" style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px">' + _importK(cm.totalUSD * _importNv(c.rate)) + ' ₩</div></div>';
@@ -18281,13 +18281,13 @@ function _importDoRender() {
       if (isAutoInv) {
         var dispVal = r.invAmt ? _importK(_importNv(r.invAmt)) : '';
         h += '<div style="position:relative">';
-        h += '<input type="text" inputmode="numeric" data-imc-id="rinvAmt-' + r.id + '" value="' + dispVal + '" oninput="_importUpdR(' + r.id + ',\'invAmt\',this.value.replace(/,/g,\'\'))" placeholder="' + _importK(autoBalance) + '" style="border-color:#a0d8b4;background:#f0faf4;font-weight:700;color:#1a7a3a;padding-right:56px;padding-left:20px"/>';
-        h += '<span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#1a7a3a;font-weight:700;font-size:14px;pointer-events:none">$</span>';
-        if (!r.invAmt) h += '<button onclick="_importUpdR(' + r.id + ',\'invAmt\',\'' + autoBalance + '\')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;padding:2px 6px;background:#1a7a3a;color:#fff;border:none;border-radius:2px;cursor:pointer">적용</button>';
+        h += '<input type="text" inputmode="numeric" data-imc-id="rinvAmt-' + r.id + '" value="' + dispVal + '" oninput="_importUpdR(' + r.id + ',\'invAmt\',this.value.replace(/,/g,\'\'))" placeholder="' + _importK(autoBalance) + '" style="border-color:#1D9E75;background:#E1F5EE;font-weight:700;color:#1D9E75;padding-right:56px;padding-left:20px"/>';
+        h += '<span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#1D9E75;font-weight:700;font-size:14px;pointer-events:none">$</span>';
+        if (!r.invAmt) h += '<button onclick="_importUpdR(' + r.id + ',\'invAmt\',\'' + autoBalance + '\')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;padding:2px 6px;background:#1D9E75;color:#fff;border:none;border-radius:2px;cursor:pointer">적용</button>';
         h += '</div>';
-        h += '<div style="font-size:10px;color:#1a7a3a;margin-top:3px;font-weight:600">총 결제금액 $' + _importK(cm ? cm.totalUSD : 0) + ' − 이전 송금 $' + _importK(prevSentUSD) + ' = 잔금 $' + _importK(autoBalance) + '</div>';
+        h += '<div style="font-size:10px;color:#1D9E75;margin-top:3px;font-weight:600">총 결제금액 $' + _importK(cm ? cm.totalUSD : 0) + ' − 이전 송금 $' + _importK(prevSentUSD) + ' = 잔금 $' + _importK(autoBalance) + '</div>';
       } else {
-        h += '<div style="position:relative"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#c47a00;font-weight:700;font-size:14px;pointer-events:none">$</span>';
+        h += '<div style="position:relative"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#EF9F27;font-weight:700;font-size:14px;pointer-events:none">$</span>';
         h += '<input type="text" inputmode="numeric" data-imc-id="rinvAmt-' + r.id + '" value="' + (r.invAmt ? _importK(_importNv(r.invAmt)) : '') + '" oninput="_importUpdR(' + r.id + ',\'invAmt\',this.value.replace(/,/g,\'\'))" placeholder="0" style="padding-left:20px"/></div>';
       }
       h += '</div>';
@@ -18305,7 +18305,7 @@ function _importDoRender() {
       if (invAmtVal > 0 && _importNv(r.sendAmt) > 0) {
         var effRate = (_importNv(r.sendAmt) + _importNv(r.sendFee) + _importNv(r.wireFee)) / invAmtVal;
         h += '<div class="imc-fgrp"><div class="imc-flbl">실적용 환율 (수수료 포함)</div>';
-        h += '<div><div class="imc-num" style="padding:5px 8px;color:#d42b2b;font-size:14px;font-weight:800;text-align:right;border:1px solid #e8b0b0;background:#fff">' + _importK(effRate, 2) + ' ₩/$</div>';
+        h += '<div><div class="imc-num" style="padding:5px 8px;color:#CC2222;font-size:14px;font-weight:800;text-align:right;border:1px solid #B0C4DE;background:#fff">' + _importK(effRate, 2) + ' ₩/$</div>';
         h += '<div style="font-size:10px;color:#555;margin-top:2px;text-align:right">(' + _importK(_importNv(r.sendAmt) + _importNv(r.sendFee) + _importNv(r.wireFee)) + ' ÷ $' + _importK(invAmtVal) + ')</div></div></div>';
       }
       h += '</div>'; // remit-body
@@ -18315,21 +18315,21 @@ function _importDoRender() {
 
   // 송금 합계
   if (cm && cm.remits.length > 0) {
-    h += '<div style="border:1px solid #e8b0b0;background:#fff0f0">';
-    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e8b0b0">';
+    h += '<div style="border:1px solid #DDE1EB;background:#F4F6FA">';
+    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #DDE1EB">';
     h += '<div><div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.04em">총 송금액 (순수)</div><div style="font-size:10px;color:#999">수수료·전신료 제외</div></div>';
     h += '<span class="imc-num imc-red" style="font-weight:800;font-size:14px">' + _importK(cm.totalSent) + ' ₩</span></div>';
-    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e8b0b0">';
+    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #DDE1EB">';
     h += '<div><div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.04em">총 지불액 (수수료·전신료 포함)</div><div style="font-size:10px;color:#999">환율 계산 기준</div></div>';
     h += '<span class="imc-num imc-red" style="font-weight:800;font-size:14px">' + _importK(cm.totalAllFees) + ' ₩</span></div>';
-    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e8b0b0">';
+    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #DDE1EB">';
     h += '<span class="imc-mu" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">인보이스+팔렛 총 결제금액</span>';
     h += '<span class="imc-num imc-yel" style="font-weight:800;font-size:13px">$' + _importK(cm.totalUSD) + '</span></div>';
     if (cm.aggRate > 0) {
-      h += '<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;background:#2b2b2b">';
+      h += '<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;background:#1A1D23">';
       h += '<div><div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">최종 적용 환율</div>';
       h += '<div style="font-size:10px;color:#888">총 지불액(수수료 포함) ÷ 총 인보이스($)</div></div>';
-      h += '<div style="text-align:right"><div class="imc-num" style="font-size:18px;font-weight:900;color:#ff9999">' + _importK(cm.aggRate, 2) + ' <span style="font-size:11px;font-weight:400;color:#aaa">₩/$</span></div>';
+      h += '<div style="text-align:right"><div class="imc-num" style="font-size:18px;font-weight:900;color:#CC2222">' + _importK(cm.aggRate, 2) + ' <span style="font-size:11px;font-weight:400;color:#aaa">₩/$</span></div>';
       h += '<div style="font-size:10px;color:#888;margin-top:1px">' + _importK(cm.totalAllFees) + ' ₩ ÷ $' + _importK(cm.totalUSD) + '</div></div></div>';
     }
     h += '</div>';
@@ -18367,10 +18367,10 @@ function _importDoRender() {
     h += '<div class="imc-num imc-yel" style="font-size:18px;font-weight:800;white-space:nowrap">$' + _importK(cm.totalUSD) + '</div>';
     h += '<div class="imc-num imc-mu" style="font-size:12px;white-space:nowrap">/ ' + _importK(cm.totalAllFees) + ' ₩</div></div>';
     h += '<div style="font-size:10px;color:#999;margin-top:3px">$ = 인보이스+팔렛 · ₩ = 공장송금 합계</div></div>';
-    h += '<div style="flex:1;padding:11px 18px;border-right:2px solid #d42b2b">';
+    h += '<div style="flex:1;padding:11px 18px;border-right:2px solid #185FA5">';
     h += '<div style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">통관비용</div>';
     h += '<div class="imc-num imc-blu" style="font-size:18px;font-weight:800">' + _importK(cm.customsSum) + ' ₩</div></div>';
-    h += '<div style="flex:0 0 auto;min-width:220px;padding:11px 22px;background:#d42b2b;display:flex;flex-direction:column;justify-content:center">';
+    h += '<div style="flex:0 0 auto;min-width:220px;padding:11px 22px;background:#185FA5;display:flex;flex-direction:column;justify-content:center">';
     h += '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">인보이스 최종 합계</div>';
     h += '<div class="imc-num" style="font-size:24px;font-weight:900;color:#fff;line-height:1.1;white-space:nowrap">' + _importK(cm.grandKRW) + ' ₩</div>';
     h += '<div class="imc-num" style="font-size:11px;color:rgba(255,255,255,.65);margin-top:4px;white-space:nowrap">' + _importK(cm.totalAllFees) + ' ₩ + ' + _importK(cm.customsSum) + ' ₩</div></div></div>';
@@ -18382,9 +18382,9 @@ function _importDoRender() {
       h += '<div class="imc-ovx"><table class="imc-tbl"><thead><tr>';
       h += '<th style="text-align:left;padding-left:12px">브랜드</th>';
       h += '<th style="text-align:left;padding-left:12px">모델넘버</th>';
-      h += '<th>수량</th><th style="color:#6ddba0">단가</th><th style="color:#6ddba0">총금액</th>';
-      h += '<th style="color:#ff9999">단가 VAT포함</th><th style="color:#ff9999">총금액 VAT포함</th>';
-      h += '<th style="color:#ffcc44">최종적용환율</th></tr></thead><tbody>';
+      h += '<th>수량</th><th style="color:#1D9E75">단가</th><th style="color:#1D9E75">총금액</th>';
+      h += '<th style="color:#CC2222">단가 VAT포함</th><th style="color:#CC2222">총금액 VAT포함</th>';
+      h += '<th style="color:#EF9F27">최종적용환율</th></tr></thead><tbody>';
       cm.prods.forEach(function(p, i) {
         if (p.qty <= 0) return;
         h += '<tr><td style="padding-left:12px"><div style="font-weight:700;font-size:14px">' + (p.brand || '—') + '</div>';
@@ -18395,8 +18395,8 @@ function _importDoRender() {
         h += '<td class="imc-tr imc-num imc-grn" style="font-weight:700;font-size:14px">' + _importK(p.exVAT) + '</td>';
         h += '<td class="imc-tr imc-num imc-grn" style="font-weight:700;font-size:14px">' + _importK(Math.round(p.finalKRW / 1.1)) + '</td>';
         h += '<td class="imc-tr imc-num imc-red" style="font-weight:800;font-size:15px">' + _importK(p.inclVAT) + '</td>';
-        h += '<td class="imc-tr imc-num imc-red" style="font-weight:800;font-size:15px;background:#fff8f8">' + _importK(p.finalKRWRounded) + '</td>';
-        h += '<td class="imc-tr imc-num" style="font-weight:700;font-size:13px;color:#cc8800;background:#fffdf0">' + (p.usdAmt > 0 ? _importK(p.finalKRW / p.usdAmt, 2) : '—') + ' ₩/$</td></tr>';
+        h += '<td class="imc-tr imc-num imc-red" style="font-weight:800;font-size:15px;background:#FCEBEB">' + _importK(p.finalKRWRounded) + '</td>';
+        h += '<td class="imc-tr imc-num" style="font-weight:700;font-size:13px;color:#EF9F27;background:#FAEEDA">' + (p.usdAmt > 0 ? _importK(p.finalKRW / p.usdAmt, 2) : '—') + ' ₩/$</td></tr>';
       });
       // 합계
       var qtyProds = cm.prods.filter(function(p) { return p.qty > 0; });
@@ -18406,8 +18406,8 @@ function _importDoRender() {
         h += '<td></td>';
         h += '<td class="imc-tr imc-num imc-grn" style="font-weight:800">' + _importK(Math.round(cm.grandKRW / 1.1)) + '</td>';
         h += '<td></td>';
-        h += '<td class="imc-tr imc-num imc-red" style="font-weight:900;background:#fff8f8;font-size:15px">' + _importK(cm.grandKRW) + '</td>';
-        h += '<td class="imc-tr imc-num" style="font-weight:800;color:#cc8800;background:#fffdf0">' + (cm.aggRate > 0 ? _importK(cm.aggRate, 2) : '—') + ' ₩/$</td></tr>';
+        h += '<td class="imc-tr imc-num imc-red" style="font-weight:900;background:#FCEBEB;font-size:15px">' + _importK(cm.grandKRW) + '</td>';
+        h += '<td class="imc-tr imc-num" style="font-weight:800;color:#EF9F27;background:#FAEEDA">' + (cm.aggRate > 0 ? _importK(cm.aggRate, 2) : '—') + ' ₩/$</td></tr>';
       }
       h += '</tbody></table></div></div>';
     }
