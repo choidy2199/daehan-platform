@@ -125,20 +125,49 @@ function toggleDarkMode() {
   html.setAttribute('data-theme', isDark ? 'light' : 'dark');
   localStorage.setItem('mw_dark_mode', isDark ? '0' : '1');
 }
-// 초기화: 사이드바 상태 + 다크모드 복원
+// 초기화: 사이드바 상태 + 다크모드 복원 + 우클릭 바인딩
 (function _initSidebarAndTheme() {
   // 다크모드 복원
   if (localStorage.getItem('mw_dark_mode') === '1') {
     document.documentElement.setAttribute('data-theme', 'dark');
   }
-  // 사이드바 상태 복원
+  // 사이드바 상태 복원 + 우클릭 바인딩
   document.addEventListener('DOMContentLoaded', function() {
     if (localStorage.getItem('mw_sidebar_collapsed') === '1') {
       var sb = document.getElementById('sidebar');
       if (sb) { sb.classList.remove('expanded'); sb.classList.add('collapsed'); }
     }
+    // 사이드바 메뉴 우클릭 → 즐겨찾기 등록/해제
+    _bindSidebarContextMenu();
   });
 })();
+
+function _bindSidebarContextMenu() {
+  // 서브 아이템 우클릭
+  document.querySelectorAll('.sidebar-sub-item').forEach(function(item) {
+    item.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var onclick = item.getAttribute('onclick') || '';
+      var m = onclick.match(/_sidebarOpenWindow\('([^']+)'/);
+      if (m && typeof showContextMenu === 'function') {
+        showContextMenu(e.pageX, e.pageY, m[1]);
+      }
+    });
+  });
+  // 단독 메뉴 우클릭
+  document.querySelectorAll('.sidebar-single').forEach(function(item) {
+    item.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var onclick = item.getAttribute('onclick') || '';
+      var m = onclick.match(/_sidebarOpenWindow\('([^']+)'/);
+      if (m && typeof showContextMenu === 'function') {
+        showContextMenu(e.pageX, e.pageY, m[1]);
+      }
+    });
+  });
+}
 
 var _scriptStart = performance.now();
 // ======================== PERF MONITORING ========================

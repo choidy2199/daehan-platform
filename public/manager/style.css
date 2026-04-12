@@ -1,5 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Pretendard', -apple-system, sans-serif; background: var(--dm-bg, #f0ede8); color: var(--dm-text, #1a1d23); font-size: 14px; }
+body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8; color: #1A1D23; font-size: 14px; }
 :root {
   --tl-primary: #185FA5; --tl-primary-dark: #0C447C; --tl-primary-light: #E6F1FB;
   --tl-bg: #FFFFFF; --tl-bg-secondary: #F4F6FA; --tl-bg-tertiary: #EAECF2;
@@ -110,7 +110,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: var(--d
 .chrome-bar-dot { position:absolute; top:4px; right:4px; width:6px; height:6px; border-radius:50%; background:#E8344E; display:none; }
 
 /* ===== CONTENT AREA ===== */
-.content-area { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; background:var(--dm-bg); }
+.content-area { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; background:#F4F6FA; color:#1A1D23; }
 
 /* ==================== TOP BAR ==================== */
 .top-bar { background: rgba(15,15,20,0.75); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255,255,255,0.08); height: 48px; display: flex; align-items: center; padding: 0 16px; gap: 0; position: sticky; top: 0; z-index: 200; transition: background 0.3s ease, backdrop-filter 0.3s ease, border-bottom 0.3s ease; }
