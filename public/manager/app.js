@@ -1,3 +1,50 @@
+// ======================== SIDEBAR + CHROME TABS + DARK MODE ========================
+
+function toggleSidebar() {
+  var sb = document.getElementById('sidebar');
+  if (!sb) return;
+  sb.classList.toggle('collapsed');
+  sb.classList.toggle('expanded');
+  localStorage.setItem('mw_sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
+}
+function toggleSidebarGroup(btn) {
+  var arrow = btn.querySelector('.sidebar-arrow');
+  var sub = btn.parentElement.querySelector('.sidebar-sub');
+  if (!sub) return;
+  var isOpen = sub.classList.contains('open');
+  sub.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open');
+}
+// 사이드바에서 창 열기 — 기존 openWindow 호출
+function _sidebarOpenWindow(name) {
+  if (typeof openWindow === 'function') openWindow(name);
+}
+// 크롬 탭 홈
+function _chromeGoHome() {
+  if (typeof goDesktop === 'function') goDesktop();
+}
+// 다크모드 토글
+function toggleDarkMode() {
+  var html = document.documentElement;
+  var isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  localStorage.setItem('mw_dark_mode', isDark ? '0' : '1');
+}
+// 초기화: 사이드바 상태 + 다크모드 복원
+(function _initSidebarAndTheme() {
+  // 다크모드 복원
+  if (localStorage.getItem('mw_dark_mode') === '1') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+  // 사이드바 상태 복원
+  document.addEventListener('DOMContentLoaded', function() {
+    if (localStorage.getItem('mw_sidebar_collapsed') === '1') {
+      var sb = document.getElementById('sidebar');
+      if (sb) { sb.classList.remove('expanded'); sb.classList.add('collapsed'); }
+    }
+  });
+})();
+
 var _scriptStart = performance.now();
 // ======================== PERF MONITORING ========================
 if (window.PerformanceObserver) {
