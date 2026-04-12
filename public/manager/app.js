@@ -1997,7 +1997,7 @@ var _tabIdMap = {
   'sales-online':     { contentId: 'tab-sales',            render: 'sales' },
   'sales-marketing':  { contentId: 'tab-sales-marketing',  placeholder: true },
   'import-product':   { contentId: 'tab-import-product',   placeholder: true },
-  'import-calc':      { contentId: 'tab-import-calc',      placeholder: true },
+  'import-calc':      { contentId: 'tab-import-calc',      render: 'importCalc' },
   'import-invoice':   { contentId: 'tab-import-invoice',   placeholder: true },
   'delivery':         { contentId: 'tab-delivery',         placeholder: true },
   'search':           { contentId: 'tab-estimate',         render: 'estimate' },
@@ -2063,6 +2063,7 @@ function switchTab(tab) {
       if (renderKey === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
       if (renderKey === 'kakao') renderKakaoTab();
       if (renderKey === 'notice') renderNoticeTab();
+      if (renderKey === 'importCalc') renderImportCalcTab();
       _renderedTabs[renderKey] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
@@ -17716,4 +17717,690 @@ function _checkUnreadNoticePopup() {
   if (unread.length > 0) {
     _showNoticePopup();
   }
+}
+
+// ======================== 수입계산기 (Import Calculator) ========================
+
+// ─── 헬퍼 함수 ───
+function _importNv(v) { return parseFloat(v) || 0; }
+function _importK(v, d) { d = d || 0; return _importNv(v).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function _importU(v) { return '$' + _importNv(v).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function _importUid() { return Math.random().toString(36).slice(2, 8); }
+function _importToday() { return new Date().toISOString().slice(0, 10); }
+
+function _importMkItem() { return { id: _importUid(), brand: '', model: '', spec: '', price: '', pallets: '', ea: '' }; }
+function _importMkProd(id) { return { id: id, dbId: '', brand: '', model: '', spec: '', pallets: '', ea: '', basePrice: '' }; }
+function _importMkCalc(id) {
+  return {
+    id: id, company: '', date: _importToday(), invoiceNo: '',
+    rate: '1450', palUnit: '19', palDisc: '0', discRate: '0',
+    products: [_importMkProd(1)],
+    remit: [1,2,3,4].map(function(i) { return { id: i, on: i === 1, lbl: '공장송금 ' + i + '차', date: '', invAmt: '', sendAmt: '', sendFee: '10000', wireFee: '8000' }; }),
+    customs: [
+      { id: 1, lbl: '부가세', amt: '', fixed: true },
+      { id: 2, lbl: '통관수수료', amt: '', fixed: true },
+      { id: 3, lbl: '컨테이너 운송료', amt: '', fixed: true },
+      { id: 4, lbl: '선임', amt: '', fixed: true },
+      { id: 5, lbl: '공항보험료', amt: '', fixed: true }
+    ].concat(Array.from({ length: 5 }, function(_, i) { return { id: i + 6, lbl: '', amt: '', fixed: false }; }))
+  };
+}
+
+// ─── 데이터 레이어 ───
+var _importData = { calcs: [_importMkCalc(1)], aid: 1, savedList: [] };
+var _importItems = [];
+
+function _importLoadData() {
+  try {
+    var calcsRaw = localStorage.getItem('mw_import_calcs');
+    var itemsRaw = localStorage.getItem('mw_import_items');
+    if (calcsRaw) {
+      var parsed = JSON.parse(calcsRaw);
+      if (parsed && parsed.calcs && parsed.calcs.length) {
+        _importData.calcs = parsed.calcs;
+        _importData.aid = parsed.aid || parsed.calcs[0].id;
+        _importData.savedList = parsed.savedList || [];
+      }
+    }
+    if (itemsRaw) {
+      var items = JSON.parse(itemsRaw);
+      if (Array.isArray(items)) _importItems = items;
+    }
+  } catch (e) { console.error('[import] 데이터 로드 실패:', e); }
+}
+
+function _importSaveData() {
+  try {
+    localStorage.setItem('mw_import_calcs', JSON.stringify({ calcs: _importData.calcs, aid: _importData.aid, savedList: _importData.savedList }));
+    autoSyncToSupabase('mw_import_calcs');
+  } catch (e) { console.error('[import] calcs 저장 실패:', e); }
+}
+
+function _importSaveItems() {
+  try {
+    localStorage.setItem('mw_import_items', JSON.stringify(_importItems));
+    autoSyncToSupabase('mw_import_items');
+  } catch (e) { console.error('[import] items 저장 실패:', e); }
+}
+
+function _importGetCalc() {
+  return _importData.calcs.find(function(x) { return x.id === _importData.aid; }) || null;
+}
+
+// ─── compute 엔진 ───
+function _importCompute(c) {
+  if (!c) return null;
+  var rate = _importNv(c.rate), disc = _importNv(c.discRate);
+  var prods = c.products.map(function(p) {
+    var ea = _importNv(p.ea), pal = _importNv(p.pallets), qty = ea * pal, base = _importNv(p.basePrice);
+    return Object.assign({}, p, { ea: ea, pal: pal, qty: qty, base: base, rawAmt: base * qty });
+  });
+  var sumRaw = prods.reduce(function(s, p) { return s + p.rawAmt; }, 0);
+  var discAmt = sumRaw * (disc / 100);
+  var sumUSD = sumRaw - discAmt;
+  var sumKRW = sumUSD * rate;
+  var sumPal = prods.reduce(function(s, p) { return s + p.pal; }, 0);
+  var palCost = sumPal * _importNv(c.palUnit) * (1 - _importNv(c.palDisc) / 100);
+  var customsSum = c.customs.reduce(function(s, ci) { return s + _importNv(ci.amt); }, 0);
+
+  var totalUSD = Math.round(sumUSD + palCost);
+  var sumUSDRounded = Math.round(sumUSD);
+  var activeRemits = c.remit.filter(function(r) { return r.on; });
+  var cumInv = 0;
+  var remits = activeRemits.map(function(r, ri) {
+    var invAmtRaw = _importNv(r.invAmt);
+    var autoInv = ri > 0 && invAmtRaw === 0 ? Math.round(totalUSD - cumInv) : invAmtRaw;
+    var effectiveInv = invAmtRaw > 0 ? invAmtRaw : autoInv;
+    cumInv += effectiveInv;
+    var sa = _importNv(r.sendAmt);
+    var totalPaid = sa + _importNv(r.sendFee) + _importNv(r.wireFee);
+    var effRate = effectiveInv > 0 ? totalPaid / effectiveInv : 0;
+    return Object.assign({}, r, { sa: sa, totalPaid: totalPaid, effectiveInv: effectiveInv, total: totalPaid, effRate: effRate });
+  });
+  var totalSent = remits.reduce(function(s, r) { return s + r.sa; }, 0);
+  var totalAllFees = remits.reduce(function(s, r) { return s + r.totalPaid; }, 0);
+  var totalInvUSD = remits.reduce(function(s, r) { return s + r.effectiveInv; }, 0);
+  var aggRate = totalInvUSD > 0 ? totalAllFees / totalInvUSD : 0;
+
+  var grandKRW = (totalAllFees > 0 ? totalAllFees : sumKRW) + customsSum;
+
+  var allocated = 0;
+  var prodsX = prods.map(function(p, idx) {
+    var share = sumRaw > 0 ? p.rawAmt / sumRaw : 0;
+    var myDisc = discAmt * share;
+    var usdAmt = p.rawAmt - myDisc;
+    var unitAfterDisc = p.qty > 0 ? usdAmt / p.qty : 0;
+
+    var finalKRW;
+    var isLast = idx === prods.length - 1;
+    if (isLast && sumRaw > 0) {
+      finalKRW = grandKRW - allocated;
+    } else {
+      finalKRW = sumRaw > 0 ? grandKRW * share : 0;
+      allocated += finalKRW;
+    }
+
+    var finalKRWRounded = Math.round(finalKRW);
+    var inclVAT = p.qty > 0 ? Math.round(finalKRW / p.qty) : 0;
+    var exVAT = Math.round(inclVAT / 1.1);
+
+    var allocShare = sumRaw > 0 ? share : 0;
+    var alloc = customsSum * allocShare;
+    var krwAmt = finalKRW - alloc;
+
+    return Object.assign({}, p, { share: share * 100, myDisc: myDisc, usdAmt: usdAmt, krwAmt: krwAmt, unitAfterDisc: unitAfterDisc, alloc: alloc, finalKRW: finalKRW, exVAT: exVAT, inclVAT: inclVAT, finalKRWRounded: finalKRWRounded });
+  });
+  return { prods: prodsX, sumRaw: sumRaw, discAmt: discAmt, sumUSD: sumUSD, sumUSDRounded: sumUSDRounded, sumKRW: sumKRW, sumPal: sumPal, palCost: palCost, customsSum: customsSum, remits: remits, totalSent: totalSent, totalAllFees: totalAllFees, totalInvUSD: totalInvUSD, aggRate: aggRate, grandKRW: grandKRW, totalUSD: totalUSD };
+}
+
+// ─── 이벤트 핸들러 ───
+function _importUpd(field, value) {
+  var c = _importGetCalc();
+  if (!c) return;
+  c[field] = value;
+  _importSaveData();
+  _importRender();
+}
+
+function _importUpdP(pid, field, value) {
+  var c = _importGetCalc();
+  if (!c) return;
+  c.products = c.products.map(function(p) { return p.id === pid ? Object.assign({}, p, (function() { var o = {}; o[field] = value; return o; })()) : p; });
+  _importSaveData();
+  _importRender();
+}
+
+function _importUpdR(rid, field, value) {
+  var c = _importGetCalc();
+  if (!c) return;
+  c.remit = c.remit.map(function(r) { return r.id === rid ? Object.assign({}, r, (function() { var o = {}; o[field] = value; return o; })()) : r; });
+  _importSaveData();
+  _importRender();
+}
+
+function _importUpdCu(cid, field, value) {
+  var c = _importGetCalc();
+  if (!c) return;
+  c.customs = c.customs.map(function(x) { return x.id === cid ? Object.assign({}, x, (function() { var o = {}; o[field] = value; return o; })()) : x; });
+  _importSaveData();
+  _importRender();
+}
+
+function _importSelBrand(pid, brand) {
+  var c = _importGetCalc();
+  if (!c) return;
+  c.products = c.products.map(function(p) { return p.id === pid ? Object.assign({}, p, { brand: brand, dbId: '', model: '', spec: '', pallets: '', ea: '', basePrice: '' }) : p; });
+  _importSaveData();
+  _importRender();
+}
+
+function _importSelModel(pid, dbId) {
+  var c = _importGetCalc();
+  if (!c) return;
+  var item = _importItems.find(function(i) { return i.id === dbId; });
+  if (!item) {
+    c.products = c.products.map(function(p) { return p.id === pid ? Object.assign({}, p, { dbId: '', model: '', spec: '', pallets: '', ea: '', basePrice: '' }) : p; });
+  } else {
+    c.products = c.products.map(function(p) { return p.id === pid ? Object.assign({}, p, { dbId: item.id, model: item.model, spec: item.spec || '', pallets: item.pallets, ea: item.ea, basePrice: item.price }) : p; });
+  }
+  _importSaveData();
+  _importRender();
+}
+
+function _importAddCalc() {
+  var maxId = _importData.calcs.reduce(function(m, x) { return Math.max(m, x.id); }, 0);
+  var newId = maxId + 1;
+  _importData.calcs.push(_importMkCalc(newId));
+  _importData.aid = newId;
+  _importSaveData();
+  _importRender();
+}
+
+function _importDelCalc(id) {
+  if (_importData.calcs.length <= 1) return;
+  _importData.calcs = _importData.calcs.filter(function(x) { return x.id !== id; });
+  if (_importData.aid === id) _importData.aid = _importData.calcs[_importData.calcs.length - 1].id;
+  _importSaveData();
+  _importRender();
+}
+
+function _importAddP() {
+  var c = _importGetCalc();
+  if (!c) return;
+  var maxId = c.products.reduce(function(m, p) { return Math.max(m, p.id); }, 0);
+  c.products.push(_importMkProd(maxId + 1));
+  _importSaveData();
+  _importRender();
+}
+
+function _importDelP(pid) {
+  var c = _importGetCalc();
+  if (!c || c.products.length <= 1) return;
+  c.products = c.products.filter(function(p) { return p.id !== pid; });
+  _importSaveData();
+  _importRender();
+}
+
+function _importNextInvoiceNo(invNo) {
+  if (!invNo || invNo === '—') return '';
+  var m = invNo.match(/^(.*?)(\d+)$/);
+  if (!m) return invNo;
+  var prefix = m[1];
+  var num = m[2];
+  var next = String(parseInt(num, 10) + 1).padStart(num.length, '0');
+  return prefix + next;
+}
+
+function _importSaveCalc() {
+  var c = _importGetCalc();
+  var cm = _importCompute(c);
+  if (!cm) return;
+  var entry = {
+    sid: _importUid(),
+    savedAt: new Date().toLocaleString('ko-KR'),
+    company: c.company || '—',
+    invoiceNo: c.invoiceNo || '—',
+    date: c.date || '—',
+    snapshot: JSON.parse(JSON.stringify(c)),
+    cmSnapshot: {
+      sumRaw: cm.sumRaw, discAmt: cm.discAmt, sumUSD: cm.sumUSD, totalUSD: cm.totalUSD,
+      sumKRW: cm.sumKRW, customsSum: cm.customsSum, grandKRW: cm.grandKRW,
+      palCost: cm.palCost, aggRate: cm.aggRate,
+      prods: cm.prods.map(function(p) { return { brand: p.brand, model: p.model, spec: p.spec, qty: p.qty, inclVAT: p.inclVAT, exVAT: p.exVAT, unitAfterDisc: p.unitAfterDisc }; })
+    }
+  };
+  _importData.savedList.unshift(entry);
+
+  // 새 계산서 자동 생성
+  var maxId = _importData.calcs.reduce(function(m, x) { return Math.max(m, x.id); }, 0);
+  var newId = maxId + 1;
+  var newCalc = _importMkCalc(newId);
+  newCalc.company = c.company;
+  newCalc.rate = c.rate;
+  newCalc.palUnit = c.palUnit;
+  newCalc.palDisc = c.palDisc;
+  newCalc.invoiceNo = _importNextInvoiceNo(c.invoiceNo);
+  _importData.calcs.push(newCalc);
+  _importData.aid = newId;
+  _importSaveData();
+  _importRender();
+}
+
+function _importExportExcel(c, cm) {
+  if (!cm) return;
+  var rows = cm.prods.filter(function(p) { return p.qty > 0; }).map(function(p) {
+    return {
+      '브랜드': p.brand || '', '규격': p.spec || '', '모델': p.model || '',
+      '수량 (EA)': p.qty, '파레트 (P)': p.pal, '기준가 ($)': _importNv(p.base),
+      '적용단가 ($)': +_importNv(p.unitAfterDisc).toFixed(2),
+      '소계 ($)': +_importNv(p.usdAmt).toFixed(2),
+      '소계 (₩)': Math.round(p.krwAmt), '통관배분 (₩)': Math.round(p.alloc),
+      '단가 VAT별도 (₩)': p.exVAT, '단가 VAT포함 (₩)': p.inclVAT
+    };
+  });
+  var summaryRows = [
+    {},
+    { '브랜드': '[ 요약 ]' },
+    { '브랜드': '소계 (할인 전)', '규격': _importU(cm.sumRaw), '모델': _importK(cm.sumRaw * _importNv(c.rate)) + ' ₩' },
+    { '브랜드': '할인 (' + c.discRate + '%)', '규격': '−' + _importU(cm.discAmt), '모델': '−' + _importK(cm.discAmt * _importNv(c.rate)) + ' ₩' },
+    { '브랜드': '인보이스 합계', '규격': _importU(cm.sumUSD), '모델': _importK(cm.sumKRW) + ' ₩' },
+    { '브랜드': '통관비용 합계', '규격': _importK(cm.customsSum) + ' ₩' },
+    { '브랜드': '팔렛 비용', '규격': _importU(cm.palCost) },
+    { '브랜드': '총 원가 합계', '규격': _importK(cm.grandKRW) + ' ₩' }
+  ];
+  var ws = XLSX.utils.json_to_sheet(rows.concat(summaryRows));
+  ws['!cols'] = [14, 14, 20, 10, 10, 12, 12, 12, 14, 14, 16, 16].map(function(w) { return { wch: w }; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '수입계산서');
+  var fname = '수입계산서_' + (c.company || '거래처') + '_' + (c.date || _importToday()) + '.xlsx';
+  XLSX.writeFile(wb, fname);
+}
+
+// ─── 스마트 렌더링 (포커스 보존) ───
+var _importRenderTimer = null;
+function _importRender() {
+  if (_importRenderTimer) cancelAnimationFrame(_importRenderTimer);
+  _importRenderTimer = requestAnimationFrame(function() { _importRenderTimer = null; _importDoRender(); });
+}
+
+function _importDoRender() {
+  var container = document.getElementById('tab-import-calc');
+  if (!container) return;
+
+  // 포커스 보존
+  var focused = document.activeElement;
+  var focusId = focused ? focused.getAttribute('data-imc-id') : null;
+  var focusPos = focused ? focused.selectionStart : null;
+
+  var c = _importGetCalc();
+  var cm = _importCompute(c);
+  if (!c) { container.innerHTML = '<div style="padding:40px;text-align:center;color:#999">계산서 데이터를 불러올 수 없습니다.</div>'; return; }
+
+  var brandList = [];
+  var seen = {};
+  _importItems.forEach(function(i) { if (i.brand && !seen[i.brand]) { seen[i.brand] = true; brandList.push(i.brand); } });
+  brandList.sort();
+  var hasDb = _importItems.length > 0;
+
+  var h = '';
+
+  // ① 계산서 선택 바
+  h += '<div class="imc-calc-bar">';
+  h += '<span class="imc-calc-label">계산서</span>';
+  h += '<div class="imc-chip-wrap">';
+  _importData.calcs.forEach(function(x) {
+    var on = x.id === _importData.aid;
+    h += '<div class="imc-chip' + (on ? ' on' : '') + '" onclick="_importData.aid=' + x.id + ';_importSaveData();_importRender()">';
+    h += '<span style="font-weight:700">No.' + String(x.id).padStart(3, '0') + '</span>';
+    if (x._sid) h += '<span class="imc-badge-edit">수정중</span>';
+    if (x.company) h += '<span>' + x.company + '</span>';
+    if (x.date) h += '<span class="imc-mu">' + x.date.slice(2) + '</span>';
+    if (on && _importData.calcs.length > 1) h += '<span class="imc-chip-del" onclick="event.stopPropagation();_importDelCalc(' + x.id + ')">×</span>';
+    h += '</div>';
+  });
+  h += '</div>';
+  h += '<button class="imc-btn imc-btn-grn imc-btn-xs" onclick="_importSaveCalc()" title="현재 계산서를 저장 목록에 저장">💾 저장</button>';
+  h += '<button class="imc-btn imc-btn-red imc-btn-xs" onclick="_importAddCalc()">＋ 새 계산서</button>';
+  h += '</div>';
+
+  // ② 기본 정보
+  h += '<div class="imc-sec" style="margin-bottom:8px">';
+  h += '<div class="imc-sec-hd"><span>기본 정보</span></div>';
+  h += '<div class="imc-sec-body"><div class="imc-g4">';
+  // 거래처
+  h += '<div class="imc-fgrp"><div class="imc-flbl">거래처</div>';
+  h += '<input data-imc-id="company" value="' + (c.company || '').replace(/"/g, '&quot;') + '" oninput="_importUpd(\'company\',this.value)" placeholder="Shenzhen Co., Ltd"/></div>';
+  // 인보이스 번호
+  h += '<div class="imc-fgrp"><div class="imc-flbl">인보이스 번호</div>';
+  h += '<input data-imc-id="invoiceNo" value="' + (c.invoiceNo || '').replace(/"/g, '&quot;') + '" oninput="_importUpd(\'invoiceNo\',this.value)" placeholder="INV-2024-001"/></div>';
+  // 총금액
+  h += '<div class="imc-fgrp"><div class="imc-flbl">총금액 (인보이스 최종합계)</div>';
+  if (cm && cm.totalUSD > 0) {
+    h += '<div style="border:1px solid #d0d0d0;border-radius:2px;padding:5px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px">';
+    h += '<span class="imc-num imc-yel" style="font-weight:800;font-size:15px;white-space:nowrap">$' + _importK(cm.totalUSD) + '</span>';
+    h += '<span class="imc-num imc-mu" style="font-size:12px;white-space:nowrap">' + _importK(cm.totalUSD * _importNv(c.rate)) + ' ₩</span></div>';
+  } else {
+    h += '<div style="border:1px solid #d0d0d0;border-radius:2px;padding:5px 10px;color:#999;font-size:12px">제품 입력 후 자동계산</div>';
+  }
+  h += '</div>';
+  // 환율
+  h += '<div class="imc-fgrp"><div class="imc-flbl">환율 (₩/$)</div>';
+  if (cm && cm.aggRate > 0) {
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff0f0;border:1px solid #e8b0b0;border-radius:2px;height:100%;min-height:36px">';
+    h += '<span style="font-size:11px;color:#d42b2b;font-weight:700;text-transform:uppercase;letter-spacing:.04em">최종적용환율</span>';
+    h += '<span class="imc-num imc-red" style="font-size:16px;font-weight:800">' + _importK(cm.aggRate, 2) + ' ₩/$</span></div>';
+  } else {
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid #d0d0d0;border-radius:2px;min-height:36px">';
+    h += '<span style="font-size:11px;color:#999;font-weight:600">최종적용환율</span>';
+    h += '<span class="imc-mu" style="font-size:12px">송금 후 자동계산</span></div>';
+  }
+  h += '</div>';
+  h += '</div></div></div>';
+
+  // ③ 제품 인보이스
+  h += '<div class="imc-sec" style="margin-bottom:0">';
+  h += '<div class="imc-sec-hd"><span>제품 인보이스</span>';
+  h += '<div style="display:flex;gap:6px;align-items:center">';
+  if (!hasDb) h += '<span style="font-size:11px;color:#ffcccc">제품 DB를 먼저 등록하세요</span>';
+  h += '<button class="imc-btn imc-btn-yel imc-btn-xs" onclick="_importAddP()">＋ 행 추가</button></div></div>';
+  h += '<div class="imc-ovx"><table class="imc-tbl"><thead><tr>';
+  h += '<th style="min-width:110px;text-align:left;padding-left:12px">브랜드 선택</th>';
+  h += '<th style="min-width:130px;text-align:left;padding-left:10px">모델 선택</th>';
+  h += '<th style="min-width:100px;text-align:left;padding-left:10px">규격</th>';
+  h += '<th style="min-width:72px">파레트(P)</th><th style="min-width:72px">낱개(EA)</th>';
+  h += '<th style="min-width:64px">총수량</th><th style="min-width:90px">기준가($)</th>';
+  h += '<th style="min-width:96px">적용단가($)</th><th style="min-width:92px">소계($)</th>';
+  h += '<th style="min-width:104px">소계(₩)</th><th style="min-width:104px">통관배분(₩)</th>';
+  h += '<th style="min-width:112px;color:#6ddba0">단가 VAT별도(₩)</th>';
+  h += '<th style="min-width:112px;color:#ff9999">단가 VAT포함(₩)</th>';
+  h += '<th style="width:34px"></th></tr></thead><tbody>';
+
+  c.products.forEach(function(p, i) {
+    var cp = cm ? cm.prods[i] : null;
+    var mfb = p.brand ? _importItems.filter(function(it) { return it.brand === p.brand; }) : [];
+    var dbStyle = p.dbId ? 'background:#fffaed;border-color:#e0cc8a' : '';
+    h += '<tr>';
+    // 브랜드
+    h += '<td style="padding-left:12px">';
+    if (hasDb) {
+      h += '<select data-imc-id="brand-' + p.id + '" onchange="_importSelBrand(' + p.id + ',this.value)" style="font-weight:' + (p.brand ? '600' : '400') + ';color:' + (p.brand ? '#1a1a1a' : '#999') + '">';
+      h += '<option value="">— 브랜드 —</option>';
+      brandList.forEach(function(b) { h += '<option value="' + b + '"' + (p.brand === b ? ' selected' : '') + '>' + b + '</option>'; });
+      h += '</select>';
+    } else {
+      h += '<input data-imc-id="brand-' + p.id + '" value="' + (p.brand || '').replace(/"/g, '&quot;') + '" oninput="_importUpdP(' + p.id + ',\'brand\',this.value)" placeholder="브랜드"/>';
+    }
+    h += '</td>';
+    // 모델
+    h += '<td style="padding-left:10px">';
+    if (hasDb) {
+      h += '<select data-imc-id="model-' + p.id + '" onchange="_importSelModel(' + p.id + ',this.value)"' + (!p.brand ? ' disabled' : '') + ' style="font-weight:' + (p.dbId ? '600' : '400') + ';color:' + (p.dbId ? '#1a1a1a' : '#999') + '">';
+      h += '<option value="">' + (p.brand ? '— 모델 선택 —' : '브랜드 먼저 선택') + '</option>';
+      mfb.forEach(function(it) { h += '<option value="' + it.id + '"' + (p.dbId === it.id ? ' selected' : '') + '>' + it.model + '</option>'; });
+      h += '</select>';
+    } else {
+      h += '<input data-imc-id="model-' + p.id + '" value="' + (p.model || '').replace(/"/g, '&quot;') + '" oninput="_importUpdP(' + p.id + ',\'model\',this.value)" placeholder="모델명"/>';
+    }
+    h += '</td>';
+    // 규격
+    h += '<td style="padding-left:10px"><input data-imc-id="spec-' + p.id + '" value="' + (p.spec || '').replace(/"/g, '&quot;') + '" oninput="_importUpdP(' + p.id + ',\'spec\',this.value)" placeholder="규격" style="' + dbStyle + '"/></td>';
+    // 파레트
+    h += '<td><input type="number" data-imc-id="pallets-' + p.id + '" value="' + (p.pallets || '') + '" oninput="_importUpdP(' + p.id + ',\'pallets\',this.value)" style="' + dbStyle + '"/></td>';
+    // 낱개
+    h += '<td><input type="number" data-imc-id="ea-' + p.id + '" value="' + (p.ea || '') + '" oninput="_importUpdP(' + p.id + ',\'ea\',this.value)" style="' + dbStyle + '"/></td>';
+    // 총수량
+    h += '<td class="imc-tr imc-num imc-mu" style="font-weight:600">' + (cp ? _importK(cp.qty) : '—') + '</td>';
+    // 기준가
+    h += '<td><input type="number" data-imc-id="basePrice-' + p.id + '" value="' + (p.basePrice || '') + '" oninput="_importUpdP(' + p.id + ',\'basePrice\',this.value)"' + (p.dbId ? ' readonly' : '') + ' style="' + (p.dbId ? 'background:#fffaed;border-color:#e0cc8a;color:#c47a00;font-weight:700' : '') + '"/></td>';
+    // 적용단가
+    h += '<td class="imc-tr imc-num imc-yel" style="font-weight:700">' + (cp && cp.qty > 0 ? _importU(cp.unitAfterDisc) : '—') + '</td>';
+    // 소계$
+    h += '<td class="imc-tr imc-num" style="font-weight:600">' + (cp ? _importU(cp.usdAmt) : '—') + '</td>';
+    // 소계₩
+    h += '<td class="imc-tr imc-num" style="font-weight:600">' + (cp ? _importK(cp.krwAmt) : '—') + '</td>';
+    // 통관배분
+    h += '<td class="imc-tr imc-num imc-mu">' + (cp ? _importK(cp.alloc) : '—') + '</td>';
+    // VAT별도
+    h += '<td class="imc-tr imc-num imc-grn" style="font-weight:700">' + (cp ? _importK(cp.exVAT) : '—') + '</td>';
+    // VAT포함
+    h += '<td class="imc-tr imc-num imc-red" style="font-weight:800">' + (cp ? _importK(cp.inclVAT) : '—') + '</td>';
+    // 삭제
+    h += '<td class="imc-tc">' + (c.products.length > 1 ? '<button class="imc-btn-del-row" onclick="_importDelP(' + p.id + ')">✕</button>' : '') + '</td>';
+    h += '</tr>';
+  });
+
+  // 합계행
+  if (cm) {
+    h += '<tr class="imc-tsum"><td colspan="5" style="padding-left:12px;font-size:12px;color:#555">소 계 (할인 전)</td>';
+    h += '<td class="imc-tr imc-num" style="font-weight:800">' + _importK(cm.prods.reduce(function(s, p) { return s + p.qty; }, 0)) + '</td>';
+    h += '<td></td><td></td>';
+    h += '<td class="imc-tr imc-num" style="font-weight:800">' + _importU(cm.sumRaw) + '</td>';
+    h += '<td class="imc-tr imc-num" style="font-weight:800">' + _importK(cm.sumRaw * _importNv(c.rate)) + '</td>';
+    h += '<td class="imc-tr imc-num imc-mu">' + _importK(cm.customsSum) + '</td>';
+    h += '<td colspan="3"></td></tr>';
+  }
+  h += '</tbody></table></div>';
+
+  // ④ 할인율 + 팔렛 + 합계 4열
+  h += '<div class="imc-disc-grid">';
+  // 할인율
+  h += '<div class="imc-disc-cell" style="border-right:1px solid #e8b0b0">';
+  h += '<div style="flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#d42b2b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:1px">전체 할인율</div><div style="font-size:10px;color:#555">합계 기준 일괄</div></div>';
+  h += '<div style="display:flex;align-items:center;gap:4px;margin-left:auto">';
+  h += '<input type="number" data-imc-id="discRate" value="' + c.discRate + '" oninput="_importUpd(\'discRate\',this.value)" style="width:56px;font-size:15px;font-weight:800;text-align:right;border-color:#e8b0b0;background:#fff;padding:4px 6px"/>';
+  h += '<span style="font-size:16px;font-weight:800;color:#d42b2b;flex-shrink:0">%</span></div></div>';
+  // 할인금액
+  h += '<div class="imc-disc-cell" style="border-right:1px solid #e8b0b0;flex-direction:column;justify-content:center;align-items:flex-start">';
+  h += '<div style="font-size:10px;color:#555;font-weight:600;text-transform:uppercase;margin-bottom:2px">할인 금액</div>';
+  if (cm && _importNv(c.discRate) > 0) {
+    h += '<div class="imc-num imc-red" style="font-size:13px;font-weight:800">−' + _importU(cm.discAmt) + '</div>';
+    h += '<div class="imc-num imc-mu" style="font-size:10px;margin-top:1px">−' + _importK(cm.discAmt * _importNv(c.rate)) + ' ₩</div>';
+  } else { h += '<div class="imc-mu" style="font-size:11px">—</div>'; }
+  h += '</div>';
+  // 팔렛
+  h += '<div class="imc-disc-cell" style="border-right:1px solid #e8b0b0">';
+  h += '<div style="display:flex;gap:8px;align-items:flex-end">';
+  h += '<div><div style="font-size:10px;font-weight:600;color:#555;text-transform:uppercase;margin-bottom:2px">팔렛 단가</div>';
+  h += '<div style="display:flex;align-items:center;gap:2px"><span style="color:#c47a00;font-weight:700;font-size:11px;flex-shrink:0">$</span>';
+  h += '<input type="number" data-imc-id="palUnit" value="' + c.palUnit + '" oninput="_importUpd(\'palUnit\',this.value)" style="width:54px;font-size:12px;font-weight:600;padding:4px 6px;text-align:right"/></div></div>';
+  h += '<div><div style="font-size:10px;font-weight:600;color:#555;text-transform:uppercase;margin-bottom:2px">할인</div>';
+  h += '<div style="display:flex;align-items:center;gap:2px">';
+  h += '<input type="number" data-imc-id="palDisc" value="' + c.palDisc + '" oninput="_importUpd(\'palDisc\',this.value)" style="width:38px;font-size:12px;font-weight:600;padding:4px 6px;text-align:right"/>';
+  h += '<span style="font-size:11px;color:#555;flex-shrink:0">%</span></div></div></div>';
+  if (cm) {
+    h += '<div style="margin-left:6px;border-left:1px dashed #e8b0b0;padding-left:8px">';
+    h += '<div style="font-size:10px;color:#555;margin-bottom:1px">' + cm.sumPal + 'P × $' + c.palUnit + '</div>';
+    h += '<div class="imc-num imc-yel" style="font-size:13px;font-weight:800">' + _importU(cm.palCost) + '</div>';
+    h += '<div class="imc-num imc-mu" style="font-size:10px">' + _importK(cm.palCost * _importNv(c.rate)) + ' ₩</div></div>';
+  }
+  h += '</div>';
+  // 최종합계
+  if (cm) {
+    h += '<div style="padding:7px 16px;background:#d42b2b;display:flex;flex-direction:column;justify-content:center">';
+    h += '<div style="font-size:10px;font-weight:600;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">인보이스 최종 합계</div>';
+    h += '<div class="imc-num" style="font-size:17px;font-weight:900;color:#fff;line-height:1.1">$' + _importK(cm.totalUSD) + '</div>';
+    h += '<div class="imc-num" style="font-size:11px;color:rgba(255,255,255,.75);margin-top:2px">' + _importK(cm.totalUSD * _importNv(c.rate)) + ' ₩</div></div>';
+  }
+  h += '</div></div>'; // close disc-grid + sec
+
+  // ⑤ 공장 송금 + 통관 비용
+  h += '<div class="imc-g2" style="margin-bottom:8px">';
+
+  // 좌: 공장 송금
+  h += '<div class="imc-sec"><div class="imc-sec-hd"><span>공장 송금</span></div>';
+  h += '<div class="imc-sec-body" style="display:flex;flex-direction:column;gap:6px">';
+  c.remit.forEach(function(r, rIdx) {
+    var prevSentUSD = c.remit.filter(function(x, xi) { return xi < rIdx && x.on && _importNv(x.invAmt) > 0; }).reduce(function(s, x) { return s + _importNv(x.invAmt); }, 0);
+    var autoBalance = rIdx > 0 && cm ? Math.round(cm.totalUSD - prevSentUSD) : null;
+    var isAutoInv = rIdx > 0 && autoBalance !== null && autoBalance > 0;
+
+    h += '<div class="imc-remit-item' + (r.on ? ' on' : '') + '" style="opacity:' + (r.on ? 1 : 0.6) + '">';
+    // 헤더
+    h += '<div class="imc-remit-hd">';
+    h += '<div style="display:inline-flex;align-items:center;gap:8px;cursor:pointer" onclick="_importUpdR(' + r.id + ',\'on\',' + !r.on + ')">';
+    h += '<div class="imc-tog-track' + (r.on ? ' on' : '') + '"><div class="imc-tog-knob"></div></div>';
+    h += '<span style="font-size:13px;font-weight:' + (r.on ? '700' : '400') + ';color:' + (r.on ? '#1a1a1a' : '#555') + ';transition:color .1s">' + r.lbl + '</span></div>';
+    if (r.on && r.date) h += '<span class="imc-mu" style="font-size:11px">' + r.date + '</span>';
+    h += '</div>';
+
+    if (r.on) {
+      h += '<div class="imc-remit-body">';
+      // 날짜
+      h += '<div class="imc-fgrp"><div class="imc-flbl">날짜</div><input type="date" data-imc-id="rdate-' + r.id + '" value="' + (r.date || '') + '" onchange="_importUpdR(' + r.id + ',\'date\',this.value)"/></div>';
+      // 인보이스 금액
+      h += '<div class="imc-fgrp"><div class="imc-flbl">' + (isAutoInv ? '잔금 (자동 계산)' : '인보이스 금액 ($)') + '</div>';
+      if (isAutoInv) {
+        var dispVal = r.invAmt ? _importK(_importNv(r.invAmt)) : '';
+        h += '<div style="position:relative">';
+        h += '<input type="text" inputmode="numeric" data-imc-id="rinvAmt-' + r.id + '" value="' + dispVal + '" oninput="_importUpdR(' + r.id + ',\'invAmt\',this.value.replace(/,/g,\'\'))" placeholder="' + _importK(autoBalance) + '" style="border-color:#a0d8b4;background:#f0faf4;font-weight:700;color:#1a7a3a;padding-right:56px;padding-left:20px"/>';
+        h += '<span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#1a7a3a;font-weight:700;font-size:14px;pointer-events:none">$</span>';
+        if (!r.invAmt) h += '<button onclick="_importUpdR(' + r.id + ',\'invAmt\',\'' + autoBalance + '\')" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:700;padding:2px 6px;background:#1a7a3a;color:#fff;border:none;border-radius:2px;cursor:pointer">적용</button>';
+        h += '</div>';
+        h += '<div style="font-size:10px;color:#1a7a3a;margin-top:3px;font-weight:600">총 결제금액 $' + _importK(cm ? cm.totalUSD : 0) + ' − 이전 송금 $' + _importK(prevSentUSD) + ' = 잔금 $' + _importK(autoBalance) + '</div>';
+      } else {
+        h += '<div style="position:relative"><span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#c47a00;font-weight:700;font-size:14px;pointer-events:none">$</span>';
+        h += '<input type="text" inputmode="numeric" data-imc-id="rinvAmt-' + r.id + '" value="' + (r.invAmt ? _importK(_importNv(r.invAmt)) : '') + '" oninput="_importUpdR(' + r.id + ',\'invAmt\',this.value.replace(/,/g,\'\'))" placeholder="0" style="padding-left:20px"/></div>';
+      }
+      h += '</div>';
+      // 송금액
+      h += '<div class="imc-fgrp"><div class="imc-flbl">송금액 (₩)</div>';
+      h += '<input type="text" inputmode="numeric" data-imc-id="rsendAmt-' + r.id + '" value="' + (r.sendAmt ? _importK(_importNv(r.sendAmt)) : '') + '" oninput="_importUpdR(' + r.id + ',\'sendAmt\',this.value.replace(/,/g,\'\'))" placeholder="0"/></div>';
+      // 송금수수료
+      h += '<div class="imc-fgrp"><div class="imc-flbl">송금수수료 (₩)</div>';
+      h += '<input type="text" inputmode="numeric" data-imc-id="rsendFee-' + r.id + '" value="' + (r.sendFee ? _importK(_importNv(r.sendFee)) : '') + '" oninput="_importUpdR(' + r.id + ',\'sendFee\',this.value.replace(/,/g,\'\'))" placeholder="0"/></div>';
+      // 전신료
+      h += '<div class="imc-fgrp"><div class="imc-flbl">전신료 (₩)</div>';
+      h += '<input type="text" inputmode="numeric" data-imc-id="rwireFee-' + r.id + '" value="' + (r.wireFee ? _importK(_importNv(r.wireFee)) : '') + '" oninput="_importUpdR(' + r.id + ',\'wireFee\',this.value.replace(/,/g,\'\'))" placeholder="0"/></div>';
+      // 실적용환율
+      var invAmtVal = _importNv(r.invAmt || (isAutoInv ? autoBalance : 0));
+      if (invAmtVal > 0 && _importNv(r.sendAmt) > 0) {
+        var effRate = (_importNv(r.sendAmt) + _importNv(r.sendFee) + _importNv(r.wireFee)) / invAmtVal;
+        h += '<div class="imc-fgrp"><div class="imc-flbl">실적용 환율 (수수료 포함)</div>';
+        h += '<div><div class="imc-num" style="padding:5px 8px;color:#d42b2b;font-size:14px;font-weight:800;text-align:right;border:1px solid #e8b0b0;background:#fff">' + _importK(effRate, 2) + ' ₩/$</div>';
+        h += '<div style="font-size:10px;color:#555;margin-top:2px;text-align:right">(' + _importK(_importNv(r.sendAmt) + _importNv(r.sendFee) + _importNv(r.wireFee)) + ' ÷ $' + _importK(invAmtVal) + ')</div></div></div>';
+      }
+      h += '</div>'; // remit-body
+    }
+    h += '</div>'; // remit-item
+  });
+
+  // 송금 합계
+  if (cm && cm.remits.length > 0) {
+    h += '<div style="border:1px solid #e8b0b0;background:#fff0f0">';
+    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e8b0b0">';
+    h += '<div><div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.04em">총 송금액 (순수)</div><div style="font-size:10px;color:#999">수수료·전신료 제외</div></div>';
+    h += '<span class="imc-num imc-red" style="font-weight:800;font-size:14px">' + _importK(cm.totalSent) + ' ₩</span></div>';
+    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e8b0b0">';
+    h += '<div><div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.04em">총 지불액 (수수료·전신료 포함)</div><div style="font-size:10px;color:#999">환율 계산 기준</div></div>';
+    h += '<span class="imc-num imc-red" style="font-weight:800;font-size:14px">' + _importK(cm.totalAllFees) + ' ₩</span></div>';
+    h += '<div style="padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e8b0b0">';
+    h += '<span class="imc-mu" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em">인보이스+팔렛 총 결제금액</span>';
+    h += '<span class="imc-num imc-yel" style="font-weight:800;font-size:13px">$' + _importK(cm.totalUSD) + '</span></div>';
+    if (cm.aggRate > 0) {
+      h += '<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;background:#2b2b2b">';
+      h += '<div><div style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">최종 적용 환율</div>';
+      h += '<div style="font-size:10px;color:#888">총 지불액(수수료 포함) ÷ 총 인보이스($)</div></div>';
+      h += '<div style="text-align:right"><div class="imc-num" style="font-size:18px;font-weight:900;color:#ff9999">' + _importK(cm.aggRate, 2) + ' <span style="font-size:11px;font-weight:400;color:#aaa">₩/$</span></div>';
+      h += '<div style="font-size:10px;color:#888;margin-top:1px">' + _importK(cm.totalAllFees) + ' ₩ ÷ $' + _importK(cm.totalUSD) + '</div></div></div>';
+    }
+    h += '</div>';
+  }
+  h += '</div></div>'; // sec-body + sec
+
+  // 우: 통관 비용
+  h += '<div class="imc-sec"><div class="imc-sec-hd"><span>통관 비용</span></div>';
+  h += '<table class="imc-tbl"><thead><tr><th style="text-align:left;padding-left:14px">항목</th><th style="padding-right:14px">금액 (₩)</th></tr></thead><tbody>';
+  c.customs.forEach(function(ci) {
+    h += '<tr><td style="padding-left:14px">';
+    if (ci.fixed) { h += '<span style="font-weight:500">' + ci.lbl + '</span>'; }
+    else { h += '<input data-imc-id="clbl-' + ci.id + '" value="' + (ci.lbl || '').replace(/"/g, '&quot;') + '" oninput="_importUpdCu(' + ci.id + ',\'lbl\',this.value)" placeholder="항목 ' + ci.id + ' 이름 입력"/>'; }
+    h += '</td><td style="padding-right:14px">';
+    h += '<input type="text" inputmode="numeric" data-imc-id="camt-' + ci.id + '" value="' + (ci.amt ? _importK(_importNv(ci.amt)) : '') + '" oninput="_importUpdCu(' + ci.id + ',\'amt\',this.value.replace(/,/g,\'\'))" placeholder="0" style="text-align:right"/>';
+    h += '</td></tr>';
+  });
+  if (cm) {
+    h += '<tr class="imc-tsum"><td style="padding-left:14px;font-weight:700">합계</td>';
+    h += '<td class="imc-tr imc-num imc-red" style="font-weight:800;padding-right:14px;font-size:15px">' + _importK(cm.customsSum) + '</td></tr>';
+  }
+  h += '</tbody></table></div>';
+  h += '</div>'; // close g2
+
+  // ⑥ 최종 요약
+  if (cm) {
+    h += '<div class="imc-sec"><div class="imc-sec-hd"><span>최종 요약</span>';
+    h += '<button class="imc-btn imc-btn-blu imc-btn-xs" onclick="_importExportExcel(_importGetCalc(),_importCompute(_importGetCalc()))">↓ Excel 출력</button></div>';
+    h += '<div class="imc-sec-body">';
+    // 3칸 통계바
+    h += '<div style="display:flex;gap:0;border:1px solid #d0d0d0;margin-bottom:14px">';
+    h += '<div style="flex:1;padding:11px 18px;border-right:1px solid #d0d0d0">';
+    h += '<div style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">인보이스 최종합계 금액</div>';
+    h += '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:nowrap">';
+    h += '<div class="imc-num imc-yel" style="font-size:18px;font-weight:800;white-space:nowrap">$' + _importK(cm.totalUSD) + '</div>';
+    h += '<div class="imc-num imc-mu" style="font-size:12px;white-space:nowrap">/ ' + _importK(cm.totalAllFees) + ' ₩</div></div>';
+    h += '<div style="font-size:10px;color:#999;margin-top:3px">$ = 인보이스+팔렛 · ₩ = 공장송금 합계</div></div>';
+    h += '<div style="flex:1;padding:11px 18px;border-right:2px solid #d42b2b">';
+    h += '<div style="font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">통관비용</div>';
+    h += '<div class="imc-num imc-blu" style="font-size:18px;font-weight:800">' + _importK(cm.customsSum) + ' ₩</div></div>';
+    h += '<div style="flex:0 0 auto;min-width:220px;padding:11px 22px;background:#d42b2b;display:flex;flex-direction:column;justify-content:center">';
+    h += '<div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">인보이스 최종 합계</div>';
+    h += '<div class="imc-num" style="font-size:24px;font-weight:900;color:#fff;line-height:1.1;white-space:nowrap">' + _importK(cm.grandKRW) + ' ₩</div>';
+    h += '<div class="imc-num" style="font-size:11px;color:rgba(255,255,255,.65);margin-top:4px;white-space:nowrap">' + _importK(cm.totalAllFees) + ' ₩ + ' + _importK(cm.customsSum) + ' ₩</div></div></div>';
+
+    // 제품별 최종 단가
+    if (cm.prods.some(function(p) { return p.qty > 0; })) {
+      h += '<div style="border-top:1px solid #d0d0d0;padding-top:10px">';
+      h += '<div style="font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">제품별 최종 단가</div>';
+      h += '<div class="imc-ovx"><table class="imc-tbl"><thead><tr>';
+      h += '<th style="text-align:left;padding-left:12px">브랜드</th>';
+      h += '<th style="text-align:left;padding-left:12px">모델넘버</th>';
+      h += '<th>수량</th><th style="color:#6ddba0">단가</th><th style="color:#6ddba0">총금액</th>';
+      h += '<th style="color:#ff9999">단가 VAT포함</th><th style="color:#ff9999">총금액 VAT포함</th>';
+      h += '<th style="color:#ffcc44">최종적용환율</th></tr></thead><tbody>';
+      cm.prods.forEach(function(p, i) {
+        if (p.qty <= 0) return;
+        h += '<tr><td style="padding-left:12px"><div style="font-weight:700;font-size:14px">' + (p.brand || '—') + '</div>';
+        if (p.spec) h += '<div class="imc-mu" style="font-size:11px">' + p.spec + '</div>';
+        h += '</td>';
+        h += '<td style="padding-left:12px;font-weight:500">' + (p.model || '—') + '</td>';
+        h += '<td class="imc-tr imc-num" style="font-weight:700">' + _importK(p.qty) + '</td>';
+        h += '<td class="imc-tr imc-num imc-grn" style="font-weight:700;font-size:14px">' + _importK(p.exVAT) + '</td>';
+        h += '<td class="imc-tr imc-num imc-grn" style="font-weight:700;font-size:14px">' + _importK(Math.round(p.finalKRW / 1.1)) + '</td>';
+        h += '<td class="imc-tr imc-num imc-red" style="font-weight:800;font-size:15px">' + _importK(p.inclVAT) + '</td>';
+        h += '<td class="imc-tr imc-num imc-red" style="font-weight:800;font-size:15px;background:#fff8f8">' + _importK(p.finalKRWRounded) + '</td>';
+        h += '<td class="imc-tr imc-num" style="font-weight:700;font-size:13px;color:#cc8800;background:#fffdf0">' + (p.usdAmt > 0 ? _importK(p.finalKRW / p.usdAmt, 2) : '—') + ' ₩/$</td></tr>';
+      });
+      // 합계
+      var qtyProds = cm.prods.filter(function(p) { return p.qty > 0; });
+      if (qtyProds.length > 1) {
+        h += '<tr class="imc-tsum"><td colspan="2" style="padding-left:12px;font-size:12px;color:#555">합 계</td>';
+        h += '<td class="imc-tr imc-num" style="font-weight:800">' + _importK(cm.prods.reduce(function(s, p) { return s + p.qty; }, 0)) + '</td>';
+        h += '<td></td>';
+        h += '<td class="imc-tr imc-num imc-grn" style="font-weight:800">' + _importK(Math.round(cm.grandKRW / 1.1)) + '</td>';
+        h += '<td></td>';
+        h += '<td class="imc-tr imc-num imc-red" style="font-weight:900;background:#fff8f8;font-size:15px">' + _importK(cm.grandKRW) + '</td>';
+        h += '<td class="imc-tr imc-num" style="font-weight:800;color:#cc8800;background:#fffdf0">' + (cm.aggRate > 0 ? _importK(cm.aggRate, 2) : '—') + ' ₩/$</td></tr>';
+      }
+      h += '</tbody></table></div></div>';
+    }
+    h += '</div></div>'; // sec-body + sec
+  }
+
+  container.innerHTML = '<div class="imc-wrap">' + h + '</div>';
+
+  // 포커스 복원
+  if (focusId) {
+    var el = container.querySelector('[data-imc-id="' + focusId + '"]');
+    if (el) {
+      el.focus();
+      if (focusPos !== null && typeof el.setSelectionRange === 'function') {
+        try { el.setSelectionRange(focusPos, focusPos); } catch (e) {}
+      }
+    }
+  }
+}
+
+// 초기화: 탭 첫 진입 시 호출
+function renderImportCalcTab() {
+  _importLoadData();
+  _importDoRender();
 }
