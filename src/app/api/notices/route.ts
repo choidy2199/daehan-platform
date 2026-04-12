@@ -31,9 +31,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '제목과 내용은 필수입니다' }, { status: 400 });
     }
 
+    // bug/improve → 자동 status=waiting
+    const status = (category === 'bug' || category === 'improve') ? 'waiting' : null;
+
     const { data, error } = await supabase
       .from('notices')
-      .insert({ category: category || 'update', title, content, pinned: pinned || false, author: author || 'admin' })
+      .insert({ category: category || 'update', title, content, pinned: pinned || false, author: author || 'admin', status })
       .select()
       .single();
 
@@ -48,15 +51,44 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, category, title, content, pinned } = body;
+    const { id } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 });
     }
 
+    // 상태 변경 전용
+    if (body.statusChange && body.status) {
+      const { error: updateErr } = await supabase
+        .from('notices')
+        .update({ status: body.status, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (updateErr) throw updateErr;
+
+      // 자동 댓글 생성
+      const statusLabels: Record<string, string> = { waiting: '대기', progress: '진행중', done: '완료', hold: '보류' };
+      const newLabel = statusLabels[body.status] || body.status;
+      await supabase.from('notice_comments').insert({
+        notice_id: id,
+        author: body.author || 'admin',
+        content: `상태를 ${newLabel}(으)로 변경했습니다.`
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    // 일반 수정
+    const { category, title, content, pinned } = body;
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (category !== undefined) updateData.category = category;
+    if (title !== undefined) updateData.title = title;
+    if (content !== undefined) updateData.content = content;
+    if (pinned !== undefined) updateData.pinned = pinned;
+
     const { data, error } = await supabase
       .from('notices')
-      .update({ category, title, content, pinned, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
