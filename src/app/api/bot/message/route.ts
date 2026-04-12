@@ -381,7 +381,7 @@ export async function POST(request: NextRequest) {
       if (!fullMatchResult.matched || fullMatchResult.count === 0) {
         for (const word of filtered) {
           const result = matchProduct(word, allProducts);
-          if (result.matched && result.count > 0 && result.count <= 20) {
+          if (result.matched && result.count > 0 && result.count <= 50) {
             fullMatchResult = result;
             console.log(`[bot] 단일 토큰 매칭 성공: "${word}" → ${result.count}건`);
             break;
