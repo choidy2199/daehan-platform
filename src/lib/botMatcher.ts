@@ -99,7 +99,7 @@ function getStockStatus(p: Product): string {
 const STOPWORDS = [
   '가격', '얼마', '재고', '있나요', '있어요', '없나요', '부탁', '드립니다',
   '확인', '문의', '주세요', '합니다', '금액', '단가', '원', '알려', '보내',
-  '요', '좀', '개',
+  '요', '좀', '개', '인치',
 ];
 
 function isStopword(token: string): boolean {
@@ -108,7 +108,8 @@ function isStopword(token: string): boolean {
 
 function tokenize(keyword: string): { enTokens: string[]; koTokens: string[] } {
   const enMatches = keyword.match(/[A-Za-z0-9][\w-]*/g) || [];
-  const enTokens = enMatches.map(t => t.toUpperCase());
+  // 순수 숫자 1~2자리 제거 ("4", "16" 등 → 너무 광범위 매칭)
+  const enTokens = enMatches.filter(t => !(t.length <= 2 && /^\d+$/.test(t))).map(t => t.toUpperCase());
   const koMatches = keyword.match(/[가-힣]{2,}/g) || [];
   const koTokens = koMatches.filter(t => !isStopword(t));
   return { enTokens, koTokens };
