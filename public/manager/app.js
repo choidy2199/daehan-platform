@@ -137,8 +137,6 @@ function toggleDarkMode() {
       var sb = document.getElementById('sidebar');
       if (sb) { sb.classList.remove('expanded'); sb.classList.add('collapsed'); }
     }
-    // 사이드바 메뉴 우클릭 + 별 상태 초기화
-    _bindSidebarContextMenu();
     // 즐겨찾기 별 상태는 로그인 후 _loadFavoritesSlots가 준비된 뒤에 실행
     setTimeout(function() { if (typeof _refreshSidebarFavStars === 'function') _refreshSidebarFavStars(); }, 500);
   });
