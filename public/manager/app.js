@@ -18440,3 +18440,300 @@ function renderImportCalcTab() {
   _importLoadData();
   _importDoRender();
 }
+
+// ========================================
+// 백오더 관리
+// ========================================
+
+var _backordersCache = null;
+var _boFilterType = 'all';
+var _boFilterStatus = 'all';
+var _boSearch = '';
+
+async function _fetchBackorders() {
+  try {
+    var res = await fetch('/api/backorders');
+    var json = await res.json();
+    if (json.success) _backordersCache = json.data || [];
+  } catch(e) { console.error('[Backorders] fetch error', e); }
+  return _backordersCache || [];
+}
+
+function _getBackorderStock(code) { return findStock(code) || 0; }
+
+function renderBackorderTab() {
+  var container = document.getElementById('tab-backorder');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:14px">불러오는 중...</div>';
+  _fetchBackorders().then(function() { _renderBackorderList(container); _updateBackorderBadge(); });
+}
+
+function _renderBackorderList(container) {
+  var data = _backordersCache || [];
+  var filtered = data.filter(function(d) {
+    if (_boFilterType !== 'all' && d.product_type !== _boFilterType) return false;
+    if (_boFilterStatus !== 'all' && d.status !== _boFilterStatus) return false;
+    if (_boSearch) {
+      var q = _boSearch.toLowerCase();
+      if ((d.product_name||'').toLowerCase().indexOf(q) === -1 && (d.customer_name||'').toLowerCase().indexOf(q) === -1 && (d.model||'').toLowerCase().indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+
+  var waitingCount = data.filter(function(d) { return d.status === 'waiting'; }).length;
+  var partialCount = data.filter(function(d) { return d.status === 'partial'; }).length;
+  var doneCount = data.filter(function(d) { return d.status === 'done'; }).length;
+  var stockInCount = data.filter(function(d) { return (d.status === 'waiting' || d.status === 'partial') && _getBackorderStock(d.product_code) > 0; }).length;
+
+  var h = '<div style="max-width:1200px;margin:0 auto;display:block !important;text-align:left !important;">';
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;">';
+
+  // 다크 헤더
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:14px 20px;background:#1A1D23;color:#fff;">';
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:10px;">';
+  h += '<span style="font-size:18px;font-weight:500;">백오더</span>';
+  h += '<span style="font-size:14px;color:rgba(255,255,255,.5);">' + data.length + '건</span>';
+  if (waitingCount > 0) h += '<span style="font-size:11px;padding:3px 10px;border-radius:10px;background:#E24B4A;color:#fff;font-weight:500;">대기 ' + waitingCount + '</span>';
+  if (stockInCount > 0) h += '<span style="font-size:11px;padding:3px 10px;border-radius:10px;background:#1D9E75;color:#fff;font-weight:500;">입고 ' + stockInCount + '</span>';
+  h += '</div>';
+  h += '<button onclick="_showBackorderForm()" style="font-size:13px;padding:7px 16px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-weight:500;font-family:Pretendard,sans-serif;">+ 백오더 등록</button>';
+  h += '</div>';
+
+  // KPI
+  h += '<div style="display:grid !important;grid-template-columns:repeat(4,1fr);gap:10px;padding:16px 20px;border-bottom:0.5px solid #eee;">';
+  h += '<div style="background:#fafafa;border-radius:8px;padding:12px 16px;text-align:center;"><div style="font-size:12px;color:#999;margin-bottom:4px;">대기</div><div style="font-size:22px;font-weight:500;color:#BA7517;">' + waitingCount + '</div></div>';
+  h += '<div style="background:#fafafa;border-radius:8px;padding:12px 16px;text-align:center;"><div style="font-size:12px;color:#999;margin-bottom:4px;">부분출고</div><div style="font-size:22px;font-weight:500;color:#0C447C;">' + partialCount + '</div></div>';
+  h += '<div style="background:#fafafa;border-radius:8px;padding:12px 16px;text-align:center;"><div style="font-size:12px;color:#999;margin-bottom:4px;">완료</div><div style="font-size:22px;font-weight:500;color:#085041;">' + doneCount + '</div></div>';
+  h += '<div style="background:' + (stockInCount > 0 ? '#EAF3DE' : '#fafafa') + ';border-radius:8px;padding:12px 16px;text-align:center;"><div style="font-size:12px;color:#999;margin-bottom:4px;">입고 알림</div><div style="font-size:22px;font-weight:500;color:' + (stockInCount > 0 ? '#2D7D2D' : '#999') + ';">' + stockInCount + '</div></div>';
+  h += '</div>';
+
+  // 필터
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;padding:10px 20px;background:#fafafa;border-bottom:0.5px solid #eee;flex-wrap:wrap;">';
+  ['all','milwaukee','general','import'].forEach(function(t) {
+    var label = { all:'전체', milwaukee:'밀워키', general:'일반', 'import':'수입' }[t];
+    var isAct = _boFilterType === t;
+    h += '<button onclick="_setBoFilterType(\'' + t + '\')" style="background:' + (isAct?'#1A1D23':'#fff') + ';color:' + (isAct?'#fff':'#5A6070') + ';border:1px solid ' + (isAct?'#1A1D23':'#DDE1EB') + ';border-radius:6px;padding:4px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif;">' + label + '</button>';
+  });
+  h += '<div style="width:1px;height:20px;background:#DDE1EB;margin:0 4px;"></div>';
+  ['all','waiting','partial','done'].forEach(function(s) {
+    var label = { all:'상태전체', waiting:'대기', partial:'부분', done:'완료' }[s];
+    var isAct = _boFilterStatus === s;
+    h += '<button onclick="_setBoFilterStatus(\'' + s + '\')" style="background:' + (isAct?'#1A1D23':'#fff') + ';color:' + (isAct?'#fff':'#5A6070') + ';border:1px solid ' + (isAct?'#1A1D23':'#DDE1EB') + ';border-radius:6px;padding:4px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif;">' + label + '</button>';
+  });
+  h += '<input type="text" id="bo-search" value="' + (_boSearch||'') + '" placeholder="제품명, 거래처 검색..." autocomplete="off" style="margin-left:auto;width:200px;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;">';
+  h += '</div>';
+
+  // 테이블
+  h += '<div style="overflow-y:auto;max-height:calc(100vh - 320px);">';
+  h += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
+  h += '<thead><tr>';
+  var thS = 'padding:10px 8px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;text-align:center;';
+  h += '<th style="width:36px;'+thS+'"><input type="checkbox" id="bo-check-all" onchange="_boToggleAll(this.checked)"></th>';
+  h += '<th style="width:55px;'+thS+'">상태</th><th style="width:55px;'+thS+'">구분</th>';
+  h += '<th style="width:120px;'+thS+'text-align:left;">모델</th><th style="'+thS+'text-align:left;">제품명</th>';
+  h += '<th style="width:55px;'+thS+'">재고</th><th style="width:90px;'+thS+'">거래처</th>';
+  h += '<th style="width:50px;'+thS+'">요청</th><th style="width:50px;'+thS+'">출고</th>';
+  h += '<th style="width:140px;'+thS+'text-align:left;">비고</th><th style="width:55px;'+thS+'">등록</th>';
+  h += '<th style="width:70px;'+thS+'">처리</th>';
+  h += '</tr></thead><tbody>';
+
+  if (filtered.length === 0) {
+    h += '<tr><td colspan="12" style="padding:40px;text-align:center;color:#9BA3B2;font-size:14px;">백오더 데이터가 없습니다</td></tr>';
+  } else {
+    filtered.forEach(function(d) {
+      var stock = _getBackorderStock(d.product_code);
+      var hasStock = stock > 0;
+      var isStockIn = hasStock && (d.status === 'waiting' || d.status === 'partial');
+      var isDone = d.status === 'done';
+      var isCancelled = d.status === 'cancelled';
+      var rowStyle = 'border-bottom:1px solid #F0F2F7;';
+      if (isDone) rowStyle += 'opacity:0.5;';
+      if (isCancelled) rowStyle += 'opacity:0.4;background:#fef5f5;';
+      if (isStockIn) rowStyle += 'background:rgba(234,243,222,0.25);';
+      var stMap = {waiting:{bg:'#FAEEDA',c:'#633806',t:'대기'},partial:{bg:'#E6F1FB',c:'#0C447C',t:'부분'},done:{bg:'#E1F5EE',c:'#085041',t:'완료'},cancelled:{bg:'#F1EFE8',c:'#444441',t:'취소'}};
+      var st = stMap[d.status]||stMap.waiting;
+      var tyMap = {milwaukee:{bg:'#E24B4A',c:'#fff',t:'밀워키'},general:{bg:'#E6F1FB',c:'#0C447C',t:'일반'},'import':{bg:'#EEEDFE',c:'#3C3489',t:'수입'}};
+      var ty = tyMap[d.product_type]||tyMap.milwaukee;
+      var titleStyle = isDone||isCancelled ? 'text-decoration:line-through;color:#999;' : '';
+      var stockInBadge = isStockIn ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#E24B4A;color:#fff;font-weight:500;margin-right:4px;">입고</span>' : '';
+      var stockHtml = hasStock ? '<span style="color:#1D9E75;font-weight:500;">'+stock+'</span>' : '<span style="color:#CC2222;font-size:11px;">없음</span>';
+      var shippedHtml = d.shipped_qty > 0 ? '<span style="color:#0C447C;font-weight:500;">'+d.shipped_qty+'</span>' : '0';
+      var dd = new Date(d.created_at);
+      var dateStr = String(dd.getMonth()+1).padStart(2,'0')+'.'+String(dd.getDate()).padStart(2,'0');
+      var actionHtml = '';
+      if (isDone) { var cd=d.completed_at?new Date(d.completed_at):null; actionHtml=cd?'<span style="font-size:11px;color:#999;">'+String(cd.getMonth()+1).padStart(2,'0')+'.'+String(cd.getDate()).padStart(2,'0')+'</span>':''; }
+      else if (isCancelled) { actionHtml=''; }
+      else if (hasStock && d.status==='waiting') { actionHtml='<button onclick="event.stopPropagation();_shipBackorder('+d.id+','+d.quantity+','+d.shipped_qty+')" style="font-size:11px;padding:4px 10px;border-radius:5px;border:none;background:#1D9E75;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">출고</button>'; }
+      else if (hasStock && d.status==='partial') { actionHtml='<button onclick="event.stopPropagation();_shipBackorder('+d.id+','+d.quantity+','+d.shipped_qty+')" style="font-size:11px;padding:4px 10px;border-radius:5px;border:none;background:#185FA5;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">추가출고</button>'; }
+      else { actionHtml='<span style="font-size:11px;color:#999;">재고없음</span>'; }
+      var tdS = 'padding:10px 8px;font-size:13px;';
+      h += '<tr style="'+rowStyle+'" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\''+(isStockIn?'rgba(234,243,222,0.25)':isCancelled?'#fef5f5':'#fff')+'\'">';
+      h += '<td style="'+tdS+'text-align:center;"><input type="checkbox" class="bo-check" data-id="'+d.id+'" data-qty="'+d.quantity+'" data-shipped="'+d.shipped_qty+'"'+(isDone||isCancelled?' disabled':'')+' onclick="event.stopPropagation()"></td>';
+      h += '<td style="'+tdS+'text-align:center;"><span style="font-size:11px;padding:2px 7px;border-radius:4px;background:'+st.bg+';color:'+st.c+';font-weight:500;">'+st.t+'</span></td>';
+      h += '<td style="'+tdS+'text-align:center;"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:'+ty.bg+';color:'+ty.c+';font-weight:500;">'+ty.t+'</span></td>';
+      h += '<td style="'+tdS+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.model||d.product_code||'')+'</td>';
+      h += '<td style="'+tdS+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+titleStyle+'">'+stockInBadge+(d.product_name||'')+'</td>';
+      h += '<td style="'+tdS+'text-align:center;">'+stockHtml+'</td>';
+      h += '<td style="'+tdS+'text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.customer_name||'')+'</td>';
+      h += '<td style="'+tdS+'text-align:center;">'+d.quantity+'</td><td style="'+tdS+'text-align:center;">'+shippedHtml+'</td>';
+      h += '<td style="'+tdS+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#666;font-size:12px;">'+(d.note||'')+'</td>';
+      h += '<td style="'+tdS+'text-align:center;font-size:12px;color:#999;">'+dateStr+'</td>';
+      h += '<td style="'+tdS+'text-align:center;">'+actionHtml+'</td></tr>';
+    });
+  }
+  h += '</tbody></table></div></div></div>';
+  container.innerHTML = h;
+
+  var searchEl = document.getElementById('bo-search');
+  if (searchEl) {
+    var composing = false;
+    searchEl.addEventListener('compositionstart', function() { composing = true; });
+    searchEl.addEventListener('compositionend', function() { composing = false; _boSearch = searchEl.value; _renderBackorderList(container); });
+    searchEl.addEventListener('input', function() { if (!composing) { _boSearch = searchEl.value; _renderBackorderList(container); } });
+  }
+}
+
+function _setBoFilterType(t) { _boFilterType = t; var c = document.getElementById('tab-backorder'); if (c) _renderBackorderList(c); }
+function _setBoFilterStatus(s) { _boFilterStatus = s; var c = document.getElementById('tab-backorder'); if (c) _renderBackorderList(c); }
+function _boToggleAll(checked) { document.querySelectorAll('.bo-check:not(:disabled)').forEach(function(cb) { cb.checked = checked; }); }
+
+// ── 백오더 등록 팝업 ──
+function _showBackorderForm() {
+  var exist = document.getElementById('bo-form-popup');
+  if (exist) exist.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'bo-form-popup';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  var modal = document.createElement('div');
+  modal.style.cssText = 'background:#fff;border-radius:8px;width:480px;max-width:95vw;overflow:hidden;border:0.5px solid #eee;';
+  modal.innerHTML =
+    '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:14px 20px;background:#1A1D23;color:#fff;cursor:move;"><span style="font-size:16px;font-weight:500;">백오더 등록</span><button onclick="document.getElementById(\'bo-form-popup\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">✕</button></div>' +
+    '<div style="padding:20px 24px;">' +
+    '<div style="margin-bottom:14px;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">구분</label><select id="bo-type" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"><option value="milwaukee">밀워키</option><option value="general">일반</option><option value="import">수입</option></select></div>' +
+    '<div style="margin-bottom:14px;position:relative;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">거래처</label><input type="text" id="bo-customer" autocomplete="off" placeholder="거래처명 입력..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"><input type="hidden" id="bo-customer-code"><div id="bo-cust-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE1EB;border-top:none;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div></div>' +
+    '<div style="margin-bottom:14px;position:relative;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">제품</label><input type="text" id="bo-product" autocomplete="off" placeholder="제품명/모델 입력..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"><input type="hidden" id="bo-product-code"><input type="hidden" id="bo-product-name"><input type="hidden" id="bo-model"><div id="bo-prod-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE1EB;border-top:none;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div></div>' +
+    '<div style="display:flex !important;flex-direction:row !important;gap:12px;margin-bottom:14px;"><div style="width:100px;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">수량</label><input type="number" id="bo-qty" value="1" min="1" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"></div><div style="flex:1;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">비고</label><input type="text" id="bo-note" placeholder="메모..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"></div></div>' +
+    '<div style="display:flex !important;flex-direction:row !important;justify-content:flex-end !important;gap:8px;"><button onclick="document.getElementById(\'bo-form-popup\').remove()" style="font-size:14px;padding:8px 16px;border-radius:6px;border:1px solid #185FA5;background:transparent;color:#185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">취소</button><button onclick="_saveBackorder()" style="font-size:14px;padding:8px 16px;border-radius:6px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-weight:500;font-family:Pretendard,sans-serif;">등록</button></div></div>';
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  _makeDraggable(modal, modal.firstChild);
+
+  var custInput = document.getElementById('bo-customer'), custDd = document.getElementById('bo-cust-dropdown'), custC = false;
+  custInput.addEventListener('compositionstart', function() { custC = true; });
+  custInput.addEventListener('compositionend', function() { custC = false; _boSearchCust(custInput.value, custDd); });
+  custInput.addEventListener('input', function() { if (!custC) _boSearchCust(custInput.value, custDd); document.getElementById('bo-customer-code').value = ''; });
+
+  var prodInput = document.getElementById('bo-product'), prodDd = document.getElementById('bo-prod-dropdown'), prodC = false;
+  prodInput.addEventListener('compositionstart', function() { prodC = true; });
+  prodInput.addEventListener('compositionend', function() { prodC = false; _boSearchProd(prodInput.value, prodDd); });
+  prodInput.addEventListener('input', function() { if (!prodC) _boSearchProd(prodInput.value, prodDd); document.getElementById('bo-product-code').value = ''; });
+
+  document.addEventListener('mousedown', function _cdd(e) {
+    if (!document.getElementById('bo-form-popup')) { document.removeEventListener('mousedown', _cdd); return; }
+    if (!custDd.contains(e.target) && e.target !== custInput) custDd.style.display = 'none';
+    if (!prodDd.contains(e.target) && e.target !== prodInput) prodDd.style.display = 'none';
+  });
+  overlay.addEventListener('keydown', function(e) { if (e.key === 'Escape') overlay.remove(); });
+  setTimeout(function() { custInput.focus(); }, 100);
+}
+
+function _boSearchCust(q, dd) {
+  if (!q || q.length < 2) { dd.style.display = 'none'; return; }
+  var ql = q.toLowerCase(), matches = [];
+  for (var i = 0; i < clientData.length && matches.length < 10; i++) {
+    if ((clientData[i].name||'').toLowerCase().indexOf(ql) !== -1) matches.push(clientData[i]);
+  }
+  if (!matches.length) { dd.innerHTML = '<div style="padding:12px;font-size:12px;color:#999;text-align:center;">없음</div>'; dd.style.display = 'block'; return; }
+  dd.innerHTML = matches.map(function(c) { return '<div onclick="_boSelCust(this)" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'" data-code="'+(c.manageCode||c.code||'')+'" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">'+(c.name||'')+' <span style="font-size:11px;color:#999;">'+(c.manageCode||c.code||'')+'</span></div>'; }).join('');
+  dd.style.display = 'block';
+}
+function _boSelCust(el) { document.getElementById('bo-customer').value = el.getAttribute('data-name'); document.getElementById('bo-customer-code').value = el.getAttribute('data-code'); document.getElementById('bo-cust-dropdown').style.display = 'none'; }
+
+function _boSearchProd(q, dd) {
+  if (!q || q.length < 2) { dd.style.display = 'none'; return; }
+  var ql = q.toLowerCase(), type = document.getElementById('bo-type').value;
+  var source = (type === 'milwaukee') ? DB.products : (JSON.parse(localStorage.getItem('mw_gen_products') || '[]'));
+  var matches = [];
+  for (var i = 0; i < source.length && matches.length < 10; i++) {
+    var p = source[i];
+    if ((p.detail||'').toLowerCase().indexOf(ql) !== -1 || (p.model||'').toLowerCase().indexOf(ql) !== -1 || (p.code||'').toLowerCase().indexOf(ql) !== -1) matches.push(p);
+  }
+  if (!matches.length) { dd.innerHTML = '<div style="padding:12px;font-size:12px;color:#999;text-align:center;">없음</div>'; dd.style.display = 'block'; return; }
+  dd.innerHTML = matches.map(function(p) { return '<div onclick="_boSelProd(this)" data-code="'+(p.code||'')+'" data-name="'+(p.detail||'').replace(/"/g,'&quot;')+'" data-model="'+(p.model||'')+'" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">'+(p.model||'')+' <span style="font-size:11px;color:#666;">'+(p.detail||'').substring(0,30)+'</span></div>'; }).join('');
+  dd.style.display = 'block';
+}
+function _boSelProd(el) { document.getElementById('bo-product').value = el.getAttribute('data-model')+' '+el.getAttribute('data-name').substring(0,20); document.getElementById('bo-product-code').value = el.getAttribute('data-code'); document.getElementById('bo-product-name').value = el.getAttribute('data-name'); document.getElementById('bo-model').value = el.getAttribute('data-model'); document.getElementById('bo-prod-dropdown').style.display = 'none'; }
+
+async function _saveBackorder() {
+  var cust = document.getElementById('bo-customer').value.trim();
+  var pCode = document.getElementById('bo-product-code').value;
+  var pName = document.getElementById('bo-product-name').value || document.getElementById('bo-product').value.trim();
+  var model = document.getElementById('bo-model').value;
+  var qty = parseInt(document.getElementById('bo-qty').value) || 1;
+  var note = document.getElementById('bo-note').value.trim();
+  var type = document.getElementById('bo-type').value;
+  var custCode = document.getElementById('bo-customer-code').value;
+  var author = (window.currentUser && window.currentUser.loginId) || 'admin';
+  if (!cust) { alert('거래처를 입력해주세요.'); return; }
+  if (!pName) { alert('제품을 선택해주세요.'); return; }
+  try {
+    var res = await fetch('/api/backorders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_code: pCode, product_name: pName, product_type: type, model: model, customer_name: cust, customer_code: custCode, quantity: qty, note: note, author: author }) });
+    var json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    toast('백오더 등록 완료');
+    document.getElementById('bo-form-popup').remove();
+    _backordersCache = null;
+    await _fetchBackorders();
+    var c = document.getElementById('tab-backorder'); if (c) _renderBackorderList(c);
+    _updateBackorderBadge();
+  } catch(e) { alert('등록 실패: ' + e.message); }
+}
+
+// ── 출고 ──
+async function _shipBackorder(id, totalQty, currentShipped) {
+  var remaining = totalQty - currentShipped;
+  var input = prompt('출고 수량 (남은: ' + remaining + ')', String(remaining));
+  if (!input) return;
+  var shipQty = parseInt(input);
+  if (isNaN(shipQty) || shipQty <= 0) { alert('올바른 수량을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/backorders', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, shipped_qty: currentShipped + shipQty, quantity: totalQty }) });
+    var json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    toast((currentShipped + shipQty) >= totalQty ? '출고 완료' : '부분 출고');
+    _backordersCache = null; await _fetchBackorders();
+    var c = document.getElementById('tab-backorder'); if (c) _renderBackorderList(c);
+    _updateBackorderBadge();
+  } catch(e) { alert('출고 실패: ' + e.message); }
+}
+
+// ── 뱃지 ──
+function _updateBackorderBadge() {
+  var data = _backordersCache || [];
+  var cnt = data.filter(function(d) { return d.status === 'waiting' || d.status === 'partial'; }).length;
+  var badge = document.getElementById('backorder-badge');
+  if (badge) { badge.textContent = cnt; badge.style.display = cnt > 0 ? 'inline-block' : 'none'; }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  _fetchBackorders().then(function() { _updateBackorderBadge(); });
+});
+
+// ── Realtime ──
+(function initBackordersRealtime() {
+  if (typeof supabase === 'undefined' || !supabase.createClient) return;
+  var SUPABASE_URL = 'https://vmbqutwrfzhruukerfkc.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtYnF1dHdyZnpocnV1a2VyZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Mzc5MjAsImV4cCI6MjA5MDIxMzkyMH0.-FI_3De1sRmAxLNQ8J45MT9hO9U9aSTchxBcq47_b-I';
+  var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  sbClient.channel('backorders_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'backorders' }, function(payload) {
+      console.log('[Backorders Realtime]', payload.eventType);
+      _backordersCache = null;
+      _fetchBackorders().then(function() {
+        _updateBackorderBadge();
+        var boTab = document.getElementById('tab-backorder');
+        if (boTab && boTab.innerHTML.indexOf('백오더') !== -1) _renderBackorderList(boTab);
+      });
+    })
+    .subscribe(function(s) { console.log('[Backorders Realtime]', s); });
+})();
