@@ -17745,6 +17745,7 @@ function _renderNoticeList(container) {
   html += '<th style="width:80px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">분류</th>';
   html += '<th style="padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;text-align:left">제목</th>';
   html += '<th style="width:80px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">작성자</th>';
+  html += '<th style="width:100px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">확인</th>';
   html += '<th style="width:100px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">날짜</th>';
   html += '<th style="width:60px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">조회</th>';
   html += '</tr></thead><tbody>';
@@ -17756,7 +17757,7 @@ function _renderNoticeList(container) {
   var pageItems = filtered.slice(startIdx, startIdx + _NOTICE_PAGE_SIZE);
 
   if (filtered.length === 0) {
-    html += '<tr><td colspan="6" style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px">공지사항이 없습니다</td></tr>';
+    html += '<tr><td colspan="7" style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px">공지사항이 없습니다</td></tr>';
   } else {
     pageItems.forEach(function(n, idx) {
       var globalIdx = startIdx + idx;
@@ -17785,6 +17786,14 @@ function _renderNoticeList(container) {
       var menuTagBadge = (n.menu_tag && (_isBugOrImprove(n.category) || n.category === 'help')) ? '<span class="notice-menu-tag" data-menu="' + n.menu_tag + '">' + n.menu_tag + '</span>' : '';
       html += '<td style="padding:10px 10px;font-size:14px;' + titleWeight + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;' + titleStyle + '">' + (n.title || '') + newBadge + menuTagBadge + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.author || 'admin') + '</td>';
+      // 확인 컬럼
+      var confirmCol = '—';
+      if (n.category === 'notice' || n.category === 'update') {
+        var cb = Array.isArray(n.confirmed_by) ? n.confirmed_by : [];
+        var _nm = { hwon:'혜원', jyoung:'지영' };
+        confirmCol = cb.length > 0 ? cb.map(function(u) { return '<span class="notice-confirm-badge">' + (_nm[u]||u) + '</span>'; }).join('') : '—';
+      }
+      html += '<td style="text-align:center;padding:10px 10px;font-size:12px">' + confirmCol + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + _noticeDateFmt(n.created_at) + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.views || 0) + '</td>';
       html += '</tr>';
@@ -17883,13 +17892,18 @@ async function _showNoticeDetail(id) {
   var contentHtml = (n.content || '').replace(/\n/g, '<br>');
   h += '<div id="notice-detail-body" style="padding:24px 28px;font-size:16px;line-height:1.9;color:#333;min-height:160px;text-align:left !important;">' + contentHtml + '</div>';
 
-  // 수정/삭제 + 상태 변경
+  // 수정/삭제 + 상태 변경 + 확인
   var currentUserId = (window.currentUser && window.currentUser.loginId) || '';
   var canEdit = isAdmin || (n.author === currentUserId && _isBugOrImprove(n.category));
   var hasBugStatus = _isBugOrImprove(n.category);
+  var isConfirmable = (n.category === 'notice' || n.category === 'update');
+  var confirmedBy = Array.isArray(n.confirmed_by) ? n.confirmed_by : [];
+  var _userNameMap = { hwon:'혜원', jyoung:'지영' };
 
-  if (canEdit || (isAdmin && hasBugStatus)) {
+  if (canEdit || (isAdmin && hasBugStatus) || isConfirmable) {
     h += '<div style="padding:10px 28px 20px;display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;border-bottom:1px solid #eee;flex-wrap:wrap;">';
+
+    // 오류/개선 상태 pill
     if (isAdmin && hasBugStatus) {
       var curStatus = (n.status === 'progress') ? 'waiting' : (n.status || 'waiting');
       h += '<div style="display:flex;align-items:center;gap:8px;">';
@@ -17901,6 +17915,29 @@ async function _showNoticeDetail(id) {
       });
       h += '</div>';
     }
+
+    // 공지/업데이트 확인 현황 + 확인 버튼
+    if (isConfirmable) {
+      h += '<div style="display:flex;align-items:center;gap:6px;">';
+      if (confirmedBy.length > 0) {
+        confirmedBy.forEach(function(uid) {
+          var name = _userNameMap[uid] || uid;
+          h += '<span class="notice-confirm-badge">' + name + ' ✓</span>';
+        });
+      } else {
+        h += '<span style="font-size:12px;color:#999;">확인: 없음</span>';
+      }
+      // hwon/jyoung만 확인 버튼 표시 (admin은 확인 대상 아님)
+      if (currentUserId && currentUserId !== 'admin') {
+        if (confirmedBy.indexOf(currentUserId) >= 0) {
+          h += '<span style="font-size:13px;color:#065F46;font-weight:500;margin-left:8px;">✓ 확인완료</span>';
+        } else {
+          h += '<button id="notice-confirm-btn" onclick="_confirmNotice(' + n.id + ')" style="font-size:13px;padding:6px 14px;border-radius:6px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;margin-left:8px;font-weight:500;">확인</button>';
+        }
+      }
+      h += '</div>';
+    }
+
     if (canEdit) {
       h += '<div style="margin-left:auto;display:flex !important;flex-direction:row !important;gap:8px;">';
       h += '<button onclick="_showNoticeWrite(' + n.id + ')" style="font-size:14px;padding:8px 20px;border-radius:6px;border:1px solid #ddd;background:#fff;color:#666;cursor:pointer;font-family:Pretendard,sans-serif;">수정</button>';
@@ -18435,6 +18472,21 @@ async function _changeNoticeStatusPill(noticeId, newStatus) {
 // 레거시 호환
 async function _changeNoticeStatus(noticeId) { _changeNoticeStatusPill(noticeId, 'waiting'); }
 
+async function _confirmNotice(noticeId) {
+  var userId = (window.currentUser && window.currentUser.loginId) || '';
+  if (!userId) return;
+  var btn = document.getElementById('notice-confirm-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '처리중...'; }
+  try {
+    var res = await fetch('/api/notices/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ noticeId: noticeId, userId: userId }) });
+    var json = await res.json();
+    if (!json.success) throw new Error(json.error);
+    _noticesCache = null;
+    await _fetchNotices();
+    _showNoticeDetail(noticeId);
+  } catch(e) { alert('확인 처리 실패: ' + e.message); if (btn) { btn.disabled = false; btn.textContent = '확인'; } }
+}
+
 // ========================================
 // 바탕화면 공지사항 패널
 // ========================================
@@ -18565,9 +18617,11 @@ function _updateNoticeBadge() {
             _renderNoticeList(noticeTab);
           }
         }
-        // INSERT → 알림음 + 팝업
+        // INSERT → 알림음 + 브라우저 알림 + 탭 깜빡임 + 팝업
         if (payload.eventType === 'INSERT' && payload.new) {
           _playNoticeSound();
+          _showBrowserNotification('새 공지', payload.new.title || '새 공지가 등록되었습니다');
+          if (document.hidden) _startTitleBlink('🔔 새 공지! | 대한종합상사');
           _showNoticePopup(payload.new);
         }
       });
@@ -18609,6 +18663,8 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   // 초기 로드
   loadNoticePanel();
+  // 브라우저 알림 권한 요청
+  _requestNotificationPermission();
 });
 
 // ========================================
@@ -18632,6 +18688,52 @@ function _playNoticeSound() {
     setTimeout(function() { ctx.close(); }, 500);
   } catch (e) { /* 브라우저 정책으로 소리 재생 실패 시 무시 */ }
 }
+
+// ========================================
+// 브라우저 알림 (Web Notifications API)
+// ========================================
+
+function _requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function _showBrowserNotification(title, body) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    var noti = new Notification(title, { body: body, icon: '/favicon.ico', tag: 'daehan-notice' });
+    noti.onclick = function() { window.focus(); noti.close(); };
+    setTimeout(function() { noti.close(); }, 8000);
+  }
+}
+
+// ========================================
+// 탭 제목 깜빡임
+// ========================================
+
+var _noticeBlinkInterval = null;
+var _originalDocTitle = document.title;
+
+function _startTitleBlink(message) {
+  if (_noticeBlinkInterval) return;
+  var show = true;
+  _noticeBlinkInterval = setInterval(function() {
+    document.title = show ? message : _originalDocTitle;
+    show = !show;
+  }, 1000);
+}
+
+function _stopTitleBlink() {
+  if (_noticeBlinkInterval) {
+    clearInterval(_noticeBlinkInterval);
+    _noticeBlinkInterval = null;
+    document.title = _originalDocTitle;
+  }
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) _stopTitleBlink();
+});
 
 // ========================================
 // 바탕화면 NEW 공지 팝업

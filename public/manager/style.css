@@ -729,6 +729,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #tab-backorder.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
 
 /* 공지 NEW 깜빡임 */
+/* 공지 확인 뱃지 */
+.notice-confirm-badge { background:#D1FAE5; color:#065F46; padding:2px 8px; border-radius:10px; font-size:11px; display:inline-block; margin-right:4px; font-family:'Pretendard',sans-serif; }
+
 @keyframes notice-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 .notice-blink { animation: notice-blink 1s infinite; }
 .notice-new-badge {
