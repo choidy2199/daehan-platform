@@ -17763,7 +17763,7 @@ function _importMkCalc(id) {
   return {
     id: id, company: '', date: _importToday(), invoiceNo: '',
     rate: '1450', palUnit: '19', palDisc: '0', discRate: '0',
-    products: [_importMkProd(1)],
+    products: [1,2,3,4,5,6,7,8,9,10].map(function(i) { return _importMkProd(i); }),
     remit: [1,2,3,4].map(function(i) { return { id: i, on: i === 1, lbl: '공장송금 ' + i + '차', date: '', invAmt: '', sendAmt: '', sendFee: '10000', wireFee: '8000' }; }),
     customs: [
       { id: 1, lbl: '부가세', amt: '', fixed: true },
