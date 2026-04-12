@@ -17433,7 +17433,7 @@ function _renderNoticeList(container) {
 
   // ── 필터 칩 + 검색 ──
   html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;padding:10px 16px;border-bottom:1px solid #DDE1EB;flex-wrap:wrap;">';
-  ['all','update','bug_improve','notice'].forEach(function(f) {
+  ['all','notice','update','bug_improve'].forEach(function(f) {
     var label = { all:'전체', update:'업데이트', bug_improve:'오류및개선', notice:'공지' }[f];
     var isActive = _noticeFilter === f;
     var bg = isActive ? '#1A1D23' : '#fff';
