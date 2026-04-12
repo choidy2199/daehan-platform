@@ -735,6 +735,26 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   vertical-align: middle; animation: notice-blink 1.2s ease-in-out infinite;
 }
 
+/* 공지 상태 pill 뱃지 */
+.notice-status-pill { padding:4px 14px; border-radius:20px; font-size:12px; cursor:pointer; border:0.5px solid #ddd; background:#fff; color:#888; transition:all 0.15s; font-family:'Pretendard',sans-serif; }
+.notice-status-pill.active[data-status="대기"] { background:#FEF3C7; color:#92400E; border:1.5px solid #F59E0B; font-weight:500; }
+.notice-status-pill.active[data-status="완료"] { background:#D1FAE5; color:#065F46; border:1.5px solid #34D399; font-weight:500; }
+.notice-status-pill.active[data-status="보류"] { background:#F3F4F6; color:#6B7280; border:1.5px solid #D1D5DB; font-weight:500; }
+
+/* 공지 메뉴 태그 뱃지 */
+.notice-menu-tag { padding:1px 6px; border-radius:3px; font-size:10px; margin-left:6px; display:inline-block; vertical-align:middle; }
+.notice-menu-tag[data-menu="밀워키"] { background:#E6F1FB; color:#0C447C; }
+.notice-menu-tag[data-menu="일반"] { background:#F1EFE8; color:#444441; }
+.notice-menu-tag[data-menu="판매"] { background:#FBEAF0; color:#72243E; }
+.notice-menu-tag[data-menu="수입"] { background:#FAEEDA; color:#633806; }
+.notice-menu-tag[data-menu="택배"] { background:#FAECE7; color:#712B13; }
+.notice-menu-tag[data-menu="검색"] { background:#EEEDFE; color:#3C3489; }
+.notice-menu-tag[data-menu="카톡"] { background:#E1F5EE; color:#085041; }
+.notice-menu-tag[data-menu="공지"] { background:#FCEBEB; color:#791F1F; }
+.notice-menu-tag[data-menu="백오더"] { background:#EAF3DE; color:#27500A; }
+.notice-menu-tag[data-menu="설정"] { background:#F1EFE8; color:#5F5E5A; }
+.notice-menu-tag[data-menu="기타"] { background:#F1EFE8; color:#888780; }
+
 /* 톡방관리 */
 .kakao-rooms-banner { background:#E1F5EE; color:#085041; font-size:12px; line-height:1.6; padding:10px 14px; border-left:3px solid #1D9E75; }
 .kakao-rooms-toolbar { display:flex; align-items:center; gap:8px; padding:10px 14px; background:#F4F6FA; border-bottom:1px solid #E2E5EB; }

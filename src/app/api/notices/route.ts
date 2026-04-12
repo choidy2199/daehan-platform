@@ -25,7 +25,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { category, title, content, pinned, author } = body;
+    const { category, title, content, pinned, author, menu_tag } = body;
 
     if (!title || !content) {
       return NextResponse.json({ error: '제목과 내용은 필수입니다' }, { status: 400 });
@@ -34,9 +34,12 @@ export async function POST(request: NextRequest) {
     // bug/improve → 자동 status=waiting
     const status = (category === 'bug' || category === 'improve') ? 'waiting' : null;
 
+    const insertData: any = { category: category || 'update', title, content, pinned: pinned || false, author: author || 'admin', status };
+    if (menu_tag) insertData.menu_tag = menu_tag;
+
     const { data, error } = await supabase
       .from('notices')
-      .insert({ category: category || 'update', title, content, pinned: pinned || false, author: author || 'admin', status })
+      .insert(insertData)
       .select()
       .single();
 
@@ -79,12 +82,13 @@ export async function PUT(request: NextRequest) {
     }
 
     // 일반 수정
-    const { category, title, content, pinned } = body;
+    const { category, title, content, pinned, menu_tag } = body;
     const updateData: any = { updated_at: new Date().toISOString() };
     if (category !== undefined) updateData.category = category;
     if (title !== undefined) updateData.title = title;
     if (content !== undefined) updateData.content = content;
     if (pinned !== undefined) updateData.pinned = pinned;
+    if (menu_tag !== undefined) updateData.menu_tag = menu_tag;
 
     const { data, error } = await supabase
       .from('notices')

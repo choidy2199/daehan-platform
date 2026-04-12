@@ -17589,9 +17589,11 @@ function _noticeCatBadge(cat) {
   return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
 }
 function _noticeStatusBadge(status) {
-  var m = { 'waiting': { bg:'#FAEEDA', color:'#633806', text:'대기' }, 'progress': { bg:'#E6F1FB', color:'#0C447C', text:'진행' }, 'done': { bg:'#E1F5EE', color:'#085041', text:'완료' }, 'hold': { bg:'#F1EFE8', color:'#444441', text:'보류' } };
-  var s = m[status]; if (!s) return '';
-  return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
+  // progress는 대기로 표시 (하위호환)
+  var st = status === 'progress' ? 'waiting' : status;
+  var m = { 'waiting': { bg:'#FEF3C7', color:'#92400E', text:'대기' }, 'done': { bg:'#D1FAE5', color:'#065F46', text:'완료' }, 'hold': { bg:'#F3F4F6', color:'#6B7280', text:'보류' } };
+  var s = m[st]; if (!s) return '';
+  return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
 }
 function _isBugOrImprove(cat) { return cat === 'bug' || cat === 'improve'; }
 
@@ -17644,7 +17646,10 @@ function _renderNoticeList(container) {
   var filtered = _noticesData.filter(function(n) {
     if (_noticeFilter === 'bug_improve') {
       if (!_isBugOrImprove(n.category)) return false;
-      if (_noticeStatusFilter !== 'all' && n.status !== _noticeStatusFilter) return false;
+      if (_noticeStatusFilter !== 'all') {
+        if (_noticeStatusFilter === 'waiting') { if (n.status !== 'waiting' && n.status !== 'progress') return false; }
+        else if (n.status !== _noticeStatusFilter) return false;
+      }
     } else if (_noticeFilter !== 'all') {
       if (n.category !== _noticeFilter) return false;
     }
@@ -17703,13 +17708,13 @@ function _renderNoticeList(container) {
   // ── 상태 필터 행 (bug_improve 탭만) ──
   if (isBugTab) {
     var bugAll = _noticesData.filter(function(n) { return _isBugOrImprove(n.category); });
-    var cntWait = bugAll.filter(function(n) { return n.status === 'waiting'; }).length;
-    var cntProg = bugAll.filter(function(n) { return n.status === 'progress'; }).length;
+    var cntWait = bugAll.filter(function(n) { return n.status === 'waiting' || n.status === 'progress'; }).length;
     var cntDone = bugAll.filter(function(n) { return n.status === 'done'; }).length;
+    var cntHold = bugAll.filter(function(n) { return n.status === 'hold'; }).length;
     html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;padding:8px 16px;border-bottom:1px solid #eee;background:#fafafa;">';
     html += '<span style="font-size:12px;color:#999;">상태:</span>';
-    ['all','waiting','progress','done'].forEach(function(s) {
-      var label = { all:'전체', waiting:'대기', progress:'진행', done:'완료' }[s];
+    ['all','waiting','done','hold'].forEach(function(s) {
+      var label = { all:'전체', waiting:'대기', done:'완료', hold:'보류' }[s];
       var isAct = _noticeStatusFilter === s;
       var sbg = isAct ? '#1A1D23' : '#fff';
       var scolor = isAct ? '#fff' : '#5A6070';
@@ -17717,9 +17722,9 @@ function _renderNoticeList(container) {
       html += '<button onclick="_setNoticeStatusFilter(\'' + s + '\')" style="background:' + sbg + ';color:' + scolor + ';border:1px solid ' + sborder + ';border-radius:6px;padding:3px 10px;font-size:12px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif">' + label + '</button>';
     });
     html += '<div style="margin-left:auto;display:flex !important;flex-direction:row !important;gap:8px;font-size:12px;">';
-    html += '<span style="color:#633806">대기 ' + cntWait + '</span>';
-    html += '<span style="color:#0C447C">진행 ' + cntProg + '</span>';
-    html += '<span style="color:#085041">완료 ' + cntDone + '</span>';
+    html += '<span style="color:#92400E">대기 ' + cntWait + '</span>';
+    html += '<span style="color:#065F46">완료 ' + cntDone + '</span>';
+    html += '<span style="color:#6B7280">보류 ' + cntHold + '</span>';
     html += '</div></div>';
   }
 
@@ -17741,10 +17746,12 @@ function _renderNoticeList(container) {
     filtered.forEach(function(n, idx) {
       var isUnread = readIds.indexOf(n.id) === -1;
       var newBadge = isUnread ? '<span class="notice-new-badge">NEW</span>' : '';
-      var isDone = _isBugOrImprove(n.category) && n.status === 'done';
+      var isDone = _isBugOrImprove(n.category) && (n.status === 'done');
+      var isHold = _isBugOrImprove(n.category) && (n.status === 'hold');
       var titleStyle = isDone ? 'text-decoration:line-through;color:#999;' : '';
       var titleWeight = isUnread && !isDone ? 'font-weight:500;' : 'font-weight:400;';
       var rowBg = isUnread ? '#FFF8F0' : '#fff';
+      var rowFilter = isDone ? 'filter:grayscale(100%);opacity:0.5;' : (isHold ? 'filter:grayscale(30%);opacity:0.65;' : '');
 
       // No./상태 컬럼
       var noCol;
@@ -17756,10 +17763,11 @@ function _renderNoticeList(container) {
         noCol = String(idx + 1);
       }
 
-      html += '<tr onclick="_showNoticeDetail(' + n.id + ')" style="cursor:pointer;border-bottom:1px solid #F0F2F7;background:' + rowBg + '" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'' + rowBg + '\'">';
+      html += '<tr onclick="_showNoticeDetail(' + n.id + ')" style="cursor:pointer;border-bottom:1px solid #F0F2F7;background:' + rowBg + ';' + rowFilter + '" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'' + rowBg + '\'">';
       html += '<td style="text-align:center;padding:10px 10px;font-size:14px;color:#5A6070">' + noCol + '</td>';
       html += '<td style="text-align:center;padding:10px 10px">' + _noticeCatBadge(n.category) + '</td>';
-      html += '<td style="padding:10px 10px;font-size:14px;' + titleWeight + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;' + titleStyle + '">' + (n.title || '') + newBadge + '</td>';
+      var menuTagBadge = (n.menu_tag && _isBugOrImprove(n.category)) ? '<span class="notice-menu-tag" data-menu="' + n.menu_tag + '">' + n.menu_tag + '</span>' : '';
+      html += '<td style="padding:10px 10px;font-size:14px;' + titleWeight + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;' + titleStyle + '">' + (n.title || '') + newBadge + menuTagBadge + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.author || 'admin') + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + _noticeDateFmt(n.created_at) + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.views || 0) + '</td>';
@@ -17826,6 +17834,7 @@ async function _showNoticeDetail(id) {
   h += '<div style="padding:24px 28px 0;text-align:left !important;">';
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:10px;margin-bottom:8px;">';
   h += _noticeCatBadge(n.category);
+  if (n.menu_tag && _isBugOrImprove(n.category)) h += '<span class="notice-menu-tag" data-menu="' + n.menu_tag + '">' + n.menu_tag + '</span>';
   if (n.status) h += _noticeStatusBadge(n.status);
   if (n.pinned) h += '<span style="font-size:12px;color:#999;">📌 상단고정</span>';
   h += '</div>';
@@ -17846,14 +17855,15 @@ async function _showNoticeDetail(id) {
   if (canEdit || (isAdmin && hasBugStatus)) {
     h += '<div style="padding:10px 28px 20px;display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;border-bottom:1px solid #eee;flex-wrap:wrap;">';
     if (isAdmin && hasBugStatus) {
-      h += '<span style="font-size:14px;color:#999;">상태:</span>';
-      h += '<select id="notice-status-sel" style="height:30px;border:1px solid #DDE1EB;border-radius:6px;padding:0 8px;font-size:13px;font-family:Pretendard,sans-serif;">';
-      ['waiting','progress','done','hold'].forEach(function(s) {
-        var sl = { waiting:'대기', progress:'진행중', done:'완료', hold:'보류' }[s];
-        h += '<option value="' + s + '"' + (n.status === s ? ' selected' : '') + '>' + sl + '</option>';
+      var curStatus = (n.status === 'progress') ? 'waiting' : (n.status || 'waiting');
+      h += '<div style="display:flex;align-items:center;gap:8px;">';
+      h += '<span style="font-size:13px;color:#888;">상태:</span>';
+      ['waiting','done','hold'].forEach(function(s) {
+        var sl = { waiting:'대기', done:'완료', hold:'보류' }[s];
+        var isActive = curStatus === s;
+        h += '<span class="notice-status-pill' + (isActive ? ' active' : '') + '" data-status="' + s + '" onclick="_changeNoticeStatusPill(' + n.id + ',\'' + s + '\')" style="cursor:pointer">' + sl + '</span>';
       });
-      h += '</select>';
-      h += '<button onclick="_changeNoticeStatus(' + n.id + ')" style="font-size:13px;padding:5px 12px;border-radius:6px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">적용</button>';
+      h += '</div>';
     }
     if (canEdit) {
       h += '<div style="margin-left:auto;display:flex !important;flex-direction:row !important;gap:8px;">';
@@ -18142,6 +18152,16 @@ function _showNoticeWrite(editId) {
     });
   }
   h += '</select></div>';
+  if (isBugMode) {
+    var menuTags = ['','밀워키','일반','판매','수입','택배','검색','카톡','공지','백오더','설정','기타'];
+    var curMenuTag = isEdit ? (n.menu_tag || '') : '';
+    h += '<div><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">관련 메뉴</label>';
+    h += '<select id="nw-menu-tag" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;min-width:120px;">';
+    menuTags.forEach(function(t) {
+      h += '<option value="' + t + '"' + (curMenuTag === t ? ' selected' : '') + '>' + (t || '선택안함') + '</option>';
+    });
+    h += '</select></div>';
+  }
   if (!isBugMode) {
     h += '<label style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;margin-top:18px;font-size:14px;color:#1A1D23;cursor:pointer;"><input type="checkbox" id="nw-pinned"' + (isEdit && n.pinned ? ' checked' : '') + '> 📌 상단고정</label>';
   }
@@ -18300,10 +18320,12 @@ async function _saveNotice(editId) {
   }
 
   var author = (window.currentUser && window.currentUser.loginId) || 'admin';
+  var menuTagEl = document.getElementById('nw-menu-tag');
+  var menuTag = menuTagEl ? menuTagEl.value : '';
 
   try {
     if (editId) {
-      var res = await fetch('/api/notices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, category: category, title: title, content: content, pinned: pinned }) });
+      var res = await fetch('/api/notices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editId, category: category, title: title, content: content, pinned: pinned, menu_tag: menuTag || null }) });
       var json = await res.json();
       if (!json.success) throw new Error(json.error);
       toast('글 수정 완료');
@@ -18312,7 +18334,7 @@ async function _saveNotice(editId) {
       await _fetchNotices();
       _showNoticeDetail(editId);
     } else {
-      var res2 = await fetch('/api/notices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: category, title: title, content: content, pinned: pinned, author: author }) });
+      var res2 = await fetch('/api/notices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: category, title: title, content: content, pinned: pinned, author: author, menu_tag: menuTag || null }) });
       var json2 = await res2.json();
       if (!json2.success) throw new Error(json2.error);
       toast('글 등록 완료');
@@ -18344,16 +18366,13 @@ async function _deleteNotice(id) {
   }
 }
 
-async function _changeNoticeStatus(noticeId) {
-  var sel = document.getElementById('notice-status-sel');
-  if (!sel) return;
-  var newStatus = sel.value;
+async function _changeNoticeStatusPill(noticeId, newStatus) {
   var author = (window.currentUser && window.currentUser.loginId) || 'admin';
   try {
     var res = await fetch('/api/notices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: noticeId, status: newStatus, statusChange: true, author: author }) });
     var json = await res.json();
     if (!json.success) throw new Error(json.error);
-    var statusLabels = { waiting:'대기', progress:'진행중', done:'완료', hold:'보류' };
+    var statusLabels = { waiting:'대기', done:'완료', hold:'보류' };
     toast('상태: ' + (statusLabels[newStatus] || newStatus) + '(으)로 변경됨');
     _lastNoticeSyncTs = Date.now();
     _lastCommentSyncTs = Date.now();
@@ -18362,6 +18381,8 @@ async function _changeNoticeStatus(noticeId) {
     _showNoticeDetail(noticeId);
   } catch(e) { alert('상태 변경 실패: ' + e.message); }
 }
+// 레거시 호환
+async function _changeNoticeStatus(noticeId) { _changeNoticeStatusPill(noticeId, 'waiting'); }
 
 // ========================================
 // 바탕화면 공지사항 패널
