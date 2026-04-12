@@ -16582,12 +16582,14 @@ function _openTemplatePopup(idx) {
   // ESC 닫기
   var escHandler = function(e) {
     if (e.key === 'Escape') {
+      e.stopPropagation();
+      e.preventDefault();
       var ov = document.getElementById('tpl-edit-overlay');
       if (ov) ov.remove();
       document.removeEventListener('keydown', escHandler);
     }
   };
-  document.addEventListener('keydown', escHandler);
+  document.addEventListener('keydown', escHandler, true);
 
   // 초기 미리보기
   _tplUpdatePreview();
