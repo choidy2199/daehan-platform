@@ -92,9 +92,9 @@ export async function getSsgProductList(): Promise<SsgProduct[]> {
     all.push(...items);
     if (items.length < pageSize) break;
     page++;
-    if (page > 50) break; // safety cap
+    if (page > 200) break; // safety cap (최대 20,000건)
   }
-  console.log(`[SSG] 상품 목록 전체 로드: ${all.length}개 (${page}페이지)`);
+  console.log('[SSG] 전체 상품 캐시 완료:', all.length, '건, 페이지:', page);
   return all;
 }
 
