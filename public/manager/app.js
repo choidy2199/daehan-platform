@@ -17685,7 +17685,7 @@ function _renderNoticeList(container) {
   var showWriteBtn = isBugTab || isHelpTab || isAdmin;
   var writeBtnText = isBugTab ? '✚ 오류/개선 작성' : (isHelpTab ? '✚ 도움말 작성' : '✚ 새 글 작성');
 
-  var html = '<div style="max-width:900px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
+  var html = '<div style="max-width:1060px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // ── 다크 헤더 ──
   html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
@@ -18155,7 +18155,7 @@ function _showNoticeWrite(editId) {
   if (editId) { n = _noticesData.find(function(x) { return x.id === editId; }); }
   var isEdit = !!n;
 
-  var h = '<div style="max-width:800px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
+  var h = '<div style="max-width:1060px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // 다크 헤더
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0;">';
