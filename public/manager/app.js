@@ -18561,8 +18561,9 @@ function _updateNoticeBadge() {
             _renderNoticeList(noticeTab);
           }
         }
-        // INSERT → 바탕화면이면 팝업 표시
+        // INSERT → 알림음 + 바탕화면이면 팝업 표시
         if (payload.eventType === 'INSERT' && payload.new) {
+          _playNoticeSound();
           var desktop = document.getElementById('desktop');
           if (desktop && desktop.style.display !== 'none') {
             _showNoticePopup(payload.new);
@@ -18610,6 +18611,28 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========================================
+// 공지 알림 사운드 (Web Audio API)
+// ========================================
+
+function _playNoticeSound() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1047, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+    setTimeout(function() { ctx.close(); }, 500);
+  } catch (e) { /* 브라우저 정책으로 소리 재생 실패 시 무시 */ }
+}
+
+// ========================================
 // 바탕화면 NEW 공지 팝업
 // ========================================
 
@@ -18653,6 +18676,7 @@ function _showNoticePopup(noticeOrNull) {
     '</div>';
 
   document.body.appendChild(popup);
+  _playNoticeSound();
   requestAnimationFrame(function() {
     requestAnimationFrame(function() { popup.style.transform = 'translateY(0)'; });
   });
