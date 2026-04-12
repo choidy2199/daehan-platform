@@ -16329,37 +16329,53 @@ var _KAKAO_DEFAULT_TEMPLATES = [
 ];
 
 var _KAKAO_BADGE_COLORS = {
-  '자동': { bg:'#E1F5EE', color:'#085041', border:'#1D9E75' },
-  'AI':   { bg:'#F3EEFF', color:'#5B21B6', border:'#7C3AED' },
-  '접수': { bg:'#E6F1FB', color:'#0C447C', border:'#185FA5' },
-  '발송': { bg:'#F0F1F3', color:'#4B5563', border:'#6B7280' },
-  '사람': { bg:'#FDE8EB', color:'#9B1C31', border:'#E8344E' }
+  'auto':    { bg:'#E1F5EE', color:'#085041', border:'#1D9E75', label:'자동' },
+  'ai':      { bg:'#F3EEFF', color:'#5B21B6', border:'#7C3AED', label:'AI' },
+  'receipt': { bg:'#E6F1FB', color:'#0C447C', border:'#185FA5', label:'접수' },
+  'human':   { bg:'#FDE8EB', color:'#9B1C31', border:'#E8344E', label:'사람' },
+  'send':    { bg:'#F0F1F3', color:'#4B5563', border:'#6B7280', label:'발송' },
+  // 레거시 한글 키 호환
+  '자동': { bg:'#E1F5EE', color:'#085041', border:'#1D9E75', label:'자동' },
+  'AI':   { bg:'#F3EEFF', color:'#5B21B6', border:'#7C3AED', label:'AI' },
+  '접수': { bg:'#E6F1FB', color:'#0C447C', border:'#185FA5', label:'접수' },
+  '발송': { bg:'#F0F1F3', color:'#4B5563', border:'#6B7280', label:'발송' },
+  '사람': { bg:'#FDE8EB', color:'#9B1C31', border:'#E8344E', label:'사람' }
 };
 
 var _KAKAO_TEMPLATE_CATEGORIES = ['전체','재고/단가','직송','송장','AS/반품','기타'];
+var _KAKAO_CAT_MAP = { 'stock':'재고/단가', 'shipping':'직송', 'as_return':'AS/반품', 'notice':'공지', 'etc':'기타' };
+var _KAKAO_TPL_VARIABLES = ['제품명','단가','재고수량','입고예정','수령인','택배사','송장번호','후보목록','거래처명'];
 
 function _initKakaoTemplates() {
   if (localStorage.getItem('mw_bot_templates')) return;
   localStorage.setItem('mw_bot_templates', JSON.stringify(_KAKAO_DEFAULT_TEMPLATES));
 }
 
+function _tplGetCategory(t) {
+  // 신규 영문 category → 한글 변환, 기존 한글은 그대로
+  if (t.category && _KAKAO_CAT_MAP[t.category]) return _KAKAO_CAT_MAP[t.category];
+  return t.category || '기타';
+}
+
 function _buildKakaoTemplates() {
   _initKakaoTemplates();
-  var templates = JSON.parse(localStorage.getItem('mw_bot_templates') || '[]');
+  var rawData = localStorage.getItem('mw_bot_templates') || '[]';
+  var parsed = JSON.parse(rawData);
+  var templates = Array.isArray(parsed) ? parsed : (parsed.templates || []);
 
   var html = '';
 
   // ── 헤더 ──
   html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
   html += '<span>응답 템플릿 관리</span>';
-  html += '<button class="kakao-btn-sm" onclick="alert(\'템플릿 추가 — 추후 구현\')">+ 템플릿 추가</button>';
+  html += '<button class="kakao-btn-sm" onclick="_openTemplatePopup(-1)">+ 템플릿 추가</button>';
   html += '</div>';
 
   // ── 카테고리 필터 탭 ──
   var catCounts = {};
   _KAKAO_TEMPLATE_CATEGORIES.forEach(function(c) { catCounts[c] = 0; });
   templates.forEach(function(t) {
-    var cat = t.category || '기타';
+    var cat = _tplGetCategory(t);
     if (catCounts[cat] !== undefined) catCounts[cat]++;
     else catCounts['기타']++;
   });
@@ -16387,61 +16403,303 @@ function _buildKakaoTemplates() {
 
   html += '</div>';
 
-  // ── 하단 요약 ──
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:12px;color:#5A6070;font-family:Pretendard,sans-serif">';
-  html += '<span>총 ' + templates.length + '개 템플릿</span>';
+  // ── 하단 요약 바 ──
+  var activeCount = templates.filter(function(t) { return t.active !== false; }).length;
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:12px;color:#5A6070;border:1px solid #E2E5EB;border-top:none;border-radius:0 0 8px 8px;background:#fff">';
+  html += '<span>총 ' + templates.length + '개 템플릿 · 활성 ' + activeCount + '개</span>';
   html += '</div>';
 
   return html;
 }
 
 function _buildKakaoTemplateCard(t, idx) {
-  var badge = _KAKAO_BADGE_COLORS[t.badge] || _KAKAO_BADGE_COLORS['자동'];
-  var cat = t.category || '기타';
+  var badgeKey = t.badge || 'auto';
+  var badge = _KAKAO_BADGE_COLORS[badgeKey] || _KAKAO_BADGE_COLORS['auto'];
+  var cat = _tplGetCategory(t);
+  var isActive = t.active !== false;
+  var opacity = isActive ? '1' : '0.45';
 
-  var h = '<div class="kakao-tpl-card" data-tpl-cat="' + cat + '">';
+  var h = '<div class="kakao-tpl-card" data-tpl-cat="' + cat + '" data-tpl-idx="' + idx + '" style="opacity:' + opacity + ';cursor:pointer" onclick="_openTemplatePopup(' + idx + ')">';
 
-  // 상단: 제목 + 뱃지 + 편집/삭제
+  // 상단: 제목 + 뱃지 + 활성토글
   h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
   h += '<div style="display:flex;align-items:center;gap:8px">';
-  h += '<span style="font-size:13px;font-weight:600;color:#1A1D23;font-family:Pretendard,sans-serif">' + t.name + '</span>';
-  h += '<span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + badge.bg + ';color:' + badge.color + ';border:1px solid ' + badge.border + ';font-family:Pretendard,sans-serif">' + t.badge + '</span>';
+  h += '<span style="font-size:13px;font-weight:600;color:#1A1D23">' + (t.name || '(제목없음)') + '</span>';
+  h += '<span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + badge.bg + ';color:' + badge.color + ';border:1px solid ' + badge.border + '">' + (badge.label || badgeKey) + '</span>';
   h += '</div>';
-  h += '<div style="display:flex;gap:6px">';
-  h += '<button style="font-size:11px;color:#185FA5;background:none;border:1px solid #185FA5;border-radius:4px;padding:3px 8px;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500" onclick="alert(\'편집 — 추후 구현\')">편집</button>';
-  h += '<button style="font-size:11px;color:#CC2222;background:none;border:1px solid #CC2222;border-radius:4px;padding:3px 8px;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500" onclick="alert(\'삭제 — 추후 구현\')">삭제</button>';
-  h += '</div>';
+  // 활성 토글
+  h += '<label class="kakao-toggle" style="width:36px;height:20px" onclick="event.stopPropagation()">';
+  h += '<input type="checkbox"' + (isActive ? ' checked' : '') + ' onchange="_toggleTemplateActive(' + idx + ', this.checked)">';
+  h += '<span class="kakao-toggle-slider" style="border-radius:20px"></span>';
+  h += '</label>';
   h += '</div>';
 
-  // 본문: 변수 강조
-  var contentHtml = (t.content || '').replace(/\n/g, '<br>').replace(/\{([^}]+)\}/g, '<span style="background:#FFF3E0;color:#E65100;font-weight:600;padding:1px 4px;border-radius:3px;font-size:12px">{$1}</span>');
-  h += '<div style="font-size:13px;color:#3A3F4B;line-height:1.6;margin-bottom:6px;font-family:Pretendard,sans-serif">' + contentHtml + '</div>';
-
-  // 트리거
-  h += '<div style="font-size:11px;color:#8B8FA3;margin-bottom:8px;font-family:Pretendard,sans-serif">트리거: ' + (t.trigger || '—') + '</div>';
-
-  // 미리보기
-  if (t.preview) {
-    var previewHtml = (t.preview || '').replace(/\n/g, '<br>');
-    h += '<div style="border-left:3px solid #185FA5;background:#F7F8FA;padding:8px 12px;border-radius:0 4px 4px 0;font-size:12px;color:#3A3F4B;line-height:1.5;font-family:Pretendard,sans-serif">';
-    h += previewHtml;
-    h += '</div>';
-  }
+  // 본문: {변수} 파란색 하이라이트
+  var contentHtml = (t.content || '').replace(/\n/g, '<br>').replace(/\{([^}]+)\}/g, '<span style="color:#185FA5;font-weight:600">{$1}</span>');
+  h += '<div style="font-size:13px;color:#3A3F4B;line-height:1.6">' + contentHtml + '</div>';
 
   h += '</div>';
   return h;
 }
 
+// ── 활성 토글 ──
+function _toggleTemplateActive(idx, checked) {
+  var rawData = localStorage.getItem('mw_bot_templates') || '[]';
+  var parsed = JSON.parse(rawData);
+  var templates = Array.isArray(parsed) ? parsed : (parsed.templates || []);
+  if (templates[idx]) {
+    templates[idx].active = checked;
+    // 저장 (배열이면 배열, 객체면 객체 유지)
+    if (Array.isArray(parsed)) { localStorage.setItem('mw_bot_templates', JSON.stringify(templates)); }
+    else { parsed.templates = templates; save('mw_bot_templates', parsed); }
+    // 카드 opacity 즉시 변경
+    var card = document.querySelector('.kakao-tpl-card[data-tpl-idx="' + idx + '"]');
+    if (card) card.style.opacity = checked ? '1' : '0.45';
+    // 하단 요약 갱신
+    _refreshTplSummary(templates);
+  }
+}
+
+function _refreshTplSummary(templates) {
+  var activeCount = templates.filter(function(t) { return t.active !== false; }).length;
+  var summaryEl = document.querySelector('#kakao-content-templates [style*="총"]');
+  // 요약 바 재렌더링은 전체 탭 갱신 시에만
+}
+
+// ── 카테고리 필터 ──
 function _filterKakaoTemplates(cat) {
-  // 버튼 활성화
   document.querySelectorAll('.kakao-tpl-cat-btn').forEach(function(btn) {
     btn.classList.toggle('kakao-tpl-cat-active', btn.getAttribute('data-cat') === cat);
   });
-  // 카드 필터
   document.querySelectorAll('.kakao-tpl-card').forEach(function(card) {
     if (cat === '전체') { card.style.display = 'block'; return; }
     card.style.display = card.getAttribute('data-tpl-cat') === cat ? 'block' : 'none';
   });
+}
+
+// ======================================
+// 템플릿 추가/편집 팝업
+// ======================================
+
+function _openTemplatePopup(idx) {
+  var rawData = localStorage.getItem('mw_bot_templates') || '[]';
+  var parsed = JSON.parse(rawData);
+  var templates = Array.isArray(parsed) ? parsed : (parsed.templates || []);
+  var isNew = idx < 0;
+  var t = isNew ? { name:'', category:'stock', badge:'auto', content:'', active:true } : templates[idx];
+  if (!t) return;
+
+  // 기존 팝업 제거
+  var old = document.getElementById('tpl-edit-overlay');
+  if (old) old.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'tpl-edit-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+  var badgeKey = t.badge || 'auto';
+  var catKey = t.category || 'stock';
+
+  var h = '<div id="tpl-edit-modal" style="background:#fff;border-radius:12px;width:560px;max-height:calc(100vh - 60px);overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.15);font-family:Pretendard,sans-serif" onclick="event.stopPropagation()">';
+
+  // 헤더
+  h += '<div id="tpl-edit-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E5E7EB;cursor:move">';
+  h += '<h3 style="font-size:16px;font-weight:600;margin:0">' + (isNew ? '템플릿 추가' : '템플릿 편집') + '</h3>';
+  h += '<button onclick="document.getElementById(\'tpl-edit-overlay\').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#5A6070;padding:4px">✕</button>';
+  h += '</div>';
+
+  // 바디
+  h += '<div style="padding:20px">';
+
+  // 이름
+  h += '<div style="margin-bottom:14px"><label style="font-size:12px;font-weight:600;color:#5A6070;display:block;margin-bottom:4px">템플릿 이름</label>';
+  h += '<input type="text" id="tpl-name" value="' + (t.name || '').replace(/"/g, '&quot;') + '" placeholder="예: 재고있음 — 단가 포함" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box" autocomplete="off"></div>';
+
+  // 카테고리 + 뱃지 (2열)
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">';
+  // 카테고리
+  h += '<div><label style="font-size:12px;font-weight:600;color:#5A6070;display:block;margin-bottom:4px">카테고리</label>';
+  h += '<select id="tpl-category" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;background:#fff">';
+  var catOptions = [['stock','재고/단가'],['shipping','직송'],['as_return','AS/반품'],['notice','공지'],['etc','기타']];
+  catOptions.forEach(function(o) {
+    var sel = (catKey === o[0] || _tplGetCategory(t) === o[1]) ? ' selected' : '';
+    h += '<option value="' + o[0] + '"' + sel + '>' + o[1] + '</option>';
+  });
+  h += '</select></div>';
+  // 뱃지
+  h += '<div><label style="font-size:12px;font-weight:600;color:#5A6070;display:block;margin-bottom:4px">뱃지</label>';
+  h += '<select id="tpl-badge" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;background:#fff">';
+  var badgeOptions = [['auto','자동'],['ai','AI'],['receipt','접수'],['human','사람'],['send','발송']];
+  badgeOptions.forEach(function(o) {
+    var sel = (badgeKey === o[0] || badgeKey === o[1]) ? ' selected' : '';
+    h += '<option value="' + o[0] + '"' + sel + '>' + o[1] + '</option>';
+  });
+  h += '</select></div>';
+  h += '</div>';
+
+  // 내용
+  h += '<div style="margin-bottom:8px"><label style="font-size:12px;font-weight:600;color:#5A6070;display:block;margin-bottom:4px">내용</label>';
+  h += '<textarea id="tpl-content" rows="4" placeholder="응답 메시지를 입력하세요. {변수명}으로 변수를 사용할 수 있습니다." style="width:100%;border:1px solid #DDE1EB;border-radius:6px;padding:10px;font-size:13px;font-family:Pretendard,sans-serif;resize:vertical;box-sizing:border-box;line-height:1.6" oninput="_tplUpdatePreview()">' + (t.content || '') + '</textarea></div>';
+
+  // 변수 pill 버튼
+  h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';
+  _KAKAO_TPL_VARIABLES.forEach(function(v) {
+    h += '<button class="tpl-var-pill" onclick="_tplInsertVar(\'' + v + '\')" style="padding:3px 10px;font-size:11px;font-weight:500;border:1px solid #185FA5;color:#185FA5;background:#E6F1FB;border-radius:12px;cursor:pointer;font-family:Pretendard,sans-serif">{' + v + '}</button>';
+  });
+  h += '</div>';
+
+  // 미리보기
+  h += '<div style="margin-bottom:4px"><label style="font-size:12px;font-weight:600;color:#5A6070;display:block;margin-bottom:4px">미리보기</label>';
+  h += '<div id="tpl-preview" style="min-height:40px;border-left:3px solid #185FA5;background:#F7F8FA;padding:10px 12px;border-radius:0 6px 6px 0;font-size:13px;color:#3A3F4B;line-height:1.6;white-space:pre-wrap"></div>';
+  h += '</div>';
+
+  h += '</div>'; // body
+
+  // 푸터
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-top:1px solid #E5E7EB">';
+  if (!isNew) {
+    h += '<button onclick="_deleteTemplate(' + idx + ')" style="font-size:13px;font-weight:600;padding:8px 16px;border-radius:6px;border:none;background:#CC2222;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif">삭제</button>';
+  } else {
+    h += '<div></div>';
+  }
+  h += '<div style="display:flex;gap:8px">';
+  h += '<button onclick="document.getElementById(\'tpl-edit-overlay\').remove()" style="font-size:13px;font-weight:600;padding:8px 16px;border-radius:6px;border:1px solid #185FA5;background:transparent;color:#185FA5;cursor:pointer;font-family:Pretendard,sans-serif">취소</button>';
+  h += '<button onclick="_saveTemplateFromPopup(' + idx + ')" style="font-size:13px;font-weight:600;padding:8px 16px;border-radius:6px;border:none;background:#185FA5;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif">저장</button>';
+  h += '</div>';
+  h += '</div>';
+
+  h += '</div>'; // modal
+
+  overlay.innerHTML = h;
+  document.body.appendChild(overlay);
+
+  // 드래그
+  var modal = document.getElementById('tpl-edit-modal');
+  var header = document.getElementById('tpl-edit-header');
+  if (modal && header) _makeDraggable(modal, header);
+
+  // ESC 닫기
+  var escHandler = function(e) {
+    if (e.key === 'Escape') {
+      var ov = document.getElementById('tpl-edit-overlay');
+      if (ov) ov.remove();
+      document.removeEventListener('keydown', escHandler);
+    }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  // 초기 미리보기
+  _tplUpdatePreview();
+}
+
+// 변수 pill 클릭 → textarea 커서 위치에 삽입
+function _tplInsertVar(varName) {
+  var ta = document.getElementById('tpl-content');
+  if (!ta) return;
+  var start = ta.selectionStart;
+  var end = ta.selectionEnd;
+  var text = ta.value;
+  var insert = '{' + varName + '}';
+  ta.value = text.substring(0, start) + insert + text.substring(end);
+  ta.selectionStart = ta.selectionEnd = start + insert.length;
+  ta.focus();
+  _tplUpdatePreview();
+}
+
+// 미리보기 실시간 갱신
+function _tplUpdatePreview() {
+  var ta = document.getElementById('tpl-content');
+  var preview = document.getElementById('tpl-preview');
+  if (!ta || !preview) return;
+  var text = ta.value || '';
+  // {변수} 파란색 bold
+  var html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\{([^}]+)\}/g, '<span style="color:#185FA5;font-weight:600">{$1}</span>')
+    .replace(/\n/g, '<br>');
+  preview.innerHTML = html || '<span style="color:#9BA3B2">미리보기가 여기에 표시됩니다</span>';
+}
+
+// 저장
+function _saveTemplateFromPopup(idx) {
+  var nameEl = document.getElementById('tpl-name');
+  var catEl = document.getElementById('tpl-category');
+  var badgeEl = document.getElementById('tpl-badge');
+  var contentEl = document.getElementById('tpl-content');
+  if (!nameEl || !contentEl) return;
+
+  var name = nameEl.value.trim();
+  var content = contentEl.value.trim();
+  if (!name) { alert('템플릿 이름을 입력하세요.'); nameEl.focus(); return; }
+  if (!content) { alert('내용을 입력하세요.'); contentEl.focus(); return; }
+
+  // {변수} 자동 추출
+  var vars = [];
+  var re = /\{([^}]+)\}/g, m;
+  while ((m = re.exec(content)) !== null) { if (vars.indexOf(m[1]) === -1) vars.push(m[1]); }
+
+  var rawData = localStorage.getItem('mw_bot_templates') || '[]';
+  var parsed = JSON.parse(rawData);
+  var isArrayFormat = Array.isArray(parsed);
+  var templates = isArrayFormat ? parsed : (parsed.templates || []);
+
+  var now = new Date().toISOString();
+  var isNew = idx < 0;
+
+  if (isNew) {
+    templates.push({
+      id: 'tpl_' + Date.now(),
+      name: name,
+      category: catEl.value,
+      badge: badgeEl.value,
+      content: content,
+      variables: vars,
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    });
+  } else {
+    templates[idx].name = name;
+    templates[idx].category = catEl.value;
+    templates[idx].badge = badgeEl.value;
+    templates[idx].content = content;
+    templates[idx].variables = vars;
+    templates[idx].updatedAt = now;
+  }
+
+  // 저장
+  if (isArrayFormat) { localStorage.setItem('mw_bot_templates', JSON.stringify(templates)); autoSyncToSupabase('mw_bot_templates'); }
+  else { parsed.templates = templates; save('mw_bot_templates', parsed); }
+
+  // 팝업 닫기 + 전체 갱신
+  var ov = document.getElementById('tpl-edit-overlay');
+  if (ov) ov.remove();
+  _rerenderTemplateTab();
+}
+
+// 삭제
+function _deleteTemplate(idx) {
+  if (!confirm('이 템플릿을 삭제하시겠습니까?')) return;
+
+  var rawData = localStorage.getItem('mw_bot_templates') || '[]';
+  var parsed = JSON.parse(rawData);
+  var isArrayFormat = Array.isArray(parsed);
+  var templates = isArrayFormat ? parsed : (parsed.templates || []);
+
+  templates.splice(idx, 1);
+
+  if (isArrayFormat) { localStorage.setItem('mw_bot_templates', JSON.stringify(templates)); autoSyncToSupabase('mw_bot_templates'); }
+  else { parsed.templates = templates; save('mw_bot_templates', parsed); }
+
+  var ov = document.getElementById('tpl-edit-overlay');
+  if (ov) ov.remove();
+  _rerenderTemplateTab();
+}
+
+// 템플릿 탭 전체 재렌더링
+function _rerenderTemplateTab() {
+  var container = document.getElementById('kakao-content-templates');
+  if (container) container.innerHTML = _buildKakaoTemplates();
 }
 
 // ========================================
