@@ -332,6 +332,12 @@ Leo팀장 또는 레오팀장이라고
 
 const STAFF_ROOM = '▣ DH ▣ 사무실';
 
+// ─── 직원 판별 ───
+const STAFF_SENDERS = ['다연아빠', "won'S", '지영'];
+function isStaff(sender: string): boolean {
+  return STAFF_SENDERS.includes(sender);
+}
+
 // ─── reply 헬퍼 ───
 function reply(r: string | null) { return NextResponse.json({ success: true, reply: r }); }
 
@@ -491,13 +497,18 @@ export async function POST(request: NextRequest) {
     console.log(`[bot] AI 응답: ${aiReply.substring(0, 100)}`);
     if (usage) console.log(`[bot] 토큰: in=${usage.input_tokens}, out=${usage.output_tokens}`);
 
+    // 비용 계산 (메시지 로그에서도 사용)
+    let msgCost = 0;
+    if (usage) {
+      const INPUT_PRICE_PER_M = 3;
+      const OUTPUT_PRICE_PER_M = 15;
+      msgCost = (usage.input_tokens / 1_000_000) * INPUT_PRICE_PER_M +
+                (usage.output_tokens / 1_000_000) * OUTPUT_PRICE_PER_M;
+    }
+
     // 비용 기록 (NO_REPLY 포함 모든 API 호출)
     try {
       if (usage) {
-        const INPUT_PRICE_PER_M = 3;
-        const OUTPUT_PRICE_PER_M = 15;
-        const cost = (usage.input_tokens / 1_000_000) * INPUT_PRICE_PER_M +
-                     (usage.output_tokens / 1_000_000) * OUTPUT_PRICE_PER_M;
 
         const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
         const { data: usageData } = await supabase
@@ -510,7 +521,7 @@ export async function POST(request: NextRequest) {
         if (!daily[today]) daily[today] = { inputTokens: 0, outputTokens: 0, cost: 0, count: 0 };
         daily[today].inputTokens += usage.input_tokens;
         daily[today].outputTokens += usage.output_tokens;
-        daily[today].cost += cost;
+        daily[today].cost += msgCost;
         daily[today].count += 1;
 
         // 365일 이전 데이터 정리
@@ -528,19 +539,73 @@ export async function POST(request: NextRequest) {
       console.error('[bot] 비용 기록 실패:', e);
     }
 
-    // 9. NO_REPLY 처리
-    if (aiReply === 'NO_REPLY' || aiReply.includes('NO_REPLY')) {
+    // 9. NO_REPLY / NEED_STAFF 판정
+    const isNoReply = aiReply === 'NO_REPLY' || aiReply.includes('NO_REPLY');
+    const needsStaff = aiReply.includes('##NEED_STAFF##');
+    const cleanReply = isNoReply ? null : aiReply.replace(/##NEED_STAFF##/g, '').trim();
+
+    // 10. 메시지 로그 저장 (mw_bot_messages)
+    try {
+      // 매칭된 제품 모델명 수집 (중복 제거)
+      const uniqueMatched = [...new Map(matchedProducts.map(p => [p.model, p])).values()];
+
+      const msgLog = {
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 3)}`,
+        room: room || '',
+        sender: sender || '거래처',
+        message: message || '',
+        timestamp: new Date().toISOString(),
+        type: isStaff(sender || '') ? 'staff' : 'incoming',
+        status: isNoReply ? 'no_reply' : (needsStaff ? 'need_staff' : 'bot_reply'),
+        botReply: cleanReply,
+        needStaff: needsStaff,
+        matchedProducts: uniqueMatched.map(p => p.model).slice(0, 5),
+        cost: Math.round(msgCost * 1_000_000) / 1_000_000, // 소수점 6자리
+      };
+
+      const { data: msgData } = await supabase
+        .from('app_data').select('value').eq('key', 'mw_bot_messages').single();
+
+      const current = (msgData?.value && typeof msgData.value === 'object')
+        ? msgData.value as { messages: Record<string, unknown>[] }
+        : { messages: [] };
+
+      if (!Array.isArray(current.messages)) current.messages = [];
+
+      // 최신이 앞
+      current.messages.unshift(msgLog);
+
+      // 30일 이전 메시지 정리
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      current.messages = current.messages.filter((m: Record<string, unknown>) =>
+        typeof m.timestamp === 'string' && m.timestamp > cutoff
+      );
+
+      // 최대 5000건 유지
+      if (current.messages.length > 5000) {
+        current.messages = current.messages.slice(0, 5000);
+      }
+
+      await supabase.from('app_data').upsert(
+        { key: 'mw_bot_messages', value: current, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+    } catch (e) {
+      console.error('[bot] 메시지 로그 저장 실패:', e);
+    }
+
+    // 11. NO_REPLY → 응답 없음
+    if (isNoReply) {
       return reply(null);
     }
 
-    // 10. ##NEED_STAFF## 태그 감지 → 제거 → 회사 단톡방 알림
-    const needsStaff = aiReply.includes('##NEED_STAFF##');
-    aiReply = aiReply.replace(/##NEED_STAFF##/g, '').trim();
+    // 12. ##NEED_STAFF## 태그 제거 후 aiReply 갱신
+    aiReply = cleanReply || '';
 
-    // 11. 봇 응답을 이력에 저장
+    // 13. 봇 응답을 이력에 저장
     await appendMessage(room, 'bot', aiReply);
 
-    // 12. 회사 단톡방 알림 발송
+    // 14. 회사 단톡방 알림 발송
     if (needsStaff) {
       const staffAlert = `⚠️ 확인 필요\n${roomInfo.customerName || room}\n${sender}: ${message}\n\n봇 응답: ${aiReply}`;
       try {
