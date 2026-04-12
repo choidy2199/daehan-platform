@@ -137,10 +137,40 @@ function toggleDarkMode() {
       var sb = document.getElementById('sidebar');
       if (sb) { sb.classList.remove('expanded'); sb.classList.add('collapsed'); }
     }
-    // 사이드바 메뉴 우클릭 → 즐겨찾기 등록/해제
+    // 사이드바 메뉴 우클릭 + 별 상태 초기화
     _bindSidebarContextMenu();
+    // 즐겨찾기 별 상태는 로그인 후 _loadFavoritesSlots가 준비된 뒤에 실행
+    setTimeout(function() { if (typeof _refreshSidebarFavStars === 'function') _refreshSidebarFavStars(); }, 500);
   });
 })();
+
+// ── 사이드바 즐겨찾기 별 토글 ──
+function _toggleSidebarFav(windowName) {
+  if (typeof _loadFavoritesSlots !== 'function') return;
+  var slots = _loadFavoritesSlots();
+  var idx = slots.indexOf(windowName);
+  if (idx >= 0) {
+    slots[idx] = null;
+  } else {
+    var emptyIdx = slots.indexOf(null);
+    if (emptyIdx >= 0) slots[emptyIdx] = windowName;
+    else slots.push(windowName);
+  }
+  _saveFavorites(slots);
+  if (typeof renderDesktop === 'function') renderDesktop();
+  _refreshSidebarFavStars();
+}
+
+function _refreshSidebarFavStars() {
+  if (typeof _loadFavoritesSlots !== 'function') return;
+  var slots = _loadFavoritesSlots();
+  document.querySelectorAll('.sidebar-fav-btn').forEach(function(btn) {
+    var parent = btn.closest('[data-window]');
+    if (!parent) return;
+    var name = parent.getAttribute('data-window');
+    btn.classList.toggle('active', slots.indexOf(name) >= 0);
+  });
+}
 
 function _bindSidebarContextMenu() {
   // 서브 아이템 우클릭
@@ -1730,6 +1760,8 @@ function renderDesktop() {
 
     grid.appendChild(slot);
   });
+  // 사이드바 별 상태 동기화
+  if (typeof _refreshSidebarFavStars === 'function') _refreshSidebarFavStars();
 }
 
 // 탭바 도트 색상

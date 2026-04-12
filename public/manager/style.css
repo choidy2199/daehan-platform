@@ -108,6 +108,16 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 .chrome-bar-btn { width:28px; height:28px; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer; color:var(--dm-text-secondary); border-radius:6px; transition:background 0.12s; position:relative; }
 .chrome-bar-btn:hover { background:rgba(0,0,0,0.06); }
 .chrome-bar-dot { position:absolute; top:4px; right:4px; width:6px; height:6px; border-radius:50%; background:#E8344E; display:none; }
+.chrome-bar-badge { padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; font-family:'Pretendard',sans-serif; border:none; cursor:pointer; white-space:nowrap; background:rgba(255,255,255,0.12); color:rgba(255,255,255,0.8); margin-bottom:4px; }
+.chrome-bar-badge:hover { background:rgba(255,255,255,0.2); color:#fff; }
+
+/* 사이드바 즐겨찾기 별 */
+.sidebar-fav-btn { margin-left:auto; background:transparent; border:none; cursor:pointer; font-size:12px; padding:2px 4px; border-radius:4px; line-height:1; opacity:0; transition:opacity 0.15s; color:#ccc; flex-shrink:0; }
+.sidebar-sub-item:hover .sidebar-fav-btn, .sidebar-single:hover .sidebar-fav-btn { opacity:1; }
+.sidebar-fav-btn.active { opacity:1; color:#EF9F27; }
+.sidebar.collapsed .sidebar-fav-btn { display:none; }
+.sidebar-sub-item { display:flex; align-items:center; }
+.sidebar-single { position:relative; }
 
 /* ===== CONTENT AREA ===== */
 .content-area { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; background:#F4F6FA; color:#1A1D23; }
