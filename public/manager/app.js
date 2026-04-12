@@ -16050,24 +16050,23 @@ function _buildNewDashboard() {
 
   // 좌: 최근 대화
   html += '<div class="bot-section">';
-  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">최근 대화</span>';
-  html += '<a href="javascript:void(0)" onclick="_openChatLogPopup()" style="font-size:12px;color:#185FA5;text-decoration:none">전체보기 →</a></div>';
+  html += '<div class="bot-section-hdr"><span>최근 대화</span>';
+  html += '<a href="javascript:void(0)" onclick="_openChatLogPopup()" style="color:#85B7EB;font-size:11px;text-decoration:none;cursor:pointer">전체보기 →</a></div>';
   html += '<div id="bot-dash-recent" class="bot-section-body">';
   html += _buildDashRecentTable();
   html += '</div></div>';
 
   // 중: 미응답 건
   html += '<div class="bot-section">';
-  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">미응답 건</span>';
-  html += '<span id="bot-unresolved-badge" class="bot-unresolve-badge">0</span></div>';
+  html += '<div class="bot-section-hdr"><span>미응답 건 <span id="bot-unresolved-badge" style="background:#E24B4A;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px">0</span></span></div>';
   html += '<div id="bot-dash-unresolved" class="bot-section-body">';
   html += _buildDashUnresolvedCards();
   html += '</div></div>';
 
   // 우: 활성 톡방 현황
   html += '<div class="bot-section">';
-  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">활성 톡방 현황</span>';
-  html += '<a href="javascript:void(0)" onclick="switchKakaoSubTab(\'kakao-settings\')" style="font-size:12px;color:#185FA5;text-decoration:none">톡방관리 →</a></div>';
+  html += '<div class="bot-section-hdr"><span>활성 톡방 현황</span>';
+  html += '<a href="javascript:void(0)" onclick="switchKakaoSubTab(\'kakao-settings\')" style="color:#85B7EB;font-size:11px;text-decoration:none;cursor:pointer">톡방관리 →</a></div>';
   html += '<div class="bot-section-body">';
   html += _buildDashRoomSummary();
   html += '</div></div>';
@@ -16117,9 +16116,10 @@ function _buildNewSettings() {
   var html = '';
 
   // ═══ 1행: 톡방 — 거래처 매핑 (3열) ═══
-  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
+  html += '<div style="background:#fff;border:0.5px solid #e0e0e0;border-radius:10px;overflow:hidden;margin-bottom:16px">';
+  html += '<div style="background:#1A1D23;color:#fff;padding:10px 16px;font-size:13px;font-weight:500;display:flex;justify-content:space-between;align-items:center">';
   html += '<span>톡방 — 거래처 매핑</span>';
-  html += '<button class="kakao-btn-sm" onclick="openBotRoomPopup()">+ 톡방 추가</button>';
+  html += '<a style="color:#85B7EB;font-size:11px;cursor:pointer" onclick="openBotRoomPopup()">+ 톡방 추가</a>';
   html += '</div>';
 
   // 유형별 분류
@@ -16156,6 +16156,7 @@ function _buildNewSettings() {
   html += '</div></div>';
 
   html += '</div>'; // .room-3col
+  html += '</div>'; // 톡방 카드
 
   // ═══ 2행: 응답 템플릿 (5열 그리드) ═══
   _initKakaoTemplates();
@@ -16163,9 +16164,10 @@ function _buildNewSettings() {
   var parsed = JSON.parse(rawData);
   var templates = Array.isArray(parsed) ? parsed : (parsed.templates || []);
 
-  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0;margin-top:16px">';
+  html += '<div style="background:#fff;border:0.5px solid #e0e0e0;border-radius:10px;overflow:hidden">';
+  html += '<div style="background:#1A1D23;color:#fff;padding:10px 16px;font-size:13px;font-weight:500;display:flex;justify-content:space-between;align-items:center">';
   html += '<span>응답 템플릿</span>';
-  html += '<button class="kakao-btn-sm" onclick="_openTemplatePopup(-1)">+ 템플릿 추가</button>';
+  html += '<a style="color:#85B7EB;font-size:11px;cursor:pointer" onclick="_openTemplatePopup(-1)">+ 템플릿 추가</a>';
   html += '</div>';
 
   // 카테고리 필터
@@ -16178,7 +16180,7 @@ function _buildNewSettings() {
   });
   catCounts['전체'] = templates.length;
 
-  html += '<div style="display:flex;gap:6px;padding:12px 16px;background:#fff;border-left:1px solid #E2E5EB;border-right:1px solid #E2E5EB;flex-wrap:wrap">';
+  html += '<div style="display:flex;gap:6px;padding:12px 16px;background:#fff;flex-wrap:wrap">';
   _KAKAO_TEMPLATE_CATEGORIES.forEach(function(cat, i) {
     var isActive = i === 0;
     html += '<button class="kakao-tpl-cat-btn' + (isActive ? ' kakao-tpl-cat-active' : '') + '" data-cat="' + cat + '" onclick="_filterKakaoTemplates(\'' + cat + '\')">';
@@ -16200,9 +16202,10 @@ function _buildNewSettings() {
 
   // 하단 요약
   var activeCount = templates.filter(function(t) { return t.active !== false; }).length;
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:12px;color:#5A6070;border:1px solid #E2E5EB;border-top:none;border-radius:0 0 8px 8px;background:#fff">';
-  html += '<span>총 ' + templates.length + '개 템플릿 · 활성 ' + activeCount + '개</span>';
+  html += '<div style="padding:10px 16px;font-size:11px;color:#5A6070;border-top:0.5px solid #e0e0e0">';
+  html += '총 ' + templates.length + '개 템플릿 · 활성 ' + activeCount + '개';
   html += '</div>';
+  html += '</div>'; // 템플릿 카드
 
   return html;
 }
@@ -17000,12 +17003,11 @@ function _buildKakaoBroadcast() {
   var html = '';
 
   // ── A. 헤더 ──
-  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
-  html += '<span>공지 일괄발송</span>';
-  html += '</div>';
+  html += '<div style="background:#fff;border:0.5px solid #e0e0e0;border-radius:10px;overflow:hidden;margin-bottom:16px">';
+  html += '<div style="background:#1A1D23;color:#fff;padding:10px 16px;font-size:13px;font-weight:500">공지 일괄발송</div>';
 
   // ── B. 좌우 2열 ──
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;background:#fff;border:1px solid #E2E5EB;border-top:none">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">';
 
   // 좌측: 공지 내용
   html += '<div style="padding:16px;border-right:1px solid #E2E5EB">';
@@ -17054,18 +17056,18 @@ function _buildKakaoBroadcast() {
   html += '</div>'; // grid
 
   // ── C. 하단 버튼 ──
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #E2E5EB;border-top:none;border-radius:0 0 8px 8px;padding:12px 16px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:0.5px solid #e0e0e0">';
   html += '<span style="font-size:11px;color:#9BA3B2;font-family:Pretendard,sans-serif">발송 후 취소 불가</span>';
   html += '<div style="display:flex;gap:8px">';
   html += '<button onclick="alert(\'임시저장 — 추후 구현\')" style="background:#fff;color:#5A6070;border:1px solid #D1D5DB;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">임시저장</button>';
   html += '<button id="bc-send-btn" onclick="alert(\'공지발송 — 추후 구현\')" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">' + activeRooms.length + '개 톡방에 발송</button>';
   html += '</div></div>';
+  html += '</div>'; // 공지 카드 닫기
 
   // ── D. 발송 이력 ──
-  html += '<div style="margin-top:16px">';
-  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
-  html += '<span>발송 이력</span></div>';
-  html += '<div class="kakao-section" style="border-radius:0 0 8px 8px;border-top:none"><div class="kakao-section-body">';
+  html += '<div style="background:#fff;border:0.5px solid #e0e0e0;border-radius:10px;overflow:hidden">';
+  html += '<div style="background:#1A1D23;color:#fff;padding:10px 16px;font-size:13px;font-weight:500">발송 이력</div>';
+  html += '<div style="padding:0">';
   html += '<table class="kakao-table"><thead><tr>';
   html += '<th style="width:110px">날짜</th><th>내용</th><th style="width:80px">첨부</th><th style="width:100px">대상</th><th style="width:80px;text-align:center">결과</th>';
   html += '</tr></thead><tbody>';
@@ -17087,7 +17089,7 @@ function _buildKakaoBroadcast() {
     });
   }
 
-  html += '</tbody></table></div></div></div>';
+  html += '</tbody></table></div></div>';
 
   return html;
 }
@@ -17198,78 +17200,82 @@ function _buildKakaoTracking() {
 
   var html = '';
 
-  // ── ① 상단: 입력 폼 ──
-  html += '<div style="background:#F8F9FA;padding:20px;border:1px solid #E5E7EB;border-radius:8px 8px 0 0">';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
-  html += '<span style="font-size:14px;font-weight:600;color:#1A1D23">송장 입력</span>';
-  html += '<span style="font-size:12px;color:#9BA3B2">저장 후 카톡 전송 가능</span>';
-  html += '</div>';
+  // ── ① 좌우 분할: 송장 입력 + 미리보기 ──
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
+
+  // 좌: 송장 입력 폼
+  html += '<div style="background:#fff;border:0.5px solid #e0e0e0;border-radius:10px;overflow:hidden">';
+  html += '<div style="background:#1A1D23;color:#fff;padding:10px 16px;font-size:13px;font-weight:500;display:flex;justify-content:space-between;align-items:center">';
+  html += '<span>송장 입력</span><span style="color:#85B7EB;font-size:11px">저장 후 카톡 전송 가능</span></div>';
+  html += '<div style="padding:16px">';
 
   // 1행: 거래처 + 택배사 + 수령인
   html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">';
   html += '<div><label class="bot-form-label">거래처(톡방) <span style="color:#CC2222">*</span></label>';
-  html += '<select id="kt-room" class="bot-form-input">';
+  html += '<select id="kt-room" class="bot-form-input" onchange="_ktUpdatePreview()">';
   html += '<option value="">톡방 선택...</option>';
   mappedRooms.forEach(function(r) {
     var label = (r.roomName || '') + (r.customerName ? ' (' + r.customerName + ')' : '');
     html += '<option value="' + (r.roomId || r.roomName || '') + '" data-name="' + (r.roomName || '').replace(/"/g,'&quot;') + '">' + label + '</option>';
   });
   html += '</select></div>';
-
   html += '<div><label class="bot-form-label">택배사 <span style="color:#CC2222">*</span></label>';
-  html += '<select id="kt-carrier" class="bot-form-input">';
+  html += '<select id="kt-carrier" class="bot-form-input" onchange="_ktUpdatePreview()">';
   html += '<option value="">택배사 선택...</option>';
   _KAKAO_CARRIERS.forEach(function(c) { html += '<option value="' + c + '">' + c + '</option>'; });
   html += '</select></div>';
-
   html += '<div><label class="bot-form-label">수령인 <span style="color:#CC2222">*</span></label>';
-  html += '<input id="kt-receiver" type="text" placeholder="수령인명" class="bot-form-input" autocomplete="off"></div>';
+  html += '<input id="kt-receiver" type="text" placeholder="수령인명" class="bot-form-input" autocomplete="off" oninput="_ktUpdatePreview()"></div>';
   html += '</div>';
 
   // 2행: 송장번호 + 제품 + 비고
   html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">';
   html += '<div><label class="bot-form-label">송장번호 <span style="color:#CC2222">*</span></label>';
-  html += '<input id="kt-tracking" type="text" placeholder="송장번호" class="bot-form-input" autocomplete="off"></div>';
-
+  html += '<input id="kt-tracking" type="text" placeholder="송장번호" class="bot-form-input" autocomplete="off" oninput="_ktUpdatePreview()"></div>';
   html += '<div><label class="bot-form-label">제품 <span style="color:#9BA3B2">(선택)</span></label>';
-  html += '<input id="kt-product" type="text" placeholder="제품명" class="bot-form-input" autocomplete="off"></div>';
-
+  html += '<input id="kt-product" type="text" placeholder="제품명" class="bot-form-input" autocomplete="off" oninput="_ktUpdatePreview()"></div>';
   html += '<div><label class="bot-form-label">비고 <span style="color:#9BA3B2">(선택)</span></label>';
   html += '<input id="kt-memo" type="text" placeholder="비고" class="bot-form-input" autocomplete="off"></div>';
   html += '</div>';
 
-  // 에러 메시지 영역
   html += '<div id="kt-error-msg" style="font-size:12px;color:#CC2222;margin-top:8px;display:none">필수 항목을 입력하세요</div>';
-
-  // 버튼
   html += '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">';
   html += '<button onclick="_saveKtRecord(false)" style="height:36px;padding:0 16px;font-size:13px;font-weight:600;border:1px solid #D1D5DB;border-radius:6px;background:#F3F4F6;color:#1A1D23;cursor:pointer;font-family:Pretendard,sans-serif">저장</button>';
   html += '<button onclick="_saveKtRecord(true)" style="height:36px;padding:0 16px;font-size:13px;font-weight:600;border:none;border-radius:6px;background:#185FA5;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif">카톡 전송</button>';
   html += '</div>';
+  html += '</div></div>'; // padding + 좌측 카드
 
-  html += '</div>'; // 폼 끝
+  // 우: 카톡 전송 미리보기
+  html += '<div style="background:#fff;border:0.5px solid #e0e0e0;border-radius:10px;overflow:hidden">';
+  html += '<div style="background:#1A1D23;color:#fff;padding:10px 16px;font-size:13px;font-weight:500">카톡 전송 미리보기</div>';
+  html += '<div style="padding:20px">';
+  html += '<div id="kt-preview" style="background:#f7f7f5;border-radius:8px;padding:16px;font-size:13px;color:#999;line-height:1.8;min-height:100px">송장 정보를 입력하면 미리보기가 표시됩니다</div>';
+  html += '</div></div>';
 
-  // ── ② 중단: 이력 테이블 ──
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border:1px solid #E5E7EB;border-top:none">';
-  html += '<input type="text" id="kt-search" placeholder="수령인 또는 송장번호 검색..." style="width:280px;height:36px;border:1px solid #D1D5DB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box" autocomplete="off">';
-  html += '<span id="kt-count" style="font-size:12px;color:#5A6070">총 ' + records.length + '건</span>';
+  html += '</div>'; // grid 좌우 분할 끝
+
+  // ── ② 발송 이력 ──
+  html += '<div style="background:#fff;border:0.5px solid #e0e0e0;border-radius:10px;overflow:hidden">';
+  html += '<div style="background:#1A1D23;color:#fff;padding:10px 16px;font-size:13px;font-weight:500;display:flex;justify-content:space-between;align-items:center">';
+  html += '<span>발송 이력</span><span style="color:#85B7EB;font-size:11px" id="kt-count">총 ' + records.length + '건</span></div>';
+
+  html += '<div style="display:flex;align-items:center;padding:10px 16px;border-bottom:0.5px solid #e0e0e0">';
+  html += '<input type="text" id="kt-search" placeholder="수령인 또는 송장번호 검색..." style="width:280px;height:32px;border:1px solid #D1D5DB;border-radius:6px;padding:0 10px;font-size:12px;font-family:Pretendard,sans-serif;box-sizing:border-box" autocomplete="off">';
   html += '</div>';
 
-  html += '<div style="border:1px solid #E5E7EB;border-top:none;overflow:hidden">';
   html += '<div style="max-height:400px;overflow-y:auto">';
   html += '<table class="bot-dash-table" id="bot-tracking-table" style="table-layout:fixed"><thead><tr>';
   html += '<th style="width:120px">날짜</th><th style="width:110px">톡방</th><th style="width:90px">택배사</th><th style="width:80px">수령인</th><th style="width:150px">송장번호</th><th>제품</th><th style="width:60px">상태</th><th style="width:40px"></th>';
   html += '</tr></thead><tbody id="kt-tbody">';
   html += _buildKtRows(records);
   html += '</tbody></table>';
-  html += '</div></div>';
+  html += '</div>';
 
-  // ── ③ 하단: 요약 바 ──
   var saved = 0, sent = 0, failed = 0;
   records.forEach(function(r) { if (r.status === 'saved') saved++; else if (r.status === 'sent') sent++; else if (r.status === 'failed') failed++; });
-  html += '<div id="kt-summary" style="height:36px;display:flex;align-items:center;padding:0 16px;font-size:12px;color:#5A6070;background:#F8F9FA;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 8px 8px">';
+  html += '<div id="kt-summary" style="padding:8px 16px;font-size:11px;color:#5A6070;border-top:0.5px solid #e0e0e0">';
   html += '전체 ' + records.length + '건 | 저장 ' + saved + '건 | 전송 ' + sent + '건 | 실패 ' + failed + '건';
-  html += '</div>';
+  html += '</div></div>';
 
   return html;
 }
@@ -17443,6 +17449,24 @@ function _sendKakaoTracking() { _saveKtRecord(true); }
 function _filterKakaoTrackingHistory() { _ktDoSearch((document.getElementById('kt-search') || {}).value); }
 function _buildKakaoTrackingRow() { return ''; }
 
+function _ktUpdatePreview() {
+  var carrierEl = document.getElementById('kt-carrier');
+  var carrier = carrierEl ? (carrierEl.options[carrierEl.selectedIndex] ? carrierEl.options[carrierEl.selectedIndex].text : '') : '';
+  if (carrier === '택배사 선택...') carrier = '';
+  var receiver = (document.getElementById('kt-receiver') || {}).value || '';
+  var tracking = (document.getElementById('kt-tracking') || {}).value || '';
+  var product = (document.getElementById('kt-product') || {}).value || '';
+  var el = document.getElementById('kt-preview');
+  if (!el) return;
+  if (!receiver && !tracking) {
+    el.innerHTML = '송장 정보를 입력하면 미리보기가 표시됩니다';
+    el.style.color = '#999';
+    return;
+  }
+  el.style.color = '#333';
+  el.innerHTML = '📦 송장안내드립니다.<br>' + (carrier || '택배사') + ' ' + (tracking || '—') + '<br>' + (receiver || '—') + '님' + (product ? ' / ' + product : '');
+}
+
 // ========================================
 // 카카오톡 — 템플릿 탭
 // ========================================
@@ -17510,7 +17534,7 @@ function _buildKakaoTemplates() {
   });
   catCounts['전체'] = templates.length;
 
-  html += '<div style="display:flex;gap:6px;padding:12px 16px;background:#fff;border-left:1px solid #E2E5EB;border-right:1px solid #E2E5EB;flex-wrap:wrap">';
+  html += '<div style="display:flex;gap:6px;padding:12px 16px;background:#fff;flex-wrap:wrap">';
   _KAKAO_TEMPLATE_CATEGORIES.forEach(function(cat, i) {
     var isActive = i === 0;
     html += '<button class="kakao-tpl-cat-btn' + (isActive ? ' kakao-tpl-cat-active' : '') + '" data-cat="' + cat + '" onclick="_filterKakaoTemplates(\'' + cat + '\')">';

@@ -744,7 +744,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 
 /* KPI 카드 */
 .kakao-kpi-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1.8fr; gap:10px; margin-bottom:12px; align-items:stretch; }
-.kakao-kpi-card { background:#fff; border:1px solid #E2E5EB; border-radius:8px; padding:14px 16px; }
+.kakao-kpi-card { background:#fff; border:0.5px solid #e0e0e0; border-radius:10px; padding:14px 16px; }
 .kakao-kpi-label { font-size:12px; color:#5A6070; font-weight:500; margin-bottom:4px; }
 .kakao-kpi-value { font-size:22px; font-weight:700; margin-bottom:2px; }
 .kakao-kpi-sub { font-size:11px; color:#8B8FA3; }
@@ -784,7 +784,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .bot-status-right { display:flex; align-items:center; gap:4px; }
 
 .bot-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:12px; }
-.bot-kpi-card { background:#fff; border:1px solid #E5E7EB; border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; justify-content:space-between; }
+.bot-kpi-card { background:#fff; border:0.5px solid #e0e0e0; border-radius:10px; padding:14px 16px; display:flex; flex-direction:column; justify-content:space-between; }
 .bot-kpi-top { display:flex; align-items:center; justify-content:space-between; }
 .bot-kpi-label { font-size:12px; color:#6B7280; font-weight:500; }
 .bot-kpi-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:14px; background:#F4F6FA; border-radius:50%; }
@@ -799,7 +799,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .kakao-send-sub.active { background:#185FA5; color:#fff; font-weight:500; }
 
 /* 설정: 톡방 3열 */
-.room-3col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; border:1px solid #E2E5EB; border-top:none; border-radius:0 0 8px 8px; background:#fff; }
+.room-3col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; background:#fff; }
 .room-col { display:flex; flex-direction:column; min-height:200px; }
 .room-col-head { padding:10px 14px; font-size:12px; font-weight:600; color:#1A1D23; border-bottom:1px solid #E2E5EB; display:flex; align-items:center; gap:8px; background:#FAFBFC; }
 .room-col-body { flex:1; overflow-y:auto; max-height:320px; }
@@ -816,9 +816,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .type-badge-both { display:inline-flex; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; background:#EEEDFE; color:#3C3489; }
 
 /* 템플릿 5열 그리드 */
-.tpl-5-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:16px; background:#F7F8FA; border:1px solid #E2E5EB; border-top:none; }
-.bot-section { background:#fff; border:1px solid #E5E7EB; border-radius:8px; overflow:hidden; }
-.bot-section-hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid #E5E7EB; }
+.tpl-5-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:16px; background:#F7F8FA; }
+.bot-section { background:#fff; border:0.5px solid #e0e0e0; border-radius:10px; overflow:hidden; }
+.bot-section-hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:#1A1D23; color:#fff; font-size:13px; font-weight:500; }
 .bot-section-body { max-height:380px; overflow-y:auto; }
 
 .bot-dash-table { width:100%; border-collapse:collapse; font-family:'Pretendard',-apple-system,sans-serif; }
