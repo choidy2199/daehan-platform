@@ -18497,7 +18497,9 @@ function _renderNoticePanel() {
 
 function _openNoticeFromPanel(id) {
   openWindow('공지');
-  setTimeout(function() { _showNoticeDetail(id); }, 200);
+  setTimeout(function() {
+    requestAnimationFrame(function() { _showNoticeDetail(id); });
+  }, 500);
 }
 
 function _switchNoticePanelTab(tab) {
@@ -18691,7 +18693,10 @@ function _confirmNoticePopup() {
   _renderNoticePanel();
   if (latest.length > 0) {
     openWindow('공지');
-    setTimeout(function() { _showNoticeDetail(latest[0].id); }, 300);
+    // 목록 렌더링 완료 후 상세 표시 (rAF 2중 + 여유 시간)
+    setTimeout(function() {
+      requestAnimationFrame(function() { _showNoticeDetail(latest[0].id); });
+    }, 500);
   }
 }
 
