@@ -1848,15 +1848,22 @@ function _ieClose() {
 
 // ESC 키로 현재 창 닫기
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape' && _activeWindow) {
-    // 모달이 열려있으면 ESC 무시 (모달 자체 핸들러가 처리)
-    var modals = document.querySelectorAll('.modal-bg');
-    for (var i = 0; i < modals.length; i++) {
-      var s = modals[i].style.display;
-      if (s && s !== 'none') return;
-    }
-    closeWindow(_activeWindow);
+  if (e.key !== 'Escape') return;
+  // 모달이 열려있으면 최상위 모달 1개만 닫고 뒤 화면으로 전파 차단
+  var openModals = document.querySelectorAll('.modal-bg.show');
+  if (openModals.length > 0) {
+    openModals[openModals.length - 1].classList.remove('show');
+    e.stopPropagation();
+    e.preventDefault();
+    return;
   }
+  // 인라인 display로 열린 모달도 체크 (기존 호환)
+  var modals = document.querySelectorAll('.modal-bg');
+  for (var i = 0; i < modals.length; i++) {
+    var s = modals[i].style.display;
+    if (s && s !== 'none') return;
+  }
+  if (_activeWindow) closeWindow(_activeWindow);
 });
 
 // 윈도우 상태 localStorage 저장/복원
@@ -2600,8 +2607,8 @@ function renderCatalog() {
     var fragment = '';
     var end = Math.min(start + count, allRows.length);
     for (var i = start; i < end; i++) { fragment += buildRow(allRows[i]); }
-    // 마지막 배치 후 단종 품목 추가
-    if (end >= allRows.length && _catalogDiscontinued.length > 0 && start < allRows.length) {
+    // 마지막 배치 후 단종 품목 추가 (active가 비어있어도 첫 호출 시 단종 렌더링)
+    if (end >= allRows.length && _catalogDiscontinued.length > 0 && (allRows.length === 0 ? start === 0 : start < allRows.length)) {
       fragment += '<tr class="discontinued-divider"><td colspan="20">단종 품목 (' + _catalogDiscontinued.length + '건)</td></tr>';
       fragment += _catalogDiscontinued.slice(0, 200).map(buildRow).join('');
     }
