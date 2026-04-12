@@ -358,8 +358,39 @@ export async function POST(request: NextRequest) {
     }
 
     // 메시지 전체 매칭 (키워드와 별개로 전체 문장도 시도)
-    const fullResult = matchProduct(message, allProducts);
-    if (fullResult.matched) matchedProducts.push(...fullResult.products);
+    let fullMatchResult = matchProduct(message, allProducts);
+
+    // 매칭 실패 시 → 점진적 토큰 축소 재시도
+    if (!fullMatchResult.matched || fullMatchResult.count === 0) {
+      const retryStopwords = ['재고','있나요','있어','얼마','가격','단가','주문','보내','있습니까','알려주세요','확인','해주세요','부탁','합니다','주세요','몇개','몇대','문의','드립니다','요','좀','개','원','넣어','보내주세요','주세요','있어요','없나요','세트','베어','본체','세트로','알몸'];
+      const words = message.match(/[A-Za-z0-9][\w-]*|[가-힣]{2,}/g) || [];
+      const filtered = words.filter((w: string) => !retryStopwords.includes(w) && w.length >= 2);
+
+      // 토큰을 하나씩 줄여가며 재시도 (뒤에서부터 제거)
+      for (let len = filtered.length - 1; len >= 1; len--) {
+        const partial = filtered.slice(0, len).join(' ');
+        const result = matchProduct(partial, allProducts);
+        if (result.matched && result.count > 0) {
+          fullMatchResult = result;
+          console.log(`[bot] 토큰 축소 매칭 성공: "${partial}" → ${result.count}건`);
+          break;
+        }
+      }
+
+      // 그래도 실패하면 개별 토큰으로 각각 시도
+      if (!fullMatchResult.matched || fullMatchResult.count === 0) {
+        for (const word of filtered) {
+          const result = matchProduct(word, allProducts);
+          if (result.matched && result.count > 0 && result.count <= 20) {
+            fullMatchResult = result;
+            console.log(`[bot] 단일 토큰 매칭 성공: "${word}" → ${result.count}건`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (fullMatchResult.matched) matchedProducts.push(...fullMatchResult.products);
 
     if (matchedProducts.length > 0) {
       // 중복 제거 (model 기준)
