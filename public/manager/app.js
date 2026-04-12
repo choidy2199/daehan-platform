@@ -17375,8 +17375,16 @@ function renderNoticeTab() {
   _noticeDetailId = null;
   _noticeEditId = null;
   if (_noticesCache && _noticesCache.length > 0) {
+    // 캐시 즉시 렌더링 (로딩 없음)
     _noticesData = _noticesCache;
     _renderNoticeList(container);
+    // 백그라운드 갱신 — 변경 있으면 조용히 재렌더링
+    _fetchNotices().then(function() {
+      if (_noticeView === 'list') {
+        var c2 = document.getElementById('tab-notice');
+        if (c2) _renderNoticeList(c2);
+      }
+    });
   } else {
     container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px">불러오는 중...</div>';
     _fetchNotices().then(function() { _renderNoticeList(container); });
