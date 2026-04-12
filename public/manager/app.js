@@ -17621,13 +17621,15 @@ function renderNoticeTab() {
   _noticeView = 'list';
   _noticeDetailId = null;
   _noticeEditId = null;
-  if (_noticesCache && _noticesCache.length > 0) {
+  if (_noticesCache) {
     // 캐시 즉시 렌더링 (로딩 없음)
     _noticesData = _noticesCache;
     _renderNoticeList(container);
     // 백그라운드 갱신 — 변경 있으면 조용히 재렌더링
+    var prevLen = _noticesData.length;
+    var prevFirst = _noticesData[0] ? _noticesData[0].id : null;
     _fetchNotices().then(function() {
-      if (_noticeView === 'list') {
+      if (_noticeView === 'list' && (_noticesData.length !== prevLen || (_noticesData[0] && _noticesData[0].id !== prevFirst))) {
         var c2 = document.getElementById('tab-notice');
         if (c2) _renderNoticeList(c2);
       }
