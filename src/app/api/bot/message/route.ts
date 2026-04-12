@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
-  matchProduct, filterByHint, labelProduct,
-  formatProductResponse, formatConfirmationQuestion, formatPriceResponse, formatStockResponse, formatCandidateList,
-  type Product, type MatchResult, type MatchedProduct,
+  matchProduct,
+  type Product, type MatchedProduct,
 } from '../../../../lib/botMatcher';
 
 export const maxDuration = 60;
@@ -75,131 +74,146 @@ async function getAllProducts(): Promise<Product[]> {
   return all;
 }
 
-// ─── AI 메시지 분석 ───
+// ─── 대화 이력 관리 ───
 
-interface ProductHint { keyword: string; hint: string; }
-interface AnalysisResult {
-  intent: string;
-  products: ProductHint[];
-  needsClarification: boolean;
-  clarificationMessage: string;
-  directReply: string;
+interface ChatMessage {
+  sender: string;
+  text: string;
+  ts: number;
 }
 
-const ANALYSIS_SYSTEM = `당신은 공구 유통회사 "대한종합상사"의 카카오톡 메시지 분석기입니다.
-거래처에서 온 메시지를 분석하여 반드시 JSON만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
-
-[취급 제품]
-- 밀워키(Milwaukee) 전동공구: M18, M12 시리즈 (FID=임팩트드라이버, FPD=해머드릴, CAG=그라인더, CHX=해머, FHIW=임팩트렌치, FCS=원형톱, FCVS=진공청소기 등)
-- 콜라보 콤프레샤: DC661, DC886, DC998 등
-- 비트맨 공구
-- 각종 수공구, 액세서리, 팩아웃(PACKOUT)
-
-[분석 규칙]
-- 제품 모델명이 불완전해도 추출 (예: "m12 fid" → "M12 FID", "콤프레샤 4마력" → "콤프레샤 4마력")
-- 한 메시지에 제품 여러 개면 모두 추출
-- 제품별 힌트 추출: "세트"/"풀세트"/"세트로" → hint:"set", "베어"/"본체"/"본체만"/"알몸" → hint:"bare", 없으면 hint:""
-- 전체에 동일 힌트면 각 제품에 적용 ("m12 fid2 m12 fpd2 세트" → 둘 다 hint:"set")
-- 가격/단가/재고/견적/얼마 → "product_inquiry"
-- 인사("안녕하세요","수고하세요","좋은아침") → "greeting"
-- 감사("감사합니다","고맙습니다","ㄱㅅ") → "thanks"
-- 퇴장("수고하세요","들어갑니다") → "bye"
-- 자기소개 질문("누구세요?","누구야") → "self_intro"
-- AS/반품/교환/수리 → "as_return"
-- 가격협상/할인/네고 → "price_negotiation"
-- 직송 요청(이름+전화+주소+제품) → "direct_ship"
-- "부탁드립니다"/"주문할게요"/"보내주세요"/"넣어주세요"/"이걸로"/"발주" → "order_request"
-- "네"/"맞아요"/"ㅇㅇ"/"넵"/"맞습니다" → "confirm_yes"
-- "아니요"/"아닌데"/"다른거"/"아닙니다" → "confirm_no"
-- 의미 파악 어려우면 needsClarification=true
-- "???" 같은 의미없는 메시지 → "unknown", directReply:""
-- 개인적 질문 → "unknown", directReply:"업무 관련 문의사항 있으시면 말씀해주세요!"
-
-응답 JSON:
-{"intent":"product_inquiry","products":[{"keyword":"M12 FID2","hint":"set"},{"keyword":"M12 FPD2","hint":"set"}],"needsClarification":false,"clarificationMessage":"","directReply":""}`;
-
-async function analyzeMessage(message: string): Promise<AnalysisResult | null> {
-  if (!ANTHROPIC_API_KEY) return null;
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 250, system: ANALYSIS_SYSTEM, messages: [{ role: 'user', content: message }] }),
-    });
-    if (!res.ok) { console.error(`[bot] AI 분석 ${res.status}`); return null; }
-    const data = await res.json();
-    const text = data.content?.[0]?.text?.trim() || '';
-    const jsonStr = text.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim();
-    const parsed = JSON.parse(jsonStr);
-    // 하위 호환: products가 문자열 배열이면 객체로 변환
-    if (Array.isArray(parsed.products) && parsed.products.length > 0 && typeof parsed.products[0] === 'string') {
-      parsed.products = parsed.products.map((kw: string) => ({ keyword: kw, hint: '' }));
-    }
-    return parsed as AnalysisResult;
-  } catch (err) { console.error('[bot] AI 분석 에러:', err); return null; }
+interface ChatHistory {
+  messages: ChatMessage[];
 }
 
-// ─── AI 선택 판별 ───
+const MSG_TTL = 30 * 60 * 1000; // 30분
+const MAX_MESSAGES = 20;
 
-async function askClaudeForSelection(products: string[], message: string): Promise<number> {
-  if (!ANTHROPIC_API_KEY) return 0;
-  const productList = products.map((code, i) => { const l = labelProduct(code); return `${i + 1}. ${code}${l ? ` — ${l}` : ''}`; }).join('\n');
-  const prompt = `전동공구 유통업체 카카오톡 대화입니다.\n봇이 아래 제품 목록을 보여줬고, 고객이 답장했습니다.\n\n제품 목록:\n${productList}\n\n고객 답장: "${message}"\n\n고객이 몇 번 제품을 원하는지 번호만 답하세요. 판단 불가능하면 0.\n숫자 하나만 답하세요.`;
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: prompt }] }),
-    });
-    if (!res.ok) return 0;
-    const data = await res.json();
-    const num = parseInt(data.content?.[0]?.text?.trim() || '0', 10);
-    return isNaN(num) ? 0 : num;
-  } catch { return 0; }
+async function getHistory(room: string): Promise<ChatMessage[]> {
+  const { data } = await supabase.from('bot_room_context').select('products').eq('room', room).single();
+  if (!data?.products || typeof data.products !== 'object') return [];
+  const hist = data.products as ChatHistory;
+  if (!Array.isArray(hist.messages)) return [];
+  const now = Date.now();
+  return hist.messages.filter(m => now - m.ts < MSG_TTL);
 }
 
-// ─── 맥락 관리 (확장: status + confirmedProducts) ───
-
-interface ContextData {
-  room: string;
-  products: unknown; // JSONB — 유연한 구조
-  updated_at: string;
-}
-
-interface BotContext {
-  status?: string; // "awaiting_confirmation" | "price_given" | undefined (선택 대기)
-  confirmedProducts?: MatchedProduct[];
-  candidates?: string[]; // 기존 호환: 선택 대기 후보 모델명
-}
-
-async function getContext(room: string): Promise<BotContext | null> {
-  const { data } = await supabase.from('bot_room_context').select('*').eq('room', room).single();
-  if (!data) return null;
-  if (Date.now() - new Date(data.updated_at).getTime() > 5 * 60 * 1000) return null;
-  // products가 배열이면 기존 형식 (선택 대기), 객체면 새 형식
-  const p = (data as ContextData).products;
-  if (Array.isArray(p)) return { candidates: p as string[] };
-  if (p && typeof p === 'object') return p as BotContext;
-  return null;
-}
-
-async function saveCtx(room: string, ctx: BotContext): Promise<void> {
+async function appendMessage(room: string, sender: string, text: string): Promise<void> {
+  const existing = await getHistory(room);
+  existing.push({ sender, text, ts: Date.now() });
+  // 최대 20개 유지
+  const trimmed = existing.length > MAX_MESSAGES ? existing.slice(existing.length - MAX_MESSAGES) : existing;
+  const payload: ChatHistory = { messages: trimmed };
   await supabase.from('bot_room_context').upsert(
-    { room, products: ctx, updated_at: new Date().toISOString() },
+    { room, products: payload, updated_at: new Date().toISOString() },
     { onConflict: 'room' }
   );
 }
 
-async function deleteCtx(room: string): Promise<void> {
-  await supabase.from('bot_room_context').delete().eq('room', room);
+// ─── 톡방 정보 ───
+
+async function getRoomInfo(room: string): Promise<{ customerName: string; manager: string }> {
+  try {
+    const { data } = await supabase.from('app_data').select('value').eq('key', 'mw_bot_rooms').single();
+    if (data?.value && Array.isArray(data.value)) {
+      const found = data.value.find((r: { room?: string }) => r.room === room);
+      if (found) return { customerName: found.customerName || '', manager: found.manager || '' };
+    }
+  } catch (e) { console.error('[bot] 톡방 정보 조회 실패:', e); }
+  return { customerName: '', manager: '' };
 }
 
-// ─── 시간대별 인사 ───
+// ─── 제품 키워드 감지 (정규식) ───
 
-function getGreeting(persona: Persona): string {
-  const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' })).getHours();
-  return hour < 12 ? (persona.morningGreeting || persona.greetingReply) : (persona.eveningGreeting || persona.greetingReply);
+function detectProductKeywords(message: string): string[] {
+  const patterns = [
+    /M18\s*[A-Z]{2,}/gi,
+    /M12\s*[A-Z]{2,}/gi,
+    /\d{4}-\d{2}-\d{4}/g,
+    /DC\s*\d{3,4}/gi,
+    /FID\d?/gi, /FPD\d?/gi, /FPP\d?/gi, /CAG\d?/gi, /CHX\d?/gi,
+    /FHIW\d?/gi, /FCS\d?/gi, /FCVS\d?/gi,
+    /PACKOUT/gi, /팩아웃/g,
+    /임팩/g, /그라인더/g, /해머드릴/g, /콤프레샤/g, /원형톱/g,
+  ];
+  const found: string[] = [];
+  for (const p of patterns) {
+    const matches = message.match(p);
+    if (matches) found.push(...matches);
+  }
+  return [...new Set(found)];
 }
+
+// ─── 제품 데이터 포맷 (시스템 프롬프트용) ───
+
+function formatProductDataForPrompt(products: MatchedProduct[], allRaw: Product[]): string {
+  return products.map(p => {
+    // raw Product에서 outA, ttiStock 등 추가 정보 가져오기
+    const raw = allRaw.find(r => r.code === p.code);
+    const outA = raw?.outA ? Number(raw.outA) : 0;
+    const ttiStock = raw?.ttiStock || '';
+    const stock = raw?.stock ? Number(raw.stock) : 0;
+    const supplyPrice = raw?.supplyPrice ? Number(raw.supplyPrice) : p.price;
+    const priceStr = outA > 0 ? outA.toLocaleString('ko-KR') : supplyPrice.toLocaleString('ko-KR');
+    return `${p.model} | 공급가: ${supplyPrice.toLocaleString('ko-KR')}원 | A단가: ${outA > 0 ? outA.toLocaleString('ko-KR') : '?'}원 | 자사재고: ${stock}개 | 밀워키재고: ${ttiStock || '?'}`;
+  }).join('\n');
+}
+
+// ─── 시스템 프롬프트 ───
+
+const SYSTEM_PROMPT = `너는 "최 팀장" (Leo Choi), 대한종합상사 영업지원 팀장이다.
+거래처 카카오톡 단톡방에서 실제 직원으로 대화한다. 자연스럽게, 진짜 사람처럼 말해라.
+
+[나는 누구인가]
+- 이름: Leo Choi (레오 최), 직책: 영업지원 팀장
+- "최과장", "최팀장", "레오", "팀장님", "과장님" 등으로 불리면 그건 나를 부르는 것이다
+- "누구세요?" → "네, 최 팀장입니다! 말씀하세요~" 처럼 자연스럽게
+- 나의 역할: 재고/단가 안내, 배송 안내, 공지 전달, 주문 접수 지원
+
+[우리 회사]
+- 회사명: 대한종합상사 (Milwaukee 공구 총판)
+- 취급: 밀워키(Milwaukee) 전동공구, 콜라보 콤프레샤, 비트맨, 수공구/액세서리, 팩아웃(PACKOUT) 등
+- 직원: 사장님(다연아빠), 혜원(won'S), 지영(지영), 나(Leo/봇) — 4명이 같은 톡방에 함께 있음
+- 영업시간: 평일 09:00~18:00 (점심 12:00~13:00), 주말/공휴일 휴무
+- 배송: 기본 당일출고, 주로 롯데택배, 지연 시 별도 공지
+- 봇은 영업시간 외에도 24시간 응답
+
+[말투 규칙]
+- 항상 존댓말
+- 이모지 절대 사용 안 함
+- 짧고 자연스럽게 (1~3줄)
+- 목록, 번호매기기(1. 2. 3.), 마크다운(**볼드** 등) 절대 금지
+- 실제 직원이 카톡에서 빠르게 치는 것처럼 대화체로
+- 모르는 건 솔직하게 "확인 후 답변드리겠습니다"
+- 가격은 항상 콤마 포함 (예: 259,000원)
+
+[응답 판단 — 매우 중요]
+- 누군가 나에게 질문하거나 정보를 요청하면 → 답변
+- 직원(다연아빠/won'S/지영)이 이미 정확하게 답변한 내용이면 → NO_REPLY
+- 직원이 가격/재고를 틀리게 말했으면 → 정정 ("정확한 단가는 xxx원입니다" 등)
+- 거래처 질문에 아무도 안 답했으면 → 내가 답변
+- 직원끼리 업무 대화면 → NO_REPLY
+- 단순 "ㅋㅋ", "ㅎㅎ", "사진", 의미없는 메시지 → NO_REPLY
+- "감사합니다", "고마워요" 같은 인사 → 짧게 답 ("네, 감사합니다!" 등)
+- 응답이 불필요하다고 판단되면 반드시 정확히 "NO_REPLY" 네 글자만 출력
+
+[제품 문의 시]
+- 아래 [조회된 제품 데이터]를 활용하여 답변
+- 데이터가 제공되지 않았으면 "확인 후 답변드리겠습니다"
+- 여러 후보가 있으면 "혹시 ~모델인지, ~모델인지 확인부탁드립니다" 식으로 자연스럽게
+- 세트/베어 구분이 있으면 자연스럽게 안내
+
+[제품 데이터 읽는 법]
+- model: 모델명
+- code: 관리코드
+- 공급가: 공급가(부가세 별도)
+- A단가: A단가(도매가, 부가세 별도) — 거래처에게는 A단가로 안내
+- 자사재고: 자사 재고수량
+- 밀워키재고: 밀워키 본사 재고 (●=재고있음, ▲=일부있음, X=재고없음)
+- A단가가 있으면 A단가로 안내, 없으면(0 또는 ?) 공급가로 안내
+- 자사 재고 있으면: "{모델명} {A단가}원 재고있습니다"
+- 자사 재고 없고 밀워키 있으면(● 또는 ▲): "현재 재고는 없지만 발주 가능합니다. 주문시 익일 출고됩니다"
+- 둘 다 없으면: "현재 품절입니다. 입고일정 확인후 말씀드리겠습니다"`;
 
 // ─── reply 헬퍼 ───
 function reply(r: string | null) { return NextResponse.json({ success: true, reply: r }); }
@@ -212,194 +226,123 @@ export async function POST(request: NextRequest) {
     if (!apiKey || apiKey !== BOT_API_KEY) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { room, sender, message, isGroupChat } = body;
+    const { room, sender, message } = body;
     if (!message) return NextResponse.json({ error: 'message is required' }, { status: 400 });
 
-    console.log(`[bot] room=${room}, sender=${sender}, msg=${message}, group=${isGroupChat}`);
-    const persona = await getPersona();
+    console.log(`[bot] room=${room}, sender=${sender}, msg=${message}`);
 
-    // ─── Step 0: 맥락 확인 ───
-    const ctx = await getContext(room);
+    // 1. 대화 이력 로드 (30분 이내)
+    const history = await getHistory(room);
 
-    if (ctx) {
-      // 먼저 새 메시지의 의도 파악 (맥락 처리를 위해)
-      const ctxAnalysis = await analyzeMessage(message);
-      const ctxIntent = ctxAnalysis?.intent || '';
+    // 2. 새 메시지를 이력에 추가 저장
+    await appendMessage(room, sender || '거래처', message);
 
-      // 새 제품 문의가 들어오면 기존 맥락 삭제 후 새로 시작
-      if (ctxIntent === 'product_inquiry' && ctxAnalysis?.products && ctxAnalysis.products.length > 0) {
-        await deleteCtx(room);
-        // 아래 Step 1로 계속 (analysis를 재사용)
-        return await handleProductInquiry(room, ctxAnalysis, persona);
+    // 3. 제품 키워드 감지 → matchProduct로 재고/가격 조회
+    const keywords = detectProductKeywords(message);
+    const allProducts = await getAllProducts();
+    let productDataStr = '';
+
+    if (keywords.length > 0) {
+      const matchedProducts: MatchedProduct[] = [];
+      for (const kw of keywords) {
+        const result = matchProduct(kw, allProducts);
+        if (result.matched) matchedProducts.push(...result.products);
       }
-
-      // --- awaiting_confirmation 상태 ---
-      if (ctx.status === 'awaiting_confirmation' && ctx.confirmedProducts) {
-        if (ctxIntent === 'confirm_yes' || ctxIntent === 'order_request') {
-          // 네 → 가격 응답
-          const priceReply = formatPriceResponse(ctx.confirmedProducts);
-          await saveCtx(room, { status: 'price_given', confirmedProducts: ctx.confirmedProducts });
-          return reply(priceReply);
-        }
-        if (ctxIntent === 'confirm_no') {
-          await deleteCtx(room);
-          return reply('어떤 제품 확인해드릴까요?');
-        }
-      }
-
-      // --- price_given 상태 ---
-      if (ctx.status === 'price_given' && ctx.confirmedProducts) {
-        if (ctxIntent === 'order_request' || ctxIntent === 'confirm_yes') {
-          const stockReply = formatStockResponse(ctx.confirmedProducts);
-          await deleteCtx(room);
-          return reply(stockReply);
-        }
-      }
-
-      // --- 기존 선택 대기 (candidates) ---
-      if (ctx.candidates && ctx.candidates.length > 0 && message.length <= 30) {
-        let selectedIdx = 0;
-        const numMatch = message.trim().match(/^(\d+)/);
-        if (numMatch && message.trim().length <= 10) selectedIdx = parseInt(numMatch[1], 10);
-        if (selectedIdx === 0) selectedIdx = await askClaudeForSelection(ctx.candidates, message);
-
-        if (selectedIdx >= 1 && selectedIdx <= ctx.candidates.length) {
-          const selectedKeyword = ctx.candidates[selectedIdx - 1];
-          console.log(`[bot] 선택: ${selectedIdx}번 → ${selectedKeyword}`);
-          const allProducts = await getAllProducts();
-          const result = matchProduct(selectedKeyword, allProducts);
-          if (result.matched && result.count === 1) {
-            // 1건 확정 → 바로 가격 (확인 생략)
-            const priceReply = formatPriceResponse(result.products);
-            await saveCtx(room, { status: 'price_given', confirmedProducts: result.products });
-            return reply(priceReply);
-          }
-          // 여전히 다건 → 전체 응답
-          const r = formatProductResponse([result]);
-          return reply(r || null);
-        }
-        // 선택 판별 실패 → 새 분석으로 계속
-      }
-
-      // 맥락은 있지만 해당 상태와 무관한 intent → 일반 처리
-      if (ctxAnalysis) {
-        return await handleByIntent(room, ctxAnalysis, persona);
+      if (matchedProducts.length > 0) {
+        // 중복 제거 (code 기준)
+        const unique = [...new Map(matchedProducts.map(p => [p.code, p])).values()];
+        productDataStr = formatProductDataForPrompt(unique, allProducts);
       }
     }
 
-    // ─── Step 1: AI 메시지 분석 ───
-    const analysis = await analyzeMessage(message);
-    console.log(`[bot] AI 분석:`, JSON.stringify(analysis));
+    // 4. 톡방 정보 로드
+    const roomInfo = await getRoomInfo(room);
 
-    if (!analysis) {
-      // AI 분석 실패 → 폴백
-      const allProducts = await getAllProducts();
-      const result = matchProduct(message, allProducts);
-      if (result.matched) {
-        const r = formatProductResponse([result]);
-        if (result.count >= 2) await saveCtx(room, { candidates: result.products.map(p => p.model) });
-        return reply(r);
+    // 5. 페르소나 로드
+    const persona = await getPersona();
+
+    // 6. 시스템 프롬프트 조합
+    let systemPrompt = SYSTEM_PROMPT;
+
+    // 페르소나 커스터마이징 반영
+    if (persona.rules && persona.rules.length > 0) {
+      systemPrompt += `\n\n[추가 규칙]\n${persona.rules.map(r => `- ${r}`).join('\n')}`;
+    }
+
+    systemPrompt += `\n\n[이 톡방 정보]\n- 톡방명: ${room}\n- 거래처: ${roomInfo.customerName || '미매핑'}`;
+
+    if (productDataStr) {
+      systemPrompt += `\n\n[조회된 제품 데이터]\n${productDataStr}`;
+    }
+
+    // 7. 대화 이력을 Anthropic messages 형식으로 변환
+    const chatMessages: { role: 'user' | 'assistant'; content: string }[] = [];
+    for (const m of history) {
+      if (m.sender === 'bot') {
+        chatMessages.push({ role: 'assistant', content: m.text });
+      } else {
+        chatMessages.push({ role: 'user', content: `[${m.sender}] ${m.text}` });
       }
+    }
+    // 새 메시지 추가
+    chatMessages.push({ role: 'user', content: `[${sender || '거래처'}] ${message}` });
+
+    // Anthropic API는 첫 메시지가 user여야 하고, user/assistant 교대 필요
+    // 연속 동일 role 병합
+    const mergedMessages: { role: 'user' | 'assistant'; content: string }[] = [];
+    for (const msg of chatMessages) {
+      if (mergedMessages.length > 0 && mergedMessages[mergedMessages.length - 1].role === msg.role) {
+        mergedMessages[mergedMessages.length - 1].content += '\n' + msg.content;
+      } else {
+        mergedMessages.push({ ...msg });
+      }
+    }
+    // 첫 메시지가 assistant면 앞에 더미 user 추가
+    if (mergedMessages.length > 0 && mergedMessages[0].role === 'assistant') {
+      mergedMessages.unshift({ role: 'user', content: '[시스템] 대화 시작' });
+    }
+
+    // 8. Sonnet 호출
+    console.log(`[bot] Sonnet 호출: messages=${mergedMessages.length}, keywords=${keywords.join(',')}`);
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system: systemPrompt,
+        messages: mergedMessages,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[bot] Sonnet API ${res.status}: ${errText}`);
       return reply(null);
     }
 
-    // ─── Step 2: intent별 분기 ───
-    return await handleByIntent(room, analysis, persona);
+    const data = await res.json();
+    const aiReply = data.content?.[0]?.text?.trim() || '';
+
+    console.log(`[bot] AI 응답: ${aiReply.substring(0, 100)}`);
+
+    // 9. NO_REPLY 처리
+    if (aiReply === 'NO_REPLY' || aiReply.includes('NO_REPLY')) {
+      return reply(null);
+    }
+
+    // 10. 봇 응답을 이력에 저장
+    await appendMessage(room, 'bot', aiReply);
+    return reply(aiReply);
 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[bot] 에러:', msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
-}
-
-// ─── intent 분기 핸들러 ───
-
-async function handleByIntent(room: string, analysis: AnalysisResult, persona: Persona): Promise<NextResponse> {
-  const { intent, needsClarification, clarificationMessage, directReply } = analysis;
-
-  switch (intent) {
-    case 'greeting': return reply(getGreeting(persona));
-    case 'thanks': return reply(persona.thanksReply);
-    case 'bye': return reply(persona.byeReply);
-    case 'self_intro': return reply(persona.intro);
-    case 'direct_ship': return reply('접수되었습니다. 송장번호는 나오는대로 전달드리겠습니다.');
-    case 'as_return': case 'price_negotiation': return reply(persona.unknownReply);
-    case 'order_request': case 'confirm_yes': case 'confirm_no':
-      // 맥락 없이 단독으로 온 경우
-      return reply(null);
-    case 'product_inquiry':
-      return await handleProductInquiry(room, analysis, persona);
-    default:
-      if (needsClarification && clarificationMessage) return reply(clarificationMessage);
-      if (directReply) return reply(directReply);
-      return reply(null);
-  }
-}
-
-// ─── 제품 문의 핸들러 ───
-
-async function handleProductInquiry(room: string, analysis: AnalysisResult, persona: Persona): Promise<NextResponse> {
-  const { products: productHints } = analysis;
-
-  if (!productHints || productHints.length === 0) {
-    return reply('어떤 제품 확인해드릴까요?');
-  }
-
-  const allProducts = await getAllProducts();
-
-  // 각 제품 매칭 + 힌트 필터
-  const matchResults: { keyword: string; hint: string; result: MatchResult }[] = [];
-  for (const ph of productHints) {
-    const raw = matchProduct(ph.keyword, allProducts);
-    if (raw.matched && ph.hint) {
-      const filtered = filterByHint(raw.products, ph.hint);
-      matchResults.push({
-        keyword: ph.keyword,
-        hint: ph.hint,
-        result: { ...raw, products: filtered, count: filtered.length },
-      });
-    } else {
-      matchResults.push({ keyword: ph.keyword, hint: ph.hint, result: raw });
-    }
-  }
-
-  // 모든 제품 확정(각 1건)인지 확인
-  const allConfirmed = matchResults.every(m => m.result.matched && m.result.count === 1);
-  const confirmedProducts = allConfirmed ? matchResults.map(m => m.result.products[0]) : [];
-
-  // 일부/전체 후보 다건인 결과
-  const hasCandidates = matchResults.some(m => m.result.matched && m.result.count >= 2);
-  const hasUnmatched = matchResults.some(m => !m.result.matched);
-
-  if (allConfirmed) {
-    if (confirmedProducts.length === 1) {
-      // 단건 1개 확정 → 확인 생략, 바로 가격
-      const priceReply = formatPriceResponse(confirmedProducts);
-      await saveCtx(room, { status: 'price_given', confirmedProducts });
-      return reply(priceReply);
-    } else {
-      // 복수 확정 → 확인 질문
-      const confirmReply = formatConfirmationQuestion(confirmedProducts);
-      await saveCtx(room, { status: 'awaiting_confirmation', confirmedProducts });
-      return reply(confirmReply);
-    }
-  }
-
-  if (hasCandidates || hasUnmatched) {
-    // 후보 나열 + 맥락 저장
-    const candidateResults = matchResults.map(m => m.result);
-    const listReply = formatCandidateList(candidateResults);
-    const allCandidateModels: string[] = [];
-    for (const m of matchResults) {
-      if (m.result.count >= 2) m.result.products.forEach(p => allCandidateModels.push(p.model));
-    }
-    if (allCandidateModels.length > 0) {
-      await saveCtx(room, { candidates: allCandidateModels });
-    }
-    return reply(listReply);
-  }
-
-  // 전부 매칭 실패
-  return reply('정확한 모델명 확인부탁드립니다.');
 }
