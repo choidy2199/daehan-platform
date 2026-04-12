@@ -165,7 +165,12 @@ function formatProductDataForPrompt(products: MatchedProduct[], allRaw: Product[
     const ttiStock = raw?.ttiStock || '';
     const stock = raw?.stock ? Number(raw.stock) : 0;
     const supplyPrice = raw?.supplyPrice ? Number(raw.supplyPrice) : p.price;
-    return `${p.model} | A단가: ${outA > 0 ? outA.toLocaleString('ko-KR') : '?'}원 | 공급가: ${supplyPrice.toLocaleString('ko-KR')}원 | 재고: ${stock}개 | 본사: ${ttiStock || '?'}`;
+    // 일반제품: model과 description이 다르면 "브랜드 규격" 형태로 표시
+    let displayName = p.model;
+    if (raw?.model && raw?.description && raw.model !== raw.description && !raw.description.includes(raw.model)) {
+      displayName = `${raw.model} ${raw.description}`;
+    }
+    return `${displayName} | A단가: ${outA > 0 ? outA.toLocaleString('ko-KR') : '?'}원 | 공급가: ${supplyPrice.toLocaleString('ko-KR')}원 | 재고: ${stock}개 | 본사: ${ttiStock || '?'}`;
   }).join('\n');
 }
 

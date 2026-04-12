@@ -63,8 +63,14 @@ function getSearchText(p: Product): string {
 
 export function getModelCode(p: Product): string {
   if (p.description && p.description.length > 3) {
-    const parts = p.description.split('/').map(s => s.trim());
-    return parts[0] || p.description;
+    const firstPart = p.description.split('/')[0].trim();
+    // description 첫 파트에 모델코드 패턴(영문+숫자 조합)이 있으면 사용 (밀워키 등)
+    const hasModelPattern = /[A-Za-z].*\d/.test(firstPart) || /\d.*[A-Za-z]/.test(firstPart);
+    if (hasModelPattern) {
+      return firstPart;
+    }
+    // 모델코드 패턴이 없으면 model 필드 우선 (일반제품: 티롤릿 등)
+    return p.model || firstPart;
   }
   const model = p.model || p.name || p.code;
   const parts = model.split('/').map(s => s.trim());
