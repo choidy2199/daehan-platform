@@ -725,6 +725,11 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 /* 공지 NEW 깜빡임 */
 @keyframes notice-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 .notice-blink { animation: notice-blink 1s infinite; }
+.notice-new-badge {
+  display: inline-block; margin-left: 8px; background: #E24B4A; color: #fff;
+  padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 500;
+  vertical-align: middle; animation: notice-blink 1.2s ease-in-out infinite;
+}
 
 /* 톡방관리 */
 .kakao-rooms-banner { background:#E1F5EE; color:#085041; font-size:12px; line-height:1.6; padding:10px 14px; border-left:3px solid #1D9E75; }
