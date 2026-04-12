@@ -18561,14 +18561,10 @@ function _updateNoticeBadge() {
             _renderNoticeList(noticeTab);
           }
         }
-        // INSERT → 알림음 + 토스트 + 바탕화면이면 팝업
+        // INSERT → 알림음 + 팝업
         if (payload.eventType === 'INSERT' && payload.new) {
           _playNoticeSound();
-          _showNoticeToast(payload.new);
-          var desktop = document.getElementById('desktop');
-          if (desktop && desktop.style.display !== 'none') {
-            _showNoticePopup(payload.new);
-          }
+          _showNoticePopup(payload.new);
         }
       });
     })
@@ -18631,42 +18627,6 @@ function _playNoticeSound() {
     osc.stop(ctx.currentTime + 0.4);
     setTimeout(function() { ctx.close(); }, 500);
   } catch (e) { /* 브라우저 정책으로 소리 재생 실패 시 무시 */ }
-}
-
-// ========================================
-// 새 공지 토스트 알림 (전역)
-// ========================================
-
-function _showNoticeToast(notice) {
-  var existing = document.querySelector('.notice-toast');
-  if (existing) existing.remove();
-
-  var toast = document.createElement('div');
-  toast.className = 'notice-toast';
-  toast.innerHTML =
-    '<div class="notice-toast-header">' +
-      '<span class="notice-toast-icon">🔔</span>' +
-      '<span class="notice-toast-title">새 공지</span>' +
-      '<span class="notice-toast-close" onclick="event.stopPropagation();this.closest(\'.notice-toast\').remove()">✕</span>' +
-    '</div>' +
-    '<div class="notice-toast-body">' + (notice.title || '새 공지가 등록되었습니다') + '</div>' +
-    '<div class="notice-toast-meta">' + (notice.author || 'admin') + ' · 방금 전</div>';
-
-  var nid = notice.id;
-  toast.onclick = function() {
-    toast.remove();
-    openWindow('공지');
-    setTimeout(function() { if (typeof _showNoticeDetail === 'function') _showNoticeDetail(nid); }, 300);
-  };
-
-  document.body.appendChild(toast);
-
-  setTimeout(function() {
-    if (toast.parentNode) {
-      toast.classList.add('hiding');
-      setTimeout(function() { if (toast.parentNode) toast.remove(); }, 300);
-    }
-  }, 5000);
 }
 
 // ========================================
