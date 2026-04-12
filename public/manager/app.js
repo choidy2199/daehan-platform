@@ -11448,9 +11448,6 @@ function searchEstProducts(val) {
   var _estRowNum = 0;
   body.innerHTML = combined.map(function(p) {
     _estRowNum++;
-    var srcBadge = p._source === 'milwaukee'
-      ? '<span class="badge badge-blue" style="font-size:10px">밀워키</span>'
-      : '<span class="badge badge-green" style="font-size:10px">일반</span>';
     var aPrice = p.priceA || 0;
     var cost = p.cost || 0;
     var margin = aPrice > 0 && cost > 0 ? aPrice - cost : 0;
@@ -11473,7 +11470,7 @@ function searchEstProducts(val) {
     }
     return '<tr>' +
       '<td class="center est-no-col" data-source="' + p._source + '" data-idx="' + origIdx + '">' + _estRowNum + '</td>' +
-      '<td class="center">' + p.code + ' ' + srcBadge + '</td>' +
+      '<td class="center">' + p.code + '</td>' +
       '<td class="center" style="font-size:10px">' + (p.manageCode || '-') + '</td>' +
       '<td class="center">' + (p.category || '-') + '</td>' +
       '<td class="center" style="font-weight:500">' + (p.model || '-') + '</td>' +
