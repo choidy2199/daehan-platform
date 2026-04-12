@@ -16085,6 +16085,41 @@ var _LOG_STATUS_BADGES = {
   'sent':   { label:'발송',     bg:'#F0F1F3', color:'#5A6070' }
 };
 
+async function _getExchangeRate() {
+  var cached = JSON.parse(localStorage.getItem('mw_exchange_rate') || '{}');
+  var today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  if (cached.date === today && cached.rate) return cached.rate;
+  try {
+    var res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    var data = await res.json();
+    var rate = Math.round(data.rates.KRW);
+    localStorage.setItem('mw_exchange_rate', JSON.stringify({ date: today, rate: rate }));
+    return rate;
+  } catch (e) {
+    console.error('[bot] 환율 조회 실패:', e);
+    return cached.rate || 1400;
+  }
+}
+
+function _calcBotCostPeriods(daily) {
+  var today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  var todayData = daily[today] || { cost: 0, count: 0, inputTokens: 0, outputTokens: 0 };
+  var now = new Date();
+  var dayOfWeek = now.getDay() || 7;
+  var monday = new Date(now); monday.setDate(now.getDate() - dayOfWeek + 1);
+  var mondayStr = monday.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  var monthPrefix = today.substring(0, 7);
+  var yearPrefix = today.substring(0, 4);
+  var week = { cost: 0, count: 0 }, month = { cost: 0, count: 0 }, year = { cost: 0, count: 0, inputTokens: 0, outputTokens: 0 };
+  for (var date in daily) {
+    var d = daily[date];
+    if (date >= mondayStr && date <= today) { week.cost += d.cost || 0; week.count += d.count || 0; }
+    if (date.startsWith(monthPrefix)) { month.cost += d.cost || 0; month.count += d.count || 0; }
+    if (date.startsWith(yearPrefix)) { year.cost += d.cost || 0; year.count += d.count || 0; year.inputTokens += d.inputTokens || 0; year.outputTokens += d.outputTokens || 0; }
+  }
+  return { today: todayData, week: week, month: month, year: year };
+}
+
 async function loadBotApiCost() {
   try {
     var url = 'https://vmbqutwrfzhruukerfkc.supabase.co';
@@ -16094,57 +16129,162 @@ async function loadBotApiCost() {
     });
     if (!res.ok) return;
     var rows = await res.json();
-    if (rows.length > 0 && rows[0].value) {
-      _renderBotApiCost(rows[0].value);
-    }
+    var usage = (rows.length > 0 && rows[0].value) ? rows[0].value : { daily: {} };
+    var daily = usage.daily || {};
+    var rate = await _getExchangeRate();
+    var p = _calcBotCostPeriods(daily);
+
+    var fmt = function(usd) { return '$' + usd.toFixed(2); };
+    var krw = function(usd) { return Math.round(usd * rate).toLocaleString() + '원'; };
+    var el = function(id) { return document.getElementById(id); };
+
+    // 환율 표시
+    if (el('bot-exchange-rate')) el('bot-exchange-rate').textContent = '1$ = ' + rate.toLocaleString() + '원';
+
+    // KPI 카드
+    if (el('bot-cost-today-usd')) el('bot-cost-today-usd').textContent = fmt(p.today.cost);
+    if (el('bot-cost-today-krw')) el('bot-cost-today-krw').textContent = krw(p.today.cost);
+    if (el('bot-count-today')) el('bot-count-today').textContent = p.today.count.toLocaleString() + '건';
+    if (el('bot-cost-week-usd')) el('bot-cost-week-usd').textContent = fmt(p.week.cost);
+    if (el('bot-cost-week-krw')) el('bot-cost-week-krw').textContent = krw(p.week.cost);
+    if (el('bot-count-week')) el('bot-count-week').textContent = p.week.count.toLocaleString() + '건';
+    if (el('bot-cost-month-usd')) el('bot-cost-month-usd').textContent = fmt(p.month.cost);
+    if (el('bot-cost-month-krw')) el('bot-cost-month-krw').textContent = krw(p.month.cost);
+    if (el('bot-count-month')) el('bot-count-month').textContent = p.month.count.toLocaleString() + '건';
+
+    // 팝업 업데이트용 데이터 저장
+    window._botApiData = { daily: daily, rate: rate, periods: p };
   } catch (e) {
     console.error('[bot] API 비용 로드 실패:', e);
   }
 }
 
-function _renderBotApiCost(usage) {
-  var daily = usage.daily || {};
-  var today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
-  var todayData = daily[today] || { cost: 0, count: 0, inputTokens: 0, outputTokens: 0 };
+function openBotApiPopup() {
+  var existing = document.getElementById('bot-api-detail-popup');
+  if (existing) { existing.style.display = 'flex'; _fillBotApiPopup(); return; }
 
-  // 이번 주 (월~일)
-  var now = new Date();
-  var dayOfWeek = now.getDay() || 7;
-  var monday = new Date(now);
-  monday.setDate(now.getDate() - dayOfWeek + 1);
-  var mondayStr = monday.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  var overlay = document.createElement('div');
+  overlay.id = 'bot-api-detail-popup';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:10000';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeBotApiPopup(); });
 
-  var weekCost = 0, weekCount = 0;
-  for (var date in daily) {
-    if (date >= mondayStr && date <= today) {
-      weekCost += daily[date].cost || 0;
-      weekCount += daily[date].count || 0;
-    }
-  }
+  var popup = document.createElement('div');
+  popup.style.cssText = 'background:#fff;border-radius:12px;width:720px;max-width:95%;max-height:calc(100vh - 100px);overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.18)';
 
-  // 이번 달
-  var monthPrefix = today.substring(0, 7);
-  var monthCost = 0, monthCount = 0;
-  for (var date2 in daily) {
-    if (date2.startsWith(monthPrefix)) {
-      monthCost += daily[date2].cost || 0;
-      monthCount += daily[date2].count || 0;
-    }
-  }
+  // 다크 헤더
+  popup.innerHTML = '<div style="background:#1A1D23;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-radius:12px 12px 0 0;cursor:move" class="popup-drag-handle">'
+    + '<span style="font-size:15px;font-weight:500">API 비용 상세</span>'
+    + '<div style="display:flex;align-items:center;gap:12px">'
+    + '<span style="font-size:11px;opacity:0.6" id="popup-exchange-rate">적용 환율: 1$ = —원</span>'
+    + '<span style="cursor:pointer;font-size:16px;opacity:0.7" onclick="closeBotApiPopup()">✕</span>'
+    + '</div></div>'
+    // 본문
+    + '<div style="padding:20px">'
+    // 상단 4카드
+    + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px">'
+    + '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999">오늘</div><div style="font-size:18px;font-weight:500" id="popup-today-usd">$0.00</div><div style="font-size:12px;color:#185FA5;text-align:right" id="popup-today-krw">0원</div><div style="font-size:10px;color:#999" id="popup-today-count">0건</div></div>'
+    + '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999">이번 주</div><div style="font-size:18px;font-weight:500" id="popup-week-usd">$0.00</div><div style="font-size:12px;color:#185FA5;text-align:right" id="popup-week-krw">0원</div><div style="font-size:10px;color:#999" id="popup-week-count">0건</div></div>'
+    + '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999">이번 달</div><div style="font-size:18px;font-weight:500" id="popup-month-usd">$0.00</div><div style="font-size:12px;color:#185FA5;text-align:right" id="popup-month-krw">0원</div><div style="font-size:10px;color:#999" id="popup-month-count">0건</div></div>'
+    + '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999">올해 누적</div><div style="font-size:18px;font-weight:500" id="popup-year-usd">$0.00</div><div style="font-size:12px;color:#185FA5;text-align:right" id="popup-year-krw">0원</div><div style="font-size:10px;color:#999" id="popup-year-count">0건</div></div>'
+    + '</div>'
+    // 토큰 사용량
+    + '<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:500;margin-bottom:8px">오늘 토큰 사용량</div>'
+    + '<div style="display:flex;gap:16px">'
+    + '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">입력</span><span style="font-size:11px;color:#888" id="popup-tokens-input">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#378ADD;border-radius:2px;width:0%" id="popup-tokens-input-bar"></div></div></div>'
+    + '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">출력</span><span style="font-size:11px;color:#888" id="popup-tokens-output">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#1D9E75;border-radius:2px;width:0%" id="popup-tokens-output-bar"></div></div></div>'
+    + '</div></div>'
+    // 월별 테이블
+    + '<div><div style="font-size:13px;font-weight:500;margin-bottom:10px">월별 내역</div>'
+    + '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="border-bottom:0.5px solid #e0e0e0">'
+    + '<th style="text-align:left;padding:8px 4px;color:#999;font-weight:400">월</th>'
+    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">건수</th>'
+    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">입력 토큰</th>'
+    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">출력 토큰</th>'
+    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">비용($)</th>'
+    + '<th style="text-align:right;padding:8px 4px;color:#999;font-weight:400">비용(원)</th>'
+    + '</tr></thead><tbody id="popup-monthly-tbody"></tbody><tfoot id="popup-monthly-tfoot"></tfoot></table>'
+    + '</div></div>';
 
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+  if (typeof _makeDraggable === 'function') _makeDraggable(popup, popup.querySelector('.popup-drag-handle'));
+  document.addEventListener('keydown', _botApiPopupEsc);
+  _fillBotApiPopup();
+}
+
+function _botApiPopupEsc(e) { if (e.key === 'Escape') closeBotApiPopup(); }
+
+function closeBotApiPopup() {
+  var popup = document.getElementById('bot-api-detail-popup');
+  if (popup) popup.style.display = 'none';
+  document.removeEventListener('keydown', _botApiPopupEsc);
+}
+
+function _fillBotApiPopup() {
+  var d = window._botApiData;
+  if (!d) return;
+  var daily = d.daily, rate = d.rate, p = d.periods;
+  var fmt = function(usd) { return '$' + usd.toFixed(2); };
+  var krw = function(usd) { return Math.round(usd * rate).toLocaleString() + '원'; };
   var el = function(id) { return document.getElementById(id); };
-  if (el('bot-cost-today-val')) el('bot-cost-today-val').textContent = '$' + todayData.cost.toFixed(2);
-  if (el('bot-cost-today-sub')) el('bot-cost-today-sub').textContent = '오늘 ' + todayData.count.toLocaleString() + '건';
-  if (el('bot-cost-today')) el('bot-cost-today').textContent = '$' + todayData.cost.toFixed(2);
-  if (el('bot-count-today')) el('bot-count-today').textContent = todayData.count.toLocaleString() + '건';
-  if (el('bot-cost-week')) el('bot-cost-week').textContent = '$' + weekCost.toFixed(2);
-  if (el('bot-count-week')) el('bot-count-week').textContent = weekCount.toLocaleString() + '건';
-  if (el('bot-cost-month')) el('bot-cost-month').textContent = '$' + monthCost.toFixed(2);
-  if (el('bot-count-month')) el('bot-count-month').textContent = monthCount.toLocaleString() + '건';
-  if (el('bot-tokens-input')) el('bot-tokens-input').textContent = todayData.inputTokens.toLocaleString();
-  if (el('bot-tokens-output')) el('bot-tokens-output').textContent = todayData.outputTokens.toLocaleString();
-  if (el('bot-tokens-input-bar')) el('bot-tokens-input-bar').style.width = Math.min(100, (todayData.inputTokens / 500000) * 100) + '%';
-  if (el('bot-tokens-output-bar')) el('bot-tokens-output-bar').style.width = Math.min(100, (todayData.outputTokens / 50000) * 100) + '%';
+
+  if (el('popup-exchange-rate')) el('popup-exchange-rate').textContent = '적용 환율: 1$ = ' + rate.toLocaleString() + '원';
+  if (el('popup-today-usd')) el('popup-today-usd').textContent = fmt(p.today.cost);
+  if (el('popup-today-krw')) el('popup-today-krw').textContent = krw(p.today.cost);
+  if (el('popup-today-count')) el('popup-today-count').textContent = p.today.count.toLocaleString() + '건';
+  if (el('popup-week-usd')) el('popup-week-usd').textContent = fmt(p.week.cost);
+  if (el('popup-week-krw')) el('popup-week-krw').textContent = krw(p.week.cost);
+  if (el('popup-week-count')) el('popup-week-count').textContent = p.week.count.toLocaleString() + '건';
+  if (el('popup-month-usd')) el('popup-month-usd').textContent = fmt(p.month.cost);
+  if (el('popup-month-krw')) el('popup-month-krw').textContent = krw(p.month.cost);
+  if (el('popup-month-count')) el('popup-month-count').textContent = p.month.count.toLocaleString() + '건';
+  if (el('popup-year-usd')) el('popup-year-usd').textContent = fmt(p.year.cost);
+  if (el('popup-year-krw')) el('popup-year-krw').textContent = krw(p.year.cost);
+  if (el('popup-year-count')) el('popup-year-count').textContent = p.year.count.toLocaleString() + '건';
+  if (el('popup-tokens-input')) el('popup-tokens-input').textContent = p.today.inputTokens.toLocaleString();
+  if (el('popup-tokens-output')) el('popup-tokens-output').textContent = p.today.outputTokens.toLocaleString();
+  if (el('popup-tokens-input-bar')) el('popup-tokens-input-bar').style.width = Math.min(100, (p.today.inputTokens / 500000) * 100) + '%';
+  if (el('popup-tokens-output-bar')) el('popup-tokens-output-bar').style.width = Math.min(100, (p.today.outputTokens / 50000) * 100) + '%';
+
+  // 월별 테이블
+  var months = {};
+  for (var date in daily) {
+    var m = date.substring(0, 7);
+    if (!months[m]) months[m] = { count: 0, inputTokens: 0, outputTokens: 0, cost: 0 };
+    months[m].count += daily[date].count || 0;
+    months[m].inputTokens += daily[date].inputTokens || 0;
+    months[m].outputTokens += daily[date].outputTokens || 0;
+    months[m].cost += daily[date].cost || 0;
+  }
+  var sorted = Object.entries(months).sort(function(a, b) { return b[0].localeCompare(a[0]); });
+  var tbody = el('popup-monthly-tbody');
+  if (tbody) {
+    tbody.innerHTML = sorted.map(function(arr) {
+      var mm = arr[0], dd = arr[1];
+      return '<tr style="border-bottom:0.5px solid #e0e0e0">'
+        + '<td style="padding:8px 4px">' + mm + '</td>'
+        + '<td style="text-align:right;padding:8px 4px;color:#888">' + dd.count.toLocaleString() + '</td>'
+        + '<td style="text-align:right;padding:8px 4px;color:#888">' + dd.inputTokens.toLocaleString() + '</td>'
+        + '<td style="text-align:right;padding:8px 4px;color:#888">' + dd.outputTokens.toLocaleString() + '</td>'
+        + '<td style="text-align:right;padding:8px 4px;font-weight:500">' + fmt(dd.cost) + '</td>'
+        + '<td style="text-align:right;padding:8px 4px;font-weight:500;color:#185FA5">' + krw(dd.cost) + '</td>'
+        + '</tr>';
+    }).join('');
+  }
+  var tfoot = el('popup-monthly-tfoot');
+  if (tfoot && sorted.length > 0) {
+    var total = sorted.reduce(function(acc, arr) {
+      return { count: acc.count + arr[1].count, inputTokens: acc.inputTokens + arr[1].inputTokens, outputTokens: acc.outputTokens + arr[1].outputTokens, cost: acc.cost + arr[1].cost };
+    }, { count: 0, inputTokens: 0, outputTokens: 0, cost: 0 });
+    tfoot.innerHTML = '<tr style="background:#f7f7f5">'
+      + '<td style="padding:8px 4px;font-weight:500">합계</td>'
+      + '<td style="text-align:right;padding:8px 4px;font-weight:500">' + total.count.toLocaleString() + '</td>'
+      + '<td style="text-align:right;padding:8px 4px;color:#888">' + total.inputTokens.toLocaleString() + '</td>'
+      + '<td style="text-align:right;padding:8px 4px;color:#888">' + total.outputTokens.toLocaleString() + '</td>'
+      + '<td style="text-align:right;padding:8px 4px;font-weight:500">' + fmt(total.cost) + '</td>'
+      + '<td style="text-align:right;padding:8px 4px;font-weight:500;color:#185FA5">' + krw(total.cost) + '</td>'
+      + '</tr>';
+  }
 }
 
 function _buildKakaoLogs() {
@@ -16159,30 +16299,20 @@ function _buildKakaoLogs() {
   html += _kakaoKpiCard('봇 자동응답', '0건', '응답률 0%', '#1D9E75');
   html += _kakaoKpiCard('AI 매칭', '0건', '정확도 —', '#7C3AED');
   html += _kakaoKpiCard('사람 처리', '0건', '대기 0건', '#E8344E', true);
-  html += '<div class="kakao-kpi-card" id="bot-api-cost-card">'
-    + '<div class="kakao-kpi-label">API 비용</div>'
-    + '<div class="kakao-kpi-value" style="color:#5A6070" id="bot-cost-today-val">$0.00</div>'
-    + '<div class="kakao-kpi-sub" id="bot-cost-today-sub">오늘 0건</div>'
-    + '</div>';
+  // API 비용 카드 (1.8fr 넓게)
+  html += '<div class="kakao-kpi-card" id="bot-api-cost-card" style="grid-column:span 1;min-width:0">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  html += '<span style="font-size:12px;color:#999">API 비용</span>';
+  html += '<span style="font-size:10px;color:#999;background:#f5f5f5;padding:2px 6px;border-radius:4px" id="bot-exchange-rate">1$ = —원</span>';
   html += '</div>';
-
-  // API 비용 상세 카드
-  html += '<div id="bot-api-detail" style="background:#fff;border-radius:12px;border:0.5px solid #e0e0e0;padding:1.25rem;margin-bottom:16px">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
-  html += '<span style="font-size:14px;font-weight:500">API 비용 상세</span>';
-  html += '<span style="font-size:12px;color:#999">Sonnet 4</span>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  html += '<div><div style="font-size:11px;color:#999">오늘</div><div style="font-size:16px;font-weight:500" id="bot-cost-today-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-today-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-today">0건</div></div>';
+  html += '<div style="border-left:0.5px solid #e0e0e0;padding-left:8px"><div style="font-size:11px;color:#999">이번 주</div><div style="font-size:16px;font-weight:500" id="bot-cost-week-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-week-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-week">0건</div></div>';
+  html += '<div style="border-left:0.5px solid #e0e0e0;padding-left:8px"><div style="font-size:11px;color:#999">이번 달</div><div style="font-size:16px;font-weight:500" id="bot-cost-month-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-month-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-month">0건</div></div>';
   html += '</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">';
-  html += '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999;margin-bottom:4px">오늘</div><div style="font-size:20px;font-weight:500" id="bot-cost-today">$0.00</div><div style="font-size:11px;color:#999;margin-top:2px" id="bot-count-today">0건</div></div>';
-  html += '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999;margin-bottom:4px">이번 주</div><div style="font-size:20px;font-weight:500" id="bot-cost-week">$0.00</div><div style="font-size:11px;color:#999;margin-top:2px" id="bot-count-week">0건</div></div>';
-  html += '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999;margin-bottom:4px">이번 달</div><div style="font-size:20px;font-weight:500" id="bot-cost-month">$0.00</div><div style="font-size:11px;color:#999;margin-top:2px" id="bot-count-month">0건</div></div>';
+  html += '<div style="text-align:right;margin-top:6px"><span style="font-size:11px;color:#185FA5;cursor:pointer" onclick="openBotApiPopup()">상세보기 ›</span></div>';
   html += '</div>';
-  html += '<div style="border-top:0.5px solid #e0e0e0;padding-top:12px">';
-  html += '<div style="font-size:12px;color:#888;margin-bottom:8px">오늘 토큰 사용량</div>';
-  html += '<div style="display:flex;gap:16px">';
-  html += '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">입력</span><span style="font-size:11px;color:#888" id="bot-tokens-input">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#378ADD;border-radius:2px;width:0%" id="bot-tokens-input-bar"></div></div></div>';
-  html += '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">출력</span><span style="font-size:11px;color:#888" id="bot-tokens-output">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#1D9E75;border-radius:2px;width:0%" id="bot-tokens-output-bar"></div></div></div>';
-  html += '</div></div></div>';
+  html += '</div>';
 
   // ── B. 필터 영역 ──
   html += '<div style="display:flex;gap:8px;align-items:center;padding:10px 0;flex-wrap:wrap">';

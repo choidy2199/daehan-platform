@@ -513,10 +513,10 @@ export async function POST(request: NextRequest) {
         daily[today].cost += cost;
         daily[today].count += 1;
 
-        // 30일 이전 데이터 정리
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+        // 365일 이전 데이터 정리
+        const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
         for (const key of Object.keys(daily)) {
-          if (key < thirtyDaysAgo) delete daily[key];
+          if (key < cutoff) delete daily[key];
         }
 
         await supabase.from('app_data').upsert(

@@ -644,7 +644,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .kakao-toggle input:checked + .kakao-toggle-slider::before { transform:translateX(18px); }
 
 /* KPI 카드 */
-.kakao-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:12px; }
+.kakao-kpi-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1.8fr; gap:10px; margin-bottom:12px; }
 .kakao-kpi-card { background:#fff; border:1px solid #E2E5EB; border-radius:8px; padding:14px 16px; }
 .kakao-kpi-label { font-size:12px; color:#5A6070; font-weight:500; margin-bottom:4px; }
 .kakao-kpi-value { font-size:22px; font-weight:700; margin-bottom:2px; }
