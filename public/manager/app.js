@@ -17004,8 +17004,8 @@ async function _showNoticeDetail(id) {
   h += '</div>'; // 본문 영역 끝
 
   // ── 사이드바 (우측) ──
-  h += '<div id="notice-sidebar" style="width:240px;flex-shrink:0;background:#fff;border:0.5px solid #eee;border-left:none;border-radius:0 8px 8px 0;overflow-y:auto;max-height:80vh;">';
-  h += _renderNoticeSidebar(id);
+  h += '<div id="notice-sidebar" style="width:260px;flex-shrink:0;background:#fff;border:0.5px solid #eee;border-left:none;border-radius:0 8px 8px 0;overflow:hidden;display:flex !important;flex-direction:column !important;">';
+  h += _renderNoticeSidebar(id, n.category);
   h += '</div>';
 
   h += '</div>'; // 2컬럼 wrapper 끝
@@ -17032,52 +17032,81 @@ async function _showNoticeDetail(id) {
 }
 
 // ── 사이드바 렌더링 ──
-function _renderNoticeSidebar(currentId) {
+function _renderNoticeSidebar(currentId, currentCategory) {
   var notices = _noticesCache || _noticesData || [];
-  var sorted = notices.slice().sort(function(a, b) {
+
+  // 해당 카테고리만 필터
+  var filtered;
+  if (_isBugOrImprove(currentCategory)) {
+    filtered = notices.filter(function(n) { return _isBugOrImprove(n.category); });
+  } else {
+    filtered = notices.filter(function(n) { return n.category === currentCategory; });
+  }
+
+  var sorted = filtered.slice().sort(function(a, b) {
     if (a.pinned && !b.pinned) return -1;
     if (!a.pinned && b.pinned) return 1;
     return new Date(b.created_at) - new Date(a.created_at);
   });
   var items = sorted.slice(0, 20);
 
+  var catGroupName = _isBugOrImprove(currentCategory) ? '오류및개선'
+    : currentCategory === 'update' ? '업데이트'
+    : currentCategory === 'notice' ? '공지' : '전체';
+
   var catColors = { update:{bg:'#E6F1FB',c:'#0C447C'}, bug:{bg:'#FCEBEB',c:'#791F1F'}, improve:{bg:'#EEEDFE',c:'#3C3489'}, notice:{bg:'#FAEEDA',c:'#633806'} };
   var catLabels = { update:'업데이트', bug:'오류', improve:'개선', notice:'공지' };
   var statusColors = { waiting:{bg:'#FAEEDA',c:'#633806'}, progress:{bg:'#E6F1FB',c:'#0C447C'}, done:{bg:'#E1F5EE',c:'#085041'}, hold:{bg:'#F1EFE8',c:'#444441'} };
   var statusLabels = { waiting:'대기', progress:'진행', done:'완료', hold:'보류' };
 
-  var html = '<div style="padding:12px 14px;background:#fafafa;border-bottom:0.5px solid #eee;font-size:13px;font-weight:500;color:#666;">게시글 목록</div>';
+  // 다크 헤더
+  var html = '<div style="padding:10px 14px;background:#1A1D23;color:#fff;font-size:13px;font-weight:500;display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;flex-shrink:0;">';
+  html += '<span>' + catGroupName + ' 글 목록</span>';
+  html += '<span style="font-size:11px;color:rgba(255,255,255,.5);">' + items.length + '건</span>';
+  html += '</div>';
 
-  items.forEach(function(n) {
-    var isCurrent = n.id === currentId;
-    var cc = catColors[n.category] || catColors.update;
-    var cl = catLabels[n.category] || '업데이트';
-    var isDone = n.status === 'done';
+  // 스크롤 영역
+  html += '<div style="flex:1;overflow-y:auto;">';
 
-    var titleStyle = isCurrent ? 'font-size:12px;font-weight:500;color:#0C447C;'
-      : isDone ? 'font-size:12px;color:#999;text-decoration:line-through;'
-      : 'font-size:12px;color:#333;';
-    var wrapStyle = isCurrent ? 'padding:10px 12px;background:#E6F1FB;border-left:3px solid #185FA5;cursor:pointer;'
-      : 'padding:10px 12px;border-bottom:0.5px solid #eee;cursor:pointer;';
+  if (items.length === 0) {
+    html += '<div style="padding:20px;text-align:center;color:#999;font-size:12px;">글이 없습니다</div>';
+  } else {
+    items.forEach(function(n) {
+      var isCur = n.id === currentId;
+      var isDone = n.status === 'done';
+      var cc = catColors[n.category] || catColors.update;
+      var cl = catLabels[n.category] || '업데이트';
+      var d = new Date(n.created_at);
+      var ds = String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
 
-    var d = new Date(n.created_at);
-    var dateStr = String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
+      var wrapStyle = isCur
+        ? 'padding:10px 14px;background:#E6F1FB;border-left:3px solid #185FA5;border-bottom:1px solid #eee;cursor:pointer;'
+        : 'padding:10px 14px;border-bottom:1px solid #eee;cursor:pointer;';
+      var titleStyle = isCur ? 'font-size:12px;font-weight:500;color:#0C447C;'
+        : isDone ? 'font-size:12px;color:#999;text-decoration:line-through;'
+        : 'font-size:12px;color:#333;';
+      var infoColor = isCur ? '#0C447C' : '#999';
 
-    var badges = '<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:' + cc.bg + ';color:' + cc.c + ';">' + cl + '</span>';
-    if (n.pinned) badges += ' <span style="font-size:10px;color:#999;">📌</span>';
-    if (n.status && _isBugOrImprove(n.category)) {
-      var sc = statusColors[n.status];
-      var sl = statusLabels[n.status];
-      if (sc) badges += ' <span style="font-size:10px;padding:1px 6px;border-radius:3px;background:' + sc.bg + ';color:' + sc.c + ';">' + sl + '</span>';
-    }
+      var badges = '<span style="font-size:10px;padding:2px 7px;border-radius:4px;background:' + cc.bg + ';color:' + cc.c + ';flex-shrink:0;' + (isCur ? 'border:0.5px solid ' + cc.c + ';' : '') + '">' + cl + '</span>';
+      if (n.status && _isBugOrImprove(n.category)) {
+        var sc = statusColors[n.status]; var sl = statusLabels[n.status];
+        if (sc) badges += ' <span style="font-size:10px;padding:2px 7px;border-radius:4px;background:' + sc.bg + ';color:' + sc.c + ';flex-shrink:0;">' + sl + '</span>';
+      }
+      var extras = '';
+      if (n.pinned) extras += '<span style="font-size:10px;color:#999;flex-shrink:0;">📌</span>';
 
-    html += '<div onclick="_showNoticeDetail(' + n.id + ')" style="' + wrapStyle + '">';
-    html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:4px;margin-bottom:2px;">' + badges + '</div>';
-    html += '<div style="' + titleStyle + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (n.title || '') + '</div>';
-    html += '<div style="font-size:10px;color:#999;margin-top:2px;">' + (n.author || 'admin') + ' · ' + dateStr + '</div>';
-    html += '</div>';
-  });
+      html += '<div onclick="_showNoticeDetail(' + n.id + ')" style="' + wrapStyle + '">';
+      html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:5px;">';
+      html += badges;
+      html += '<span style="' + titleStyle + 'flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (n.title || '') + '</span>';
+      html += extras;
+      html += '</div>';
+      html += '<div style="font-size:10px;color:' + infoColor + ';margin-top:4px;padding-left:2px;">' + (n.author || 'admin') + ' · ' + ds + '</div>';
+      html += '</div>';
+    });
+  }
 
+  html += '</div>'; // 스크롤 영역 끝
   return html;
 }
 
