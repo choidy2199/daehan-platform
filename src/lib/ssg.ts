@@ -57,6 +57,8 @@ export async function ssgApi(method: string, path: string, body?: any): Promise<
   });
   const t1 = Date.now();
 
+  console.log('[SSG STATUS]', resp.status);
+
   if (!resp.ok) {
     const errText = await resp.text();
     throw new Error(`SSG API ${method} ${path} 실패: ${resp.status} ${errText}`);
@@ -64,9 +66,17 @@ export async function ssgApi(method: string, path: string, body?: any): Promise<
 
   const contentType = resp.headers.get('content-type') || '';
   const result = contentType.includes('application/json') ? await resp.json() : await resp.text();
+  try {
+    console.log('[SSG RAW]', typeof result === 'string' ? result.slice(0, 1000) : JSON.stringify(result).slice(0, 1000));
+  } catch { /* ignore stringify errors */ }
+  _ssgLastRawSample = typeof result === 'string' ? result.slice(0, 500) : JSON.stringify(result).slice(0, 500);
   console.log(`[PERF ssgApi] ${method} ${path} — fetch:${t1-t0}ms total:${Date.now()-t0}ms`);
   return result;
 }
+
+// 디버그용: 마지막 ssgApi 호출의 원본 응답 샘플 (첫 500자)
+let _ssgLastRawSample: string = '';
+export function getSsgLastRawSample(): string { return _ssgLastRawSample; }
 
 /**
  * SSG 상품 목록 조회 (전체 페이지 순회)

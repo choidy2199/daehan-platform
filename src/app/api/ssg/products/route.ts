@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSsgProductList, findSsgProductByCode } from '@/lib/ssg';
+import { getSsgProductList, findSsgProductByCode, getSsgLastRawSample } from '@/lib/ssg';
 
 // GET /api/ssg/products           → SSG 전체 상품 목록
 // GET /api/ssg/products?code=XXX  → 코드 단건 매칭
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       success: true,
       products,
       total: products.length,
+      rawSample: getSsgLastRawSample(), // 디버그용 (임시)
     });
   } catch (error: any) {
     console.error('SSG 상품 조회 실패:', error);
