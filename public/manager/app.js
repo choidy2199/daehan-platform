@@ -1406,9 +1406,6 @@ var _windowConfig = {
   '발주':       { tabId: 'mw-order',       color: 'red' },
   '세트및분해': { tabId: 'mw-set',         color: 'red' },
   '일반단가표': { tabId: 'gen-price',      color: 'blue' },
-  '매출':       { tabId: 'gen-trade',      color: 'blue' },
-  '매입':       { tabId: 'gen-trade',      color: 'blue' },
-  '견적':       { tabId: 'search',         color: 'blue' },
   '온라인':     { tabId: 'sales-online',   color: 'green' },
   '마케팅':     { tabId: 'sales-marketing',color: 'green' },
   '제품':       { tabId: 'import-product', color: 'purple' },
@@ -1422,9 +1419,12 @@ var _windowConfig = {
   '설정':       { tabId: 'setting',        color: 'darkgray' }
 };
 
+// 삭제된 탭 ID (즐겨찾기/열린창 자동 정리용)
+var _removedWindowNames = ['매출', '매입', '견적'];
+
 var _openWindows = [];    // 열린 창 이름 목록 (순서 유지)
 var _activeWindow = null; // 현재 활성 창 이름
-var _defaultFavorites = ['단가표','발주','일반단가표','온라인','검색','견적','매출','매입'];
+var _defaultFavorites = ['단가표','발주','일반단가표','온라인','검색'];
 
 function _getFavoritesKey() {
   var u = window.currentUser && window.currentUser.loginId || 'default';
@@ -1884,6 +1884,27 @@ function _restoreWindowState() {
     }
   } catch(e) {}
   return false;
+}
+
+// 삭제된 탭 즐겨찾기/열린창 자동 정리 (로그인 시 1회)
+function _cleanupRemovedTabs() {
+  if (!_removedWindowNames.length) return;
+  // 즐겨찾기 정리
+  var favs = _loadFavorites();
+  var cleanFavs = favs.filter(function(f) { return _removedWindowNames.indexOf(f) < 0; });
+  if (cleanFavs.length !== favs.length) _saveFavorites(cleanFavs);
+  // 열린창 정리
+  var cleaned = false;
+  for (var i = _openWindows.length - 1; i >= 0; i--) {
+    if (_removedWindowNames.indexOf(_openWindows[i]) >= 0) { _openWindows.splice(i, 1); cleaned = true; }
+  }
+  if (cleaned) _saveWindowState();
+  // localStorage 열린창 목록에서도 제거
+  try {
+    var savedWins = JSON.parse(localStorage.getItem('mw_open_windows') || '[]');
+    var cleanWins = savedWins.filter(function(w) { return _removedWindowNames.indexOf(w) < 0; });
+    if (cleanWins.length !== savedWins.length) localStorage.setItem('mw_open_windows', JSON.stringify(cleanWins));
+  } catch(e) {}
 }
 
 // 드롭다운 메뉴 관리
@@ -14213,6 +14234,8 @@ async function init() {
   updateStatus();
   console.log('[PERF] init — step0 즉시 렌더링: ' + (performance.now() - _t).toFixed(0) + 'ms');
 
+  // 삭제된 탭 즐겨찾기/열린창 정리 (매출/매입/견적)
+  _cleanupRemovedTabs();
   // 윈도우 상태 복원 또는 바탕화면 표시
   var _windowRestored = _restoreWindowState();
   if (!_windowRestored) {

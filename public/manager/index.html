@@ -38,10 +38,7 @@
     <div class="tb-menu tb-dropdown" data-menu="gen">
       <span class="tb-dot" style="color:#7BB8FF">●</span> 일반
       <div class="tb-dropdown-panel">
-        <div class="tb-dd-item" onclick="openWindow('일반단가표')">일반단가표</div>
-        <div class="tb-dd-item" onclick="openWindow('매출')">매출</div>
-        <div class="tb-dd-item" onclick="openWindow('매입')">매입</div>
-        <div class="tb-dd-item" onclick="openWindow('견적')">견적</div>
+        <div class="tb-dd-item" onclick="openWindow('일반단가표')">매입.매출.견적</div>
       </div>
     </div>
     <div class="tb-sep"></div>
@@ -513,67 +510,6 @@
     </div>
   </div>
 
-  <!-- 2번째 큰 메뉴: 견적서 작성 -->
-  <div class="section" id="est-editor">
-    <div class="section-header">
-      <div style="display:flex;align-items:center;gap:12px">
-        <button class="btn-action" onclick="newEstimate()" style="font-size:13px">+ 전표/견적서</button>
-        <span id="est-current-no" style="display:none">-</span>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <div style="display:flex">
-          <button id="btn-order-out" onclick="registerOrderOut()" style="background:#1D9E75;color:#fff;border:none;border-radius:4px 0 0 4px;padding:5px 12px;font-size:13px;font-weight:600;cursor:pointer">📋 전표 등록</button>
-          <span id="invoice-count-badge" onclick="toggleInvoicePopover()" style="background:#157a5a;color:#FFD700;border:none;border-radius:0 4px 4px 0;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center">0건</span>
-        </div>
-        <button class="btn-export" onclick="previewEstimatePdf()" style="font-size:13px">📄 견적서 PDF</button>
-        <button class="btn-action" onclick="saveEstimate()" style="font-size:13px">견적서 저장</button>
-        <button class="btn-action-sub" onclick="showEstimateList()" style="font-size:13px">📁 견적서 리스트 <span style="font-size:12px" id="est-list-count">0건</span></button>
-      </div>
-    </div>
-    <div class="section-body" style="padding:12px">
-      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
-        <div class="form-field">
-          <label class="label">공급받는자 (거래처)</label>
-          <div style="position:relative" id="client-ac-wrap">
-            <input class="input" id="est-client" type="search" name="search_naf_est_client" placeholder="거래처명 또는 사업자번호 검색..." autocomplete="nope" data-form-type="other" data-lpignore="true"
-              oninput="searchClientAC(this.value)"
-              onfocus="if(this.value) searchClientAC(this.value)">
-            <div id="client-ac-list" style="display:none;position:absolute;top:100%;left:0;width:100%;max-height:220px;overflow-y:auto;background:white;border:1px solid var(--tl-border);border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:300;font-size:12px"></div>
-          </div>
-        </div>
-        <div class="form-field">
-          <label class="label">견적 날짜</label>
-          <input class="input" id="est-date" type="date">
-        </div>
-      </div>
-      <div id="est-client-info" style="display:none;background:#F4F6FA;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;gap:16px;flex-wrap:wrap"></div>
-
-      <div class="table-scroll" style="overflow-x:auto">
-        <table class="data-table" id="est-table">
-          <thead><tr>
-            <th style="width:40px"></th>
-            <th>코드</th>
-            <th>관리코드</th>
-            <th>대분류</th>
-            <th>모델/규격</th>
-            <th>제품/품명</th>
-            <th>수량</th>
-            <th>단가</th>
-            <th>합계금액</th>
-            <th>부가세</th>
-            <th>비고</th>
-            <th>택배회사</th>
-            <th>택배비</th>
-            <th style="color:#CC2222">재고</th>
-          </tr></thead>
-          <tbody id="est-body"></tbody>
-        </table>
-      </div>
-      <div style="text-align:right;padding:12px 0;font-size:16px;font-weight:700">
-        합계: <span id="est-total" style="color:#185FA5">0</span>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- =============== TAB 8: 관리 =============== -->
