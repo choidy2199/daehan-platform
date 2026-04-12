@@ -743,7 +743,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .kakao-toggle input:checked + .kakao-toggle-slider::before { transform:translateX(18px); }
 
 /* KPI 카드 */
-.kakao-kpi-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1.8fr; gap:10px; margin-bottom:12px; }
+.kakao-kpi-row { display:grid; grid-template-columns:1fr 1fr 1fr 1fr 1.8fr; gap:10px; margin-bottom:12px; align-items:stretch; }
 .kakao-kpi-card { background:#fff; border:1px solid #E2E5EB; border-radius:8px; padding:14px 16px; }
 .kakao-kpi-label { font-size:12px; color:#5A6070; font-weight:500; margin-bottom:4px; }
 .kakao-kpi-value { font-size:22px; font-weight:700; margin-bottom:2px; }
@@ -784,11 +784,11 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .bot-status-right { display:flex; align-items:center; gap:4px; }
 
 .bot-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:12px; }
-.bot-kpi-card { height:90px; background:#fff; border:1px solid #E5E7EB; border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; justify-content:space-between; }
+.bot-kpi-card { background:#fff; border:1px solid #E5E7EB; border-radius:8px; padding:14px 16px; display:flex; flex-direction:column; justify-content:space-between; }
 .bot-kpi-top { display:flex; align-items:center; justify-content:space-between; }
 .bot-kpi-label { font-size:12px; color:#6B7280; font-weight:500; }
 .bot-kpi-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-size:14px; background:#F4F6FA; border-radius:50%; }
-.bot-kpi-value { font-size:28px; font-weight:700; line-height:1; }
+.bot-kpi-value { font-size:22px; font-weight:700; line-height:1; }
 
 .bot-mid-grid { display:grid; grid-template-columns:6fr 4fr; gap:12px; margin-bottom:0; }
 .bot-dash-3col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
