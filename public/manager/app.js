@@ -10586,6 +10586,7 @@ function _initColumnResizeImpl(tableId) {
 
   ths.forEach((th, thIdx) => {
     if (th.querySelector('.col-resize')) return;
+    if (th.dataset.noResize) return; // No. 컬럼 등 리사이즈 비활성화
     th.classList.add('resizable');
     const handle = document.createElement('div');
     handle.className = 'col-resize';
