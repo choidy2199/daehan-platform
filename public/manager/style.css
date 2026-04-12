@@ -729,6 +729,18 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #tab-backorder.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
 
 /* 공지 NEW 깜빡임 */
+/* 새 공지 토스트 알림 */
+.notice-toast { position:fixed; top:20px; right:20px; width:320px; background:#fff; border-radius:12px; border:0.5px solid #ddd; box-shadow:0 4px 20px rgba(0,0,0,0.12); padding:14px 16px; cursor:pointer; z-index:10000; animation:toast-slide-in 0.3s ease-out; transition:opacity 0.3s,transform 0.3s; font-family:'Pretendard',sans-serif; }
+.notice-toast.hiding { opacity:0; transform:translateX(100px); }
+.notice-toast-header { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.notice-toast-icon { font-size:14px; }
+.notice-toast-title { font-size:13px; font-weight:500; color:#E24B4A; flex:1; }
+.notice-toast-close { font-size:14px; color:#999; cursor:pointer; padding:2px 4px; }
+.notice-toast-close:hover { color:#333; }
+.notice-toast-body { font-size:14px; font-weight:500; color:#1A1D23; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.notice-toast-meta { font-size:11px; color:#999; }
+@keyframes toast-slide-in { from { opacity:0; transform:translateX(100px); } to { opacity:1; transform:translateX(0); } }
+
 @keyframes notice-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 .notice-blink { animation: notice-blink 1s infinite; }
 .notice-new-badge {
