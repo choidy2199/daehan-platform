@@ -473,7 +473,8 @@ function refreshActiveTab() {
     if (tabId === 'tab-general' && typeof renderGenProducts === 'function') renderGenProducts();
     if (tabId === 'tab-kakao') {
       var activeKakaoSub = localStorage.getItem('mw_kakao_active_subtab') || 'kakao-dashboard';
-      if (activeKakaoSub === 'kakao-dashboard' && typeof _refreshDashboardData === 'function') _refreshDashboardData();
+      if (_kakaoLegacyMap && _kakaoLegacyMap[activeKakaoSub]) activeKakaoSub = _kakaoLegacyMap[activeKakaoSub];
+      if (activeKakaoSub === 'kakao-dashboard' && typeof _refreshDashboardData === 'function') { _refreshDashboardData(); if (typeof loadBotApiCost === 'function') loadBotApiCost(); }
     }
 
     console.log('[Realtime] UI 갱신 완료:', tabId);
@@ -15702,18 +15703,27 @@ window._testNaverPriceUpdate = async function(originProductNo, newPrice) {
 
 var _kakaoSubTabs = [
   { id: 'kakao-dashboard', label: '대시보드' },
-  { id: 'kakao-rooms',     label: '톡방관리' },
-  { id: 'kakao-templates', label: '템플릿' },
-  { id: 'kakao-tracking',  label: '송장/발송' },
-  { id: 'kakao-broadcast', label: '공지발송' },
-  { id: 'kakao-logs',      label: '대화로그' }
+  { id: 'kakao-send',      label: '발송' },
+  { id: 'kakao-settings',  label: '설정' }
 ];
+
+// 레거시 6탭 → 3탭 매핑
+var _kakaoLegacyMap = {
+  'kakao-rooms': 'kakao-settings', 'kakao-templates': 'kakao-settings',
+  'kakao-tracking': 'kakao-send', 'kakao-broadcast': 'kakao-send',
+  'kakao-logs': 'kakao-dashboard'
+};
 
 function renderKakaoTab() {
   var container = document.getElementById('tab-kakao');
   if (!container) return;
 
+  // 레거시 6탭 ID → 3탭 매핑
   var activeSubTab = localStorage.getItem('mw_kakao_active_subtab') || 'kakao-dashboard';
+  if (_kakaoLegacyMap[activeSubTab]) {
+    activeSubTab = _kakaoLegacyMap[activeSubTab];
+    localStorage.setItem('mw_kakao_active_subtab', activeSubTab);
+  }
 
   var html = '';
 
@@ -15731,43 +15741,26 @@ function renderKakaoTab() {
 
   // 대시보드 탭
   html += '<div id="kakao-content-dashboard" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-dashboard' ? 'block' : 'none') + '">';
-  html += _buildKakaoDashboard();
+  html += _buildNewDashboard();
   html += '</div>';
 
-  // 톡방관리 탭
-  html += '<div id="kakao-content-rooms" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-rooms' ? 'block' : 'none') + '">';
-  html += _buildKakaoRooms();
+  // 발송 탭
+  html += '<div id="kakao-content-send" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-send' ? 'block' : 'none') + '">';
+  html += _buildNewSend();
   html += '</div>';
 
-  // 템플릿 탭
-  html += '<div id="kakao-content-templates" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-templates' ? 'block' : 'none') + '">';
-  html += _buildKakaoTemplates();
-  html += '</div>';
-
-  // 송장/발송 탭
-  html += '<div id="kakao-content-tracking" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-tracking' ? 'block' : 'none') + '">';
-  html += _buildKakaoTracking();
-  html += '</div>';
-
-  // 나머지 2개 탭 — placeholder
-  // 공지발송 탭
-  html += '<div id="kakao-content-broadcast" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-broadcast' ? 'block' : 'none') + '">';
-  html += _buildKakaoBroadcast();
-  html += '</div>';
-
-  // 대화로그 탭
-  html += '<div id="kakao-content-logs" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-logs' ? 'block' : 'none') + '">';
-  html += _buildKakaoLogs();
+  // 설정 탭
+  html += '<div id="kakao-content-settings" class="kakao-tab-content" style="display:' + (activeSubTab === 'kakao-settings' ? 'block' : 'none') + '">';
+  html += _buildNewSettings();
   html += '</div>';
 
   html += '</div>'; // .kakao-tab-contents
 
   container.innerHTML = html;
 
-  // 톡방관리 테이블 렌더링 + 검색 초기화
-  renderBotRoomTable();
-  _initKakaoRoomsSearch();
-  // 송장 검색 초기화
+  // 초기화: 설정 탭 — 톡방 테이블 + 검색
+  _initSettingsRoomTable();
+  // 초기화: 발송 탭 — 송장 검색
   _initKtSearch();
 
   // 봇 마스터 토글 이벤트
@@ -15778,7 +15771,6 @@ function renderKakaoTab() {
       var cfg = JSON.parse(localStorage.getItem('mw_bot_config') || '{}');
       cfg.botEnabled = isOn;
       localStorage.setItem('mw_bot_config', JSON.stringify(cfg));
-      // 모든 톡방 botActive 일괄 변경
       var roomData = _getBotRooms();
       for (var i = 0; i < roomData.rooms.length; i++) {
         roomData.rooms[i].botActive = isOn;
@@ -15788,13 +15780,17 @@ function renderKakaoTab() {
     });
   }
 
-  // 대시보드 탭이면 자동 갱신 시작
-  var activeSubTab = localStorage.getItem('mw_kakao_active_subtab') || 'kakao-dashboard';
-  if (activeSubTab === 'kakao-dashboard') _startDashboardAutoRefresh();
-  if (activeSubTab === 'kakao-logs') loadBotApiCost();
+  // 대시보드 탭이면 자동 갱신 + API 비용 로드
+  if (activeSubTab === 'kakao-dashboard') {
+    _startDashboardAutoRefresh();
+    loadBotApiCost();
+  }
 }
 
 function switchKakaoSubTab(tabId) {
+  // 레거시 6탭 → 3탭 매핑
+  if (_kakaoLegacyMap[tabId]) tabId = _kakaoLegacyMap[tabId];
+
   // 콘텐츠 전환
   document.querySelectorAll('.kakao-tab-content').forEach(function(el) { el.style.display = 'none'; });
   var suffix = tabId.replace('kakao-', '');
@@ -15809,14 +15805,14 @@ function switchKakaoSubTab(tabId) {
 
   localStorage.setItem('mw_kakao_active_subtab', tabId);
 
-  // 대시보드 탭 자동갱신 제어
+  // 대시보드 탭 자동갱신 + API 비용
   if (tabId === 'kakao-dashboard') {
     _refreshDashboardData();
     _startDashboardAutoRefresh();
+    loadBotApiCost();
   } else {
     _stopDashboardAutoRefresh();
   }
-  if (tabId === 'kakao-logs') loadBotApiCost();
 }
 
 function _updateBotStatusUI(isOn) {
@@ -15831,6 +15827,376 @@ function _updateBotStatusUI(isOn) {
 }
 
 var _dashboardInterval = null;
+
+// ========================================
+// 카카오톡 — 신규 3탭 래퍼 함수
+// ========================================
+
+// ── 탭1: 대시보드 (기존 대시보드 + 대화로그 KPI/API비용 합침) ──
+function _buildNewDashboard() {
+  var cfg = JSON.parse(localStorage.getItem('mw_bot_config') || '{}');
+  var botOn = cfg.botEnabled !== false;
+  var rooms = _getBotRooms().rooms;
+  var activeCount = rooms.filter(function(r) { return r.botActive; }).length;
+
+  var html = '';
+
+  // ── ① 상단: 봇 상태 바 ──
+  html += '<div class="bot-status-bar">';
+  html += '<div class="bot-status-left">';
+  html += '<span id="kakao-bot-status-dot" style="font-size:10px;color:' + (botOn ? '#1D9E75' : '#E8344E') + '">●</span> ';
+  html += '<span id="kakao-bot-status-text" style="font-size:13px;font-weight:600;color:#1A1D23">' + (botOn ? '정상 가동중 (' + activeCount + '개 톡방)' : '봇 정지') + '</span>';
+  html += '</div>';
+  html += '<div class="bot-status-right">';
+  html += '<span style="font-size:12px;color:#5A6070;margin-right:8px">마스터</span>';
+  html += '<label class="kakao-toggle"><input type="checkbox" id="kakao-bot-toggle"' + (botOn ? ' checked' : '') + '><span class="kakao-toggle-slider"></span></label>';
+  html += '</div>';
+  html += '</div>';
+
+  // ── ② KPI 5카드 (기존 4카드 + API 비용) ──
+  html += '<div class="kakao-kpi-row" id="bot-kpi-row">';
+  html += _buildDashKpiCards();
+  // API 비용 카드
+  html += '<div class="kakao-kpi-card" id="bot-api-cost-card" style="min-width:0">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  html += '<span style="font-size:12px;color:#999">API 비용</span>';
+  html += '<span style="font-size:10px;color:#fff;background:#E24B4A;padding:2px 8px;border-radius:10px;font-weight:500" id="bot-exchange-rate">1$ = —원</span>';
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+  html += '<div><div style="font-size:11px;color:#999">오늘</div><div style="font-size:16px;font-weight:500" id="bot-cost-today-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-today-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-today">0건</div></div>';
+  html += '<div style="border-left:0.5px solid #e0e0e0;padding-left:8px"><div style="font-size:11px;color:#999">이번 주</div><div style="font-size:16px;font-weight:500" id="bot-cost-week-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-week-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-week">0건</div></div>';
+  html += '<div style="border-left:0.5px solid #e0e0e0;padding-left:8px"><div style="font-size:11px;color:#999">이번 달</div><div style="font-size:16px;font-weight:500" id="bot-cost-month-usd">$0.00</div><div style="font-size:11px;color:#185FA5;text-align:right" id="bot-cost-month-krw">0원</div><div style="font-size:10px;color:#999" id="bot-count-month">0건</div></div>';
+  html += '</div>';
+  html += '<div style="text-align:right;margin-top:6px"><span style="font-size:11px;color:#fff;background:#185FA5;padding:3px 10px;border-radius:10px;font-weight:500;cursor:pointer" onclick="openBotApiPopup()">상세보기 ›</span></div>';
+  html += '</div>';
+  html += '</div>'; // .kakao-kpi-row
+
+  // ── ③ 3열 그리드 ──
+  html += '<div class="bot-dash-3col">';
+
+  // 좌: 최근 대화
+  html += '<div class="bot-section">';
+  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">최근 대화</span>';
+  html += '<a href="javascript:void(0)" onclick="_openChatLogPopup()" style="font-size:12px;color:#185FA5;text-decoration:none">전체보기 →</a></div>';
+  html += '<div id="bot-dash-recent" class="bot-section-body">';
+  html += _buildDashRecentTable();
+  html += '</div></div>';
+
+  // 중: 미응답 건
+  html += '<div class="bot-section">';
+  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">미응답 건</span>';
+  html += '<span id="bot-unresolved-badge" class="bot-unresolve-badge">0</span></div>';
+  html += '<div id="bot-dash-unresolved" class="bot-section-body">';
+  html += _buildDashUnresolvedCards();
+  html += '</div></div>';
+
+  // 우: 활성 톡방 현황
+  html += '<div class="bot-section">';
+  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">활성 톡방 현황</span>';
+  html += '<a href="javascript:void(0)" onclick="switchKakaoSubTab(\'kakao-settings\')" style="font-size:12px;color:#185FA5;text-decoration:none">톡방관리 →</a></div>';
+  html += '<div class="bot-section-body">';
+  html += _buildDashRoomSummary();
+  html += '</div></div>';
+
+  html += '</div>'; // .bot-dash-3col
+
+  return html;
+}
+
+// ── 탭2: 발송 (서브탭: 송장발송 + 공지발송) ──
+function _buildNewSend() {
+  var html = '';
+
+  // 서브탭 버튼
+  html += '<div class="kakao-send-subtabs">';
+  html += '<button class="kakao-send-sub active" data-sub="send-tracking" onclick="_switchKakaoSendSub(\'send-tracking\')">송장 발송</button>';
+  html += '<button class="kakao-send-sub" data-sub="send-broadcast" onclick="_switchKakaoSendSub(\'send-broadcast\')">공지 발송</button>';
+  html += '</div>';
+
+  // 송장 발송
+  html += '<div id="kakao-send-content-tracking" class="kakao-send-body">';
+  html += _buildKakaoTracking();
+  html += '</div>';
+
+  // 공지 발송
+  html += '<div id="kakao-send-content-broadcast" class="kakao-send-body" style="display:none">';
+  html += _buildKakaoBroadcast();
+  html += '</div>';
+
+  return html;
+}
+
+function _switchKakaoSendSub(sub) {
+  document.querySelectorAll('.kakao-send-body').forEach(function(el) { el.style.display = 'none'; });
+  var target = document.getElementById('kakao-send-content-' + sub.replace('send-', ''));
+  if (target) target.style.display = 'block';
+
+  document.querySelectorAll('.kakao-send-sub').forEach(function(btn) {
+    btn.classList.toggle('active', btn.getAttribute('data-sub') === sub);
+  });
+}
+
+// ── 탭3: 설정 (톡방매핑 3열 + 템플릿 5열) ──
+function _buildNewSettings() {
+  var data = _getBotRooms();
+  var rooms = data.rooms;
+  var html = '';
+
+  // ═══ 1행: 톡방 — 거래처 매핑 (3열) ═══
+  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0">';
+  html += '<span>톡방 — 거래처 매핑</span>';
+  html += '<button class="kakao-btn-sm" onclick="openBotRoomPopup()">+ 톡방 추가</button>';
+  html += '</div>';
+
+  // 유형별 분류
+  var sellRooms = [], buyRooms = [], bothRooms = [];
+  rooms.forEach(function(r, idx) {
+    var type = r.type || 'sell';
+    var item = { room: r, idx: idx };
+    if (type === 'buy') buyRooms.push(item);
+    else if (type === 'both') bothRooms.push(item);
+    else sellRooms.push(item);
+  });
+
+  html += '<div class="room-3col">';
+
+  // 매출 열
+  html += '<div class="room-col" style="border-right:0.5px solid #e0e0e0">';
+  html += '<div class="room-col-head"><span class="type-badge-sell">매출</span> 매출 거래처 (' + sellRooms.length + ')</div>';
+  html += '<div class="room-col-body" id="settings-rooms-sell">';
+  html += _buildSettingsRoomList(sellRooms);
+  html += '</div></div>';
+
+  // 매입 열
+  html += '<div class="room-col" style="border-right:0.5px solid #e0e0e0">';
+  html += '<div class="room-col-head"><span class="type-badge-buy">매입</span> 매입 거래처 (' + buyRooms.length + ')</div>';
+  html += '<div class="room-col-body" id="settings-rooms-buy">';
+  html += _buildSettingsRoomList(buyRooms);
+  html += '</div></div>';
+
+  // 매입/매출 열
+  html += '<div class="room-col">';
+  html += '<div class="room-col-head"><span class="type-badge-both">매입/매출</span> 매입·매출 거래처 (' + bothRooms.length + ')</div>';
+  html += '<div class="room-col-body" id="settings-rooms-both">';
+  html += _buildSettingsRoomList(bothRooms);
+  html += '</div></div>';
+
+  html += '</div>'; // .room-3col
+
+  // ═══ 2행: 응답 템플릿 (5열 그리드) ═══
+  _initKakaoTemplates();
+  var rawData = localStorage.getItem('mw_bot_templates') || '[]';
+  var parsed = JSON.parse(rawData);
+  var templates = Array.isArray(parsed) ? parsed : (parsed.templates || []);
+
+  html += '<div class="kakao-section-header" style="border-radius:8px 8px 0 0;margin-bottom:0;margin-top:16px">';
+  html += '<span>응답 템플릿</span>';
+  html += '<button class="kakao-btn-sm" onclick="_openTemplatePopup(-1)">+ 템플릿 추가</button>';
+  html += '</div>';
+
+  // 카테고리 필터
+  var catCounts = {};
+  _KAKAO_TEMPLATE_CATEGORIES.forEach(function(c) { catCounts[c] = 0; });
+  templates.forEach(function(t) {
+    var cat = _tplGetCategory(t);
+    if (catCounts[cat] !== undefined) catCounts[cat]++;
+    else catCounts['기타']++;
+  });
+  catCounts['전체'] = templates.length;
+
+  html += '<div style="display:flex;gap:6px;padding:12px 16px;background:#fff;border-left:1px solid #E2E5EB;border-right:1px solid #E2E5EB;flex-wrap:wrap">';
+  _KAKAO_TEMPLATE_CATEGORIES.forEach(function(cat, i) {
+    var isActive = i === 0;
+    html += '<button class="kakao-tpl-cat-btn' + (isActive ? ' kakao-tpl-cat-active' : '') + '" data-cat="' + cat + '" onclick="_filterKakaoTemplates(\'' + cat + '\')">';
+    html += cat + '(' + catCounts[cat] + ')';
+    html += '</button>';
+  });
+  html += '</div>';
+
+  // 5열 그리드
+  html += '<div id="kakao-tpl-cards" class="tpl-5-grid">';
+  if (templates.length === 0) {
+    html += '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#8B8FA3;font-size:13px">등록된 템플릿이 없습니다</div>';
+  } else {
+    templates.forEach(function(t, idx) {
+      html += _buildKakaoTemplateCard(t, idx);
+    });
+  }
+  html += '</div>';
+
+  // 하단 요약
+  var activeCount = templates.filter(function(t) { return t.active !== false; }).length;
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:12px;color:#5A6070;border:1px solid #E2E5EB;border-top:none;border-radius:0 0 8px 8px;background:#fff">';
+  html += '<span>총 ' + templates.length + '개 템플릿 · 활성 ' + activeCount + '개</span>';
+  html += '</div>';
+
+  return html;
+}
+
+// ── 설정: 톡방 3열 개별 행 빌드 ──
+function _buildSettingsRoomList(roomItems) {
+  if (roomItems.length === 0) {
+    return '<div style="text-align:center;padding:24px;color:#9BA3B2;font-size:12px">등록된 톡방이 없습니다</div>';
+  }
+  var h = '';
+  roomItems.forEach(function(item) {
+    var r = item.room;
+    var isUnmapped = r.status === 'unmapped' || !r.customerCode;
+    var rowBg = isUnmapped ? 'background:#FAEEDA;' : '';
+    h += '<div class="room-row" style="' + rowBg + 'cursor:pointer" onclick="openBotRoomPopup(\'' + (r.id || '') + '\')">';
+    h += '<div class="room-row-top">';
+    h += '<span class="room-row-name">' + ((r.roomName || '').replace(/★[^★]*★\s*/, '') || '—') + '</span>';
+    h += '<label class="kakao-toggle" style="width:34px;height:18px" onclick="event.stopPropagation()">';
+    h += '<input type="checkbox"' + (r.botActive ? ' checked' : '') + ' onchange="_toggleKakaoRoomBot(\'' + (r.id || '') + '\',this.checked)">';
+    h += '<span class="kakao-toggle-slider" style="border-radius:18px"></span>';
+    h += '</label>';
+    h += '</div>';
+    if (!isUnmapped) {
+      h += '<div class="room-row-sub">';
+      h += '<span style="font-size:11px;color:#5A6070">' + (r.customerName || '') + '</span>';
+      var managerColors = { admin:'#EAECF2', hwon:'#E6F1FB', jyoung:'#E1F5EE' };
+      var mBg = managerColors[r.manager] || '#EAECF2';
+      h += '<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:500;background:' + mBg + '">' + (r.manager || 'admin') + '</span>';
+      h += '</div>';
+    } else {
+      h += '<div class="room-row-sub"><span style="font-size:11px;color:#EF9F27;font-style:italic">미매핑</span></div>';
+    }
+    h += '</div>';
+  });
+  return h;
+}
+
+// 설정 탭 초기화 (톡방 검색 등 — 현재는 클릭 편집만)
+function _initSettingsRoomTable() {
+  // 향후 검색 기능 추가 시 여기에 구현
+}
+
+// ── 대화로그 팝업 ──
+function _openChatLogPopup() {
+  var existing = document.getElementById('chat-log-popup');
+  if (existing) { existing.style.display = 'flex'; return; }
+
+  var rooms = _getBotRooms().rooms;
+  var messages = getBotMessages().messages;
+
+  var overlay = document.createElement('div');
+  overlay.id = 'chat-log-popup';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;z-index:10000';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.style.display = 'none'; } });
+
+  var popup = document.createElement('div');
+  popup.style.cssText = 'background:#fff;border-radius:12px;width:900px;max-width:95%;max-height:calc(100vh - 100px);overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18);display:flex;flex-direction:column';
+
+  // 다크 헤더
+  var headerHtml = '<div style="background:#1A1D23;color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;border-radius:12px 12px 0 0;cursor:move;flex-shrink:0" class="popup-drag-handle">';
+  headerHtml += '<span style="font-size:15px;font-weight:500">대화 로그</span>';
+  headerHtml += '<span style="cursor:pointer;font-size:16px;opacity:0.7" onclick="document.getElementById(\'chat-log-popup\').style.display=\'none\'">✕</span>';
+  headerHtml += '</div>';
+
+  // 필터
+  var filterHtml = '<div style="display:flex;gap:8px;align-items:center;padding:10px 16px;flex-wrap:wrap;border-bottom:1px solid #E2E5EB;flex-shrink:0">';
+  filterHtml += '<select id="clp-room-filter" style="padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif">';
+  filterHtml += '<option value="all">전체 톡방</option>';
+  rooms.forEach(function(r) {
+    var name = (r.roomName || '').replace(/★[^★]*★\s*/, '') || r.customerName || '톡방';
+    filterHtml += '<option value="' + (r.roomName || '') + '">' + name + '</option>';
+  });
+  filterHtml += '</select>';
+  filterHtml += '<select id="clp-status-filter" style="padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif">';
+  filterHtml += '<option value="all">전체 상태</option>';
+  Object.keys(_LOG_STATUS_BADGES).forEach(function(k) { filterHtml += '<option value="' + k + '">' + _LOG_STATUS_BADGES[k].label + '</option>'; });
+  filterHtml += '</select>';
+  filterHtml += '<select id="clp-period-filter" style="padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif">';
+  filterHtml += '<option value="today">오늘</option><option value="7d">최근 7일</option><option value="30d">최근 30일</option>';
+  filterHtml += '</select>';
+  filterHtml += '<input type="text" id="clp-search" placeholder="메시지 내용 검색..." style="flex:1;min-width:150px;padding:7px 10px;font-size:12px;border:1px solid #E2E5EB;border-radius:6px;font-family:Pretendard,sans-serif" autocomplete="off">';
+  filterHtml += '</div>';
+
+  // 좌우 분할
+  var bodyHtml = '<div style="display:grid;grid-template-columns:40% 60%;gap:0;flex:1;min-height:0;overflow:hidden">';
+
+  // 좌측: 대화 목록
+  bodyHtml += '<div style="border-right:1px solid #E2E5EB;display:flex;flex-direction:column;min-height:0">';
+  bodyHtml += '<div class="kakao-section-header" style="border-radius:0;margin-bottom:0;padding:8px 14px;flex-shrink:0"><span style="font-size:12px">대화 목록</span></div>';
+  bodyHtml += '<div id="clp-msg-list" style="flex:1;overflow-y:auto;background:#fff">';
+  if (messages.length === 0) {
+    bodyHtml += '<div style="text-align:center;padding:40px 16px;color:#8B8FA3;font-size:13px">대화 내역이 없습니다</div>';
+  } else {
+    messages.slice(0, 100).forEach(function(m, i) {
+      bodyHtml += _buildChatLogPopupItem(m, i);
+    });
+  }
+  bodyHtml += '</div></div>';
+
+  // 우측: 대화 상세
+  bodyHtml += '<div style="display:flex;flex-direction:column;min-height:0">';
+  bodyHtml += '<div class="kakao-section-header" style="border-radius:0;margin-bottom:0;padding:8px 14px;flex-shrink:0"><span style="font-size:12px">대화 상세</span></div>';
+  bodyHtml += '<div id="clp-detail" style="flex:1;display:flex;align-items:center;justify-content:center;background:#FAFBFC;overflow-y:auto">';
+  bodyHtml += '<span style="color:#9BA3B2;font-size:13px">좌측에서 대화를 선택하세요</span>';
+  bodyHtml += '</div></div>';
+
+  bodyHtml += '</div>';
+
+  popup.innerHTML = headerHtml + filterHtml + bodyHtml;
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
+
+  if (typeof _makeDraggable === 'function') _makeDraggable(popup, popup.querySelector('.popup-drag-handle'));
+
+  // ESC 닫기
+  var escHandler = function(e) { if (e.key === 'Escape') { overlay.style.display = 'none'; document.removeEventListener('keydown', escHandler); } };
+  document.addEventListener('keydown', escHandler);
+}
+
+function _buildChatLogPopupItem(m, idx) {
+  var time = m.date ? new Date(m.date).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' }) : '—';
+  var st = _LOG_STATUS_BADGES[m.status] || _LOG_STATUS_BADGES['bot'];
+  var room = (m.room || '').replace(/★[^★]*★\s*/, '');
+  if (room.length > 8) room = room.slice(0, 8) + '…';
+  var msg = (m.message || '').slice(0, 30);
+  if ((m.message || '').length > 30) msg += '…';
+
+  var h = '<div class="clp-msg-item" data-idx="' + idx + '" onclick="_selectChatLogPopupItem(' + idx + ')" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #F0F1F3;cursor:pointer;transition:background .1s">';
+  h += '<span style="font-size:11px;color:#8B8FA3;white-space:nowrap;min-width:40px">' + time + '</span>';
+  h += '<span style="font-size:11px;font-weight:600;color:#1A1D23;white-space:nowrap;min-width:60px">' + (room || '—') + '</span>';
+  h += '<span style="flex:1;font-size:12px;color:#5A6070;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (msg || '—') + '</span>';
+  h += '<span style="display:inline-flex;padding:2px 6px;border-radius:10px;font-size:9px;font-weight:600;white-space:nowrap;background:' + st.bg + ';color:' + st.color + '">' + st.label + '</span>';
+  h += '</div>';
+  return h;
+}
+
+function _selectChatLogPopupItem(idx) {
+  document.querySelectorAll('.clp-msg-item').forEach(function(el) { el.style.background = ''; });
+  var items = document.querySelectorAll('.clp-msg-item');
+  if (items[idx]) items[idx].style.background = '#E6F1FB';
+
+  var messages = getBotMessages().messages;
+  var m = messages[idx];
+  var detail = document.getElementById('clp-detail');
+  if (!detail || !m) return;
+
+  var st = _LOG_STATUS_BADGES[m.status] || _LOG_STATUS_BADGES['bot'];
+  var h = '<div style="padding:16px;width:100%;box-sizing:border-box">';
+  h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">';
+  h += '<span style="font-size:12px;color:#8B8FA3">' + (m.date || '—') + '</span>';
+  h += '<span style="display:inline-flex;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;background:' + st.bg + ';color:' + st.color + '">' + st.label + '</span>';
+  h += '</div>';
+  h += '<div style="font-size:12px;color:#5A6070;margin-bottom:4px"><strong>톡방:</strong> ' + (m.room || '—') + '</div>';
+  h += '<div style="font-size:12px;color:#5A6070;margin-bottom:8px"><strong>발신:</strong> ' + (m.sender || '—') + '</div>';
+  h += '<div style="border-left:3px solid #185FA5;background:#F7F8FA;padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;color:#1A1D23;line-height:1.6;white-space:pre-wrap">' + (m.message || '') + '</div>';
+  if (m.aiAnalysis) {
+    h += '<div style="margin-top:12px;padding:10px 14px;background:#F3EEFF;border-radius:6px;font-size:12px;color:#5B21B6;line-height:1.5"><strong>AI 분석:</strong><br>' + m.aiAnalysis + '</div>';
+  }
+  h += '</div>';
+  detail.innerHTML = h;
+  detail.style.display = 'block';
+  detail.style.alignItems = 'flex-start';
+  detail.style.justifyContent = 'flex-start';
+}
+
+// ========================================
+// 카카오톡 — 기존 대시보드 빌드 함수 (레거시 유지)
+// ========================================
 
 function _buildKakaoDashboard() {
   var cfg = JSON.parse(localStorage.getItem('mw_bot_config') || '{}');
@@ -16046,7 +16412,22 @@ function _buildDashRoomSummary() {
 // ── 대시보드 데이터 새로고침 (KPI + 테이블 + 미응답) ──
 function _refreshDashboardData() {
   var kpiRow = document.getElementById('bot-kpi-row');
-  if (kpiRow) kpiRow.innerHTML = _buildDashKpiCards();
+  if (kpiRow) {
+    // KPI 4카드 + API 비용 카드 갱신 — KPI 카드만 갱신 (API 비용 카드는 loadBotApiCost가 갱신)
+    var tempDiv = document.createElement('div');
+    tempDiv.innerHTML = _buildDashKpiCards();
+    // KPI 4카드는 bot-kpi-card 클래스, API 비용 카드는 #bot-api-cost-card
+    var apiCard = kpiRow.querySelector('#bot-api-cost-card');
+    if (apiCard) {
+      // API 카드 유지하면서 앞 4카드만 교체
+      var existingCards = kpiRow.querySelectorAll('.bot-kpi-card:not(#bot-api-cost-card)');
+      existingCards.forEach(function(c) { c.remove(); });
+      var newCards = tempDiv.querySelectorAll('.bot-kpi-card');
+      newCards.forEach(function(c) { kpiRow.insertBefore(c, apiCard); });
+    } else {
+      kpiRow.innerHTML = _buildDashKpiCards();
+    }
+  }
   var recentEl = document.getElementById('bot-dash-recent');
   if (recentEl) recentEl.innerHTML = _buildDashRecentTable();
   var unresolvedEl = document.getElementById('bot-dash-unresolved');
@@ -17585,7 +17966,16 @@ function openBotRoomPopup(roomId) {
       '<label style="font-size:12px;font-weight:500;color:#5A6070;margin-bottom:4px;display:block">경영박사 코드</label>' +
       '<input type="text" id="brp-customer-code" value="' + _escAttr(isEdit ? (editRoom.customerCode || '') : '') + '" readonly disabled style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;background:#F4F6FA;color:#5A6070">' +
     '</div>' +
-    // 2행 우: 담당자
+    // 2행 우: 유형
+    '<div>' +
+      '<label style="font-size:12px;font-weight:500;color:#5A6070;margin-bottom:4px;display:block">유형</label>' +
+      '<select id="brp-type" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;background:#fff">' +
+        '<option value="sell"' + (isEdit && (editRoom.type || 'sell') === 'sell' ? ' selected' : (!isEdit ? ' selected' : '')) + '>매출</option>' +
+        '<option value="buy"' + (isEdit && editRoom.type === 'buy' ? ' selected' : '') + '>매입</option>' +
+        '<option value="both"' + (isEdit && editRoom.type === 'both' ? ' selected' : '') + '>매입/매출</option>' +
+      '</select>' +
+    '</div>' +
+    // 3행 좌: 담당자
     '<div>' +
       '<label style="font-size:12px;font-weight:500;color:#5A6070;margin-bottom:4px;display:block">담당자</label>' +
       '<select id="brp-manager" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;background:#fff">' +
@@ -17732,6 +18122,8 @@ function _saveBotRoomPopup(roomId) {
   var customerName = document.getElementById('brp-customer-name').value || '';
   var customerCode = document.getElementById('brp-customer-code').value || '';
   var manager = document.getElementById('brp-manager').value || 'admin';
+  var typeEl = document.getElementById('brp-type');
+  var type = typeEl ? typeEl.value : 'sell';
   var botActive = document.getElementById('brp-bot-active').checked;
   var status = customerCode ? 'mapped' : 'unmapped';
 
@@ -17746,6 +18138,7 @@ function _saveBotRoomPopup(roomId) {
       room.customerName = customerName;
       room.customerCode = customerCode;
       room.manager = manager;
+      room.type = type;
       room.botActive = botActive;
       room.status = status;
       room.updatedAt = now;
@@ -17758,6 +18151,7 @@ function _saveBotRoomPopup(roomId) {
       customerName: customerName,
       customerCode: customerCode,
       manager: manager,
+      type: type,
       botActive: botActive,
       status: status,
       createdAt: now,
@@ -17766,7 +18160,7 @@ function _saveBotRoomPopup(roomId) {
   }
 
   _saveBotRooms(data);
-  renderBotRoomTable();
+  _refreshSettingsRooms();
   document.getElementById('bot-room-popup').remove();
   toast(roomId ? '톡방 수정 완료' : '톡방 추가 완료');
 }
@@ -17776,9 +18170,30 @@ function _deleteBotRoom(roomId) {
   var data = _getBotRooms();
   data.rooms = data.rooms.filter(function(r) { return r.id !== roomId; });
   _saveBotRooms(data);
-  renderBotRoomTable();
+  _refreshSettingsRooms();
   document.getElementById('bot-room-popup').remove();
   toast('톡방 삭제 완료');
+}
+
+function _refreshSettingsRooms() {
+  // 새 3탭 설정 톡방 영역 갱신
+  var rooms = _getBotRooms().rooms;
+  var sellRooms = [], buyRooms = [], bothRooms = [];
+  rooms.forEach(function(r, idx) {
+    var type = r.type || 'sell';
+    var item = { room: r, idx: idx };
+    if (type === 'buy') buyRooms.push(item);
+    else if (type === 'both') bothRooms.push(item);
+    else sellRooms.push(item);
+  });
+  var sellEl = document.getElementById('settings-rooms-sell');
+  if (sellEl) sellEl.innerHTML = _buildSettingsRoomList(sellRooms);
+  var buyEl = document.getElementById('settings-rooms-buy');
+  if (buyEl) buyEl.innerHTML = _buildSettingsRoomList(buyRooms);
+  var bothEl = document.getElementById('settings-rooms-both');
+  if (bothEl) bothEl.innerHTML = _buildSettingsRoomList(bothRooms);
+  // 기존 톡방관리 테이블도 갱신 (레거시 호환)
+  renderBotRoomTable();
 }
 
 // ========================================

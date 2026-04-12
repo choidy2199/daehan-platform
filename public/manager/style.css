@@ -692,6 +692,32 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .bot-kpi-value { font-size:28px; font-weight:700; line-height:1; }
 
 .bot-mid-grid { display:grid; grid-template-columns:6fr 4fr; gap:12px; margin-bottom:0; }
+.bot-dash-3col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+
+/* 발송 서브탭 */
+.kakao-send-subtabs { display:flex; gap:4px; padding:0 0 12px 0; }
+.kakao-send-sub { padding:6px 14px; border-radius:6px; font-size:12px; font-weight:500; border:none; cursor:pointer; font-family:'Pretendard',sans-serif; background:var(--color-background-secondary,#F4F6FA); color:#5A6070; }
+.kakao-send-sub.active { background:#185FA5; color:#fff; font-weight:500; }
+
+/* 설정: 톡방 3열 */
+.room-3col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; border:1px solid #E2E5EB; border-top:none; border-radius:0 0 8px 8px; background:#fff; }
+.room-col { display:flex; flex-direction:column; min-height:200px; }
+.room-col-head { padding:10px 14px; font-size:12px; font-weight:600; color:#1A1D23; border-bottom:1px solid #E2E5EB; display:flex; align-items:center; gap:8px; background:#FAFBFC; }
+.room-col-body { flex:1; overflow-y:auto; max-height:320px; }
+.room-row { padding:10px 14px; border-bottom:1px solid #F0F2F7; }
+.room-row:last-child { border-bottom:none; }
+.room-row:hover { background:#F4F6FA; }
+.room-row-top { display:flex; align-items:center; justify-content:space-between; }
+.room-row-name { font-size:13px; font-weight:500; color:#1A1D23; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.room-row-sub { display:flex; align-items:center; gap:8px; margin-top:4px; }
+
+/* 유형 뱃지 */
+.type-badge-sell { display:inline-flex; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; background:#E6F1FB; color:#0C447C; }
+.type-badge-buy { display:inline-flex; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; background:#E1F5EE; color:#085041; }
+.type-badge-both { display:inline-flex; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; background:#EEEDFE; color:#3C3489; }
+
+/* 템플릿 5열 그리드 */
+.tpl-5-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:16px; background:#F7F8FA; border:1px solid #E2E5EB; border-top:none; }
 .bot-section { background:#fff; border:1px solid #E5E7EB; border-radius:8px; overflow:hidden; }
 .bot-section-hdr { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid #E5E7EB; }
 .bot-section-body { max-height:380px; overflow-y:auto; }
