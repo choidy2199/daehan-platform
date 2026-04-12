@@ -9653,6 +9653,7 @@ async function syncInventory() {
 
   // 6) localStorage 저장
   save(KEYS.inventory, DB.inventory);
+  autoSyncToSupabase('mw_products');
   localStorage.setItem('mw_gen_products', JSON.stringify(gp)); autoSyncToSupabase('mw_gen_products');
 
   // 7) 테이블 새로고침
