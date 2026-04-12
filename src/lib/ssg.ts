@@ -79,8 +79,8 @@ export async function getSsgProductList(): Promise<SsgProduct[]> {
   while (true) {
     const qs = new URLSearchParams({
       sellStatCd: '20', // 판매중
-      '페이지': String(page),
-      '페이지크기': String(pageSize),
+      page: String(page),
+      pageSize: String(pageSize),
     });
     const data = await ssgApi('GET', `/item/0.1/getItemList.ssg?${qs.toString()}`);
     // SSG 응답 구조: result.items[].item[] (items는 배열, 각 요소에 item 배열)

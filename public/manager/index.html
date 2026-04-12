@@ -40,9 +40,9 @@
         <span class="sidebar-arrow open"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
       </button>
       <div class="sidebar-sub open">
-        <div class="sidebar-sub-item" data-tab="tab-catalog" onclick="_sidebarOpenWindow('단가표')">단가표</div>
-        <div class="sidebar-sub-item" data-tab="tab-order" onclick="_sidebarOpenWindow('발주')">발주</div>
-        <div class="sidebar-sub-item" data-tab="tab-setbun" onclick="_sidebarOpenWindow('세트및분해')">세트및분해</div>
+        <div class="sidebar-sub-item" data-tab="tab-catalog" data-window="단가표" onclick="_sidebarOpenWindow('단가표')"><span>단가표</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('단가표')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-order" data-window="발주" onclick="_sidebarOpenWindow('발주')"><span>발주</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('발주')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-setbun" data-window="세트및분해" onclick="_sidebarOpenWindow('세트및분해')"><span>세트및분해</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('세트및분해')">★</button></div>
       </div>
     </div>
     <!-- 일반 -->
@@ -54,9 +54,9 @@
         <span class="sidebar-arrow"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
       </button>
       <div class="sidebar-sub">
-        <div class="sidebar-sub-item" data-tab="tab-general" onclick="_sidebarOpenWindow('일반단가표')">일반단가표</div>
-        <div class="sidebar-sub-item" data-tab="tab-gen-trade" onclick="_sidebarOpenWindow('일반단가표')">매입매출</div>
-        <div class="sidebar-sub-item" data-tab="tab-estimate" onclick="_sidebarOpenWindow('검색')">견적서</div>
+        <div class="sidebar-sub-item" data-tab="tab-general" data-window="일반단가표" onclick="_sidebarOpenWindow('일반단가표')"><span>일반단가표</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('일반단가표')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-gen-trade" data-window="일반단가표" onclick="_sidebarOpenWindow('일반단가표')"><span>매입매출</span></div>
+        <div class="sidebar-sub-item" data-tab="tab-estimate" data-window="검색" onclick="_sidebarOpenWindow('검색')"><span>견적서</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('검색')">★</button></div>
       </div>
     </div>
     <!-- 판매 -->
@@ -68,8 +68,8 @@
         <span class="sidebar-arrow"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
       </button>
       <div class="sidebar-sub">
-        <div class="sidebar-sub-item" data-tab="tab-sales" onclick="_sidebarOpenWindow('온라인')">온라인</div>
-        <div class="sidebar-sub-item" data-tab="tab-sales-marketing" onclick="_sidebarOpenWindow('마케팅')">마케팅</div>
+        <div class="sidebar-sub-item" data-tab="tab-sales" data-window="온라인" onclick="_sidebarOpenWindow('온라인')"><span>온라인</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('온라인')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-sales-marketing" data-window="마케팅" onclick="_sidebarOpenWindow('마케팅')"><span>마케팅</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('마케팅')">★</button></div>
       </div>
     </div>
     <!-- 수입 -->
@@ -81,42 +81,47 @@
         <span class="sidebar-arrow"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
       </button>
       <div class="sidebar-sub">
-        <div class="sidebar-sub-item" data-tab="tab-import-product" onclick="_sidebarOpenWindow('제품')">제품</div>
-        <div class="sidebar-sub-item" data-tab="tab-import-calc" onclick="_sidebarOpenWindow('수입계산기')">수입계산기</div>
-        <div class="sidebar-sub-item" data-tab="tab-import-invoice" onclick="_sidebarOpenWindow('인보이스')">인보이스</div>
+        <div class="sidebar-sub-item" data-tab="tab-import-product" data-window="제품" onclick="_sidebarOpenWindow('제품')"><span>제품</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('제품')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-import-calc" data-window="수입계산기" onclick="_sidebarOpenWindow('수입계산기')"><span>수입계산기</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('수입계산기')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-import-invoice" data-window="인보이스" onclick="_sidebarOpenWindow('인보이스')"><span>인보이스</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('인보이스')">★</button></div>
       </div>
     </div>
 
     <div class="sidebar-divider" style="margin:6px 10px"></div>
 
     <!-- 단독 메뉴들 -->
-    <button class="sidebar-single" onclick="_sidebarOpenWindow('택배')">
+    <button class="sidebar-single" data-window="택배" onclick="_sidebarOpenWindow('택배')">
       <div class="sidebar-color-bar" style="background:#888"></div>
       <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13" rx="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span>
       <span class="sidebar-single-text">택배</span>
+      <span class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('택배')">★</span>
     </button>
-    <button class="sidebar-single" onclick="_sidebarOpenWindow('검색')">
+    <button class="sidebar-single" data-window="검색" onclick="_sidebarOpenWindow('검색')">
       <div class="sidebar-color-bar" style="background:#555"></div>
       <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
       <span class="sidebar-single-text">검색</span>
+      <span class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('검색')">★</span>
     </button>
-    <button class="sidebar-single" onclick="_sidebarOpenWindow('카톡')">
+    <button class="sidebar-single" data-window="카톡" onclick="_sidebarOpenWindow('카톡')">
       <div class="sidebar-color-bar" style="background:#fae100"></div>
       <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></span>
       <span class="sidebar-single-text">카톡</span>
       <span class="sidebar-badge" id="kakaoBadge"></span>
+      <span class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('카톡')">★</span>
     </button>
-    <button class="sidebar-single" onclick="_sidebarOpenWindow('공지')">
+    <button class="sidebar-single" data-window="공지" onclick="_sidebarOpenWindow('공지')">
       <div class="sidebar-color-bar" style="background:#4a90c7"></div>
       <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg></span>
       <span class="sidebar-single-text">공지</span>
       <span class="sidebar-badge" id="noticeBadge"></span>
+      <span class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('공지')">★</span>
     </button>
-    <button class="sidebar-single" onclick="_sidebarOpenWindow('백오더')">
+    <button class="sidebar-single" data-window="백오더" onclick="_sidebarOpenWindow('백오더')">
       <div class="sidebar-color-bar" style="background:#d48a2e"></div>
       <span class="sidebar-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
       <span class="sidebar-single-text">백오더</span>
       <span class="sidebar-badge" id="backorderBadge"></span>
+      <span class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('백오더')">★</span>
     </button>
   </div>
 
