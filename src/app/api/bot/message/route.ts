@@ -486,8 +486,47 @@ export async function POST(request: NextRequest) {
 
     const data = await res.json();
     let aiReply = data.content?.[0]?.text?.trim() || '';
+    const usage = data.usage as { input_tokens: number; output_tokens: number } | undefined;
 
     console.log(`[bot] AI 응답: ${aiReply.substring(0, 100)}`);
+    if (usage) console.log(`[bot] 토큰: in=${usage.input_tokens}, out=${usage.output_tokens}`);
+
+    // 비용 기록 (NO_REPLY 포함 모든 API 호출)
+    try {
+      if (usage) {
+        const INPUT_PRICE_PER_M = 3;
+        const OUTPUT_PRICE_PER_M = 15;
+        const cost = (usage.input_tokens / 1_000_000) * INPUT_PRICE_PER_M +
+                     (usage.output_tokens / 1_000_000) * OUTPUT_PRICE_PER_M;
+
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+        const { data: usageData } = await supabase
+          .from('app_data').select('value').eq('key', 'mw_bot_usage').single();
+
+        const current = (usageData?.value as Record<string, unknown>) || { daily: {} };
+        if (!current.daily || typeof current.daily !== 'object') current.daily = {};
+        const daily = current.daily as Record<string, { inputTokens: number; outputTokens: number; cost: number; count: number }>;
+
+        if (!daily[today]) daily[today] = { inputTokens: 0, outputTokens: 0, cost: 0, count: 0 };
+        daily[today].inputTokens += usage.input_tokens;
+        daily[today].outputTokens += usage.output_tokens;
+        daily[today].cost += cost;
+        daily[today].count += 1;
+
+        // 30일 이전 데이터 정리
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+        for (const key of Object.keys(daily)) {
+          if (key < thirtyDaysAgo) delete daily[key];
+        }
+
+        await supabase.from('app_data').upsert(
+          { key: 'mw_bot_usage', value: current, updated_at: new Date().toISOString() },
+          { onConflict: 'key' }
+        );
+      }
+    } catch (e) {
+      console.error('[bot] 비용 기록 실패:', e);
+    }
 
     // 9. NO_REPLY 처리
     if (aiReply === 'NO_REPLY' || aiReply.includes('NO_REPLY')) {

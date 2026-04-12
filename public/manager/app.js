@@ -15784,6 +15784,7 @@ function renderKakaoTab() {
   // 대시보드 탭이면 자동 갱신 시작
   var activeSubTab = localStorage.getItem('mw_kakao_active_subtab') || 'kakao-dashboard';
   if (activeSubTab === 'kakao-dashboard') _startDashboardAutoRefresh();
+  if (activeSubTab === 'kakao-logs') loadBotApiCost();
 }
 
 function switchKakaoSubTab(tabId) {
@@ -15808,6 +15809,7 @@ function switchKakaoSubTab(tabId) {
   } else {
     _stopDashboardAutoRefresh();
   }
+  if (tabId === 'kakao-logs') loadBotApiCost();
 }
 
 function _updateBotStatusUI(isOn) {
@@ -16083,6 +16085,68 @@ var _LOG_STATUS_BADGES = {
   'sent':   { label:'발송',     bg:'#F0F1F3', color:'#5A6070' }
 };
 
+async function loadBotApiCost() {
+  try {
+    var url = 'https://vmbqutwrfzhruukerfkc.supabase.co';
+    var anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtYnF1dHdyZnpocnV1a2VyZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Mzc5MjAsImV4cCI6MjA5MDIxMzkyMH0.-FI_3De1sRmAxLNQ8J45MT9hO9U9aSTchxBcq47_b-I';
+    var res = await fetch(url + '/rest/v1/app_data?key=eq.mw_bot_usage&select=value', {
+      headers: { 'apikey': anonKey, 'Authorization': 'Bearer ' + anonKey }
+    });
+    if (!res.ok) return;
+    var rows = await res.json();
+    if (rows.length > 0 && rows[0].value) {
+      _renderBotApiCost(rows[0].value);
+    }
+  } catch (e) {
+    console.error('[bot] API 비용 로드 실패:', e);
+  }
+}
+
+function _renderBotApiCost(usage) {
+  var daily = usage.daily || {};
+  var today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+  var todayData = daily[today] || { cost: 0, count: 0, inputTokens: 0, outputTokens: 0 };
+
+  // 이번 주 (월~일)
+  var now = new Date();
+  var dayOfWeek = now.getDay() || 7;
+  var monday = new Date(now);
+  monday.setDate(now.getDate() - dayOfWeek + 1);
+  var mondayStr = monday.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+
+  var weekCost = 0, weekCount = 0;
+  for (var date in daily) {
+    if (date >= mondayStr && date <= today) {
+      weekCost += daily[date].cost || 0;
+      weekCount += daily[date].count || 0;
+    }
+  }
+
+  // 이번 달
+  var monthPrefix = today.substring(0, 7);
+  var monthCost = 0, monthCount = 0;
+  for (var date2 in daily) {
+    if (date2.startsWith(monthPrefix)) {
+      monthCost += daily[date2].cost || 0;
+      monthCount += daily[date2].count || 0;
+    }
+  }
+
+  var el = function(id) { return document.getElementById(id); };
+  if (el('bot-cost-today-val')) el('bot-cost-today-val').textContent = '$' + todayData.cost.toFixed(2);
+  if (el('bot-cost-today-sub')) el('bot-cost-today-sub').textContent = '오늘 ' + todayData.count.toLocaleString() + '건';
+  if (el('bot-cost-today')) el('bot-cost-today').textContent = '$' + todayData.cost.toFixed(2);
+  if (el('bot-count-today')) el('bot-count-today').textContent = todayData.count.toLocaleString() + '건';
+  if (el('bot-cost-week')) el('bot-cost-week').textContent = '$' + weekCost.toFixed(2);
+  if (el('bot-count-week')) el('bot-count-week').textContent = weekCount.toLocaleString() + '건';
+  if (el('bot-cost-month')) el('bot-cost-month').textContent = '$' + monthCost.toFixed(2);
+  if (el('bot-count-month')) el('bot-count-month').textContent = monthCount.toLocaleString() + '건';
+  if (el('bot-tokens-input')) el('bot-tokens-input').textContent = todayData.inputTokens.toLocaleString();
+  if (el('bot-tokens-output')) el('bot-tokens-output').textContent = todayData.outputTokens.toLocaleString();
+  if (el('bot-tokens-input-bar')) el('bot-tokens-input-bar').style.width = Math.min(100, (todayData.inputTokens / 500000) * 100) + '%';
+  if (el('bot-tokens-output-bar')) el('bot-tokens-output-bar').style.width = Math.min(100, (todayData.outputTokens / 50000) * 100) + '%';
+}
+
 function _buildKakaoLogs() {
   var rooms = _getBotRooms().rooms;
   var messages = getBotMessages().messages;
@@ -16095,8 +16159,30 @@ function _buildKakaoLogs() {
   html += _kakaoKpiCard('봇 자동응답', '0건', '응답률 0%', '#1D9E75');
   html += _kakaoKpiCard('AI 매칭', '0건', '정확도 —', '#7C3AED');
   html += _kakaoKpiCard('사람 처리', '0건', '대기 0건', '#E8344E', true);
-  html += _kakaoKpiCard('API 비용', '$0.00', '이번 주', '#5A6070');
+  html += '<div class="kakao-kpi-card" id="bot-api-cost-card">'
+    + '<div class="kakao-kpi-label">API 비용</div>'
+    + '<div class="kakao-kpi-value" style="color:#5A6070" id="bot-cost-today-val">$0.00</div>'
+    + '<div class="kakao-kpi-sub" id="bot-cost-today-sub">오늘 0건</div>'
+    + '</div>';
   html += '</div>';
+
+  // API 비용 상세 카드
+  html += '<div id="bot-api-detail" style="background:#fff;border-radius:12px;border:0.5px solid #e0e0e0;padding:1.25rem;margin-bottom:16px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  html += '<span style="font-size:14px;font-weight:500">API 비용 상세</span>';
+  html += '<span style="font-size:12px;color:#999">Sonnet 4</span>';
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">';
+  html += '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999;margin-bottom:4px">오늘</div><div style="font-size:20px;font-weight:500" id="bot-cost-today">$0.00</div><div style="font-size:11px;color:#999;margin-top:2px" id="bot-count-today">0건</div></div>';
+  html += '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999;margin-bottom:4px">이번 주</div><div style="font-size:20px;font-weight:500" id="bot-cost-week">$0.00</div><div style="font-size:11px;color:#999;margin-top:2px" id="bot-count-week">0건</div></div>';
+  html += '<div style="background:#f7f7f5;border-radius:8px;padding:12px"><div style="font-size:11px;color:#999;margin-bottom:4px">이번 달</div><div style="font-size:20px;font-weight:500" id="bot-cost-month">$0.00</div><div style="font-size:11px;color:#999;margin-top:2px" id="bot-count-month">0건</div></div>';
+  html += '</div>';
+  html += '<div style="border-top:0.5px solid #e0e0e0;padding-top:12px">';
+  html += '<div style="font-size:12px;color:#888;margin-bottom:8px">오늘 토큰 사용량</div>';
+  html += '<div style="display:flex;gap:16px">';
+  html += '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">입력</span><span style="font-size:11px;color:#888" id="bot-tokens-input">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#378ADD;border-radius:2px;width:0%" id="bot-tokens-input-bar"></div></div></div>';
+  html += '<div style="flex:1"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#999">출력</span><span style="font-size:11px;color:#888" id="bot-tokens-output">0</span></div><div style="height:4px;background:#f0f0f0;border-radius:2px;overflow:hidden"><div style="height:100%;background:#1D9E75;border-radius:2px;width:0%" id="bot-tokens-output-bar"></div></div></div>';
+  html += '</div></div></div>';
 
   // ── B. 필터 영역 ──
   html += '<div style="display:flex;gap:8px;align-items:center;padding:10px 0;flex-wrap:wrap">';
