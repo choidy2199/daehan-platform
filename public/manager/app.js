@@ -11489,6 +11489,7 @@ function showEstimateList() {
 
 function renderEstimateList() {
   const body = document.getElementById('est-list-body');
+  if (!body) return;
   body.innerHTML = estimates.map((e, i) => {
     return `<tr>
       <td class="center" style="font-weight:600">${e.no}</td>
@@ -11504,7 +11505,8 @@ function renderEstimateList() {
   if (!estimates.length) {
     body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>저장된 견적서가 없습니다</p></div></td></tr>';
   }
-  document.getElementById('est-list-count').textContent = `${estimates.length}건`;
+  var countEl = document.getElementById('est-list-count');
+  if (countEl) countEl.textContent = `${estimates.length}건`;
 }
 
 function getTodayStr() {
@@ -11516,8 +11518,10 @@ var _estDateManuallySet = false;
 function newEstimate() {
   currentEstIdx = -1;
   currentEstItems = [];
-  document.getElementById('est-client').value = '';
-  document.getElementById('est-date').value = getTodayStr();
+  var clientEl = document.getElementById('est-client');
+  var dateEl = document.getElementById('est-date');
+  if (clientEl) clientEl.value = '';
+  if (dateEl) dateEl.value = getTodayStr();
   _estDateManuallySet = false;
   estSelectedClient = null;
   var cInfo = document.getElementById('est-client-info');
@@ -11699,6 +11703,7 @@ function onEstMemoChange(idx, val) {
 
 function renderEstimateItems() {
   const body = document.getElementById('est-body');
+  if (!body) return;
   const isVatExempt = estSelectedClient && estSelectedClient.vatExempt === true;
   let total = 0;
   body.innerHTML = currentEstItems.map((item, i) => {
@@ -11732,9 +11737,9 @@ function renderEstimateItems() {
   }
   const totalVat = isVatExempt ? 0 : Math.round(total * 0.1);
   const vatLabel = isVatExempt ? '부가세 면제' : '부가세 ' + fmt(totalVat);
-  document.getElementById('est-total').innerHTML = `${fmt(total)} <span style="font-size:13px;color:#5A6070;font-weight:400">+</span> <span style="font-size:13px;color:${isVatExempt ? '#CC2222' : '#5A6070'}">${vatLabel}</span> <span style="font-size:13px;color:#5A6070;font-weight:400">=</span> <span style="font-size:18px;color:#CC2222">토탈 ${fmt(total + totalVat)}</span>`;
-  initColumnResize('est-table');
-  initStickyHeader('est-table');
+  var estTotalEl = document.getElementById('est-total');
+  if (estTotalEl) estTotalEl.innerHTML = `${fmt(total)} <span style="font-size:13px;color:#5A6070;font-weight:400">+</span> <span style="font-size:13px;color:${isVatExempt ? '#CC2222' : '#5A6070'}">${vatLabel}</span> <span style="font-size:13px;color:#5A6070;font-weight:400">=</span> <span style="font-size:18px;color:#CC2222">토탈 ${fmt(total + totalVat)}</span>`;
+  if (document.getElementById('est-table')) { initColumnResize('est-table'); initStickyHeader('est-table'); }
 }
 
 function onEstPriceChange(idx, val) {
