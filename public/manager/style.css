@@ -710,6 +710,8 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .bot-btn-confirm:hover { background:#0C447C; }
 
 /* 검색 탭 테이블 */
+#est-search-table th { border-right:1px solid #D1D5DB; }
+#est-search-table th:last-child { border-right:none; }
 #est-search-table td { font-size:13px; }
 #est-search-table td .btn-edit { font-size:13px; }
 

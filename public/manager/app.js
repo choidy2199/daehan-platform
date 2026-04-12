@@ -10586,7 +10586,7 @@ function _initColumnResizeImpl(tableId) {
 
   ths.forEach((th, thIdx) => {
     if (th.querySelector('.col-resize')) return;
-    if (th.dataset.noResize) return; // No. 컬럼 등 리사이즈 비활성화
+    var noResize = !!th.dataset.noResize;
     th.classList.add('resizable');
     const handle = document.createElement('div');
     handle.className = 'col-resize';
@@ -10594,9 +10594,11 @@ function _initColumnResizeImpl(tableId) {
 
     let startX, startW, clickTimer = null, clickCount = 0;
 
+    if (noResize) { handle.style.cursor = 'default'; }
     handle.addEventListener('mousedown', function(e) {
       e.preventDefault();
       e.stopPropagation();
+      if (noResize) return; // 구분선은 보이지만 드래그 비활성
 
       // 더블클릭 감지
       clickCount++;
