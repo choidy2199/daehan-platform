@@ -141,7 +141,7 @@ async function forceUploadAll() {
   if (btn) btn.disabled = true;
   updateSyncStatus('동기화 중...');
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts'];
 
   try {
     var uploadData = [];
@@ -188,7 +188,7 @@ async function uploadAllToSupabase() {
   btn.style.background = '#888';
   btn.style.color = '#fff';
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts'];
 
   try {
     var uploadData = [];
@@ -471,6 +471,10 @@ function refreshActiveTab() {
     }
     if (tabId === 'tab-estimate' && typeof renderEstimateList === 'function') renderEstimateList();
     if (tabId === 'tab-general' && typeof renderGenProducts === 'function') renderGenProducts();
+    if (tabId === 'tab-kakao') {
+      var activeKakaoSub = localStorage.getItem('mw_kakao_active_subtab') || 'kakao-dashboard';
+      if (activeKakaoSub === 'kakao-dashboard' && typeof _refreshDashboardData === 'function') _refreshDashboardData();
+    }
 
     console.log('[Realtime] UI 갱신 완료:', tabId);
   } catch (e) {
@@ -1997,9 +2001,9 @@ var _tabIdMap = {
   'gen-trade':        { contentId: 'tab-gen-trade',        placeholder: true },
   'sales-online':     { contentId: 'tab-sales',            render: 'sales' },
   'sales-marketing':  { contentId: 'tab-sales-marketing',  placeholder: true },
-  'import-product':   { contentId: 'tab-import-product',   placeholder: true },
+  'import-product':   { contentId: 'tab-import-product',   render: 'importProduct' },
   'import-calc':      { contentId: 'tab-import-calc',      render: 'importCalc' },
-  'import-invoice':   { contentId: 'tab-import-invoice',   placeholder: true },
+  'import-invoice':   { contentId: 'tab-import-invoice',   render: 'importInvoice' },
   'delivery':         { contentId: 'tab-delivery',         placeholder: true },
   'search':           { contentId: 'tab-estimate',         render: 'estimate' },
   'kakao':            { contentId: 'tab-kakao',            render: 'kakao' },
@@ -2067,6 +2071,8 @@ function switchTab(tab) {
       if (renderKey === 'notice') renderNoticeTab();
       if (renderKey === 'backorder') renderBackorderTab();
       if (renderKey === 'importCalc') renderImportCalcTab();
+      if (renderKey === 'importProduct') renderImportProductTab();
+      if (renderKey === 'importInvoice') renderImportInvoiceTab();
       _renderedTabs[renderKey] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
@@ -15476,16 +15482,27 @@ function renderKakaoTab() {
   renderBotRoomTable();
   _initKakaoRoomsSearch();
 
-  // 봇 토글 이벤트
+  // 봇 마스터 토글 이벤트
   var toggle = document.getElementById('kakao-bot-toggle');
   if (toggle) {
     toggle.addEventListener('change', function() {
+      var isOn = this.checked;
       var cfg = JSON.parse(localStorage.getItem('mw_bot_config') || '{}');
-      cfg.botEnabled = this.checked;
+      cfg.botEnabled = isOn;
       localStorage.setItem('mw_bot_config', JSON.stringify(cfg));
-      _updateBotStatusUI(this.checked);
+      // 모든 톡방 botActive 일괄 변경
+      var roomData = _getBotRooms();
+      for (var i = 0; i < roomData.rooms.length; i++) {
+        roomData.rooms[i].botActive = isOn;
+      }
+      _saveBotRooms(roomData);
+      _updateBotStatusUI(isOn);
     });
   }
+
+  // 대시보드 탭이면 자동 갱신 시작
+  var activeSubTab = localStorage.getItem('mw_kakao_active_subtab') || 'kakao-dashboard';
+  if (activeSubTab === 'kakao-dashboard') _startDashboardAutoRefresh();
 }
 
 function switchKakaoSubTab(tabId) {
@@ -15502,92 +15519,264 @@ function switchKakaoSubTab(tabId) {
   });
 
   localStorage.setItem('mw_kakao_active_subtab', tabId);
+
+  // 대시보드 탭 자동갱신 제어
+  if (tabId === 'kakao-dashboard') {
+    _refreshDashboardData();
+    _startDashboardAutoRefresh();
+  } else {
+    _stopDashboardAutoRefresh();
+  }
 }
 
 function _updateBotStatusUI(isOn) {
   var dot = document.getElementById('kakao-bot-status-dot');
   var text = document.getElementById('kakao-bot-status-text');
   if (dot) dot.style.color = isOn ? '#1D9E75' : '#E8344E';
-  if (text) text.textContent = isOn ? '봇 정상 작동중' : '봇 정지됨';
+  if (text) {
+    var activeCount = _getBotRooms().rooms.filter(function(r) { return r.botActive; }).length;
+    text.textContent = isOn ? '정상 가동중 (' + activeCount + '개 톡방)' : '봇 정지';
+  }
+  _refreshDashboardData();
 }
+
+var _dashboardInterval = null;
 
 function _buildKakaoDashboard() {
   var cfg = JSON.parse(localStorage.getItem('mw_bot_config') || '{}');
-  var botOn = cfg.botEnabled !== false; // 기본 ON
+  var botOn = cfg.botEnabled !== false;
+  var rooms = _getBotRooms().rooms;
+  var activeCount = rooms.filter(function(r) { return r.botActive; }).length;
 
   var html = '';
 
-  // ── 헤더 영역 ──
-  html += '<div class="kakao-dash-header">';
-  html += '<div class="kakao-dash-title">카카오톡 봇 대시보드</div>';
-  html += '<div class="kakao-dash-status">';
-  html += '<span id="kakao-bot-status-dot" style="color:' + (botOn ? '#1D9E75' : '#E8344E') + '">●</span> ';
-  html += '<span id="kakao-bot-status-text">' + (botOn ? '봇 정상 작동중' : '봇 정지됨') + '</span>';
+  // ── ① 상단: 봇 상태 바 ──
+  html += '<div class="bot-status-bar">';
+  html += '<div class="bot-status-left">';
+  html += '<span id="kakao-bot-status-dot" style="font-size:10px;color:' + (botOn ? '#1D9E75' : '#E8344E') + '">●</span> ';
+  html += '<span id="kakao-bot-status-text" style="font-size:13px;font-weight:600;color:#1A1D23">' + (botOn ? '정상 가동중 (' + activeCount + '개 톡방)' : '봇 정지') + '</span>';
+  html += '</div>';
+  html += '<div class="bot-status-right">';
+  html += '<span style="font-size:12px;color:#5A6070;margin-right:8px">마스터</span>';
   html += '<label class="kakao-toggle"><input type="checkbox" id="kakao-bot-toggle"' + (botOn ? ' checked' : '') + '><span class="kakao-toggle-slider"></span></label>';
   html += '</div>';
   html += '</div>';
 
-  // ── KPI 카드 4장 ──
-  html += '<div class="kakao-kpi-row">';
-
-  html += _kakaoKpiCard('오늘 수신', '0건', '어제 대비 +0', '#185FA5');
-  html += _kakaoKpiCard('자동응답 (봇)', '0건', '응답률 0%', '#1D9E75');
-  html += _kakaoKpiCard('미응답 (사람 필요)', '0건', 'AS 0 / 기타 0', '#E8344E', true);
-  html += _kakaoKpiCard('송장 전달', '0건', '오늘 발송 완료', '#185FA5');
-
+  // ── ② KPI 4카드 ──
+  html += '<div class="bot-kpi-row" id="bot-kpi-row">';
+  html += _buildDashKpiCards();
   html += '</div>';
 
-  // ── 중간 2단 영역 (톡방 현황 + 최근 대화) ──
-  html += '<div class="kakao-mid-row">';
+  // ── ③ 중단 좌우 분할 (6:4) ──
+  html += '<div class="bot-mid-grid">';
 
-  // 좌측: 활성 톡방 현황
-  html += '<div class="kakao-section">';
-  html += '<div class="kakao-section-header">';
-  html += '<span>활성 톡방 현황</span>';
-  html += '<span class="kakao-section-sub">총 0개 / 봇 활성 0개</span>';
-  html += '</div>';
-  html += '<div class="kakao-section-body">';
-  html += '<table class="kakao-table"><thead><tr>';
-  html += '<th>톡방</th><th>거래처</th><th>오늘</th><th>상태</th>';
-  html += '</tr></thead><tbody>';
-  html += '<tr><td colspan="4" class="kakao-empty">등록된 톡방이 없습니다</td></tr>';
-  html += '</tbody></table>';
+  // 좌측: 최근 대화
+  html += '<div class="bot-section">';
+  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">최근 대화</span>';
+  html += '<a href="javascript:void(0)" onclick="switchKakaoSubTab(\'kakao-logs\')" style="font-size:12px;color:#185FA5;text-decoration:none">전체보기 →</a></div>';
+  html += '<div id="bot-dash-recent" class="bot-section-body">';
+  html += _buildDashRecentTable();
   html += '</div>';
   html += '</div>';
 
-  // 우측: 최근 대화 실시간
-  html += '<div class="kakao-section">';
-  html += '<div class="kakao-section-header">';
-  html += '<span>최근 대화 (실시간)</span>';
-  html += '<button class="kakao-btn-sm" onclick="alert(\'전체 대화 로그 — 추후 구현\')">전체보기</button>';
-  html += '</div>';
-  html += '<div class="kakao-section-body">';
-  html += '<table class="kakao-table"><thead><tr>';
-  html += '<th>시간</th><th>거래처</th><th>내용</th><th>상태</th>';
-  html += '</tr></thead><tbody>';
-  html += '<tr><td colspan="4" class="kakao-empty">대화 내역이 없습니다</td></tr>';
-  html += '</tbody></table>';
+  // 우측: 미응답 건
+  html += '<div class="bot-section">';
+  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">미응답 건</span>';
+  html += '<span id="bot-unresolved-badge" class="bot-unresolve-badge">0</span></div>';
+  html += '<div id="bot-dash-unresolved" class="bot-section-body">';
+  html += _buildDashUnresolvedCards();
   html += '</div>';
   html += '</div>';
 
-  html += '</div>'; // .kakao-mid-row
+  html += '</div>'; // .bot-mid-grid
 
-  // ── 하단: 미응답 건 ──
-  html += '<div class="kakao-section kakao-section-full">';
-  html += '<div class="kakao-section-header">';
-  html += '<span>미응답 건 (사람 처리 필요)</span>';
-  html += '<span class="kakao-section-sub">0건</span>';
-  html += '</div>';
-  html += '<div class="kakao-section-body">';
-  html += '<table class="kakao-table"><thead><tr>';
-  html += '<th>시간</th><th>톡방</th><th>발신자</th><th>내용</th><th>분류</th><th>처리</th>';
-  html += '</tr></thead><tbody>';
-  html += '<tr><td colspan="6" class="kakao-empty">미처리 건이 없습니다</td></tr>';
-  html += '</tbody></table>';
+  // ── ④ 하단: 활성 톡방 현황 ──
+  html += '<div class="bot-section" style="margin-top:12px">';
+  html += '<div class="bot-section-hdr"><span style="font-size:14px;font-weight:600;color:#1A1D23">활성 톡방 현황</span>';
+  html += '<a href="javascript:void(0)" onclick="switchKakaoSubTab(\'kakao-rooms\')" style="font-size:12px;color:#185FA5;text-decoration:none">톡방관리 →</a></div>';
+  html += '<div class="bot-section-body">';
+  html += _buildDashRoomSummary();
   html += '</div>';
   html += '</div>';
 
   return html;
+}
+
+// ── KPI 카드 빌더 ──
+function _buildDashKpiCards() {
+  var msgs = getBotMessages().messages;
+  var tracking = getBotTracking().records;
+  var todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' })).toDateString();
+
+  var todayReceived = 0, todayBotReplied = 0, humanNeeded = 0, todayTracking = 0;
+  for (var i = 0; i < msgs.length; i++) {
+    var m = msgs[i];
+    var mDate = new Date(m.timestamp).toDateString();
+    if (m.type === 'received' && mDate === todayStr) todayReceived++;
+    if (m.status === 'bot_replied' && mDate === todayStr) todayBotReplied++;
+    if (m.status === 'human_needed') humanNeeded++;
+  }
+  for (var j = 0; j < tracking.length; j++) {
+    if (new Date(tracking[j].createdAt).toDateString() === todayStr) todayTracking++;
+  }
+
+  var h = '';
+  h += _dashKpiCard('오늘 수신', todayReceived, '📩', '#1A1D23');
+  h += _dashKpiCard('봇 자동응답', todayBotReplied, '🤖', '#1D9E75');
+  h += _dashKpiCard('미응답 (사람필요)', humanNeeded, '🔴', '#E8344E');
+  h += _dashKpiCard('오늘 송장전달', todayTracking, '📦', '#185FA5');
+  return h;
+}
+
+function _dashKpiCard(label, value, icon, color) {
+  return '<div class="bot-kpi-card">' +
+    '<div class="bot-kpi-top"><span class="bot-kpi-label">' + label + '</span>' +
+    '<span class="bot-kpi-icon">' + icon + '</span></div>' +
+    '<div class="bot-kpi-value" style="color:' + color + '">' + value.toLocaleString() + '</div>' +
+    '</div>';
+}
+
+// ── 최근 대화 테이블 (최신 15건) ──
+function _buildDashRecentTable() {
+  var msgs = getBotMessages().messages.slice().sort(function(a, b) {
+    return new Date(b.timestamp) - new Date(a.timestamp);
+  }).slice(0, 15);
+
+  if (msgs.length === 0) {
+    return '<div style="text-align:center;padding:40px;color:#9BA3B2;font-size:13px">대화 내역이 없습니다</div>';
+  }
+
+  var todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' })).toDateString();
+  var statusMap = {
+    'bot_replied': { label:'봇응답', bg:'#E1F5EE', color:'#085041' },
+    'human_needed': { label:'사람필요', bg:'#FCEBEB', color:'#CC2222' },
+    'pending': { label:'대기', bg:'#FAEEDA', color:'#854F0B' },
+    'confirmed': { label:'확인', bg:'#E6F1FB', color:'#0C447C' }
+  };
+
+  var h = '<table class="bot-dash-table"><thead><tr><th style="width:70px">시간</th><th style="width:90px">톡방</th><th>메시지</th><th style="width:66px">상태</th></tr></thead><tbody>';
+  for (var i = 0; i < msgs.length; i++) {
+    var m = msgs[i];
+    var d = new Date(m.timestamp);
+    var timeStr = d.toDateString() === todayStr
+      ? ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)
+      : ('0' + (d.getMonth()+1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var roomName = (m.roomName || '').replace(/★[^★]*★\s*/, '');
+    if (roomName.length > 10) roomName = roomName.substring(0, 10) + '...';
+    var content = (m.content || '').substring(0, 25);
+    if ((m.content || '').length > 25) content += '...';
+    var st = statusMap[m.status] || { label: m.status || '-', bg:'#F0F1F3', color:'#5A6070' };
+    h += '<tr style="cursor:pointer" onclick="switchKakaoSubTab(\'kakao-logs\')">';
+    h += '<td style="font-size:12px;color:#5A6070">' + timeStr + '</td>';
+    h += '<td style="font-size:12px">' + roomName + '</td>';
+    h += '<td style="font-size:13px;text-align:left">' + content + '</td>';
+    h += '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:' + st.bg + ';color:' + st.color + '">' + st.label + '</span></td>';
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+  return h;
+}
+
+// ── 미응답 건 카드 ──
+function _buildDashUnresolvedCards() {
+  var msgs = getBotMessages().messages.filter(function(m) { return m.status === 'human_needed'; });
+  msgs.sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });
+  msgs = msgs.slice(0, 5);
+
+  // 뱃지 업데이트
+  setTimeout(function() {
+    var badge = document.getElementById('bot-unresolved-badge');
+    if (badge) {
+      var total = getBotMessages().messages.filter(function(m) { return m.status === 'human_needed'; }).length;
+      badge.textContent = total;
+      badge.style.display = total > 0 ? 'inline-flex' : 'none';
+    }
+  }, 0);
+
+  if (msgs.length === 0) {
+    return '<div style="text-align:center;padding:40px;color:#9BA3B2;font-size:13px">미응답 건이 없습니다</div>';
+  }
+
+  var todayStr = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' })).toDateString();
+  var h = '';
+  for (var i = 0; i < msgs.length; i++) {
+    var m = msgs[i];
+    var d = new Date(m.timestamp);
+    var timeStr = d.toDateString() === todayStr
+      ? ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2)
+      : ('0' + (d.getMonth()+1)).slice(-2) + '/' + ('0' + d.getDate()).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var roomName = (m.roomName || '').replace(/★[^★]*★\s*/, '');
+    var content = (m.content || '').substring(0, 40);
+    if ((m.content || '').length > 40) content += '...';
+
+    h += '<div class="bot-unresolved-card">';
+    h += '<div class="bot-unresolved-row1"><span style="font-weight:600;font-size:13px">' + roomName + '</span><span style="font-size:11px;color:#9BA3B2">' + timeStr + '</span></div>';
+    h += '<div style="font-size:13px;color:#1A1D23;margin:4px 0 8px">' + content + '</div>';
+    h += '<button class="bot-btn-confirm" onclick="_dashConfirmMsg(\'' + m.id + '\')">확인완료</button>';
+    h += '</div>';
+  }
+  return h;
+}
+
+// ── 확인완료 처리 ──
+function _dashConfirmMsg(msgId) {
+  var data = getBotMessages();
+  for (var i = 0; i < data.messages.length; i++) {
+    if (data.messages[i].id === msgId) {
+      data.messages[i].status = 'confirmed';
+      break;
+    }
+  }
+  saveBotMessages(data);
+  _refreshDashboardData();
+}
+
+// ── 활성 톡방 요약 (최대 5행) ──
+function _buildDashRoomSummary() {
+  var rooms = _getBotRooms().rooms.filter(function(r) { return r.status === 'mapped'; });
+  if (rooms.length === 0) {
+    return '<div style="text-align:center;padding:24px;color:#9BA3B2;font-size:13px">매핑된 톡방이 없습니다</div>';
+  }
+  var show = rooms.slice(0, 5);
+  var h = '<table class="bot-dash-table"><thead><tr><th>톡방명</th><th>담당자</th><th style="width:66px">봇상태</th></tr></thead><tbody>';
+  for (var i = 0; i < show.length; i++) {
+    var r = show[i];
+    var name = (r.roomName || '').replace(/★[^★]*★\s*/, '') || r.customerName || '-';
+    var person = r.salesRep || '-';
+    var botSt = r.botActive ? '<span style="color:#1D9E75;font-weight:600">ON</span>' : '<span style="color:#E8344E">OFF</span>';
+    h += '<tr><td style="text-align:left">' + name + '</td><td>' + person + '</td><td>' + botSt + '</td></tr>';
+  }
+  h += '</tbody></table>';
+  if (rooms.length > 5) {
+    h += '<div style="text-align:center;padding:8px;font-size:12px;color:#5A6070">톡방관리에서 전체 ' + rooms.length + '개 확인 →</div>';
+  }
+  return h;
+}
+
+// ── 대시보드 데이터 새로고침 (KPI + 테이블 + 미응답) ──
+function _refreshDashboardData() {
+  var kpiRow = document.getElementById('bot-kpi-row');
+  if (kpiRow) kpiRow.innerHTML = _buildDashKpiCards();
+  var recentEl = document.getElementById('bot-dash-recent');
+  if (recentEl) recentEl.innerHTML = _buildDashRecentTable();
+  var unresolvedEl = document.getElementById('bot-dash-unresolved');
+  if (unresolvedEl) unresolvedEl.innerHTML = _buildDashUnresolvedCards();
+}
+
+// ── 대시보드 30초 자동 갱신 ──
+function _startDashboardAutoRefresh() {
+  _stopDashboardAutoRefresh();
+  _dashboardInterval = setInterval(function() {
+    var activeTab = localStorage.getItem('mw_kakao_active_subtab');
+    if (activeTab === 'kakao-dashboard') {
+      _refreshDashboardData();
+    } else {
+      _stopDashboardAutoRefresh();
+    }
+  }, 30000);
+}
+function _stopDashboardAutoRefresh() {
+  if (_dashboardInterval) { clearInterval(_dashboardInterval); _dashboardInterval = null; }
 }
 
 function _kakaoKpiCard(label, value, sub, color, isAlert) {
@@ -16254,6 +16443,66 @@ function _filterKakaoTemplates(cat) {
     card.style.display = card.getAttribute('data-tpl-cat') === cat ? 'block' : 'none';
   });
 }
+
+// ========================================
+// 카카오톡 — 데이터 구조 4개 (get/save 헬퍼)
+// ========================================
+
+function getBotMessages() {
+  var data = loadObj('mw_bot_messages', { messages: [] });
+  if (Array.isArray(data)) { data = { messages: data }; }
+  if (!data.messages) data.messages = [];
+  return data;
+}
+function saveBotMessages(data) { save('mw_bot_messages', data); }
+
+function getBotTemplates() {
+  var data = loadObj('mw_bot_templates', { templates: [] });
+  // 마이그레이션: 기존 배열 형태 → 객체 래핑
+  if (Array.isArray(data)) {
+    data = { templates: data.map(function(t, i) {
+      return Object.assign({
+        id: t.id || 'tpl_' + Date.now() + '_' + i,
+        active: true,
+        createdAt: t.createdAt || new Date().toISOString(),
+        updatedAt: t.updatedAt || new Date().toISOString()
+      }, t);
+    })};
+  }
+  if (!data.templates) data.templates = [];
+  // 기본 7개 템플릿 자동 생성
+  if (data.templates.length === 0) {
+    var now = new Date().toISOString();
+    data.templates = [
+      { id:'tpl_default_1', name:'재고있음 — 단가 포함', category:'stock', badge:'auto', content:'{제품명} {단가}원 재고있습니다.', variables:['제품명','단가'], active:true, createdAt:now, updatedAt:now },
+      { id:'tpl_default_2', name:'품절 — 본사재고 없음', category:'stock', badge:'auto', content:'현재 {제품명} 품절입니다. 입고일정 확인후 말씀드리겠습니다.', variables:['제품명'], active:true, createdAt:now, updatedAt:now },
+      { id:'tpl_default_3', name:'품절 — 발주후 출고가능', category:'stock', badge:'auto', content:'현재 {제품명} 재고는 없지만 발주 가능합니다. 주문시 {입고예정} 출고됩니다.', variables:['제품명','입고예정'], active:true, createdAt:now, updatedAt:now },
+      { id:'tpl_default_4', name:'확인질문 — 유사 제품', category:'stock', badge:'ai', content:'말씀하신 제품이 아래 중 어떤 제품인지 확인부탁드립니다.\n{후보목록}', variables:['후보목록'], active:true, createdAt:now, updatedAt:now },
+      { id:'tpl_default_5', name:'직송 접수 확인', category:'shipping', badge:'receipt', content:'접수되었습니다. 송장번호는 나오는대로 전달드리겠습니다.', variables:[], active:true, createdAt:now, updatedAt:now },
+      { id:'tpl_default_6', name:'송장번호 전달', category:'shipping', badge:'send', content:'{수령인} {택배사} {송장번호}', variables:['수령인','택배사','송장번호'], active:true, createdAt:now, updatedAt:now },
+      { id:'tpl_default_7', name:'AS/반품 안내', category:'as_return', badge:'human', content:'담당자 확인 후 답변드리겠습니다.', variables:[], active:true, createdAt:now, updatedAt:now }
+    ];
+    save('mw_bot_templates', data);
+  }
+  return data;
+}
+function saveBotTemplates(data) { save('mw_bot_templates', data); }
+
+function getBotTracking() {
+  var data = loadObj('mw_bot_tracking', { records: [] });
+  if (Array.isArray(data)) { data = { records: data }; }
+  if (!data.records) data.records = [];
+  return data;
+}
+function saveBotTracking(data) { save('mw_bot_tracking', data); }
+
+function getBotBroadcasts() {
+  var data = loadObj('mw_bot_broadcasts', { broadcasts: [] });
+  if (Array.isArray(data)) { data = { broadcasts: data }; }
+  if (!data.broadcasts) data.broadcasts = [];
+  return data;
+}
+function saveBotBroadcasts(data) { save('mw_bot_broadcasts', data); }
 
 // ========================================
 // 카카오톡 — 톡방관리 탭
