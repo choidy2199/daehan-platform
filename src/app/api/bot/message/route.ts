@@ -66,9 +66,18 @@ async function getAllProducts(): Promise<Product[]> {
     supabase.from('app_data').select('value').eq('key', 'mw_products').single(),
     supabase.from('app_data').select('value').eq('key', 'mw_gen_products').single(),
   ]);
+
+  if (mwRes.error) console.error('[bot] mw_products 로드 실패:', mwRes.error.message);
+  if (genRes.error) console.error('[bot] mw_gen_products 로드 실패:', genRes.error.message);
+
+  const mwProducts = Array.isArray(mwRes.data?.value) ? mwRes.data.value : [];
+  const genProducts = Array.isArray(genRes.data?.value) ? genRes.data.value : [];
+
+  console.log(`[bot] 제품 로드: 밀워키 ${mwProducts.length}건, 일반 ${genProducts.length}건`);
+
   const all = [
-    ...(Array.isArray(mwRes.data?.value) ? mwRes.data.value : []),
-    ...(Array.isArray(genRes.data?.value) ? genRes.data.value : []),
+    ...mwProducts,
+    ...genProducts,
   ] as Product[];
   _productsCache = { data: all, ts: Date.now() };
   return all;
