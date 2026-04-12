@@ -15,13 +15,108 @@ function toggleSidebarGroup(btn) {
   sub.classList.toggle('open');
   if (arrow) arrow.classList.toggle('open');
 }
-// 사이드바에서 창 열기 — 기존 openWindow 호출
-function _sidebarOpenWindow(name) {
-  if (typeof openWindow === 'function') openWindow(name);
+// 사이드바에서 창 열기 — 기존 openWindow 호출 + 크롬탭 갱신 + active 표시
+function _sidebarOpenWindow(name, settingsSub) {
+  if (typeof openWindow === 'function') openWindow(name, settingsSub);
+  _renderChromeTabBar();
+  _updateSidebarActive(name);
 }
 // 크롬 탭 홈
 function _chromeGoHome() {
   if (typeof goDesktop === 'function') goDesktop();
+  _renderChromeTabBar();
+  _updateSidebarActive(null);
+}
+
+// ── 크롬 탭 바 렌더링 (기존 _renderTabBar 대응) ──
+var _chromeDotColors = { red:'#E24B4A', blue:'#378ADD', green:'#1D9E75', orange:'#EF9F27', purple:'#7F77DD', gray:'#888780', teal:'#14a49c', pink:'#D4537E', darkgray:'#444441' };
+
+function _renderChromeTabBar() {
+  var items = document.getElementById('chromeTabItems');
+  if (!items) return;
+
+  // 홈 탭 active 상태
+  var homeTab = document.querySelector('.chrome-tab-home');
+  if (homeTab) homeTab.classList.toggle('active', !_activeWindow);
+
+  items.innerHTML = '';
+  if (typeof _openWindows === 'undefined' || _openWindows.length === 0) return;
+
+  _openWindows.forEach(function(name, idx) {
+    var cfg = (typeof _windowConfig !== 'undefined') ? _windowConfig[name] : null;
+    var dotColor = cfg ? (_chromeDotColors[cfg.color] || '#999') : '#999';
+    var isActive = name === _activeWindow;
+
+    // 구분선 (첫번째 탭 앞에도)
+    var sep = document.createElement('div');
+    sep.className = 'chrome-tab-sep';
+    items.appendChild(sep);
+
+    var tab = document.createElement('div');
+    tab.className = 'chrome-tab' + (isActive ? ' active' : '');
+    tab.setAttribute('data-window', name);
+    tab.onclick = function() { _chromeActivateTab(name); };
+
+    tab.innerHTML = '<div class="chrome-tab-dot" style="background:' + dotColor + '"></div>'
+      + '<span style="overflow:hidden;text-overflow:ellipsis">' + name + '</span>'
+      + '<span class="chrome-tab-close" onclick="event.stopPropagation();_chromeCloseTab(\'' + name.replace(/'/g, "\\'") + '\')">✕</span>';
+
+    items.appendChild(tab);
+  });
+}
+
+function _chromeActivateTab(name) {
+  if (typeof focusWindow === 'function') focusWindow(name);
+  _renderChromeTabBar();
+  _updateSidebarActive(name);
+}
+
+function _chromeCloseTab(name) {
+  if (typeof closeWindow === 'function') closeWindow(name);
+  _renderChromeTabBar();
+  _updateSidebarActive(_activeWindow);
+}
+
+// ── 사이드바 active 항목 표시 ──
+function _updateSidebarActive(windowName) {
+  // 모든 sub-item과 single에서 active 제거
+  document.querySelectorAll('.sidebar-sub-item.active').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('.sidebar-single.active').forEach(function(el) { el.classList.remove('active'); });
+
+  if (!windowName) return;
+
+  // _windowConfig에서 tabId 찾기
+  var cfg = (typeof _windowConfig !== 'undefined') ? _windowConfig[windowName] : null;
+  if (!cfg) return;
+  var tabId = cfg.tabId;
+
+  // _tabIdMap에서 contentId 찾기
+  var meta = (typeof _tabIdMap !== 'undefined') ? _tabIdMap[tabId] : null;
+  if (!meta) return;
+
+  // data-tab 속성으로 매칭 (sidebar sub-item)
+  var contentId = meta.contentId;
+  var subItem = document.querySelector('.sidebar-sub-item[data-tab="' + contentId + '"]');
+  if (subItem) {
+    subItem.classList.add('active');
+    // 해당 그룹 열기
+    var group = subItem.closest('.sidebar-group');
+    if (group) {
+      var sub = group.querySelector('.sidebar-sub');
+      var arrow = group.querySelector('.sidebar-arrow');
+      if (sub && !sub.classList.contains('open')) { sub.classList.add('open'); }
+      if (arrow && !arrow.classList.contains('open')) { arrow.classList.add('open'); }
+    }
+    return;
+  }
+
+  // sidebar-single에서 매칭 (onclick 텍스트로는 불가하므로 data-tab 이 없음 → windowName으로 매칭)
+  document.querySelectorAll('.sidebar-single').forEach(function(btn) {
+    var onclick = btn.getAttribute('onclick') || '';
+    if (onclick.indexOf("'" + windowName + "'") >= 0) {
+      btn.classList.add('active');
+    }
+  });
 }
 // 다크모드 토글
 function toggleDarkMode() {
@@ -1633,6 +1728,9 @@ function _renderTabBar() {
       + '<span class="tab-bar-close" onclick="event.stopPropagation();closeWindow(\'' + name + '\')" title="닫기">✕</span>';
     items.appendChild(el);
   });
+  // 크롬 탭 바도 동기화
+  if (typeof _renderChromeTabBar === 'function') _renderChromeTabBar();
+  if (typeof _updateSidebarActive === 'function') _updateSidebarActive(_activeWindow);
 }
 
 // 창 열기

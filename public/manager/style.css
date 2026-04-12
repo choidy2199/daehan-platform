@@ -76,6 +76,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: var(--d
 /* 단독 메뉴 */
 .sidebar-single { width:100%; display:flex; align-items:center; gap:8px; padding:7px 14px; background:none; border:none; cursor:pointer; font-family:'Pretendard',sans-serif; font-size:14px; font-weight:400; color:var(--dm-text); text-align:left; transition:background 0.12s; }
 .sidebar-single:hover { background:rgba(0,0,0,0.04); }
+.sidebar-single.active { color:var(--tl-primary); font-weight:600; background:var(--tl-primary-light); }
 .sidebar.collapsed .sidebar-single { justify-content:center; padding:7px 0; }
 .sidebar.collapsed .sidebar-group-btn { justify-content:center; padding:7px 0; }
 .sidebar-badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:#E8344E; color:#fff; font-size:10px; font-weight:700; margin-left:auto; }
