@@ -18690,6 +18690,277 @@ function renderImportCalcTab() {
   _importDoRender();
 }
 
+// ======================== 인보이스 탭 (ListView) ========================
+
+var _importViewSid = null;
+
+function _importExportExcelFromSnapshot(entry) {
+  var c = entry.snapshot, cm = entry.cmSnapshot;
+  var rows = cm.prods.filter(function(p) { return p.qty > 0; }).map(function(p) {
+    return { '브랜드': p.brand || '', '규격': p.spec || '', '모델': p.model || '', '수량 (EA)': p.qty, '단가 VAT별도 (₩)': p.exVAT, '단가 VAT포함 (₩)': p.inclVAT };
+  });
+  var summaryRows = [
+    {}, { '브랜드': '[ 요약 ]' },
+    { '브랜드': '거래처', '규격': c.company, '모델': c.invoiceNo, '수량 (EA)': c.date },
+    { '브랜드': '소계 (할인 전)', '규격': _importU(cm.sumRaw), '모델': _importK(cm.sumRaw * _importNv(c.rate)) + ' ₩' },
+    { '브랜드': '할인 (' + c.discRate + '%)', '규격': '−' + _importU(cm.discAmt) },
+    { '브랜드': '인보이스 합계', '규격': _importU(cm.sumUSD), '모델': _importK(cm.sumKRW) + ' ₩' },
+    { '브랜드': '통관비용 합계', '규격': _importK(cm.customsSum) + ' ₩' },
+    { '브랜드': '팔렛 비용', '규격': _importU(cm.palCost) },
+    { '브랜드': '총 원가 합계', '규격': _importK(cm.grandKRW) + ' ₩' }
+  ];
+  var ws = XLSX.utils.json_to_sheet(rows.concat(summaryRows));
+  ws['!cols'] = [14, 14, 20, 10, 16, 16].map(function(w) { return { wch: w }; });
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '수입계산서');
+  XLSX.writeFile(wb, '수입계산서_' + (c.company || '거래처') + '_' + (c.date || _importToday()) + '.xlsx');
+}
+
+function _importLoadSaved(sid) {
+  _importLoadData();
+  var entry = _importData.savedList.find(function(s) { return s.sid === sid; });
+  if (!entry) return;
+  var exist = _importData.calcs.find(function(x) { return x._sid === sid; });
+  if (exist) { _importData.aid = exist.id; _importSaveData(); _renderedTabs['importCalc'] = false; switchTab('import-calc'); return; }
+  var maxId = _importData.calcs.reduce(function(m, x) { return Math.max(m, x.id); }, 0);
+  var loadId = maxId + 1;
+  var loaded = JSON.parse(JSON.stringify(entry.snapshot));
+  loaded.id = loadId; loaded._sid = sid;
+  _importData.calcs.push(loaded);
+  _importData.aid = loadId;
+  _importSaveData();
+  _renderedTabs['importCalc'] = false;
+  switchTab('import-calc');
+}
+
+function _importDelSaved(sid) {
+  if (!confirm('이 인보이스를 삭제하시겠습니까?')) return;
+  _importLoadData();
+  _importData.savedList = _importData.savedList.filter(function(s) { return s.sid !== sid; });
+  _importSaveData();
+  _importViewSid = null;
+  _importDoRenderInvoice();
+}
+
+function _importToggleView(sid) {
+  _importViewSid = _importViewSid === sid ? null : sid;
+  _importDoRenderInvoice();
+}
+
+function _importDoRenderInvoice() {
+  var container = document.getElementById('tab-import-invoice');
+  if (!container) return;
+  _importLoadData();
+  var savedList = _importData.savedList || [];
+  var viewEntry = _importViewSid ? savedList.find(function(s) { return s.sid === _importViewSid; }) : null;
+  if (!viewEntry) _importViewSid = null;
+
+  var h = '';
+  if (savedList.length === 0) {
+    h += '<div class="imc-sec" style="text-align:center;padding:40px"><div style="font-size:14px;font-weight:600;margin-bottom:6px">저장된 계산서가 없습니다</div>';
+    h += '<div class="imc-mu" style="font-size:12px">수입계산기 작성 완료 후 [저장] 버튼을 누르면 여기에 기록됩니다</div></div>';
+  } else {
+    h += '<div style="display:grid;grid-template-columns:' + (viewEntry ? '1fr 1fr' : '1fr') + ';gap:10px">';
+    h += '<div class="imc-sec"><div class="imc-sec-hd"><span>인보이스 리스트 — ' + savedList.length + '건</span></div>';
+    h += '<div class="imc-ovx"><table class="imc-tbl"><thead><tr>';
+    h += '<th style="width:36px">#</th><th style="text-align:left;padding-left:14px;min-width:120px">거래처</th>';
+    h += '<th style="min-width:120px">인보이스 번호</th><th style="min-width:100px">날짜</th>';
+    h += '<th style="text-align:left;padding-left:10px;min-width:180px">품명 (모델)</th>';
+    h += '<th style="min-width:110px">환율 (₩/$)</th><th style="min-width:120px">인보이스 합계</th>';
+    h += '<th style="min-width:130px">총 원가 합계 (₩)</th><th style="min-width:110px">저장일시</th>';
+    h += '<th style="min-width:160px">관리</th></tr></thead><tbody>';
+    savedList.forEach(function(s, idx) {
+      var models = s.cmSnapshot.prods.filter(function(p) { return p.qty > 0; }).map(function(p) { return p.model || p.brand; }).filter(Boolean);
+      var modelStr = models.length <= 2 ? models.join(', ') : models.slice(0, 2).join(', ') + ' 외 ' + (models.length - 2) + '종';
+      h += '<tr class="imc-list-row' + (_importViewSid === s.sid ? ' active' : '') + '" onclick="_importToggleView(\'' + s.sid + '\')">';
+      h += '<td class="imc-tc imc-mu">' + (idx + 1) + '</td>';
+      h += '<td style="padding-left:14px;font-weight:700">' + (s.company || '') + '</td>';
+      h += '<td class="imc-tc" style="font-weight:600">' + (s.invoiceNo || '') + '</td>';
+      h += '<td class="imc-tc">' + (s.date || '') + '</td>';
+      h += '<td style="padding-left:10px;font-size:12px;color:#5A6070">' + (modelStr || '—') + '</td>';
+      h += s.cmSnapshot.aggRate > 0 ? '<td class="imc-tr imc-num" style="font-weight:800;color:#EF9F27">' + _importK(s.cmSnapshot.aggRate, 2) + ' <span style="font-size:10px;color:#9BA3B2">₩/$</span></td>' : '<td class="imc-tr imc-mu">—</td>';
+      h += '<td class="imc-tr imc-num imc-yel" style="font-weight:700">$' + _importK(s.cmSnapshot.totalUSD || Math.round(s.cmSnapshot.sumUSD)) + '</td>';
+      h += '<td class="imc-tr imc-num imc-red" style="font-weight:800">' + _importK(s.cmSnapshot.grandKRW) + ' ₩</td>';
+      h += '<td class="imc-tc imc-mu" style="font-size:11px">' + (s.savedAt || '') + '</td>';
+      h += '<td class="imc-tc"><div style="display:flex;gap:4px;justify-content:center;align-items:center">';
+      h += '<button class="imc-btn imc-btn-yel imc-btn-xs" onclick="event.stopPropagation();_importLoadSaved(\'' + s.sid + '\')">✎ 수정</button>';
+      h += '<button class="imc-btn imc-btn-blu imc-btn-xs" onclick="event.stopPropagation();_importExportExcelFromSnapshot(_importData.savedList[' + idx + '])">↓ Excel</button>';
+      h += '<button class="imc-btn imc-btn-xs" onclick="event.stopPropagation();_importDelSaved(\'' + s.sid + '\')" style="color:#CC2222;border-color:#CC2222">✕</button>';
+      h += '</div></td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+    if (viewEntry) {
+      var cms = viewEntry.cmSnapshot, sn = viewEntry.snapshot;
+      h += '<div><div class="imc-sec"><div class="imc-sec-hd"><span>상세 — ' + viewEntry.company + ' / ' + viewEntry.invoiceNo + '</span>';
+      h += '<button class="imc-btn-del-row" onclick="_importViewSid=null;_importDoRenderInvoice()" style="color:#fff;font-size:16px">×</button></div>';
+      h += '<div class="imc-sec-body"><div class="imc-stat-row" style="margin-bottom:10px">';
+      h += '<div class="imc-stat"><div class="imc-stat-lbl">소계 (할인 전)</div><div class="imc-stat-val imc-num imc-mu">' + _importU(cms.sumRaw) + '</div></div>';
+      h += '<div class="imc-stat"><div class="imc-stat-lbl">할인 (' + (sn.discRate || 0) + '%)</div><div class="imc-stat-val imc-num imc-red">−' + _importU(cms.discAmt) + '</div></div>';
+      h += '<div class="imc-stat"><div class="imc-stat-lbl">인보이스 합계</div><div class="imc-stat-val imc-num imc-yel">' + _importU(cms.sumUSD) + '</div><div class="imc-stat-sub imc-num">' + _importK(cms.sumKRW) + ' ₩</div></div>';
+      h += '<div class="imc-stat"><div class="imc-stat-lbl">통관비용</div><div class="imc-stat-val imc-num imc-blu">' + _importK(cms.customsSum) + ' ₩</div></div>';
+      h += '<div class="imc-stat"><div class="imc-stat-lbl">팔렛 비용</div><div class="imc-stat-val imc-num imc-mu">' + _importU(cms.palCost) + '</div></div>';
+      h += '<div class="imc-stat imc-stat-hl"><div class="imc-stat-lbl">총 원가 합계</div><div class="imc-stat-val imc-num imc-red">' + _importK(cms.grandKRW) + ' ₩</div></div>';
+      h += '</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px">';
+      cms.prods.filter(function(p) { return p.qty > 0; }).forEach(function(p) {
+        h += '<div class="imc-product-card"><div style="font-weight:700;margin-bottom:3px">' + (p.brand || '') + ' <span class="imc-mu" style="font-weight:400">' + (p.model || '') + '</span></div>';
+        if (p.spec) h += '<div class="imc-mu" style="font-size:11px;margin-bottom:3px">' + p.spec + '</div>';
+        h += '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:4px"><div><div style="font-size:10px;color:#5A6070">수량</div><div class="imc-num" style="font-weight:700">' + _importK(p.qty) + '개</div></div>';
+        h += '<div style="text-align:right"><div style="font-size:10px;color:#5A6070">VAT포함 단가</div><div class="imc-num imc-red" style="font-weight:800;font-size:15px">' + _importK(p.inclVAT) + ' ₩</div></div></div></div>';
+      });
+      h += '</div></div></div></div>';
+    }
+    h += '</div>';
+  }
+  container.innerHTML = '<div class="imc-wrap"><div class="imc-scroll">' + h + '</div></div>';
+}
+
+function renderImportInvoiceTab() { _importLoadData(); _importDoRenderInvoice(); }
+
+// ======================== 제품 탭 (DataView) ========================
+
+var _importEditId = null;
+var _importDraft = {};
+
+function _importStartEdit(item) { _importEditId = item.id; _importDraft = JSON.parse(JSON.stringify(item)); _importDoRenderProduct(); }
+function _importCancelEdit() { _importEditId = null; _importDraft = {}; _importDoRenderProduct(); }
+function _importSaveEdit() {
+  if (!_importDraft.brand && !_importDraft.model) return;
+  _importItems = _importItems.map(function(i) { return i.id === _importEditId ? JSON.parse(JSON.stringify(_importDraft)) : i; });
+  _importEditId = null; _importDraft = {};
+  _importSaveItems(); _importDoRenderProduct();
+}
+function _importAddItem() {
+  var item = _importMkItem();
+  _importItems.push(item);
+  _importEditId = item.id; _importDraft = JSON.parse(JSON.stringify(item));
+  _importSaveItems(); _importDoRenderProduct();
+}
+function _importDelItem(id) {
+  if (!confirm('이 제품을 삭제하시겠습니까?')) return;
+  _importItems = _importItems.filter(function(i) { return i.id !== id; });
+  if (_importEditId === id) { _importEditId = null; _importDraft = {}; }
+  _importSaveItems(); _importDoRenderProduct();
+}
+function _importUpdDraft(f, v) { _importDraft[f] = v; _importDoRenderProduct(); }
+
+function _importParseExcelItems(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      var items = rows.slice(1).filter(function(r) { return r[0] || r[1]; }).map(function(r) {
+        return { id: _importUid(), brand: String(r[0] || '').trim(), model: String(r[1] || '').trim(), spec: String(r[2] || '').trim(), price: String(r[3] || '').trim(), pallets: String(r[4] || '').trim(), ea: String(r[5] || '').trim() };
+      });
+      cb(items);
+    } catch (err) { alert('엑셀 파일 읽기 오류: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function _importDownloadExcelTemplate() {
+  var ws = XLSX.utils.aoa_to_sheet([['브랜드','모델 / 품목명','규격','기준가($)','파레트(P)','낱개(EA/P당)'],['콜라보','DC9915','DC9915','180','20','120'],['콜라보','DC9925','DC9925','190','20','400']]);
+  ws['!cols'] = [14,18,14,12,10,14].map(function(w){return{wch:w};});
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '제품DB'); XLSX.writeFile(wb, '제품DB_템플릿.xlsx');
+}
+function _importHandleExcelUpload(input) {
+  var f = input.files && input.files[0]; if (!f) return;
+  _importParseExcelItems(f, function(items) {
+    if (!items.length) { alert('데이터가 없습니다.'); return; }
+    if (confirm(items.length + '개 제품을 추가하시겠습니까?\n(기존 데이터에 추가됩니다)')) {
+      _importItems = _importItems.concat(items); _importSaveItems();
+      alert(items.length + '개 제품이 추가됐습니다!'); _importDoRenderProduct();
+    }
+    input.value = '';
+  });
+}
+function _importBackup() {
+  _importLoadData();
+  var data = { calcs: _importData.calcs, aid: _importData.aid, dbItems: _importItems, savedList: _importData.savedList, exportedAt: new Date().toLocaleString('ko-KR') };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob); var a = document.createElement('a');
+  a.href = url; a.download = 'import-backup-' + new Date().toISOString().slice(0, 10) + '.json'; a.click(); URL.revokeObjectURL(url);
+}
+function _importRestore(input) {
+  var f = input.files && input.files[0]; if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (data.calcs && data.calcs.length) { _importData.calcs = data.calcs; _importData.aid = data.aid || data.calcs[0].id; }
+      if (data.dbItems && data.dbItems.length) _importItems = data.dbItems;
+      if (data.savedList && data.savedList.length) _importData.savedList = data.savedList;
+      _importSaveData(); _importSaveItems(); alert('복원 완료!');
+      _renderedTabs['importCalc'] = false; _renderedTabs['importInvoice'] = false; _renderedTabs['importProduct'] = false;
+      _importDoRenderProduct();
+    } catch (err) { alert('파일을 읽을 수 없습니다.'); }
+    input.value = '';
+  };
+  reader.readAsText(f);
+}
+
+function _importDoRenderProduct() {
+  var container = document.getElementById('tab-import-product');
+  if (!container) return;
+  _importLoadData();
+  var focused = document.activeElement;
+  var focusId = focused ? focused.getAttribute('data-imc-id') : null;
+
+  var h = '';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+  h += '<div style="font-size:15px;font-weight:600">제품 데이터베이스</div>';
+  h += '<div style="display:flex;gap:6px;align-items:center">';
+  h += '<button class="imc-btn imc-btn-blu imc-btn-xs" onclick="_importBackup()">↓ 백업</button>';
+  h += '<label class="imc-btn imc-btn-xs" style="cursor:pointer;color:#185FA5;border-color:#185FA5">↑ 복원<input type="file" accept=".json" style="display:none" onchange="_importRestore(this)"/></label>';
+  h += '<button class="imc-btn imc-btn-blu imc-btn-xs" onclick="_importAddItem()">＋ 제품 등록</button>';
+  h += '</div></div>';
+
+  if (_importItems.length === 0) {
+    h += '<div class="imc-sec" style="text-align:center;padding:40px"><div style="font-size:14px;font-weight:600;margin-bottom:6px">등록된 제품이 없습니다</div>';
+    h += '<div class="imc-mu" style="font-size:12px;margin-bottom:8px">제품을 등록하면 수입계산기에서 브랜드 → 모델 순으로 선택해 자동 입력됩니다</div>';
+    h += '<div class="imc-mu" style="font-size:11px;margin-bottom:16px;color:#185FA5">엑셀 템플릿을 다운로드해서 한번에 여러 제품을 등록할 수 있습니다</div>';
+    h += '<div style="display:flex;gap:8px;justify-content:center">';
+    h += '<button class="imc-btn imc-btn-xs" style="color:#185FA5;border-color:#185FA5" onclick="_importDownloadExcelTemplate()">↓ 템플릿 다운로드</button>';
+    h += '<button class="imc-btn imc-btn-blu imc-btn-xs" onclick="_importAddItem()">＋ 직접 등록하기</button></div></div>';
+  } else {
+    h += '<div class="imc-sec"><div class="imc-sec-hd"><span>등록 제품 <span style="color:#CC2222;font-weight:800">' + _importItems.length + '</span>개</span>';
+    h += '<div style="display:flex;gap:6px;align-items:center">';
+    h += '<label class="imc-btn imc-btn-grn imc-btn-xs" style="cursor:pointer">엑셀 업로드<input type="file" accept=".xlsx,.xls" style="display:none" onchange="_importHandleExcelUpload(this)"/></label>';
+    h += '<button class="imc-btn imc-btn-xs" style="color:#185FA5;border-color:#185FA5" onclick="_importDownloadExcelTemplate()">↓ 템플릿</button>';
+    h += '<button class="imc-btn imc-btn-blu imc-btn-xs" onclick="_importAddItem()">＋ 직접 등록</button></div></div>';
+    h += '<div class="imc-ovx"><table class="imc-tbl"><thead><tr>';
+    h += '<th style="width:36px">#</th><th style="text-align:left;padding-left:12px;min-width:110px">브랜드</th>';
+    h += '<th style="text-align:left;padding-left:12px;min-width:140px">모델 / 품목명</th>';
+    h += '<th style="text-align:left;padding-left:12px;min-width:130px">규격</th>';
+    h += '<th style="min-width:100px">기준가 ($)</th><th style="min-width:80px">파레트 (P)</th>';
+    h += '<th style="min-width:110px">낱개 (EA / P당)</th><th style="min-width:160px">관리</th></tr></thead><tbody>';
+    _importItems.forEach(function(item, idx) {
+      var isEdit = _importEditId === item.id;
+      h += '<tr' + (isEdit ? ' style="outline:2px solid #185FA5;outline-offset:-1px"' : '') + '>';
+      h += '<td class="imc-tc imc-mu">' + (idx + 1) + '</td>';
+      h += '<td style="padding-left:12px">' + (isEdit ? '<input data-imc-id="pd-brand" value="' + (_importDraft.brand || '').replace(/"/g, '&quot;') + '" oninput="_importUpdDraft(\'brand\',this.value)" placeholder="브랜드명"/>' : '<b>' + (item.brand || '<span class="imc-mu" style="font-weight:400">—</span>') + '</b>') + '</td>';
+      h += '<td style="padding-left:12px">' + (isEdit ? '<input data-imc-id="pd-model" value="' + (_importDraft.model || '').replace(/"/g, '&quot;') + '" oninput="_importUpdDraft(\'model\',this.value)" placeholder="모델명"/>' : (item.model || '<span class="imc-mu">—</span>')) + '</td>';
+      h += '<td style="padding-left:12px">' + (isEdit ? '<input data-imc-id="pd-spec" value="' + (_importDraft.spec || '').replace(/"/g, '&quot;') + '" oninput="_importUpdDraft(\'spec\',this.value)" placeholder="규격"/>' : '<span class="imc-mu">' + (item.spec || '<span style="opacity:.4">—</span>') + '</span>') + '</td>';
+      h += '<td>' + (isEdit ? '<input type="number" data-imc-id="pd-price" value="' + (_importDraft.price || '') + '" oninput="_importUpdDraft(\'price\',this.value)" placeholder="0.00"/>' : '<div class="imc-tr imc-num imc-yel" style="font-weight:700">' + (item.price ? _importU(item.price) : '<span class="imc-mu">—</span>') + '</div>') + '</td>';
+      h += '<td>' + (isEdit ? '<input type="number" data-imc-id="pd-pallets" value="' + (_importDraft.pallets || '') + '" oninput="_importUpdDraft(\'pallets\',this.value)" placeholder="0"/>' : '<div class="imc-tr imc-num" style="font-weight:600">' + (item.pallets || '<span class="imc-mu">—</span>') + '</div>') + '</td>';
+      h += '<td>' + (isEdit ? '<input type="number" data-imc-id="pd-ea" value="' + (_importDraft.ea || '') + '" oninput="_importUpdDraft(\'ea\',this.value)" placeholder="0"/>' : '<div class="imc-tr imc-num" style="font-weight:600">' + (item.ea || '<span class="imc-mu">—</span>') + '</div>') + '</td>';
+      h += '<td class="imc-tc">';
+      if (isEdit) {
+        h += '<div style="display:flex;gap:5px;justify-content:center"><button class="imc-btn imc-btn-grn imc-btn-xs" onclick="_importSaveEdit()">✓ 저장</button><button class="imc-btn imc-btn-xs" onclick="_importCancelEdit()">취소</button></div>';
+      } else {
+        h += '<div style="display:flex;gap:4px;justify-content:center;align-items:center"><button class="imc-btn imc-btn-xs" onclick="_importStartEdit(_importItems[' + idx + '])">✎ 수정</button>';
+        h += '<button class="imc-btn imc-btn-xs" onclick="_importDelItem(\'' + item.id + '\')" style="color:#CC2222;border-color:#CC2222">✕</button></div>';
+      }
+      h += '</td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+  }
+  container.innerHTML = '<div class="imc-wrap"><div class="imc-scroll">' + h + '</div></div>';
+  if (_importEditId && focusId) { var el = container.querySelector('[data-imc-id="' + focusId + '"]'); if (el) el.focus(); }
+}
+
+function renderImportProductTab() { _importLoadData(); _importDoRenderProduct(); }
+
 // ========================================
 // 백오더 관리
 // ========================================
