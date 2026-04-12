@@ -17568,8 +17568,10 @@ var _noticesCache = null;
 var _lastNoticeSyncTs = 0;
 var _lastCommentSyncTs = 0;
 var _noticeFilter = 'all';
-var _noticeStatusFilter = 'all'; // 'all' | 'waiting' | 'progress' | 'done'
+var _noticeStatusFilter = 'all'; // 'all' | 'waiting' | 'done' | 'hold'
 var _noticeSearch = '';
+var _noticeCurrentPage = 1;
+var _NOTICE_PAGE_SIZE = 10;
 var _noticeView = 'list'; // 'list' | 'detail' | 'write'
 var _noticeDetailId = null;
 var _noticeEditId = null;
@@ -17586,7 +17588,7 @@ function _markNoticeRead(id) {
 function _isAdmin() { return window.currentUser && window.currentUser.loginId === 'admin'; }
 
 function _noticeCatBadge(cat) {
-  var m = { 'update': { bg:'#E6F1FB', color:'#0C447C', text:'업데이트' }, 'bug': { bg:'#FCEBEB', color:'#791F1F', text:'오류' }, 'improve': { bg:'#EEEDFE', color:'#3C3489', text:'개선' }, 'notice': { bg:'#FAEEDA', color:'#633806', text:'공지' } };
+  var m = { 'update': { bg:'#E6F1FB', color:'#0C447C', text:'업데이트' }, 'bug': { bg:'#FCEBEB', color:'#791F1F', text:'오류' }, 'improve': { bg:'#EEEDFE', color:'#3C3489', text:'개선' }, 'notice': { bg:'#FAEEDA', color:'#633806', text:'공지' }, 'help': { bg:'#E1F5EE', color:'#085041', text:'도움말' } };
   var s = m[cat] || m['update'];
   return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:' + s.bg + ';color:' + s.color + '">' + s.text + '</span>';
 }
@@ -17652,6 +17654,8 @@ function _renderNoticeList(container) {
         if (_noticeStatusFilter === 'waiting') { if (n.status !== 'waiting' && n.status !== 'progress') return false; }
         else if (n.status !== _noticeStatusFilter) return false;
       }
+    } else if (_noticeFilter === 'help') {
+      if (n.category !== 'help') return false;
     } else if (_noticeFilter !== 'all') {
       if (n.category !== _noticeFilter) return false;
     }
@@ -17662,13 +17666,16 @@ function _renderNoticeList(container) {
     return true;
   });
 
-  // 정렬: bug_improve 탭은 상태순 (대기→진행→보류→완료)
+  // 정렬: bug_improve 탭은 미처리(대기) 먼저 + 처리완료(완료/보류) 나중
   if (isBugTab) {
-    var statusOrder = { waiting: 0, progress: 1, hold: 2, done: 3 };
+    var statusGroup = { waiting: 0, progress: 0, done: 1, hold: 1 };
     filtered.sort(function(a, b) {
-      var sa = statusOrder[a.status] !== undefined ? statusOrder[a.status] : 0;
-      var sb = statusOrder[b.status] !== undefined ? statusOrder[b.status] : 0;
-      if (sa !== sb) return sa - sb;
+      // pinned 항상 최상단
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      var ga = statusGroup[a.status] !== undefined ? statusGroup[a.status] : 0;
+      var gb = statusGroup[b.status] !== undefined ? statusGroup[b.status] : 0;
+      if (ga !== gb) return ga - gb;
       return new Date(b.created_at) - new Date(a.created_at);
     });
   }
@@ -17677,8 +17684,9 @@ function _renderNoticeList(container) {
   var waitingCount = _noticesData.filter(function(n) { return _isBugOrImprove(n.category) && n.status === 'waiting'; }).length;
 
   // 새글작성 버튼 표시 조건
-  var showWriteBtn = isBugTab || isAdmin;
-  var writeBtnText = isBugTab ? '✚ 오류/개선 작성' : '✚ 새 글 작성';
+  var isHelpTab = (_noticeFilter === 'help');
+  var showWriteBtn = isBugTab || isHelpTab || isAdmin;
+  var writeBtnText = isBugTab ? '✚ 오류/개선 작성' : (isHelpTab ? '✚ 도움말 작성' : '✚ 새 글 작성');
 
   var html = '<div style="max-width:900px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
 
@@ -17692,8 +17700,8 @@ function _renderNoticeList(container) {
 
   // ── 필터 칩 + 검색 ──
   html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;padding:10px 16px;border-bottom:1px solid #DDE1EB;flex-wrap:wrap;">';
-  ['all','notice','update','bug_improve'].forEach(function(f) {
-    var label = { all:'전체', update:'업데이트', bug_improve:'오류및개선', notice:'공지' }[f];
+  ['all','notice','update','bug_improve','help'].forEach(function(f) {
+    var label = { all:'전체', update:'업데이트', bug_improve:'오류및개선', notice:'공지', help:'도움말' }[f];
     var isActive = _noticeFilter === f;
     var bg = isActive ? '#1A1D23' : '#fff';
     var color = isActive ? '#fff' : '#5A6070';
@@ -17742,10 +17750,17 @@ function _renderNoticeList(container) {
   html += '<th style="width:60px;text-align:center;padding:10px 10px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB">조회</th>';
   html += '</tr></thead><tbody>';
 
+  // 페이지네이션 계산
+  var totalPages = Math.max(1, Math.ceil(filtered.length / _NOTICE_PAGE_SIZE));
+  if (_noticeCurrentPage > totalPages) _noticeCurrentPage = totalPages;
+  var startIdx = (_noticeCurrentPage - 1) * _NOTICE_PAGE_SIZE;
+  var pageItems = filtered.slice(startIdx, startIdx + _NOTICE_PAGE_SIZE);
+
   if (filtered.length === 0) {
     html += '<tr><td colspan="6" style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px">공지사항이 없습니다</td></tr>';
   } else {
-    filtered.forEach(function(n, idx) {
+    pageItems.forEach(function(n, idx) {
+      var globalIdx = startIdx + idx;
       var isUnread = readIds.indexOf(n.id) === -1;
       var newBadge = isUnread ? '<span class="notice-new-badge">NEW</span>' : '';
       var isDone = _isBugOrImprove(n.category) && (n.status === 'done');
@@ -17762,13 +17777,13 @@ function _renderNoticeList(container) {
       } else if (n.pinned) {
         noCol = '<span style="font-size:14px">📌</span>';
       } else {
-        noCol = String(idx + 1);
+        noCol = String(globalIdx + 1);
       }
 
       html += '<tr onclick="_showNoticeDetail(' + n.id + ')" style="cursor:pointer;border-bottom:1px solid #F0F2F7;background:' + rowBg + ';' + rowFilter + '" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'' + rowBg + '\'">';
       html += '<td style="text-align:center;padding:10px 10px;font-size:14px;color:#5A6070">' + noCol + '</td>';
       html += '<td style="text-align:center;padding:10px 10px">' + _noticeCatBadge(n.category) + '</td>';
-      var menuTagBadge = (n.menu_tag && _isBugOrImprove(n.category)) ? '<span class="notice-menu-tag" data-menu="' + n.menu_tag + '">' + n.menu_tag + '</span>' : '';
+      var menuTagBadge = (n.menu_tag && (_isBugOrImprove(n.category) || n.category === 'help')) ? '<span class="notice-menu-tag" data-menu="' + n.menu_tag + '">' + n.menu_tag + '</span>' : '';
       html += '<td style="padding:10px 10px;font-size:14px;' + titleWeight + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;' + titleStyle + '">' + (n.title || '') + newBadge + menuTagBadge + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.author || 'admin') + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + _noticeDateFmt(n.created_at) + '</td>';
@@ -17777,6 +17792,18 @@ function _renderNoticeList(container) {
     });
   }
   html += '</tbody></table></div>';
+
+  // 페이지네이션 UI (10건 초과 시만)
+  if (filtered.length > _NOTICE_PAGE_SIZE) {
+    html += '<div class="notice-pagination">';
+    html += '<span class="notice-page-btn' + (_noticeCurrentPage <= 1 ? '' : '') + '" onclick="_setNoticePage(' + (_noticeCurrentPage - 1) + ')">‹</span>';
+    for (var pi = 1; pi <= totalPages; pi++) {
+      html += '<span class="notice-page-btn' + (pi === _noticeCurrentPage ? ' active' : '') + '" onclick="_setNoticePage(' + pi + ')">' + pi + '</span>';
+    }
+    html += '<span class="notice-page-btn" onclick="_setNoticePage(' + (_noticeCurrentPage + 1) + ')">›</span>';
+    html += '</div>';
+  }
+
   html += '</div>'; // wrapper 끝
 
   container.innerHTML = html;
@@ -17786,19 +17813,27 @@ function _renderNoticeList(container) {
   if (searchEl) {
     var composing = false;
     searchEl.addEventListener('compositionstart', function() { composing = true; });
-    searchEl.addEventListener('compositionend', function() { composing = false; _noticeSearch = searchEl.value; _renderNoticeList(container); });
-    searchEl.addEventListener('input', function() { if (!composing) { _noticeSearch = searchEl.value; _renderNoticeList(container); } });
+    searchEl.addEventListener('compositionend', function() { composing = false; _noticeSearch = searchEl.value; _noticeCurrentPage = 1; _renderNoticeList(container); });
+    searchEl.addEventListener('input', function() { if (!composing) { _noticeSearch = searchEl.value; _noticeCurrentPage = 1; _renderNoticeList(container); } });
   }
 }
 
 function _setNoticeFilter(f) {
   _noticeFilter = f;
   _noticeStatusFilter = 'all';
+  _noticeCurrentPage = 1;
+  var container = document.getElementById('tab-notice');
+  if (container) _renderNoticeList(container);
+}
+function _setNoticePage(p) {
+  var maxP = Math.max(1, Math.ceil(_noticesData.length / _NOTICE_PAGE_SIZE));
+  _noticeCurrentPage = Math.max(1, Math.min(p, maxP));
   var container = document.getElementById('tab-notice');
   if (container) _renderNoticeList(container);
 }
 function _setNoticeStatusFilter(s) {
   _noticeStatusFilter = s;
+  _noticeCurrentPage = 1;
   var container = document.getElementById('tab-notice');
   if (container) _renderNoticeList(container);
 }
@@ -17836,7 +17871,7 @@ async function _showNoticeDetail(id) {
   h += '<div style="padding:24px 28px 0;text-align:left !important;">';
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:10px;margin-bottom:8px;">';
   h += _noticeCatBadge(n.category);
-  if (n.menu_tag && _isBugOrImprove(n.category)) h += '<span class="notice-menu-tag" data-menu="' + n.menu_tag + '">' + n.menu_tag + '</span>';
+  if (n.menu_tag && (_isBugOrImprove(n.category) || n.category === 'help')) h += '<span class="notice-menu-tag" data-menu="' + n.menu_tag + '">' + n.menu_tag + '</span>';
   if (n.status) h += _noticeStatusBadge(n.status);
   if (n.pinned) h += '<span style="font-size:12px;color:#999;">📌 상단고정</span>';
   h += '</div>';
@@ -18129,7 +18164,8 @@ function _showNoticeWrite(editId) {
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0;">';
   h += '<button onclick="renderNoticeTab()" style="font-size:13px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
   var isBugMode = (_noticeFilter === 'bug_improve') || (isEdit && _isBugOrImprove(n.category));
-  var headerTitle = isEdit ? '글 수정' : (isBugMode ? '오류/개선 작성' : '새 글 작성');
+  var isHelpMode = (_noticeFilter === 'help') || (isEdit && n && n.category === 'help');
+  var headerTitle = isEdit ? '글 수정' : (isBugMode ? '오류/개선 작성' : (isHelpMode ? '도움말 작성' : '새 글 작성'));
   h += '<span style="font-size:18px;font-weight:500;">' + headerTitle + '</span>';
   h += '</div>';
 
@@ -18141,20 +18177,20 @@ function _showNoticeWrite(editId) {
   h += '<div><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">분류</label>';
   h += '<select id="nw-category" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;min-width:120px;">';
   if (isBugMode) {
-    // 오류/개선 모드
     ['bug','improve'].forEach(function(c) {
       var label = { bug:'오류', improve:'개선요청' }[c];
       h += '<option value="' + c + '"' + (isEdit && n.category === c ? ' selected' : '') + '>' + label + '</option>';
     });
+  } else if (isHelpMode) {
+    h += '<option value="help" selected>도움말</option>';
   } else {
-    // 일반 모드
     ['update','notice'].forEach(function(c) {
       var label = { update:'업데이트', notice:'공지' }[c];
       h += '<option value="' + c + '"' + (isEdit && n.category === c ? ' selected' : '') + '>' + label + '</option>';
     });
   }
   h += '</select></div>';
-  if (isBugMode) {
+  if (isBugMode || isHelpMode) {
     var menuTags = ['','밀워키','일반','판매','수입','택배','검색','카톡','공지','백오더','설정','기타'];
     var curMenuTag = isEdit ? (n.menu_tag || '') : '';
     h += '<div><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">관련 메뉴</label>';
@@ -18369,6 +18405,10 @@ async function _deleteNotice(id) {
 }
 
 async function _changeNoticeStatusPill(noticeId, newStatus) {
+  // 즉시 시각 반응 — API 기다리지 않고 active 클래스 교체
+  document.querySelectorAll('.notice-status-pill').forEach(function(p) {
+    p.classList.toggle('active', p.getAttribute('data-status') === newStatus);
+  });
   var author = (window.currentUser && window.currentUser.loginId) || 'admin';
   try {
     var res = await fetch('/api/notices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: noticeId, status: newStatus, statusChange: true, author: author }) });
