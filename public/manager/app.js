@@ -2085,7 +2085,7 @@ function switchTab(tab) {
       if (renderKey === 'sales') { renderSales(); renderOnlineSales(); }
       if (renderKey === 'promo') { renderPromo(); renderAllPromosV2(); }
       if (renderKey === 'setbun') renderSetbun();
-      if (renderKey === 'estimate') { renderEstimateList(); if (!_estDateManuallySet) document.getElementById('est-date').value = getTodayStr(); }
+      if (renderKey === 'estimate') { renderEstimateList(); if (!_estDateManuallySet) { var _edEl = document.getElementById('est-date'); if (_edEl) _edEl.value = getTodayStr(); } searchEstProducts(''); }
       if (renderKey === 'general') renderGenProducts();
       if (renderKey === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
       if (renderKey === 'kakao') renderKakaoTab();
@@ -11421,18 +11421,25 @@ function findAnyProduct(code) {
 
 function searchEstProducts(val) {
   const body = document.getElementById('est-search-body');
-  if (!val || val.length < 1) { body.innerHTML = ''; return; }
-  const q = val.toLowerCase();
+  if (!body) return;
+  const q = (val || '').toLowerCase().trim();
 
-  // Search 밀워키
-  const mwResults = searchProducts(val).slice(0, 20).map(p => ({ ...p, _source: 'milwaukee' }));
-
-  // Search 일반제품
-  const genResults = genProducts.filter(p => {
-    return `${p.code} ${p.model} ${p.description}`.toLowerCase().includes(q);
-  }).slice(0, 20).map(p => ({ ...p, _source: 'general' }));
-
-  const combined = [...mwResults, ...genResults].slice(0, 30);
+  var combined;
+  if (!q) {
+    // 검색어 없으면 전체 목록 표시
+    combined = DB.products.map(function(p) { return Object.assign({}, p, { _source: 'milwaukee' }); })
+      .concat(genProducts.map(function(p) { return Object.assign({}, p, { _source: 'general' }); }));
+  } else {
+    // 밀워키 검색 (manageCode 포함)
+    var mwResults = DB.products.filter(function(p) {
+      return String(p.code).includes(q) || String(p.manageCode || '').toLowerCase().includes(q) || String(p.model || '').toLowerCase().includes(q) || String(p.description || '').toLowerCase().includes(q);
+    }).map(function(p) { return Object.assign({}, p, { _source: 'milwaukee' }); });
+    // 일반제품 검색
+    var genResults = genProducts.filter(function(p) {
+      return (String(p.code) + ' ' + (p.manageCode || '') + ' ' + (p.model || '') + ' ' + (p.description || '')).toLowerCase().includes(q);
+    }).map(function(p) { return Object.assign({}, p, { _source: 'general' }); });
+    combined = mwResults.concat(genResults);
+  }
 
   body.innerHTML = combined.map(p => {
     const srcBadge = p._source === 'milwaukee'
@@ -17481,9 +17488,11 @@ function _renderNoticeList(container) {
   } else {
     filtered.forEach(function(n, idx) {
       var isUnread = readIds.indexOf(n.id) === -1;
-      var newDot = isUnread ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#CC2222;margin-left:6px;vertical-align:middle"></span>' : '';
+      var newBadge = isUnread ? '<span class="notice-new-badge">NEW</span>' : '';
       var isDone = _isBugOrImprove(n.category) && n.status === 'done';
       var titleStyle = isDone ? 'text-decoration:line-through;color:#999;' : '';
+      var titleWeight = isUnread && !isDone ? 'font-weight:500;' : 'font-weight:400;';
+      var rowBg = isUnread ? '#FFF8F0' : '#fff';
 
       // No./상태 컬럼
       var noCol;
@@ -17495,10 +17504,10 @@ function _renderNoticeList(container) {
         noCol = String(idx + 1);
       }
 
-      html += '<tr onclick="_showNoticeDetail(' + n.id + ')" style="cursor:pointer;border-bottom:1px solid #F0F2F7" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">';
+      html += '<tr onclick="_showNoticeDetail(' + n.id + ')" style="cursor:pointer;border-bottom:1px solid #F0F2F7;background:' + rowBg + '" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'' + rowBg + '\'">';
       html += '<td style="text-align:center;padding:10px 10px;font-size:14px;color:#5A6070">' + noCol + '</td>';
       html += '<td style="text-align:center;padding:10px 10px">' + _noticeCatBadge(n.category) + '</td>';
-      html += '<td style="padding:10px 10px;font-size:14px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;' + titleStyle + '">' + (n.title || '') + newDot + '</td>';
+      html += '<td style="padding:10px 10px;font-size:14px;' + titleWeight + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;' + titleStyle + '">' + (n.title || '') + newBadge + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.author || 'admin') + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + _noticeDateFmt(n.created_at) + '</td>';
       html += '<td style="text-align:center;padding:10px 10px;font-size:13px;color:#5A6070">' + (n.views || 0) + '</td>';
