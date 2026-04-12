@@ -18172,7 +18172,13 @@ function _showNoticeWrite(editId) {
   // 분류 + 상단고정
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;margin-bottom:16px;">';
   h += '<div><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">분류</label>';
-  h += '<select id="nw-category" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;min-width:120px;">';
+  // 탭별 분류 자동 고정
+  var isNoticeTab = (_noticeFilter === 'notice');
+  var isUpdateTab = (_noticeFilter === 'update');
+  var catDisabled = (!isEdit && (_noticeFilter !== 'all' && _noticeFilter !== 'bug_improve')) ? ' disabled' : '';
+  var catDisabledBug = (!isEdit && isBugMode) ? '' : ''; // 오류/개선은 둘 다 선택 가능
+
+  h += '<select id="nw-category" style="height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;min-width:120px;' + (catDisabled ? 'background:#F3F4F6;color:#666;' : '') + '"' + catDisabled + '>';
   if (isBugMode) {
     ['bug','improve'].forEach(function(c) {
       var label = { bug:'오류', improve:'개선요청' }[c];
@@ -18180,6 +18186,10 @@ function _showNoticeWrite(editId) {
     });
   } else if (isHelpMode) {
     h += '<option value="help" selected>도움말</option>';
+  } else if (!isEdit && isNoticeTab) {
+    h += '<option value="notice" selected>공지</option>';
+  } else if (!isEdit && isUpdateTab) {
+    h += '<option value="update" selected>업데이트</option>';
   } else {
     ['update','notice'].forEach(function(c) {
       var label = { update:'업데이트', notice:'공지' }[c];
