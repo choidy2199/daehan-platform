@@ -339,6 +339,48 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - productType: set/bare/unknown
   - 콘솔 리포트 (전체/매칭성공/세트만/베어만/스킵)
 
+- [2026-04-12] 카톡 톡방관리 실제 기능 구현
+  - mw_bot_rooms {rooms:[]} 객체 구조, save()+autoSyncToSupabase 적용
+  - openBotRoomPopup: 추가/편집/삭제 팝업, 거래처 검색 드롭다운
+  - renderBotRoomTable: 필터/검색, 담당자 뱃지, 봇 토글 즉시 반영
+  - 미매핑 행 노란 배경, 행 클릭 편집, 한글 composing 처리
+
+- [2026-04-12] 공지사항 게시판 전체 구현
+  - Supabase notices 테이블 + RLS + Realtime
+  - API: GET/POST/PUT/DELETE /api/notices + /api/notices/view (조회수)
+  - 게시판: 목록(필터칩+검색+테이블) / 상세보기 / 작성수정 3화면
+  - admin만 새글작성/수정/삭제, 📌상단고정, 새글 빨간● 표시
+  - 바탕화면 우측 패널 실데이터, Realtime 자동갱신, 상단 뱃지
+
+- [2026-04-12] 공지사항 개선 — 캐시/리디자인/댓글/알림
+  - 목록 캐시: "← 목록" 즉시 표시 (fetch 제거)
+  - 상세보기: 제목 22px, 본문 16px, 수정/삭제 본문 아래
+  - 댓글: notice_comments 테이블 + API + 아바타/낙관적 업데이트
+  - 패널 리디자인: 가로배치, NEW 깜빡임, 모두읽음
+  - NEW 팝업: 최신 3건 슬라이드업, 확인/나중에
+  - Realtime 자기변경 3초 무시 (_lastNoticeSyncTs/_lastCommentSyncTs)
+
+- [2026-04-12] 공지사항 리치에디터 + 이미지 업로드
+  - 작성/수정: textarea → contenteditable + B/I/U 툴바
+  - Supabase Storage notices 버킷 + /api/notices/upload
+  - 이미지: 파일선택/드래그앤드롭/Ctrl+V + ✕ 삭제 오버레이
+  - 상세보기 img max-width/border-radius 적용
+
+- [2026-04-12] 오류및개선 피드백 시스템
+  - notices 테이블 status 컬럼 (waiting/progress/done/hold)
+  - 카테고리 확장: 'improve' 추가, "오류및개선" 탭
+  - 상태 필터 행 + 대기 건수 뱃지 + 상태순 정렬
+  - 상태 변경 UI (admin) + 자동 댓글 로그
+  - 권한 분리: admin 전체, hwon/jyoung 본인 bug/improve만
+  - 상세보기 우측 사이드바 (카테고리별 필터, 다크 헤더)
+
+- [2026-04-12] 백오더 관리 시스템
+  - Supabase backorders 테이블 + API + Realtime
+  - 상단 메뉴 "백오더" 추가, KPI 4카드, 필터칩(타입+상태)
+  - 12컬럼 테이블: 상태/구분/모델/제품명/재고/거래처/요청/출고/비고 등
+  - 입고 감지: 재고>0 + 대기/부분 → 초록배경 + "입고" 뱃지
+  - 등록 팝업: 거래처/제품 자동완성, 출고 처리 (prompt 수량)
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인
