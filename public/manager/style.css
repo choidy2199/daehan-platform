@@ -22,17 +22,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
   --dm-tab-active: #f0ede8;
   --dm-desktop-bg: linear-gradient(135deg,#e8e4df 0%,#d8d3cb 40%,#ccc5bb 100%);
 }
-[data-theme="dark"] {
-  --dm-bg: #1a1a1e;
-  --dm-sidebar-bg: #242428;
-  --dm-text: #e0e0e0;
-  --dm-text-secondary: #aaa;
-  --dm-border: rgba(255,255,255,.06);
-  --dm-tab-bar: #2a2a2e;
-  --dm-tab-inactive: #333;
-  --dm-tab-active: #1a1a1e;
-  --dm-desktop-bg: linear-gradient(135deg,#1a1a1e 0%,#222226 50%,#1e1e22 100%);
-}
+/* 다크모드 비활성 — 사이드바/크롬탭은 :root의 --dm-* 변수로 항상 라이트 */
 
 /* ==================== APP LAYOUT ==================== */
 .app-layout { display:flex; height:100vh; overflow:hidden; }
@@ -62,7 +52,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 .sidebar-color-bar { width:3px; height:18px; border-radius:2px; flex-shrink:0; }
 .sidebar-icon { display:flex; align-items:center; justify-content:center; width:20px; height:20px; flex-shrink:0; color:var(--dm-text-secondary); }
 .sidebar.collapsed .sidebar-icon { color:#444; }
-[data-theme="dark"] .sidebar-icon { color:#bbb; }
+/* 사이드바 아이콘 색상 — 항상 라이트 */
 .sidebar-arrow { display:flex; align-items:center; margin-left:auto; transition:transform 0.2s; color:var(--dm-text-hint,#9BA3B2); }
 .sidebar-arrow.open svg { transform:rotate(90deg); }
 

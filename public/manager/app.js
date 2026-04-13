@@ -118,20 +118,8 @@ function _updateSidebarActive(windowName) {
     }
   });
 }
-// 다크모드 토글
-function toggleDarkMode() {
-  var html = document.documentElement;
-  var isDark = html.getAttribute('data-theme') === 'dark';
-  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  localStorage.setItem('mw_dark_mode', isDark ? '0' : '1');
-}
-// 초기화: 사이드바 상태 + 다크모드 복원 + 우클릭 바인딩
-(function _initSidebarAndTheme() {
-  // 다크모드 복원
-  if (localStorage.getItem('mw_dark_mode') === '1') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
-  // 사이드바 상태 복원 + 우클릭 바인딩
+// 초기화: 사이드바 상태 복원
+(function _initSidebar() {
   document.addEventListener('DOMContentLoaded', function() {
     if (localStorage.getItem('mw_sidebar_collapsed') === '1') {
       var sb = document.getElementById('sidebar');
