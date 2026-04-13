@@ -166,7 +166,9 @@ function _refreshSidebarFavStars() {
     var parent = btn.closest('[data-window]');
     if (!parent) return;
     var name = parent.getAttribute('data-window');
-    btn.classList.toggle('active', slots.indexOf(name) >= 0);
+    var isActive = slots.indexOf(name) >= 0;
+    btn.classList.toggle('active', isActive);
+    btn.textContent = isActive ? '★' : '☆';
   });
 }
 

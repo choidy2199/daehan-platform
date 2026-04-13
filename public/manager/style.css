@@ -108,14 +108,15 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 .chrome-bar-btn { width:28px; height:28px; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer; color:var(--dm-text-secondary); border-radius:6px; transition:background 0.12s; position:relative; }
 .chrome-bar-btn:hover { background:rgba(0,0,0,0.06); }
 .chrome-bar-dot { position:absolute; top:4px; right:4px; width:6px; height:6px; border-radius:50%; background:#E8344E; display:none; }
-.chrome-bar-badge { padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; font-family:'Pretendard',sans-serif; border:none; cursor:pointer; white-space:nowrap; background:#CC2222; color:#fff; margin-bottom:4px; animation:badge-blink 2s ease-in-out infinite; }
+.chrome-bar-badge { padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; font-family:'Pretendard',sans-serif; border:none; cursor:pointer; white-space:nowrap; background:#CC2222; color:#fff; margin-bottom:4px; animation:badge-blink 0.8s ease-in-out infinite; }
 .chrome-bar-badge:hover { background:#e03030; }
-@keyframes badge-blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+@keyframes badge-blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
 /* 사이드바 즐겨찾기 별 */
-.sidebar-fav-btn { margin-left:auto; background:transparent; border:none; cursor:pointer; font-size:16px; padding:2px 4px; border-radius:4px; line-height:1; opacity:0; transition:opacity 0.15s, color 0.15s; color:transparent; flex-shrink:0; }
-.sidebar-sub-item:hover .sidebar-fav-btn, .sidebar-single:hover .sidebar-fav-btn { opacity:1; color:#ddd; }
-.sidebar-fav-btn.active { opacity:1; color:#EF9F27; }
+.sidebar-fav-btn { margin-left:auto; background:transparent; border:none; cursor:pointer; font-size:16px; padding:2px 4px; border-radius:4px; line-height:1; opacity:0; transition:opacity 0.15s; color:rgba(255,255,255,0.5); -webkit-text-stroke:1px rgba(255,255,255,0.7); flex-shrink:0; }
+.sidebar-sub-item:hover .sidebar-fav-btn, .sidebar-single:hover .sidebar-fav-btn { opacity:1; }
+.sidebar-fav-btn.active { opacity:1; color:#EF9F27; -webkit-text-stroke:0; animation:star-blink 0.8s ease-in-out infinite; }
+@keyframes star-blink { 0%,100%{opacity:1;color:#EF9F27} 50%{opacity:0.4;color:#ffd700} }
 .sidebar.collapsed .sidebar-fav-btn { display:none; }
 .sidebar-sub-item { display:flex; align-items:center; }
 .sidebar-single { position:relative; }
