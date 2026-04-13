@@ -19709,15 +19709,11 @@ function _updateNoticeBadge() {
   var badge = document.getElementById('notice-unread-badge');
   var readIds = _getReadNoticeIds();
   var unread = _noticesData.filter(function(n) { return readIds.indexOf(n.id) === -1; }).length;
-  if (badge) {
-    if (unread > 0) { badge.textContent = unread; badge.style.display = 'inline-block'; }
-    else { badge.style.display = 'none'; }
-  }
-  // 크롬탭바 종 뱃지 동기화
-  var bellBadge = document.getElementById('ctBellBadge');
-  if (bellBadge) {
-    if (unread > 0) { bellBadge.textContent = unread; bellBadge.style.display = 'flex'; }
-    else { bellBadge.style.display = 'none'; }
+  if (unread > 0) {
+    badge.textContent = unread;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
   }
 }
 
