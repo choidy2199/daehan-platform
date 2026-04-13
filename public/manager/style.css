@@ -109,6 +109,8 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 .ct-bell { position:relative; padding:4px; cursor:pointer; border-radius:50%; margin-bottom:4px; display:flex; align-items:center; justify-content:center; }
 .ct-bell:hover { background:rgba(255,255,255,0.1); }
 .ct-bell-badge { position:absolute; top:-1px; right:-2px; min-width:14px; height:14px; padding:0 3px; border-radius:7px; background:#E24B4A; color:#fff; font-size:8px; font-weight:700; display:flex; align-items:center; justify-content:center; font-family:'Pretendard',sans-serif; }
+.ct-logout { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:6px; background:transparent; border:1px solid #DDE1EB; cursor:pointer; font-family:'Pretendard',sans-serif; white-space:nowrap; margin-bottom:4px; }
+.ct-logout:hover { background:#EAECF2; }
 
 /* 사이드바 즐겨찾기 별 */
 .sidebar-fav-btn { margin-left:auto; background:transparent; border:none; cursor:pointer; font-size:16px; padding:2px 4px; border-radius:4px; line-height:1; opacity:1; color:transparent; -webkit-text-stroke:0.7px #999; flex-shrink:0; }
