@@ -955,11 +955,88 @@ function _pdSetHeaderBtnsDisabled(disabled) {
 // 채널 → 마켓명 매핑
 var _pdMarketNames = { naver: '스토어팜', gmarket: '오픈마켓', ssg: 'SSG', coupang: '쿠팡' };
 
+// SSG 가격전송 (detail popup의 ▲ 가격전송 버튼 전용)
+// 1) GET /api/ssg/price?code= → 현재 splprc/mrgrt 조회
+// 2) POST /api/ssg/price → { code, sellprc: p.priceSsg, splprc: 현재값, mrgrt: 현재값 }
+async function _pdPriceSyncSsg(code, btn, marketName) {
+  var p = findProduct(code);
+  if (!p) { alert('제품을 찾을 수 없습니다.'); return; }
+  var sellprc = Number(p.priceSsg || 0);
+  if (!sellprc || sellprc <= 0) { alert('SSG 가격이 없습니다.'); return; }
+
+  var origHtml = btn.innerHTML;
+  var origBg = btn.style.background;
+  var origColor = btn.style.color;
+  btn.disabled = true;
+  btn.style.opacity = '0.7';
+  btn.style.cursor = 'wait';
+  btn.textContent = '전송 중...';
+
+  function restore(bg, color, text) {
+    setTimeout(function() {
+      var cur = document.getElementById('pd-btn-sync');
+      if (!cur) return;
+      cur.disabled = false;
+      cur.style.background = origBg || '#185FA5';
+      cur.style.color = origColor || '#fff';
+      cur.style.cursor = 'pointer';
+      cur.innerHTML = origHtml;
+    }, 3000);
+  }
+
+  try {
+    // 현재 SSG 가격 조회
+    var getRes = await fetch('/api/ssg/price?code=' + encodeURIComponent(code));
+    var getData = await getRes.json();
+    if (!getData.success) {
+      throw new Error(getData.error || 'SSG 상품 조회 실패');
+    }
+    var curPrice = getData.price || {};
+    var splprc = Number(curPrice.splprc);
+    var mrgrt = Number(curPrice.mrgrt);
+    if (!splprc || !mrgrt) {
+      btn.style.background = '#CC2222';
+      btn.style.color = '#fff';
+      btn.style.opacity = '1';
+      btn.textContent = '전송실패';
+      alert(marketName + ' 공급가/마진율 정보를 찾을 수 없습니다.\n\n조회된 값: splprc=' + curPrice.splprc + ', mrgrt=' + curPrice.mrgrt);
+      restore();
+      return;
+    }
+
+    // 가격 수정 전송 (sellprc만 변경, splprc/mrgrt는 기존값 유지)
+    var putRes = await fetch('/api/ssg/price', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, sellprc: sellprc, splprc: splprc, mrgrt: mrgrt }),
+    });
+    var putData = await putRes.json();
+    if (!putData.success) {
+      throw new Error(putData.message || putData.error || '전송 실패');
+    }
+
+    btn.style.background = '#1D9E75';
+    btn.style.color = '#fff';
+    btn.style.opacity = '1';
+    btn.textContent = '전송완료 ✓';
+    alert(marketName + ' 가격수정이 정상적으로 반영되었습니다.');
+    restore();
+  } catch (e) {
+    btn.style.background = '#CC2222';
+    btn.style.color = '#fff';
+    btn.style.opacity = '1';
+    btn.textContent = '전송실패';
+    alert(marketName + ' 가격전송에 실패했습니다. 다시 시도해주세요.\n\n' + (e.message || '알 수 없는 오류'));
+    restore();
+  }
+}
+
 async function _pdPriceSync(code, channel) {
   if (_pdEditMode) return;
   var btn = document.getElementById('pd-btn-sync');
   if (!btn) return;
   var marketName = _pdMarketNames[channel] || (_marketBadgeStyles[channel] || {}).label || '';
+  if (channel === 'ssg') { return _pdPriceSyncSsg(code, btn, marketName); }
   if (channel !== 'naver') { alert(marketName + ' 가격전송은 준비 중입니다.'); return; }
   var p = findProduct(code);
   if (!p) { alert('제품을 찾을 수 없습니다.'); return; }
