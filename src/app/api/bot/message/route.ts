@@ -330,10 +330,19 @@ Leo팀장 또는 레오팀장이라고
 - ttiStock: 밀워키 본사 재고 (a=재고있음, b=일부있음, c=재고없음)
 - 가격 안내 시 outA 사용 (outA가 0이면 supplyPrice 사용)`;
 
-const STAFF_ROOM = '▣ DH ▣ 사무실';
+const STAFF_ROOM = '대한 사무실';
+
+// ─── 회사 내부 톡방 블랙리스트 (절대 응답 안 함) ───
+const BLOCKED_ROOMS = [
+  '대한 전체톡방',
+  '대한 사무실',
+  '대한 전동공구 분해/조립',
+  '대한 영진',
+  '대한 대신화물',
+];
 
 // ─── 직원 판별 ───
-const STAFF_SENDERS = ['다연아빠', "won'S", '지영'];
+const STAFF_SENDERS = ['다연아빠', "won'S", '지영', '찌리찌리', '뱅', '❤️봉봉❤️'];
 function isStaff(sender: string): boolean {
   return STAFF_SENDERS.includes(sender);
 }
@@ -353,6 +362,26 @@ export async function POST(request: NextRequest) {
     if (!message) return NextResponse.json({ error: 'message is required' }, { status: 400 });
 
     console.log(`[bot] room=${room}, sender=${sender}, msg=${message}`);
+
+    // 0-1. 블랙리스트 톡방 → 즉시 무시
+    if (BLOCKED_ROOMS.includes(room)) {
+      console.log(`[bot] 블랙리스트 톡방 — 무시: ${room}`);
+      return reply(null);
+    }
+
+    // 0-2. mw_bot_rooms에 등록된 톡방만 응답
+    const { data: roomData } = await supabase.from('app_data').select('value').eq('key', 'mw_bot_rooms').single();
+    const registeredRooms: string[] = [];
+    if (roomData?.value) {
+      const rooms = Array.isArray(roomData.value) ? roomData.value : (roomData.value as { rooms?: { roomName?: string }[] }).rooms || [];
+      for (const r of rooms) {
+        if (r && typeof r === 'object' && 'roomName' in r && r.roomName) registeredRooms.push(r.roomName);
+      }
+    }
+    if (!registeredRooms.includes(room)) {
+      console.log(`[bot] 미등록 톡방 — 무시: ${room} (등록: ${registeredRooms.length}개)`);
+      return reply(null);
+    }
 
     // 1. 대화 이력 로드 (30분 이내)
     const history = await getHistory(room);
