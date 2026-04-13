@@ -3,10 +3,8 @@
 function toggleSidebar() {
   var sb = document.getElementById('sidebar');
   if (!sb) return;
-  sb.style.removeProperty('width');
   sb.classList.add('animating');
   sb.classList.toggle('collapsed');
-  sb.classList.toggle('expanded');
   localStorage.setItem('mw_sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
   setTimeout(function() { sb.classList.remove('animating'); }, 300);
 }
@@ -125,9 +123,8 @@ function _updateSidebarActive(windowName) {
 (function _initSidebar() {
   document.addEventListener('DOMContentLoaded', function() {
     var sb = document.getElementById('sidebar');
-    if (sb) sb.style.removeProperty('width'); // 인라인 width 잔여물 제거
     if (localStorage.getItem('mw_sidebar_collapsed') === '1') {
-      if (sb) { sb.classList.remove('expanded'); sb.classList.add('collapsed'); }
+      if (sb) sb.classList.add('collapsed');
     }
     // 즐겨찾기 별 상태는 로그인 후 _loadFavoritesSlots가 준비된 뒤에 실행
     setTimeout(function() { if (typeof _refreshSidebarFavStars === 'function') _refreshSidebarFavStars(); }, 500);
