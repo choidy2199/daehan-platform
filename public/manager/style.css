@@ -946,7 +946,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 }
 .imc-scroll {
   flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;
-  padding: 12px 16px; max-width: 1440px; margin: 0 auto;
+  padding: 12px 16px;
 }
 .imc-wrap input, .imc-wrap select, .imc-wrap textarea {
   background: #fff; border: 1px solid var(--imc-bd); color: var(--imc-t1); border-radius: 6px;

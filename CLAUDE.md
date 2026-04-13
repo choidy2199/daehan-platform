@@ -106,6 +106,12 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - 좌측 패널과 우측 패널의 테이블 텍스트 크기 반드시 동일
   - 새로운 탭/기능 추가 시에도 po-table 기본 스타일 적용
   - 인라인 font-size로 개별 축소/확대 금지 (디자인 토큰 우선)
+- 콘텐츠 너비 기준 (필수)
+  - 기준: 사이드바 접힌 상태(52px)에서 밀워키 단가표(#tab-catalog) 너비
+  - 원칙: 모든 탭 콘텐츠는 .content의 padding: 16px 24px 8px만으로 좌우 여백 결정
+  - 금지: 탭 내부에 추가 max-width, margin: 0 auto, 별도 width 제한 금지
+  - 새 화면: 반드시 사이드바 접힌 상태에서 단가표와 동일한 너비인지 확인
+  - 레이아웃: .app-layout(flex) → .sidebar(52/220px) + .main-area(flex:1) → .content(padding 24px) → #tab-XXX(추가 제한 없이 100%)
 
 ## 로컬 개발 주의
 - 한글 경로 이슈: Turbopack이 한글 폴더명에서 크래시
