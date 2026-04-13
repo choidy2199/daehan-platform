@@ -4,8 +4,16 @@ function toggleSidebar() {
   var sb = document.getElementById('sidebar');
   if (!sb) return;
   sb.classList.add('animating');
-  sb.classList.toggle('collapsed');
-  sb.classList.toggle('expanded');
+  var isCollapsed = sb.classList.contains('collapsed');
+  if (isCollapsed) {
+    sb.classList.remove('collapsed');
+    sb.classList.add('expanded');
+    sb.style.width = '220px';
+  } else {
+    sb.classList.add('collapsed');
+    sb.classList.remove('expanded');
+    sb.style.width = '52px';
+  }
   localStorage.setItem('mw_sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
   setTimeout(function() { sb.classList.remove('animating'); }, 300);
 }
@@ -8378,6 +8386,9 @@ function _enterMwEditMode() {
   // 액션바 표시
   var bar = document.getElementById('mw-edit-action-bar');
   if (bar) bar.style.display = 'flex';
+  // 마켓 상태 필터바 표시
+  var statusBar = document.getElementById('mw-price-status-bar');
+  if (statusBar) statusBar.style.display = 'flex';
   updateMwEditSelection();
   // sticky header 재초기화
   initStickyHeader('catalog-table');
@@ -8397,6 +8408,9 @@ function _exitMwEditMode() {
   // 액션바 숨김
   var bar = document.getElementById('mw-edit-action-bar');
   if (bar) bar.style.display = 'none';
+  // 마켓 상태 필터바 숨김
+  var statusBar = document.getElementById('mw-price-status-bar');
+  if (statusBar) statusBar.style.display = 'none';
   // sticky header 재초기화
   initStickyHeader('catalog-table');
 }
@@ -8427,8 +8441,22 @@ function _getCheckedProductIndices() {
   return indices;
 }
 
+// 마켓 상태 필터바 클릭 이벤트 (active 토글 — 필터링 로직은 추후 구현)
+document.addEventListener('click', function(e) {
+  var item = e.target.closest('#mw-price-status-bar .ps-item');
+  if (!item) return;
+  document.querySelectorAll('#mw-price-status-bar .ps-item').forEach(function(i) { i.classList.remove('active'); });
+  item.classList.add('active');
+  // TODO: 실제 필터링은 Step 5에서 구현
+});
+
 function mwEditAction(action) {
   var indices = _getCheckedProductIndices();
+
+  if (action === 'priceCollect') {
+    alert('가격 수집 기능 준비 중입니다.');
+    return;
+  }
 
   if (action === 'modify') {
     if (indices.length === 0) { alert('제품을 선택해주세요'); return; }

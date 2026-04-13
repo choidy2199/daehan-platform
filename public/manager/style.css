@@ -1093,3 +1093,60 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 
 /* 제품 카드 (상세 패널) */
 .imc-product-card { border: 1px solid var(--imc-bd); padding: 9px 11px; background: #FAFBFC; border-radius: 6px; }
+
+/* 밀워키 편집모드 — 마켓 상태 필터바 */
+#mw-price-status-bar {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f0efeb;
+  border-bottom: 1px solid #e0e0d8;
+  font-family: 'Pretendard', sans-serif;
+}
+#mw-price-status-bar .ps-label {
+  font-size: 10px;
+  color: #999;
+  margin-right: 4px;
+}
+#mw-price-status-bar .ps-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #555;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+#mw-price-status-bar .ps-item:hover { background: #e8e8e2; }
+#mw-price-status-bar .ps-item.active {
+  background: white;
+  border-color: #1A1D23;
+  font-weight: 500;
+  color: #1A1D23;
+}
+#mw-price-status-bar .ps-count {
+  font-size: 8px;
+  font-weight: 600;
+  color: white;
+  border-radius: 6px;
+  padding: 0 4px;
+  min-width: 14px;
+  text-align: center;
+}
+#mw-price-status-bar .ps-item[data-status="match"] .ps-count { background: #3B6D11; }
+#mw-price-status-bar .ps-item[data-status="diff"] .ps-count { background: #185FA5; }
+#mw-price-status-bar .ps-item[data-status="soldout"] .ps-count { background: #A32D2D; }
+#mw-price-status-bar .ps-item[data-status="sent"] .ps-count { background: #854F0B; }
+#mw-price-status-bar .ps-item[data-status="notreg"] .ps-count { background: #5F5E5A; }
+#mw-price-status-bar .ps-item[data-status="fail"] .ps-count { background: #993C1D; }
+#mw-price-status-bar .ps-item[data-status="all"] .ps-count { background: #1A1D23; }
+#mw-price-status-bar .ps-item[data-status="match"]::before { content:''; width:7px; height:7px; border-radius:50%; background:#639922; }
+#mw-price-status-bar .ps-item[data-status="diff"]::before { content:''; width:7px; height:7px; border-radius:50%; background:#378ADD; }
+#mw-price-status-bar .ps-item[data-status="soldout"]::before { content:''; width:7px; height:7px; border-radius:50%; background:#E24B4A; }
+#mw-price-status-bar .ps-item[data-status="sent"]::before { content:''; width:7px; height:7px; border-radius:50%; background:#EF9F27; }
+#mw-price-status-bar .ps-item[data-status="notreg"]::before { content:''; width:7px; height:7px; border-radius:50%; background:#888780; }
+#mw-price-status-bar .ps-item[data-status="fail"]::before { content:''; width:7px; height:7px; border-radius:50%; background:#D85A30; }
