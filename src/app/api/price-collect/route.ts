@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllNaverProductsMap } from '@/lib/naver';
-import { getSsgProductList } from '@/lib/ssg';
+import { getSsgProductList, getSsgPrice } from '@/lib/ssg';
 
 // GET /api/price-collect?channels=naver,ssg
 // 응답: { naver: { total, results: { [code]: { price, status } } }, ssg: {...}, timestamp }
@@ -35,16 +35,45 @@ export async function GET(request: NextRequest) {
         name: 'ssg',
         promise: (async () => {
           const products = await getSsgProductList();
-          const results: Record<string, { price: number | null; status: string }> = {};
+          // 1) splVenItemId → {itemId, status} 매핑
+          const ssgMap: Record<string, { itemId: string; status: string }> = {};
           for (const p of products) {
             const code = String(p.splVenItemId || '').trim();
-            if (!code) continue;
-            // sellprc가 목록에 포함되면 사용, 없으면 null (개별 조회 timeout 방지)
-            const rawPrice = (p as any).sellprc;
-            const price = rawPrice != null ? Number(rawPrice) : null;
-            const status = String(p.sellStatCd ?? '');
-            results[code] = { price, status };
+            const itemId = String(p.itemId || '').trim();
+            if (!code || !itemId) continue;
+            ssgMap[code] = { itemId, status: String(p.sellStatCd ?? '') };
           }
+          // 2) 배치 단위 getSsgPrice 병렬 조회
+          const BATCH_SIZE = 20;
+          const BATCH_DELAY = 200; // ms
+          const codes = Object.keys(ssgMap);
+          const results: Record<string, { price: number | null; status: string }> = {};
+          const tBatch0 = Date.now();
+          for (let i = 0; i < codes.length; i += BATCH_SIZE) {
+            const batch = codes.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.allSettled(
+              batch.map(async (code) => {
+                const { itemId, status } = ssgMap[code];
+                try {
+                  const priceData = await getSsgPrice(itemId);
+                  const price = priceData?.sellprc != null ? Number(priceData.sellprc) : null;
+                  return { code, price, status };
+                } catch {
+                  return { code, price: null, status };
+                }
+              })
+            );
+            for (const r of batchResults) {
+              if (r.status === 'fulfilled') {
+                const { code, price, status } = r.value;
+                results[code] = { price, status };
+              }
+            }
+            if (i + BATCH_SIZE < codes.length) {
+              await new Promise(res => setTimeout(res, BATCH_DELAY));
+            }
+          }
+          console.log(`[SSG price batch] ${codes.length}건 조회 완료 ${Date.now() - tBatch0}ms`);
           return { total: products.length, results };
         })(),
       });
