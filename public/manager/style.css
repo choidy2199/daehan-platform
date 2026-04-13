@@ -1095,9 +1095,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 /* 제품 카드 (상세 패널) */
 .imc-product-card { border: 1px solid var(--imc-bd); padding: 9px 11px; background: #FAFBFC; border-radius: 6px; }
 
-/* 밀워키 편집모드 — 마켓 상태 필터바 (pill) */
+/* 밀워키 — 마켓 상태 필터바 (pill, 상시 표시) */
 #mw-price-status-bar {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 4px;
   margin-left: auto;

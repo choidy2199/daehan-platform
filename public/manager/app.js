@@ -8380,9 +8380,6 @@ function _enterMwEditMode() {
   // 액션바 표시
   var bar = document.getElementById('mw-edit-action-bar');
   if (bar) bar.style.display = 'flex';
-  // 마켓 상태 필터바 표시
-  var statusBar = document.getElementById('mw-price-status-bar');
-  if (statusBar) statusBar.style.display = 'flex';
   updateMwEditSelection();
   // sticky header 재초기화
   initStickyHeader('catalog-table');
@@ -8402,9 +8399,6 @@ function _exitMwEditMode() {
   // 액션바 숨김
   var bar = document.getElementById('mw-edit-action-bar');
   if (bar) bar.style.display = 'none';
-  // 마켓 상태 필터바 숨김
-  var statusBar = document.getElementById('mw-price-status-bar');
-  if (statusBar) statusBar.style.display = 'none';
   // sticky header 재초기화
   initStickyHeader('catalog-table');
 }
