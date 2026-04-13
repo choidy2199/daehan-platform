@@ -227,6 +227,9 @@ if (window.PerformanceObserver) {
       window.currentUser = saved;
       var nameEl = document.getElementById('current-user-name');
       if (nameEl) nameEl.textContent = saved.name + '님';
+      // 우측 상단 사용자명 표시
+      var ctUser = document.getElementById('ct-username');
+      if (ctUser) ctUser.textContent = saved.loginId || saved.name || 'user';
     }
   } catch(e) {}
 })();
@@ -19704,14 +19707,17 @@ function _markAllNoticesRead() {
 
 function _updateNoticeBadge() {
   var badge = document.getElementById('notice-unread-badge');
-  if (!badge) return;
   var readIds = _getReadNoticeIds();
   var unread = _noticesData.filter(function(n) { return readIds.indexOf(n.id) === -1; }).length;
-  if (unread > 0) {
-    badge.textContent = unread;
-    badge.style.display = 'inline-block';
-  } else {
-    badge.style.display = 'none';
+  if (badge) {
+    if (unread > 0) { badge.textContent = unread; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+  }
+  // 크롬탭바 종 뱃지 동기화
+  var bellBadge = document.getElementById('ctBellBadge');
+  if (bellBadge) {
+    if (unread > 0) { bellBadge.textContent = unread; bellBadge.style.display = 'flex'; }
+    else { bellBadge.style.display = 'none'; }
   }
 }
 
