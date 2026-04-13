@@ -106,7 +106,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 @keyframes badge-blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
 /* 사이드바 즐겨찾기 별 */
-.sidebar-fav-btn { margin-left:auto; background:transparent; border:none; cursor:pointer; font-size:16px; padding:2px 4px; border-radius:4px; line-height:1; opacity:1; color:transparent; -webkit-text-stroke:1.5px #1A1D23; flex-shrink:0; }
+.sidebar-fav-btn { margin-left:auto; background:transparent; border:none; cursor:pointer; font-size:16px; padding:2px 4px; border-radius:4px; line-height:1; opacity:1; color:transparent; -webkit-text-stroke:0.7px #999; flex-shrink:0; }
 .sidebar-fav-btn.active { color:#EF9F27; -webkit-text-stroke:0; animation:star-blink 0.8s ease-in-out infinite; }
 @keyframes star-blink { 0%,100%{opacity:1;color:#EF9F27} 50%{opacity:0.4;color:#ffd700} }
 .sidebar.collapsed .sidebar-fav-btn { display:none; }
