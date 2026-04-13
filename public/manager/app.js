@@ -794,7 +794,7 @@ function _getBadgeStatusInfo(code, channel, localPrice) {
   if (local === marketPrice) {
     return { status: 'sync', dotClass: 'ps-dot-sync', tagClass: 'ps-tag-sync', tagText: '일치' };
   }
-  return { status: 'diff', dotClass: 'ps-dot-diff', tagClass: 'ps-tag-diff', tagText: '차이', subText: '← ' + marketPrice.toLocaleString(), subColor: '#185FA5' };
+  return { status: 'diff', dotClass: 'ps-dot-diff', tagClass: 'ps-tag-diff', tagText: '차이' };
 }
 
 function marketBadge(p, channel) {
