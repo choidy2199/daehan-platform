@@ -1098,43 +1098,44 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #mw-price-status-bar {
   display: none;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  background: #f0efeb;
-  border-bottom: 1px solid #e0e0d8;
+  gap: 6px;
+  padding: 7px 12px;
+  background: #E6E5DD;
+  border-bottom: 1px solid #d4d3ca;
   font-family: 'Pretendard', sans-serif;
 }
 #mw-price-status-bar .ps-label {
-  font-size: 10px;
-  color: #999;
-  margin-right: 4px;
+  font-size: 11px;
+  color: #5A6070;
+  font-weight: 500;
+  margin-right: 6px;
 }
 #mw-price-status-bar .ps-item {
   display: flex;
   align-items: center;
-  gap: 3px;
-  font-size: 10px;
-  color: #555;
+  gap: 5px;
+  font-size: 11px;
+  color: #3A3E48;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 4px 10px;
   border-radius: 4px;
   border: 1px solid transparent;
   white-space: nowrap;
 }
-#mw-price-status-bar .ps-item:hover { background: #e8e8e2; }
+#mw-price-status-bar .ps-item:hover { background: #d9d8cf; }
 #mw-price-status-bar .ps-item.active {
   background: white;
   border-color: #1A1D23;
-  font-weight: 500;
+  font-weight: 600;
   color: #1A1D23;
 }
 #mw-price-status-bar .ps-count {
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 600;
   color: white;
-  border-radius: 6px;
-  padding: 0 4px;
-  min-width: 14px;
+  border-radius: 8px;
+  padding: 1px 6px;
+  min-width: 18px;
   text-align: center;
 }
 #mw-price-status-bar .ps-item[data-status="match"] .ps-count { background: #3B6D11; }
