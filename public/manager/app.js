@@ -2702,14 +2702,19 @@ function setCatalogFilter(mode) {
 var _lastRenderCatalog = 0;
 var _catalogRowNum = 0;
 function renderCatalog() {
+  try {
   var now = performance.now();
   if (now - _lastRenderCatalog < 200) return;
   _lastRenderCatalog = now;
   _catalogRowNum = 0;
   var _rc0 = now;
-  const search = document.getElementById('catalog-search').value.toLowerCase();
-  const cat = document.getElementById('catalog-cat').value;
-  const sub = document.getElementById('catalog-sub').value;
+  var _searchEl = document.getElementById('catalog-search');
+  var _catEl = document.getElementById('catalog-cat');
+  var _subEl = document.getElementById('catalog-sub');
+  if (!_searchEl || !_catEl || !_subEl) { console.error('[renderCatalog] DOM 요소 없음:', {search:!!_searchEl, cat:!!_catEl, sub:!!_subEl}); return; }
+  const search = _searchEl.value.toLowerCase();
+  const cat = _catEl.value;
+  const sub = _subEl.value;
 
   let filtered = DB.products.filter(p => {
     if (cat && p.category !== cat) return false;
@@ -2989,6 +2994,7 @@ function renderCatalog() {
     if (tabs[5]) tabs[5].textContent = '코드없음(' + nosku.length + ')';
   })();
   console.log('[PERF] renderCatalog 전체: ' + (performance.now() - _rc0).toFixed(0) + 'ms');
+  } catch(e) { console.error('[renderCatalog] 에러:', e); }
 }
 
 function toggleDiscontinued(idx, checked) {
