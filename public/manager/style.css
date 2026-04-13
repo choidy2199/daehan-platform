@@ -1211,8 +1211,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .ps-pulse { animation: ps-pulse-dot 1.4s ease-in-out infinite; }
 
 /* === 다크바 편집 버튼 + 마켓 탭 (Step 11) === */
+.db, .db-edit { align-items: center; justify-content: center; line-height: 1; }
 .db-edit { background: #2a2d33; color: #ccc; border: 1px solid #444; }
-.dm-info { font-size: 11px; color: #EF9F27; margin-right: 2px; }
+.dm-info { font-size: 12px; font-weight: 500; color: #EF9F27; margin-right: 6px; line-height: 30px; vertical-align: middle; }
 .mw-dark-sep { width: 1px; height: 20px; background: #444; margin: 0 3px; }
 
 /* 필터바 마켓 탭 */
