@@ -18816,7 +18816,7 @@ function _renderNoticeList(container) {
   var showWriteBtn = isBugTab || isHelpTab || isAdmin;
   var writeBtnText = isBugTab ? '✚ 오류/개선 작성' : (isHelpTab ? '✚ 도움말 작성' : '✚ 새 글 작성');
 
-  var html = '<div style="max-width:1060px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
+  var html = '<div style="display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // ── 다크 헤더 ──
   html += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:10px 16px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0">';
@@ -18993,7 +18993,7 @@ async function _showNoticeDetail(id) {
   var dateStr = fullDate.getFullYear() + '.' + String(fullDate.getMonth()+1).padStart(2,'0') + '.' + String(fullDate.getDate()).padStart(2,'0');
 
   // ── 2컬럼 flex wrapper ──
-  var h = '<div style="max-width:1060px;margin:0 auto;display:flex !important;flex-direction:row !important;gap:0;text-align:left !important;">';
+  var h = '<div style="display:flex !important;flex-direction:row !important;gap:0;text-align:left !important;">';
 
   // ── 본문 영역 (좌측) ──
   h += '<div style="flex:1;min-width:0;background:#fff;border:0.5px solid #eee;border-radius:8px 0 0 8px;overflow:hidden;">';
@@ -19323,7 +19323,7 @@ function _showNoticeWrite(editId) {
   if (editId) { n = _noticesData.find(function(x) { return x.id === editId; }); }
   var isEdit = !!n;
 
-  var h = '<div style="max-width:1060px;margin:0 auto;display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
+  var h = '<div style="display:block !important;text-align:left !important;background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // 다크 헤더
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:12px;padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px 8px 0 0;">';
@@ -19376,7 +19376,7 @@ function _showNoticeWrite(editId) {
     h += '</select></div>';
   }
   if (!isBugMode) {
-    h += '<label style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;margin-top:18px;font-size:14px;color:#1A1D23;cursor:pointer;"><input type="checkbox" id="nw-pinned"' + (isEdit && n.pinned ? ' checked' : '') + '> 📌 상단고정</label>';
+    h += '<label style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:6px;margin-left:auto;font-size:13px;color:#1A1D23;cursor:pointer;white-space:nowrap;align-self:flex-end;padding-bottom:2px"><input type="checkbox" id="nw-pinned"' + (isEdit && n.pinned ? ' checked' : '') + '> 📌 상단고정</label>';
   }
   h += '</div>';
 
@@ -20953,7 +20953,7 @@ function _renderBackorderList(container) {
   var doneCount = data.filter(function(d) { return d.status === 'done'; }).length;
   var stockInCount = data.filter(function(d) { return (d.status === 'waiting' || d.status === 'partial') && _getBackorderStock(d.product_code) > 0; }).length;
 
-  var h = '<div style="max-width:1200px;margin:0 auto;display:block !important;text-align:left !important;">';
+  var h = '<div style="display:block !important;text-align:left !important;">';
   h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // 다크 헤더

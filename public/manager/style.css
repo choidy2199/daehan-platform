@@ -737,7 +737,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .kakao-subtab-inactive .kakao-subtab-dot { background:#aaa; }
 .kakao-subtab-inactive:hover { background:#DCDCDC; }
 
-.kakao-tab-contents { flex:1; min-height:0; overflow-y:auto !important; overflow-x:hidden; padding:12px; }
+.kakao-tab-contents { flex:1; min-height:0; overflow-y:auto !important; overflow-x:hidden; padding:0; }
 .kakao-tab-content { overflow:visible !important; }
 
 /* 대시보드 헤더 */
