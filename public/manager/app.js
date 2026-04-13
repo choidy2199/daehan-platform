@@ -768,6 +768,32 @@ var _marketBadgeStyles = {
   gmarket: { bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C', priceColor: '#0C447C', dot: '#185FA5', label: '오픈마켓' },
   ssg: { bg: '#FDF6E3', border: '#D4A843', color: '#7A5C00', priceColor: '#7A5C00', dot: '#B8860B', label: 'SSG' }
 };
+
+// Step 10 — 수집된 _priceCollectMap 기반으로 뱃지 상태 판정
+function _getBadgeStatusInfo(code, channel, localPrice) {
+  if (typeof _priceCollectMap === 'undefined' || !_priceCollectMap) return null; // 수집 전
+  var channelMap = _priceCollectMap[channel];
+  if (!channelMap) return null; // gmarket 등 미연동
+  var marketData = channelMap[String(code || '')];
+  if (!marketData) {
+    return { status: 'none', dotClass: 'ps-dot-none', tagClass: 'ps-tag-none', tagText: '없음', borderClass: 'ps-none-border', showDash: true };
+  }
+  var isSold = (channel === 'naver' && (marketData.status === 'SUSPENSION' || marketData.status === 'OUTOFSTOCK'))
+    || (channel === 'ssg' && String(marketData.status) === '80');
+  if (isSold) {
+    return { status: 'sold', dotClass: 'ps-dot-sold ps-pulse', tagClass: 'ps-tag-sold ps-blink', tagText: '품절', borderClass: 'ps-sold-border', subText: '판매중지', subColor: '#A32D2D' };
+  }
+  if (marketData.price == null) {
+    return { status: 'none', dotClass: 'ps-dot-none', tagClass: 'ps-tag-none', tagText: '없음', borderClass: 'ps-none-border', showDash: true };
+  }
+  var marketPrice = Math.round(Number(marketData.price) || 0);
+  var local = Math.round(Number(localPrice) || 0);
+  if (local === marketPrice) {
+    return { status: 'sync', dotClass: 'ps-dot-sync', tagClass: 'ps-tag-sync', tagText: '일치' };
+  }
+  return { status: 'diff', dotClass: 'ps-dot-diff', tagClass: 'ps-tag-diff', tagText: '차이', subText: '← ' + marketPrice.toLocaleString(), subColor: '#185FA5' };
+}
+
 function marketBadge(p, channel) {
   var st = _marketBadgeStyles[channel];
   if (!st) return '';
@@ -777,9 +803,26 @@ function marketBadge(p, channel) {
   var m = calcMargin(price, p.cost, feeRate);
   var mColor = m && m.profit >= 0 ? '#1D9E75' : '#CC2222';
   var mText = m ? (m.rate.toFixed(1) + '% ' + (m.profit >= 0 ? '+' : '') + fmt(m.profit)) : '';
-  return '<div onclick="openPriceDetail(\'' + (p.code || '') + '\',\'' + channel + '\')" data-mb-border="' + st.border + '" style="cursor:pointer;background:' + st.bg + ';border-radius:6px;padding:4px 6px;text-align:center;border:1px solid ' + st.border + ';transition:border-color 0.15s" onmouseenter="this.style.borderColor=\'#1A1D23\'" onmouseleave="this.style.borderColor=this.getAttribute(\'data-mb-border\')">'
-    + '<div style="font-size:15px;font-weight:700;color:' + st.priceColor + ';line-height:1.2">' + fmt(price) + '</div>'
-    + (mText ? '<div style="font-size:11px;color:' + mColor + ';line-height:1;margin-top:2px">' + mText + '</div>' : '')
+  // 상태 정보 (수집 후에만)
+  var info = _getBadgeStatusInfo(p.code, channel, price);
+  var borderCls = info && info.borderClass ? ' ' + info.borderClass : '';
+  var dotHtml = info ? '<div class="ps-dot ' + info.dotClass + '"></div>' : '';
+  var tagHtml = info ? '<div class="ps-tag ' + info.tagClass + '">' + info.tagText + '</div>' : '';
+  var innerHtml;
+  if (info && info.showDash) {
+    innerHtml = '<div class="bp" style="font-size:15px;font-weight:700;color:#888;line-height:1.2">—</div>'
+              + '<div class="bs" style="font-size:11px;color:#aaa;line-height:1;margin-top:2px">미등록</div>';
+  } else {
+    var subHtml = mText ? '<div class="bs" style="font-size:11px;color:' + mColor + ';line-height:1;margin-top:2px">' + mText + '</div>' : '';
+    if (info && info.subText) {
+      subHtml = '<div class="bs" style="font-size:11px;color:' + (info.subColor || mColor) + ';line-height:1;margin-top:2px">' + info.subText + '</div>';
+    }
+    innerHtml = '<div class="bp" style="font-size:15px;font-weight:700;color:' + st.priceColor + ';line-height:1.2">' + fmt(price) + '</div>' + subHtml;
+  }
+  return '<div class="' + borderCls.trim() + '" onclick="openPriceDetail(\'' + (p.code || '') + '\',\'' + channel + '\')" data-mb-border="' + st.border + '" style="position:relative;cursor:pointer;background:' + st.bg + ';border-radius:6px;padding:4px 6px;text-align:center;border:1px solid ' + st.border + ';transition:border-color 0.15s" onmouseenter="this.style.borderColor=\'#1A1D23\'" onmouseleave="this.style.borderColor=this.getAttribute(\'data-mb-border\')">'
+    + dotHtml
+    + tagHtml
+    + innerHtml
     + '</div>';
 }
 function getMarketFeeRate(p, channel) {
@@ -8498,6 +8541,19 @@ async function _mwPriceCollect() {
       }
     });
     _priceCollectStats = stats;
+    // 테이블 리렌더링 — 뱃지에 도트/태그 반영 (편집모드 체크박스 보존)
+    var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
+    if (typeof renderCatalog === 'function') renderCatalog();
+    if (_mwEditMode) {
+      _enterMwEditMode();
+      if (_savedChecked && _savedChecked.length) {
+        _savedChecked.forEach(function(idx) {
+          var cb = document.querySelector('.mw-edit-cb[value="' + idx + '"]');
+          if (cb) cb.checked = true;
+        });
+        updateMwEditSelection();
+      }
+    }
     _updatePriceStatusBar();
     alert('가격 수집 완료\n전체: ' + stats.total + '건\n일치: ' + stats.match + ' | 차이: ' + stats.diff + ' | 품절: ' + stats.soldout + ' | 없음: ' + stats.notreg + ' | 실패: ' + stats.fail);
   } catch (err) {

@@ -1148,3 +1148,57 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #mw-price-status-bar .ps-item[data-status="notreg"]::before  { content:''; width:7px; height:7px; border-radius:50%; background:#888780; }
 #mw-price-status-bar .ps-item[data-status="fail"]::before    { content:''; width:7px; height:7px; border-radius:50%; background:#D85A30; }
 #mw-price-status-bar .ps-item.active::before { border: 1px solid rgba(255,255,255,0.4); }
+
+/* === 가격 상태 도트 + 태그 (Step 10) === */
+.ps-dot {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.ps-tag {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  font-size: 7px;
+  padding: 1px 4px;
+  border-radius: 0 3px 0 3px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+/* 태그 색상 — 6가지 상태 */
+.ps-tag-sync { background: #1a3a08; color: #a8d86a; }
+.ps-tag-diff { background: #0a3766; color: #85c4f7; }
+.ps-tag-sold { background: #5a1010; color: #f7a0a0; }
+.ps-tag-sent { background: #3a1e02; color: #f5c060; }
+.ps-tag-none { background: #333; color: #bbb; }
+.ps-tag-fail { background: #5a1010; color: #f7a0a0; }
+/* 도트 색상 */
+.ps-dot-sync { background: #639922; }
+.ps-dot-diff { background: #378ADD; }
+.ps-dot-sold { background: #E24B4A; }
+.ps-dot-sent { background: #EF9F27; }
+.ps-dot-none { background: #888780; }
+.ps-dot-fail { background: #D85A30; }
+/* 품절 뱃지 — 빨간 보더 + 가격 취소선 */
+.ps-sold-border { border-color: #E24B4A !important; }
+.ps-sold-border .bp,
+.ps-sold-border .badge-price {
+  text-decoration: line-through;
+  opacity: 0.45;
+}
+/* 없음 뱃지 — 회색 보더 */
+.ps-none-border { border-color: #B4B2A9 !important; }
+/* 애니메이션 — 품절/실패만 적용 */
+@keyframes ps-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@keyframes ps-pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0.5; }
+}
+.ps-blink { animation: ps-blink 1.4s ease-in-out infinite; }
+.ps-pulse { animation: ps-pulse-dot 1.4s ease-in-out infinite; }
