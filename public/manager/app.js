@@ -8429,9 +8429,11 @@ function _enterMwEditMode() {
     var pidx = td.dataset.idx || '';
     td.innerHTML = '<input type="checkbox" class="mw-edit-cb" value="' + pidx + '" onchange="updateMwEditSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
   });
-  // 액션바 표시
-  var bar = document.getElementById('mw-edit-action-bar');
-  if (bar) bar.style.display = 'flex';
+  // 다크바 편집 모드 전환 (normal 숨김, edit 표시)
+  document.querySelectorAll('.mw-btn-normal').forEach(function(el) { el.style.display = 'none'; });
+  document.querySelectorAll('.mw-btn-edit').forEach(function(el) {
+    el.style.display = (el.tagName === 'DIV' || el.classList.contains('mw-dark-sep')) ? 'inline-block' : 'inline-flex';
+  });
   updateMwEditSelection();
   // sticky header 재초기화
   initStickyHeader('catalog-table');
@@ -8448,9 +8450,9 @@ function _exitMwEditMode() {
     if (td._origHTML) { td.innerHTML = td._origHTML; delete td._origHTML; }
     else { num++; td.textContent = num; }
   });
-  // 액션바 숨김
-  var bar = document.getElementById('mw-edit-action-bar');
-  if (bar) bar.style.display = 'none';
+  // 다크바 일반 모드 복원
+  document.querySelectorAll('.mw-btn-edit').forEach(function(el) { el.style.display = 'none'; });
+  document.querySelectorAll('.mw-btn-normal').forEach(function(el) { el.style.display = ''; });
   // sticky header 재초기화
   initStickyHeader('catalog-table');
 }
@@ -8463,13 +8465,10 @@ function toggleAllMwEditCheckbox(masterCb) {
 function updateMwEditSelection() {
   var checked = document.querySelectorAll('.mw-edit-cb:checked').length;
   var total = document.querySelectorAll('.mw-edit-cb').length;
-  var info = document.getElementById('mw-edit-selection-info');
-  if (info) info.textContent = checked + '개 선택됨';
+  var dmInfo = document.getElementById('catalog-count-edit');
+  if (dmInfo) dmInfo.textContent = checked + '개 선택';
   var masterCb = document.getElementById('mw-edit-checkall');
   if (masterCb) masterCb.checked = (checked === total && total > 0);
-  // 바의 체크박스도 동기화
-  var barCb = document.getElementById('mw-edit-checkall-bar');
-  if (barCb) barCb.checked = (checked === total && total > 0);
 }
 
 function _getCheckedProductIndices() {
@@ -8490,13 +8489,38 @@ document.addEventListener('click', function(e) {
   // TODO: 실제 필터링은 Step 5에서 구현
 });
 
-// ===== 가격 수집 (Step 9) =====
+// ===== 가격 수집 (Step 9/11) =====
 var _priceCollectMap = null; // { naver: {code: {price, status}}, ssg: {code: {price, status}} }
 var _priceCollectStats = { total: 0, match: 0, diff: 0, soldout: 0, sent: 0, notreg: 0, fail: 0 };
+var _priceCollectStatsByMarket = { naver: null, ssg: null, gmarket: null };
+var _selectedPriceMarket = 'naver';
+
+function _computeStatsForChannel(channel, products, channelMap, failedFlag) {
+  var s = { total: 0, match: 0, diff: 0, soldout: 0, sent: 0, notreg: 0, fail: 0 };
+  var priceField = channel === 'naver' ? 'priceNaver' : channel === 'ssg' ? 'priceSsg' : channel === 'gmarket' ? 'priceOpen' : null;
+  if (!priceField) return s;
+  products.forEach(function(p) {
+    if (!p || p.discontinued) return;
+    var local = Math.round(Number(p[priceField]) || 0);
+    if (local <= 0) return;
+    s.total++;
+    if (failedFlag) { s.fail++; return; }
+    var code = String(p.code || '').trim();
+    var r = channelMap ? channelMap[code] : null;
+    if (!r) { s.notreg++; return; }
+    if (channel === 'naver' && (r.status === 'SUSPENSION' || r.status === 'OUTOFSTOCK')) { s.soldout++; return; }
+    if (channel === 'ssg' && String(r.status) === '80') { s.soldout++; return; }
+    if (r.price == null) { s.notreg++; return; }
+    if (local === Math.round(Number(r.price) || 0)) s.match++;
+    else s.diff++;
+  });
+  return s;
+}
 
 async function _mwPriceCollect() {
   var btn = document.getElementById('mw-edit-pricecollect-btn');
   if (!btn) return;
+  alert('네이버 + SSG 가격 수집을 시작합니다.\n약 30초 소요됩니다.');
   var origText = btn.textContent;
   btn.textContent = '수집 중...';
   btn.disabled = true;
@@ -8510,39 +8534,13 @@ async function _mwPriceCollect() {
     };
     var naverFailed = !data.naver || !!data.naver.error;
     var ssgFailed = !data.ssg || !!data.ssg.error;
-    var stats = { total: 0, match: 0, diff: 0, soldout: 0, sent: 0, notreg: 0, fail: 0 };
     var products = (DB && DB.products) ? DB.products : [];
-    products.forEach(function(p) {
-      if (!p || p.discontinued) return;
-      var code = String(p.code || '').trim();
-      // 네이버
-      var naverLocal = Math.round(Number(p.priceNaver) || 0);
-      if (naverLocal > 0) {
-        stats.total++;
-        if (naverFailed) { stats.fail++; }
-        else {
-          var nr = _priceCollectMap.naver[code];
-          if (!nr) { stats.notreg++; }
-          else if (nr.status === 'SUSPENSION' || nr.status === 'OUTOFSTOCK') { stats.soldout++; }
-          else if (naverLocal === Math.round(Number(nr.price) || 0)) { stats.match++; }
-          else { stats.diff++; }
-        }
-      }
-      // SSG
-      var ssgLocal = Math.round(Number(p.priceSsg) || 0);
-      if (ssgLocal > 0) {
-        stats.total++;
-        if (ssgFailed) { stats.fail++; }
-        else {
-          var sr = _priceCollectMap.ssg[code];
-          if (!sr) { stats.notreg++; }
-          else if (String(sr.status) === '80') { stats.soldout++; }
-          else if (sr.price == null) { stats.notreg++; } // sellprc 미포함 시
-          else if (ssgLocal === Math.round(Number(sr.price) || 0)) { stats.match++; }
-          else { stats.diff++; }
-        }
-      }
-    });
+    // 마켓별 stats 집계
+    _priceCollectStatsByMarket.naver = _computeStatsForChannel('naver', products, _priceCollectMap.naver, naverFailed);
+    _priceCollectStatsByMarket.ssg = _computeStatsForChannel('ssg', products, _priceCollectMap.ssg, ssgFailed);
+    _priceCollectStatsByMarket.gmarket = _computeStatsForChannel('gmarket', products, null, false);
+    // 합계 (alert용)
+    var stats = _priceCollectStatsByMarket[_selectedPriceMarket] || _priceCollectStatsByMarket.naver;
     _priceCollectStats = stats;
     // 테이블 리렌더링 — 뱃지에 도트/태그 반영 (편집모드 체크박스 보존)
     var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
@@ -8558,7 +8556,7 @@ async function _mwPriceCollect() {
       }
     }
     _updatePriceStatusBar();
-    alert('가격 수집 완료\n전체: ' + stats.total + '건\n일치: ' + stats.match + ' | 차이: ' + stats.diff + ' | 품절: ' + stats.soldout + ' | 없음: ' + stats.notreg + ' | 실패: ' + stats.fail);
+    alert('가격 수집 완료 (' + _selectedPriceMarket + ')\n전체: ' + stats.total + '건\n일치: ' + stats.match + ' | 차이: ' + stats.diff + ' | 품절: ' + stats.soldout + ' | 없음: ' + stats.notreg + ' | 실패: ' + stats.fail);
   } catch (err) {
     console.error('[가격수집] 오류:', err);
     alert('가격 수집 실패: ' + (err.message || err));
@@ -8571,7 +8569,7 @@ async function _mwPriceCollect() {
 function _updatePriceStatusBar() {
   var bar = document.getElementById('mw-price-status-bar');
   if (!bar) return;
-  var s = _priceCollectStats;
+  var s = _priceCollectStatsByMarket[_selectedPriceMarket] || _priceCollectStats;
   bar.querySelectorAll('.ps-item').forEach(function(item) {
     var status = item.dataset.status;
     var count = 0;
@@ -8586,6 +8584,16 @@ function _updatePriceStatusBar() {
     if (countSpan) countSpan.textContent = count;
   });
 }
+
+// 마켓 탭 클릭 — active 전환 + 필터바 건수 갱신
+document.addEventListener('click', function(e) {
+  var tab = e.target.closest('#mw-price-status-bar .ps-market-tab');
+  if (!tab) return;
+  document.querySelectorAll('#mw-price-status-bar .ps-market-tab').forEach(function(t) { t.classList.remove('ps-mt-active'); });
+  tab.classList.add('ps-mt-active');
+  _selectedPriceMarket = tab.dataset.market || 'naver';
+  _updatePriceStatusBar();
+});
 
 function mwEditAction(action) {
   var indices = _getCheckedProductIndices();

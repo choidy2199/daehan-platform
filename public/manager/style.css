@@ -1209,3 +1209,56 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 }
 .ps-blink { animation: ps-blink 1.4s ease-in-out infinite; }
 .ps-pulse { animation: ps-pulse-dot 1.4s ease-in-out infinite; }
+
+/* === 다크바 편집 버튼 + 마켓 탭 (Step 11) === */
+.db-edit { background: #2a2d33; color: #ccc; border: 1px solid #444; }
+.dm-info { font-size: 11px; color: #EF9F27; margin-right: 2px; }
+.mw-dark-sep { width: 1px; height: 20px; background: #444; margin: 0 3px; }
+
+/* 필터바 마켓 탭 */
+.ps-market-tab {
+  font-size: 14px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #888;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ps-mt-active {
+  background: #1A1D23;
+  color: white;
+  border-color: #1A1D23;
+  font-weight: 500;
+}
+.ps-sep {
+  width: 1px;
+  height: 26px;
+  background: #ddd;
+  flex-shrink: 0;
+  margin: 0 4px;
+}
+
+/* 필터바 pill 크기 1.5x 상향 (override) */
+#mw-price-status-bar { gap: 8px; }
+#mw-price-status-bar .ps-item {
+  font-size: 14px;
+  padding: 5px 14px;
+  border-radius: 14px;
+}
+#mw-price-status-bar .ps-count {
+  font-size: 12px;
+  padding: 2px 8px;
+  min-width: 24px;
+  border-radius: 12px;
+}
+#mw-price-status-bar .ps-item[data-status="match"]::before,
+#mw-price-status-bar .ps-item[data-status="diff"]::before,
+#mw-price-status-bar .ps-item[data-status="soldout"]::before,
+#mw-price-status-bar .ps-item[data-status="sent"]::before,
+#mw-price-status-bar .ps-item[data-status="notreg"]::before,
+#mw-price-status-bar .ps-item[data-status="fail"]::before {
+  width: 10px;
+  height: 10px;
+}

@@ -288,9 +288,16 @@ document.head.appendChild(s);
         </div>
       </div>
       <div style="display:flex;gap:0;align-items:center">
-        <span style="font-size:12px;font-weight:400;opacity:0.7;margin-right:12px" id="catalog-count">0건</span>
+        <span class="mw-btn-normal" style="font-size:12px;font-weight:400;opacity:0.7;margin-right:12px" id="catalog-count">0건</span>
+        <span id="catalog-count-edit" class="dm-info mw-btn-edit" style="display:none">0개 선택</span>
         <button class="btn-danger btn-sm" onclick="deleteSelectedProducts()" id="btn-delete-selected" style="display:none">선택 삭제</button>
-        <button onclick="showProductManageModal()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:0 16px;height:30px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Pretendard',sans-serif">제품등록및수정</button>
+        <button class="mw-btn-normal" onclick="showProductManageModal()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:0 16px;height:30px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Pretendard',sans-serif">제품등록및수정</button>
+        <button class="mw-btn-edit db db-edit" onclick="mwEditAction('modify')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#2a2d33;color:#ccc;border:1px solid #444;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap;margin-right:6px">수정</button>
+        <button class="mw-btn-edit db db-edit" onclick="mwEditAction('delete')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#2a2d33;color:#ccc;border:1px solid #444;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap;margin-right:6px">삭제</button>
+        <button class="mw-btn-edit db db-edit" onclick="mwEditAction('discontinue')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#2a2d33;color:#ccc;border:1px solid #444;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap;margin-right:6px">단종</button>
+        <div class="mw-btn-edit mw-dark-sep" style="display:none"></div>
+        <button class="mw-btn-edit" id="mw-edit-pricecollect-btn" onclick="mwEditAction('priceCollect')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;border:1px solid #666;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap;margin-right:6px">▼ 가격 수집</button>
+        <button class="mw-btn-edit" id="mw-edit-pricesync-btn" onclick="mwEditAction('priceSync')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#E24B4A;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">▲ 가격 전송</button>
         <div style="width:1px;height:20px;background:rgba(255,255,255,0.2);margin:0 10px"></div>
         <button onclick="showSettingsModal()" style="background:#5A6070;color:#fff;border:none;border-radius:6px;padding:0 16px;height:30px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Pretendard',sans-serif;margin-right:6px">⚙ 설정</button>
         <button id="mw-edit-toggle-btn" onclick="toggleMwEditMode()" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:0 16px;height:30px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Pretendard',sans-serif">✎ 수정</button>
@@ -305,18 +312,11 @@ document.head.appendChild(s);
         <select class="select" id="catalog-sub" onchange="renderCatalog()" style="flex:0 0 auto;width:130px">
           <option value="">전체 중분류</option>
         </select>
-        <div id="mw-edit-action-bar" style="display:none;align-items:center;gap:6px;margin-left:auto">
-          <input type="checkbox" id="mw-edit-checkall-bar" onchange="toggleAllMwEditCheckbox(this)" style="width:15px;height:15px;accent-color:#185FA5">
-          <span id="mw-edit-selection-info" style="font-size:12px;color:#185FA5;font-weight:500;white-space:nowrap">0개 선택됨</span>
-          <button onclick="mwEditAction('modify')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#185FA5;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">선택 수정</button>
-          <button onclick="mwEditAction('delete')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#FCEBEB;color:#791F1F;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">선택 삭제</button>
-          <button onclick="mwEditAction('discontinue')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#FAEEDA;color:#854F0B;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">단종 처리</button>
-          <div style="width:1px;height:18px;background:#ddd;margin:0 4px"></div>
-          <button id="mw-edit-pricecollect-btn" onclick="mwEditAction('priceCollect')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#1A1D23;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">▼ 가격 수집</button>
-          <button id="mw-edit-pricesync-btn" onclick="mwEditAction('priceSync')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#E24B4A;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">▲ 가격 일괄 전송</button>
-        </div>
         <div id="mw-price-status-bar">
-          <span class="ps-label">마켓:</span>
+          <span class="ps-market-tab ps-mt-active" data-market="naver">스토어팜</span>
+          <span class="ps-market-tab" data-market="gmarket">오픈마켓</span>
+          <span class="ps-market-tab" data-market="ssg">SSG</span>
+          <div class="ps-sep"></div>
           <div class="ps-item active" data-status="all">전체 <span class="ps-count">0</span></div>
           <div class="ps-item" data-status="match">일치 <span class="ps-count">0</span></div>
           <div class="ps-item" data-status="diff">차이 <span class="ps-count">0</span></div>
