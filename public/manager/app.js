@@ -14889,10 +14889,36 @@ async function init() {
     renderDesktop();
   }
 
-  // 1. 백그라운드에서 Supabase 다운로드 → 변경분만 업데이트
+  // 1. localStorage에 핵심 데이터가 없으면 Supabase에서 전체 다운로드 (새 PC/브라우저)
   var savedTab = localStorage.getItem('mw_active_tab');
   updateSyncStatus('동기화 중...');
-  _bgSyncFromSupabase(savedTab);
+  var _hasProducts = localStorage.getItem('mw_products') && localStorage.getItem('mw_products') !== '[]' && localStorage.getItem('mw_products') !== 'null';
+  if (!_hasProducts) {
+    console.log('[Init] mw_products 없음 — Supabase 전체 다운로드 시작');
+    loadFromSupabase().then(function(loaded) {
+      if (loaded) {
+        // DB 객체 재로드
+        DB.products = load(KEYS.products);
+        DB.inventory = load(KEYS.inventory);
+        DB.promotions = load(KEYS.promotions);
+        DB.orders = loadObj(KEYS.orders, { elec: [], hand: [], pack: [] });
+        DB.settings = loadObj(KEYS.settings, DB.settings);
+        DB.rebate = load(KEYS.rebate);
+        _stockMap = null;
+        if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gp = loadObj('mw_gen_products', []); for (var j = 0; j < _gp.length; j++) genProducts.push(_gp[j]); }
+        if (typeof estimates !== 'undefined') { estimates.length = 0; var _es = loadObj('mw_estimates', []); for (var j = 0; j < _es.length; j++) estimates.push(_es[j]); }
+        if (typeof clientData !== 'undefined') { clientData.length = 0; var _cl = loadObj('mw_clients', []); for (var j = 0; j < _cl.length; j++) clientData.push(_cl[j]); }
+        // 렌더링된 탭 초기화 → 다시 렌더링
+        _renderedTabs = {};
+        refreshActiveTab();
+        console.log('[Init] Supabase 다운로드 완료 — DB 재로드 (products:' + DB.products.length + ')');
+      }
+      updateSyncStatus('동기화 완료');
+    });
+  } else {
+    // 이미 데이터 있으면 백그라운드 동기화 (변경분만)
+    _bgSyncFromSupabase(savedTab);
+  }
 
   // 2. 나머지 탭은 지연 렌더링 (유저가 클릭할 때 또는 백그라운드)
   setTimeout(function() {
