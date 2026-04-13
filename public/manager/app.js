@@ -3,17 +3,10 @@
 function toggleSidebar() {
   var sb = document.getElementById('sidebar');
   if (!sb) return;
+  sb.style.removeProperty('width');
   sb.classList.add('animating');
-  var isCollapsed = sb.classList.contains('collapsed');
-  if (isCollapsed) {
-    sb.classList.remove('collapsed');
-    sb.classList.add('expanded');
-    sb.style.width = '220px';
-  } else {
-    sb.classList.add('collapsed');
-    sb.classList.remove('expanded');
-    sb.style.width = '52px';
-  }
+  sb.classList.toggle('collapsed');
+  sb.classList.toggle('expanded');
   localStorage.setItem('mw_sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
   setTimeout(function() { sb.classList.remove('animating'); }, 300);
 }
@@ -131,8 +124,9 @@ function _updateSidebarActive(windowName) {
 // 초기화: 사이드바 상태 복원
 (function _initSidebar() {
   document.addEventListener('DOMContentLoaded', function() {
+    var sb = document.getElementById('sidebar');
+    if (sb) sb.style.removeProperty('width'); // 인라인 width 잔여물 제거
     if (localStorage.getItem('mw_sidebar_collapsed') === '1') {
-      var sb = document.getElementById('sidebar');
       if (sb) { sb.classList.remove('expanded'); sb.classList.add('collapsed'); }
     }
     // 즐겨찾기 별 상태는 로그인 후 _loadFavoritesSlots가 준비된 뒤에 실행

@@ -10,10 +10,12 @@
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link rel="stylesheet" href="/manager/style.css">
-<style>.sidebar{width:220px}.sidebar.collapsed{width:52px}.app-layout{display:flex}</style>
+<style>.sidebar{width:220px}.sidebar.collapsed{width:52px}.app-layout{display:flex;height:100vh}</style>
 <script>
 (function(){try{if(localStorage.getItem('mw_sidebar_collapsed')==='1'){
-document.write('<style>#sidebar{width:52px}</style>');
+var s=document.createElement('style');
+s.textContent='#sidebar{width:52px !important}#sidebar .sidebar-group-text,#sidebar .sidebar-single-text,#sidebar .sidebar-arrow,#sidebar .sidebar-logo,#sidebar .sidebar-fav-btn,#sidebar .sidebar-badge,#sidebar .sidebar-sub{display:none !important}';
+document.head.appendChild(s);
 }}catch(e){}})();
 </script>
 </head>
@@ -25,10 +27,10 @@ document.write('<style>#sidebar{width:52px}</style>');
 </div>
 
 <!-- ==================== NEW: app-layout 래퍼 시작 ==================== -->
-<div class="app-layout" id="appLayout" style="display:flex;height:100vh">
+<div class="app-layout" id="appLayout">
 
 <!-- ===== 좌측 사이드바 ===== -->
-<aside class="sidebar expanded" id="sidebar" style="width:220px">
+<aside class="sidebar expanded" id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-logo">DAEHAN<span>TOOL</span></div>
     <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="사이드바 접기/펼치기">
