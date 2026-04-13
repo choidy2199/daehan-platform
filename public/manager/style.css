@@ -28,7 +28,8 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 .app-layout { display:flex; height:100vh; overflow:hidden; }
 
 /* ===== SIDEBAR ===== */
-.sidebar { width:220px; background:var(--dm-sidebar-bg); border-right:1px solid var(--dm-border); display:flex; flex-direction:column; flex-shrink:0; transition:width 0.25s ease; overflow:hidden; z-index:200; }
+.sidebar { width:220px; background:var(--dm-sidebar-bg); border-right:1px solid var(--dm-border); display:flex; flex-direction:column; flex-shrink:0; overflow:hidden; z-index:200; }
+.sidebar.animating { transition:width 0.25s ease; }
 .sidebar.collapsed { width:52px; }
 .sidebar-header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; height:38px; flex-shrink:0; }
 .sidebar-logo { font-size:17px; font-weight:700; color:var(--dm-text); white-space:nowrap; letter-spacing:0.5px; }

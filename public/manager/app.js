@@ -3,9 +3,11 @@
 function toggleSidebar() {
   var sb = document.getElementById('sidebar');
   if (!sb) return;
+  sb.classList.add('animating');
   sb.classList.toggle('collapsed');
   sb.classList.toggle('expanded');
   localStorage.setItem('mw_sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
+  setTimeout(function() { sb.classList.remove('animating'); }, 300);
 }
 function toggleSidebarGroup(btn) {
   var arrow = btn.querySelector('.sidebar-arrow');
