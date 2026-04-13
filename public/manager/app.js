@@ -8444,11 +8444,95 @@ document.addEventListener('click', function(e) {
   // TODO: 실제 필터링은 Step 5에서 구현
 });
 
+// ===== 가격 수집 (Step 9) =====
+var _priceCollectMap = null; // { naver: {code: {price, status}}, ssg: {code: {price, status}} }
+var _priceCollectStats = { total: 0, match: 0, diff: 0, soldout: 0, sent: 0, notreg: 0, fail: 0 };
+
+async function _mwPriceCollect() {
+  var btn = document.getElementById('mw-edit-pricecollect-btn');
+  if (!btn) return;
+  var origText = btn.textContent;
+  btn.textContent = '수집 중...';
+  btn.disabled = true;
+  try {
+    var res = await fetch('/api/price-collect?channels=naver,ssg');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    _priceCollectMap = {
+      naver: (data.naver && data.naver.results) || {},
+      ssg: (data.ssg && data.ssg.results) || {},
+    };
+    var naverFailed = !data.naver || !!data.naver.error;
+    var ssgFailed = !data.ssg || !!data.ssg.error;
+    var stats = { total: 0, match: 0, diff: 0, soldout: 0, sent: 0, notreg: 0, fail: 0 };
+    var products = (DB && DB.products) ? DB.products : [];
+    products.forEach(function(p) {
+      if (!p || p.discontinued) return;
+      var code = String(p.code || '').trim();
+      // 네이버
+      var naverLocal = Math.round(Number(p.priceNaver) || 0);
+      if (naverLocal > 0) {
+        stats.total++;
+        if (naverFailed) { stats.fail++; }
+        else {
+          var nr = _priceCollectMap.naver[code];
+          if (!nr) { stats.notreg++; }
+          else if (nr.status === 'SUSPENSION' || nr.status === 'OUTOFSTOCK') { stats.soldout++; }
+          else if (naverLocal === Math.round(Number(nr.price) || 0)) { stats.match++; }
+          else { stats.diff++; }
+        }
+      }
+      // SSG
+      var ssgLocal = Math.round(Number(p.priceSsg) || 0);
+      if (ssgLocal > 0) {
+        stats.total++;
+        if (ssgFailed) { stats.fail++; }
+        else {
+          var sr = _priceCollectMap.ssg[code];
+          if (!sr) { stats.notreg++; }
+          else if (String(sr.status) === '80') { stats.soldout++; }
+          else if (sr.price == null) { stats.notreg++; } // sellprc 미포함 시
+          else if (ssgLocal === Math.round(Number(sr.price) || 0)) { stats.match++; }
+          else { stats.diff++; }
+        }
+      }
+    });
+    _priceCollectStats = stats;
+    _updatePriceStatusBar();
+    alert('가격 수집 완료\n전체: ' + stats.total + '건\n일치: ' + stats.match + ' | 차이: ' + stats.diff + ' | 품절: ' + stats.soldout + ' | 없음: ' + stats.notreg + ' | 실패: ' + stats.fail);
+  } catch (err) {
+    console.error('[가격수집] 오류:', err);
+    alert('가격 수집 실패: ' + (err.message || err));
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+}
+
+function _updatePriceStatusBar() {
+  var bar = document.getElementById('mw-price-status-bar');
+  if (!bar) return;
+  var s = _priceCollectStats;
+  bar.querySelectorAll('.ps-item').forEach(function(item) {
+    var status = item.dataset.status;
+    var count = 0;
+    if (status === 'all') count = s.total;
+    else if (status === 'match') count = s.match;
+    else if (status === 'diff') count = s.diff;
+    else if (status === 'soldout') count = s.soldout;
+    else if (status === 'sent') count = s.sent;
+    else if (status === 'notreg') count = s.notreg;
+    else if (status === 'fail') count = s.fail;
+    var countSpan = item.querySelector('.ps-count');
+    if (countSpan) countSpan.textContent = count;
+  });
+}
+
 function mwEditAction(action) {
   var indices = _getCheckedProductIndices();
 
   if (action === 'priceCollect') {
-    alert('가격 수집 기능 준비 중입니다.');
+    _mwPriceCollect();
     return;
   }
 

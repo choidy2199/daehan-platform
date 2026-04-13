@@ -184,6 +184,14 @@ async function _ensureNaverCodeMap(): Promise<Map<string, any>> {
 }
 
 /**
+ * 전체 네이버 상품 캐시 Map 반환 (sellerManagementCode → product)
+ * price-collect 등 일괄 작업용
+ */
+export async function getAllNaverProductsMap(): Promise<Map<string, any>> {
+  return _ensureNaverCodeMap();
+}
+
+/**
  * 판매자관리코드로 네이버 상품 조회 (정확 매칭, 캐시 사용)
  */
 export async function findNaverProductByCode(sellerCode: string) {
