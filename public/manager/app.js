@@ -61,7 +61,7 @@ function _renderChromeTabBar() {
     tab.setAttribute('data-window', name);
     tab.onclick = function() { _chromeActivateTab(name); };
 
-    tab.innerHTML = '<div class="chrome-tab-dot" style="background:' + dotColor + '"></div>'
+    tab.innerHTML = '<div class="chrome-tab-dot"></div>'
       + '<span style="overflow:hidden;text-overflow:ellipsis">' + name + '</span>'
       + '<span class="chrome-tab-close" onclick="event.stopPropagation();_chromeCloseTab(\'' + name.replace(/'/g, "\\'") + '\')">✕</span>';
 

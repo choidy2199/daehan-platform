@@ -311,16 +311,16 @@ document.head.appendChild(s);
           <button id="mw-edit-pricecollect-btn" onclick="mwEditAction('priceCollect')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#1A1D23;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">▼ 가격 수집</button>
           <button id="mw-edit-pricesync-btn" onclick="mwEditAction('priceSync')" style="padding:0 12px;height:26px;border-radius:4px;font-size:11px;font-weight:600;background:#1D9E75;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">▲ 가격 일괄 전송</button>
         </div>
-      </div>
-      <div id="mw-price-status-bar">
-        <span class="ps-label">마켓 상태:</span>
-        <div class="ps-item active" data-status="all">전체 <span class="ps-count">0</span></div>
-        <div class="ps-item" data-status="match">일치 <span class="ps-count">0</span></div>
-        <div class="ps-item" data-status="diff">차이 <span class="ps-count">0</span></div>
-        <div class="ps-item" data-status="soldout">품절 <span class="ps-count">0</span></div>
-        <div class="ps-item" data-status="sent">전송 <span class="ps-count">0</span></div>
-        <div class="ps-item" data-status="notreg">없음 <span class="ps-count">0</span></div>
-        <div class="ps-item" data-status="fail">실패 <span class="ps-count">0</span></div>
+        <div id="mw-price-status-bar">
+          <span class="ps-label">마켓:</span>
+          <div class="ps-item active" data-status="all">전체 <span class="ps-count">0</span></div>
+          <div class="ps-item" data-status="match">일치 <span class="ps-count">0</span></div>
+          <div class="ps-item" data-status="diff">차이 <span class="ps-count">0</span></div>
+          <div class="ps-item" data-status="soldout">품절 <span class="ps-count">0</span></div>
+          <div class="ps-item" data-status="sent">전송 <span class="ps-count">0</span></div>
+          <div class="ps-item" data-status="notreg">없음 <span class="ps-count">0</span></div>
+          <div class="ps-item" data-status="fail">실패 <span class="ps-count">0</span></div>
+        </div>
       </div>
       <div class="table-scroll" style="flex:1;overflow-y:auto;overflow-x:auto;min-height:0">
         <table class="data-table" id="catalog-table" style="table-layout:fixed;width:1520px">
