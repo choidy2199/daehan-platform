@@ -10,11 +10,11 @@
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link rel="stylesheet" href="/manager/style.css">
-<style>.sidebar{width:220px}.sidebar.collapsed{width:52px}.app-layout{display:flex;height:100vh}</style>
+<style>.sidebar{visibility:hidden;width:220px}.sidebar.collapsed{width:52px}.app-layout{display:flex;height:100vh}</style>
 <script>
 (function(){try{if(localStorage.getItem('mw_sidebar_collapsed')==='1'){
 var s=document.createElement('style');
-s.textContent='#sidebar{width:52px !important}#sidebar .sidebar-group-text,#sidebar .sidebar-single-text,#sidebar .sidebar-arrow,#sidebar .sidebar-logo,#sidebar .sidebar-fav-btn,#sidebar .sidebar-badge,#sidebar .sidebar-sub{display:none !important}';
+s.textContent='#sidebar{width:52px}#sidebar .sidebar-group-text,#sidebar .sidebar-single-text,#sidebar .sidebar-arrow,#sidebar .sidebar-logo,#sidebar .sidebar-fav-btn,#sidebar .sidebar-badge,#sidebar .sidebar-sub{display:none}';
 document.head.appendChild(s);
 }}catch(e){}})();
 </script>
