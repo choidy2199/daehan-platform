@@ -3,6 +3,9 @@
 function toggleSidebar() {
   var sb = document.getElementById('sidebar');
   if (!sb) return;
+  // FOUC fix 스타일 태그 제거 (head에서 주입한 것)
+  var fouc = document.getElementById('sidebar-fouc-fix');
+  if (fouc) fouc.remove();
   sb.classList.add('animating');
   sb.classList.toggle('collapsed');
   localStorage.setItem('mw_sidebar_collapsed', sb.classList.contains('collapsed') ? '1' : '0');
