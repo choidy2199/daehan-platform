@@ -24,6 +24,7 @@
 ## 작업 전 반드시 읽을 파일
 - ~/.claude/skills/web-ui-patterns/SKILL.md
 - ~/.claude/skills/toollab-design-system/SKILL.md (디자인 시스템 단일 진리의 원천)
+- public/manager/style.css의 :root 블록은 src/app/globals.css :root와 동일하게 유지 (한쪽 수정 시 양쪽 동시)
 
 ## 라우트 구조
 - / → /manager/index.html로 리다이렉트

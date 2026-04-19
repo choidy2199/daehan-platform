@@ -1,5 +1,9 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8; color: #1A1D23; font-size: 14px; }
+/* ================================================================
+   ⚠️ 이 :root 블록은 src/app/globals.css와 반드시 동일하게 유지
+   변경 시 양쪽 동시 수정. 동기화 책임은 CLAUDE.md 규칙 참조.
+   ================================================================ */
 :root {
   --tl-primary: #185FA5; --tl-primary-dark: #0C447C; --tl-primary-light: #E6F1FB;
   --tl-bg: #FFFFFF; --tl-bg-secondary: #F4F6FA; --tl-bg-tertiary: #EAECF2;
@@ -9,6 +13,11 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
   --tl-warning: #EF9F27; --tl-warning-bg: #FAEEDA;
   --tl-danger: #CC2222; --tl-danger-bg: #FCEBEB;
   --tl-info: #185FA5; --tl-info-bg: #E6F1FB;
+  --tl-danger-dark: #A81A1A;
+  --tl-text-inverse: #FFFFFF;
+  --tl-ch-storefarm: #1D9E75;
+  --tl-ch-openmarket: #185FA5;
+  --tl-ch-ssg: #E8B530;
   --tl-accent: #EF9F27; --tl-accent-dark: #D48A1C;
   --tl-section-header: #1A1D23;
   /* 다크모드 레이아웃 변수 */
