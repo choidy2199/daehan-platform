@@ -23,6 +23,7 @@
 
 ## 작업 전 반드시 읽을 파일
 - ~/.claude/skills/web-ui-patterns/SKILL.md
+- ~/.claude/skills/toollab-design-system/SKILL.md (디자인 시스템 단일 진리의 원천)
 
 ## 라우트 구조
 - / → /manager/index.html로 리다이렉트
@@ -112,6 +113,38 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - 금지: 탭 내부에 추가 max-width, margin: 0 auto, 별도 width 제한 금지
   - 새 화면: 반드시 사이드바 접힌 상태에서 단가표와 동일한 너비인지 확인
   - 레이아웃: .app-layout(flex) → .sidebar(52/220px) + .main-area(flex:1) → .content(padding 24px) → #tab-XXX(추가 제한 없이 100%)
+
+## 디자인 시스템 준수 규칙
+
+### 1. 토큰만 사용
+- 색상/여백/라디우스/섀도우: `var(--tl-*)` 또는 shadcn alias (`--primary`, `--destructive` 등)만 사용
+- 하드코딩 금지: `#XXXXXX`, `rgb()`, px 고정값, rem 고정값
+- 예외: `public/manager/*` (레거시 영역, 별도 이관 계획)
+- SKILL.md 토큰 목록: `~/.claude/skills/toollab-design-system/SKILL.md` 참조
+
+### 2. 컴포넌트 우선순위
+- 신규 UI: `src/components/ui/*.tsx` (shadcn) 최우선
+- shadcn에 없는 패턴: SKILL.md의 UI 패턴 섹션 참조 후 구현
+- 기존 raw `<button>`, `<input>`, custom Modal: 명시적 요청 없으면 유지
+
+### 3. SKILL.md는 단일 진리의 원천
+- 우선순위: SKILL.md > globals.css > 기타
+- globals.css와 SKILL.md 충돌 발견 시: **수정 전 사용자에게 보고**
+- AI가 임의로 SKILL.md와 globals.css 중 한쪽을 "맞추는" 행위 금지
+
+### 4. 작업 범위 엄수
+- 요청받은 파일/섹션만 수정
+- "김에 같이" 리팩터링 금지 (raw `<button>` 발견해도 건드리지 않음)
+- 예상 밖 코드 발견 시 보고 후 대기
+
+### 5. 빌드 검증
+- 한글 경로 이슈 대응: `/tmp` 복사 후 `npm run build` (자세한 절차는 "## 로컬 개발 주의" 참조)
+- 다음 파일 수정 시 빌드 검증 필수:
+  - `src/app/globals.css` (`:root` / `@theme` / `.dark` 블록)
+  - `src/components/ui/*.tsx`
+  - `components.json`
+  - Tailwind 관련 설정
+- 빌드 실패 시: 원인 규명 전 commit/push 금지
 
 ## 로컬 개발 주의
 - 한글 경로 이슈: Turbopack이 한글 폴더명에서 크래시
