@@ -1292,11 +1292,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 /* =================================================================
    거래명세서 (tab-transactions)  — Phase 2: 정적 UI
    ================================================================= */
-#tab-transactions {
+#tab-transactions.tab-content.active {
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #1A1D23;
-  display: flex;
-  flex-direction: column;
   gap: 10px;
 }
 
