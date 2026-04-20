@@ -1293,9 +1293,27 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
    거래명세서 (tab-transactions)  — Phase 2: 정적 UI
    ================================================================= */
 #tab-transactions.tab-content.active {
+  display: block !important;
+  overflow-y: auto;
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #1A1D23;
-  gap: 10px;
+}
+#tab-transactions.tab-content.active > div {
+  display: block !important;
+  flex: none !important;
+  overflow: visible !important;
+  margin-bottom: 10px;
+}
+#tab-transactions.tab-content.active > div:last-child { margin-bottom: 0; }
+#tab-transactions.tab-content.active > .tx-toolbar {
+  display: flex !important;
+  flex-direction: row;
+  height: 48px;
+  min-height: 48px;
+  max-height: 48px;
+}
+#tab-transactions.tab-content.active > .tx-form-area {
+  display: grid !important;
 }
 
 /* ---- 1. 상단 제품 검색 블록 ---- */
