@@ -21761,15 +21761,35 @@ function _ipv2Upload(input) {
       body: JSON.stringify({ rows: rows }),
     })
       .then(function(r) {
-        return r.json().then(function(json) { return { status: r.status, ok: r.ok, json: json }; });
+        // 먼저 text로 읽고 JSON.parse 시도 (500 응답이 HTML/빈 body 여도 안전)
+        return r.text().then(function(text) { return { status: r.status, ok: r.ok, text: text }; });
       })
       .then(function(res) {
-        if (!res.json.success) {
-          var msg = _ipv2FormatError(res.json.error != null ? res.json.error : res.json);
+        var json = null;
+        var parseErr = null;
+        if (res.text && res.text.length > 0) {
+          try { json = JSON.parse(res.text); } catch (e) { parseErr = e; }
+        }
+        if (!res.ok) {
+          var msg;
+          if (json && json.error) {
+            msg = _ipv2FormatError(json.error);
+            if (json.code) msg = '[' + json.code + '] ' + msg;
+            if (json.details) msg += '\n\n상세: ' + _ipv2FormatError(json.details);
+          } else if (parseErr) {
+            msg = '서버 오류 (HTTP ' + res.status + ')\n\n응답을 해석할 수 없습니다. 관리자에게 문의하세요.';
+          } else {
+            msg = '서버 오류 (HTTP ' + res.status + ')\n\n' + (res.text || '응답 본문 없음').substring(0, 300);
+          }
           alert('업로드 실패\n\n' + msg);
           return;
         }
-        var data = res.json.data || { created: 0, updated: 0, errors: [] };
+        if (!json || !json.success) {
+          var errMsg = json ? _ipv2FormatError(json.error != null ? json.error : json) : '응답 형식 오류';
+          alert('업로드 실패\n\n' + errMsg);
+          return;
+        }
+        var data = json.data || { created: 0, updated: 0, errors: [] };
         data.skipped = skipped;
         _ipv2ShowUploadResult(data);
         _ipv2FetchList(function() { _ipv2RenderTable(); });
