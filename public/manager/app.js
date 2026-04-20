@@ -21631,13 +21631,18 @@ function _poLoadDetail(poId) {
 function _poRenderDetail() {
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
+  // 상세 화면은 .content(overflow:hidden) 자식이므로 자체 스크롤 컨테이너가 필요
+  // → 외곽에 height:100% + overflow-y:auto 래퍼
+  // 내부 카드 div는 overflow:visible (자식 테이블의 자연 높이 반영 → scrollHeight 정확)
   var h = '';
-  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;margin-bottom:24px;">';
+  h += '<div style="height:100%;overflow-y:auto;">';
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;margin-bottom:24px;">';
   h += _poRenderDetailHeader();
   h += _poRenderDetailInfo();
   h += _poRenderDetailProductsSection();
   h += _poRenderDetailTable();
   h += _poRenderDetailSummary();
+  h += '</div>';
   h += '</div>';
   // 모달 자리
   h += '<div id="po-modal-root"></div>';
