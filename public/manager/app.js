@@ -61,8 +61,9 @@ function _renderChromeTabBar() {
     tab.setAttribute('data-window', name);
     tab.onclick = function() { _chromeActivateTab(name); };
 
+    var label = (cfg && cfg.displayName) ? cfg.displayName : name;
     tab.innerHTML = '<div class="chrome-tab-dot"></div>'
-      + '<span style="overflow:hidden;text-overflow:ellipsis">' + name + '</span>'
+      + '<span style="overflow:hidden;text-overflow:ellipsis">' + label + '</span>'
       + '<span class="chrome-tab-close" onclick="event.stopPropagation();_chromeCloseTab(\'' + name.replace(/'/g, "\\'") + '\')">✕</span>';
 
     items.appendChild(tab);
@@ -1728,7 +1729,7 @@ var _windowConfig = {
   '거래명세서': { tabId: 'transactions',   color: 'blue' },
   '온라인':     { tabId: 'sales-online',   color: 'green' },
   '마케팅':     { tabId: 'sales-marketing',color: 'green' },
-  '발주서V2':   { tabId: 'import-po-v2',   color: 'purple' },
+  '발주서V2':   { tabId: 'import-po-v2',   color: 'purple', displayName: '제품·발주' },
   '제품':       { tabId: 'import-product', color: 'purple' },
   '수입계산기': { tabId: 'import-calc',    color: 'purple' },
   '인보이스':   { tabId: 'import-invoice', color: 'purple' },
@@ -1903,10 +1904,11 @@ function _renderTabBar() {
   _openWindows.forEach(function(name) {
     var cfg = _windowConfig[name];
     var dotColor = cfg ? (_dotColors[cfg.color] || '#999') : '#999';
+    var label = (cfg && cfg.displayName) ? cfg.displayName : name;
     var el = document.createElement('div');
     el.className = 'tab-bar-item' + (name === _activeWindow ? ' active' : '');
     el.innerHTML = '<span class="tb-dot" style="color:' + dotColor + '">●</span>'
-      + '<span onclick="focusWindow(\'' + name + '\')" style="cursor:pointer">' + name + '</span>'
+      + '<span onclick="focusWindow(\'' + name + '\')" style="cursor:pointer">' + label + '</span>'
       + '<span class="tab-bar-close" onclick="event.stopPropagation();closeWindow(\'' + name + '\')" title="닫기">✕</span>';
     items.appendChild(el);
   });
@@ -21341,39 +21343,69 @@ function _poFormatUsd(n) {
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// P1 후속: 탭 진입 시 상세화면(65/35 뼈대) 바로 표시.
+// 기본 흐름: 최근 draft 재사용 → 없으면 새 draft 자동 생성 → _poRenderDetail
+// _poRenderList / _poLoadList / 캐시 키 'mw_cache_import_po_v2' 는 P7 발주서 리스트 모달 재활용용으로 보존 (현재 미사용).
 function _poInit() {
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
-  var CACHE_KEY = 'mw_cache_import_po_v2';
-  var cached = _loadCache(CACHE_KEY);
 
-  function renderFromState() {
-    _poRenderLayout(container);
-    _poBindEvents();
-    _poRenderList();
-  }
+  // 탭 컨테이너 스크롤 설정 (P3-B2-A 유지)
+  container.style.overflowY = 'auto';
+  container.style.height = '100%';
 
-  if (cached && Array.isArray(cached)) {
-    // 캐시 즉시 렌더 (0초)
-    _poList = cached;
-    renderFromState();
-    // 백그라운드 fetch (silent)
-    _poLoadList(function() {
-      if (_hasDataChanged(cached, _poList)) {
-        _saveCache(CACHE_KEY, _poList);
-        _poRenderList();
-      } else {
-        _saveCache(CACHE_KEY, _poList);
+  // 로딩 UI
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">발주서를 준비하는 중...</div>';
+
+  // 상태 초기화 (상세 모드)
+  _poState.mode = 'detail';
+  _poState.loadError = false;
+  _poState.loadErrorMsg = null;
+
+  // 1) 최근 draft 조회
+  fetch('/api/import-po?status=draft', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.success) {
+        throw new Error((json && json.error) || 'draft 조회 실패');
       }
+      var drafts = json.data || [];
+      if (drafts.length > 0) {
+        // 재사용: 빈 누적 방지
+        return drafts[0];
+      }
+      // 2) 없으면 신규 draft 자동 생성 (PO-YYYY-NNN 자동 부여)
+      return fetch('/api/import-po', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      }).then(function(r) { return r.json(); }).then(function(cj) {
+        if (!cj || !cj.success || !cj.data) {
+          throw new Error((cj && cj.error) || '발주서 생성 실패');
+        }
+        return cj.data;
+      });
+    })
+    .then(function(po) {
+      _poState.currentPoId = po.id;
+      _poState.currentPo = po;
+      // 3) 아이템 로드 (빈 draft여도 배열은 항상 초기화)
+      return fetch('/api/import-po/' + po.id + '/items', { cache: 'no-store' })
+        .then(function(r) { return r.json(); })
+        .then(function(ij) {
+          _poState.currentItems = (ij && ij.success) ? (ij.data || []) : [];
+          _poRenderDetail();
+        });
+    })
+    .catch(function(err) {
+      console.error('[po] _poInit error', err);
+      _poState.loadError = true;
+      _poState.loadErrorMsg = (err && err.message) || '발주서 로드 실패';
+      _poState.currentPoId = null;
+      _poState.currentPo = null;
+      _poState.currentItems = [];
+      _poRenderDetail();
     });
-  } else {
-    // 캐시 없음 → 기존 로딩 UI
-    container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
-    _poLoadList(function() {
-      renderFromState();
-      _saveCache(CACHE_KEY, _poList);
-    });
-  }
 }
 
 function _poLoadList(cb) {
@@ -21419,7 +21451,7 @@ function _poRenderLayout(container) {
   // 다크 헤더
   h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#1A1D23;color:#fff;">';
   h += '<div style="display:flex;align-items:center;gap:10px;">';
-  h += '<span style="font-size:14px;font-weight:500;color:#fff;">발주서V2</span>';
+  h += '<span style="font-size:14px;font-weight:500;color:#fff;">제품·발주</span>';
   h += '<span id="po-count" style="font-size:12px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);color:#fff;font-weight:500;">0건</span>';
   h += '</div>';
   h += '<div style="display:flex;align-items:center;gap:8px;">';
@@ -21635,26 +21667,39 @@ function _poRenderDetail() {
   container.style.overflowY = 'auto';
   container.style.height = '100%';
 
-  var po = _poState.currentPo || {};
-  var poNumber = _poEsc(po.po_number || '');
-  var statusBadge = _poFormatStatusBadge(po.status || 'draft');
-  var poDate = _poFormatDate(po.po_date);
-  var brand = _poEsc(po.brand || '-');
-  var itemCount = (_poState.currentItems || []).length;
+  var hasError = !!(_poState && _poState.loadError);
+  var po = (_poState && _poState.currentPo) ? _poState.currentPo : {};
+  var poNumber = _poEsc(po.po_number || (hasError ? '-' : '로드 중...'));
+  var statusBadge = hasError
+    ? '<span class="pc-badge-state" style="background:#CC2222;color:#fff">오류</span>'
+    : _poFormatStatusBadge(po.status || 'draft');
+  var poDate = hasError ? '-' : _poFormatDate(po.po_date);
+  var brand = hasError ? '-' : _poEsc(po.brand || '-');
+  var itemCount = (_poState && _poState.currentItems) ? _poState.currentItems.length : 0;
+  var disabledAttr = hasError ? ' disabled' : '';
   var placeholderAlert = "alert('P2~P9에서 구현 예정')";
+  var listPlaceholderAlert = "alert('발주서 리스트 모달은 P7에서 구현 예정')";
 
   var h = '';
   h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;margin-bottom:24px;overflow:hidden;">';
 
-  // 상단 다크 헤더 (버튼 제거, 메타 정보만)
+  // 상단 다크 헤더 (← 목록 버튼 제거, 메타 정보만. 에러 시 오류 배지)
   h += '<div class="pc-main-header">';
   h += '<div class="pc-mh-left">';
-  h += '<button onclick="_poBackToList()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
   h += '<span class="pc-mh-title">' + poNumber + '</span>';
   h += statusBadge;
   h += '<span class="pc-mh-meta">· ' + poDate + ' · ' + brand + ' (' + itemCount + '개 제품)</span>';
   h += '</div>';
   h += '</div>';
+
+  // 에러 배너 (loadError true일 때만 표시)
+  if (hasError) {
+    var errMsg = _poEsc((_poState && _poState.loadErrorMsg) || '발주서 로드 실패');
+    h += '<div style="padding:14px 16px;background:#FCEBEB;border-bottom:1px solid #F0D2D2;display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:Pretendard,sans-serif;">';
+    h += '<div style="font-size:13px;color:#791F1F;">⚠ ' + errMsg + ' — 네트워크 또는 서버 상태를 확인한 뒤 다시 시도해 주세요.</div>';
+    h += '<button onclick="_poInit()" style="font-size:12px;padding:6px 14px;border-radius:6px;background:#CC2222;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">↻ 다시 시도</button>';
+    h += '</div>';
+  }
 
   // 본문 2분할 (65/35)
   h += '<div class="pc-split">';
@@ -21664,17 +21709,17 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-header">';
   h += '<div class="pc-panel-title">제품목록 <span class="pc-panel-count">' + itemCount + '건</span></div>';
   h += '<div class="pc-panel-actions">';
-  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">템플릿</button>';
-  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">백업</button>';
-  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">복원</button>';
-  h += '<button class="btn-mini btn-mini-p" onclick="' + placeholderAlert + '">+ 제품등록</button>';
-  h += '<button class="btn-mini btn-mini-erp" onclick="' + placeholderAlert + '">↻ 경영박사 재고</button>';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>템플릿</button>';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>백업</button>';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>복원</button>';
+  h += '<button class="btn-mini btn-mini-p" onclick="' + placeholderAlert + '"' + disabledAttr + '>+ 제품등록</button>';
+  h += '<button class="btn-mini btn-mini-erp" onclick="' + placeholderAlert + '"' + disabledAttr + '>↻ 경영박사 재고</button>';
   h += '</div></div>';
   h += '<div class="pc-search-bar">';
   h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" disabled>';
   h += '<select class="pc-search-sel" disabled><option>전체 브랜드</option></select>';
   h += '</div>';
-  h += '<div class="pc-tbl-placeholder">제품목록 준비중 (P2에서 구현)</div>';
+  h += '<div class="pc-tbl-placeholder">' + (hasError ? '로드 실패 — 우측 상단 [↻ 다시 시도] 버튼을 눌러 주세요' : '제품목록 준비중 (P2에서 구현)') + '</div>';
   h += '</div>';
 
   // 우측 패널 (35% — 제품발주, P4에서 구현)
@@ -21682,13 +21727,13 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-header">';
   h += '<div class="pc-panel-title">제품발주 <span class="pc-panel-count">0건</span></div>';
   h += '<div class="pc-panel-actions">';
-  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">발주서 리스트</button>';
-  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">비우기</button>';
-  h += '<button class="btn-mini btn-mini-confirm" onclick="' + placeholderAlert + '">✓ 발주확정</button>';
+  h += '<button class="btn-mini" onclick="' + listPlaceholderAlert + '"' + disabledAttr + '>발주서 리스트</button>';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>비우기</button>';
+  h += '<button class="btn-mini btn-mini-confirm" onclick="' + placeholderAlert + '"' + disabledAttr + '>✓ 발주확정</button>';
   h += '</div></div>';
   h += '<div class="pc-info-strip">발주번호: <strong>' + poNumber + '</strong> · 자동부여</div>';
-  h += '<div class="pc-tbl-placeholder">발주목록 준비중 (P4에서 구현)</div>';
-  h += '<div class="pc-right-summary-skeleton">요약 준비중 (P4)</div>';
+  h += '<div class="pc-tbl-placeholder">' + (hasError ? '로드 실패' : '발주목록 준비중 (P4에서 구현)') + '</div>';
+  h += '<div class="pc-right-summary-skeleton">' + (hasError ? '-' : '요약 준비중 (P4)') + '</div>';
   h += '</div>';
 
   h += '</div>'; // .pc-split

@@ -578,6 +578,41 @@ public/manager/index.html:1783:        <input class="input" id="picker-search" t
 | P4 | 우측 "제품발주" 테이블 8컬럼 + 🛒 제품→발주 복사 로직 + 요약 섹션 |
 | P5 | 경영박사 재고 연동 (↻ 버튼) |
 | P6 | 발주확정 → 리스트 전환 |
-| P7 | 발주서 리스트 화면 (기존 `_poRenderList` 재활용) |
+| P7 | 발주서 리스트 화면 (기존 `_poRenderList` 재활용, 모달 형태) |
 | P8 | PDF 내보내기 |
 | P9 | 폴리싱/QA |
+
+## 10. [2026-04-21] P1 후속 — 탭바 rename + 진입 상세화면 + 에러 폴백
+
+P1 배포 후 사용자 확인에서 발견된 3건 보완.
+
+### 변경 요약
+| # | 항목 | 위치 | 비고 |
+|---|---|---|---|
+| a | `_windowConfig['발주서V2']`에 `displayName: '제품·발주'` 추가 | [app.js:1732](public/manager/app.js:1732) | 내부 윈도우키 `'발주서V2'` 유지, 표시만 교체 |
+| b | `_renderTabBar` label 우선순위 = `cfg.displayName \|\| name` | [app.js:1909~](public/manager/app.js:1909) | 열린 창 탭바 (상단) |
+| c | `_renderChromeTabBar` 동일 패턴 적용 | [app.js:64~](public/manager/app.js:64) | 크롬 탭 스타일 동기화 |
+| d | `_poRenderLayout` 다크헤더 타이틀 "발주서V2" → "제품·발주" | [app.js:~21424](public/manager/app.js) | P7 리스트 모달 재활용 시 일관된 명칭 |
+| e | `_poInit` 전면 재작성 — 최근 draft 재사용 → 없으면 신규 생성 → `_poRenderDetail` | [app.js:21344~](public/manager/app.js:21344) | 탭 진입 기본 화면을 상세로 전환 |
+| f | `_poRenderDetail` 좌측 상단 "← 목록" 버튼 제거 | [app.js:~21654](public/manager/app.js) | 사용자 주도 복귀 버튼 차단 |
+| g | 에러 폴백 UI — 상단 [오류] 배지 + 에러 배너 + ↻ 다시 시도 버튼 + 모든 액션 disabled | [app.js:~21690](public/manager/app.js) | `_poState.loadError` / `_poState.loadErrorMsg` 신설 |
+| h | 우측 "발주서 리스트" onclick 문구 명시화 — "발주서 리스트 모달은 P7에서 구현 예정" | [app.js](public/manager/app.js) | P7 구현 시 실제 모달 호출로 교체 |
+
+### 보존
+- `_poRenderList`, `_poRenderLayout`, `_poRenderFilterChips`, `_poRenderEmpty`, `_poBindEvents`, `_poLoadList` — 호출 경로만 차단, 함수 본체는 **P7 재활용용 유지**
+- `mw_cache_import_po_v2` localStorage 캐시 키 — P7 재활용용, 현재 `_poInit`에선 미사용
+- `_poBackToList` 호출처 3곳(에러/삭제 폴백) 그대로 유지 (탭 진입 기본 경로와는 별개)
+
+### draft 빈 누적 방지
+- 진입 시 `GET /api/import-po?status=draft` → 가장 최근 draft 1건 재사용
+- 없을 때만 `POST /api/import-po` 로 신규 생성
+- 사용자가 탭을 나갔다 다시 들어오면 같은 draft 재로딩
+
+### 에러 UX 계약
+- 네트워크/서버 오류 시 `_poRenderDetail()`이 `_poState.loadError=true` 상태를 읽어 에러 배너만 표시
+- 목록 화면으로 폴백하지 않음 (P7까지 목록 차단 원칙 유지)
+- 사용자가 `↻ 다시 시도` 클릭 → `_poInit()` 재호출 → 성공 시 정상 화면 복구
+
+### 커밋
+- P1 base: `c846097`
+- P1 후속: (이번 커밋)
