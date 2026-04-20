@@ -12,6 +12,7 @@ type UpsertRow = {
   product_name?: string | null;
   spec?: string | null;
   pallet_qty?: unknown;
+  base_fob_usd?: unknown;
   memo?: string | null;
 };
 
@@ -21,6 +22,7 @@ type NormalizedRow = {
   product_name: string | null;
   spec: string | null;
   pallet_qty: number;
+  base_fob_usd: number;
   memo: string | null;
 };
 
@@ -73,12 +75,22 @@ export async function POST(request: NextRequest) {
           const parsed = parseInt(String(palletRaw).replace(/[^0-9-]/g, ''), 10);
           pallet = Number.isFinite(parsed) ? parsed : 0;
         }
+        const baseFobRaw = r?.base_fob_usd;
+        let baseFob: number;
+        if (typeof baseFobRaw === 'number' && Number.isFinite(baseFobRaw)) baseFob = baseFobRaw;
+        else if (baseFobRaw == null || baseFobRaw === '') baseFob = 0;
+        else {
+          const parsed = parseFloat(String(baseFobRaw).replace(/[^0-9.-]/g, ''));
+          baseFob = Number.isFinite(parsed) ? parsed : 0;
+        }
+        if (baseFob < 0) baseFob = 0;
         valid.push({
           brand,
           model,
           product_name: r?.product_name ? String(r.product_name).trim() || null : null,
           spec: r?.spec ? String(r.spec).trim() || null : null,
           pallet_qty: pallet,
+          base_fob_usd: baseFob,
           memo: r?.memo ? String(r.memo).trim() || null : null,
         });
       } catch (rowErr) {

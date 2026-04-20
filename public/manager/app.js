@@ -21397,9 +21397,9 @@ function _ipv2RenderTable() {
   var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
   var tdS = 'padding:9px 10px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
 
-  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  var h = '<table id="ipv2-products-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  h += '<col style="width:44px"><col style="width:140px"><col style=""><col style=""><col style="width:120px"><col style="width:96px"><col style="width:120px">';
+  h += '<col style="width:50px"><col style="width:100px"><col style="width:140px"><col style=""><col style="width:100px"><col style="width:90px"><col style="width:110px"><col style="width:120px">';
   h += '</colgroup>';
   h += '<thead><tr>';
   h += '<th style="' + thS + '">No.</th>';
@@ -21408,11 +21408,12 @@ function _ipv2RenderTable() {
   h += '<th style="' + thS + 'text-align:left;padding-left:12px;">품명</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:12px;">규격</th>';
   h += '<th style="' + thS + 'text-align:right;padding-right:12px;">팔렛당</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">수입가 ($)</th>';
   h += '<th style="' + thS + '">액션</th>';
   h += '</tr></thead><tbody>';
 
   if (rows.length === 0) {
-    h += '<tr><td colspan="7" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 제품이 없습니다.</td></tr>';
+    h += '<tr><td colspan="8" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 제품이 없습니다.</td></tr>';
   } else {
     rows.forEach(function(r, i) {
       h += '<tr data-id="' + r.id + '" onmouseover="this.style.background=\'#FAFAF7\'" onmouseout="this.style.background=\'\'">';
@@ -21422,6 +21423,7 @@ function _ipv2RenderTable() {
       h += '<td style="' + tdS + 'text-align:left;padding-left:12px;color:#5A6070;" data-field="product_name" ondblclick="_ipv2InlineEdit(this,\'product_name\',\'' + r.id + '\')">' + _ipv2Esc(r.product_name || '') + '</td>';
       h += '<td style="' + tdS + 'text-align:left;padding-left:12px;color:#5A6070;" data-field="spec" ondblclick="_ipv2InlineEdit(this,\'spec\',\'' + r.id + '\')">' + _ipv2Esc(r.spec || '') + '</td>';
       h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;" data-field="pallet_qty" ondblclick="_ipv2InlineEdit(this,\'pallet_qty\',\'' + r.id + '\')">' + (r.pallet_qty ? r.pallet_qty + ' EA' : '<span style="color:#9BA3B2">-</span>') + '</td>';
+      h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;" data-field="base_fob_usd" ondblclick="_ipv2InlineEdit(this,\'base_fob_usd\',\'' + r.id + '\')">' + _ipv2FormatBaseFobDisplay(r.base_fob_usd) + '</td>';
       h += '<td style="' + tdS + '">';
       h += '<div style="display:inline-flex;gap:4px;">';
       h += '<button onclick="_ipv2OpenModal(\'edit\',\'' + r.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #DDE1EB;background:#fff;color:#5A6070;cursor:pointer;font-family:Pretendard,sans-serif;">수정</button>';
@@ -21432,6 +21434,7 @@ function _ipv2RenderTable() {
   }
   h += '</tbody></table>';
   wrap.innerHTML = h;
+  if (typeof initColumnResize === 'function') initColumnResize('ipv2-products-table');
 }
 
 // ── 인라인 편집 ──
@@ -21440,9 +21443,12 @@ function _ipv2InlineEdit(td, field, id) {
   var product = _ipv2Data.find(function(r) { return r.id === id; });
   if (!product) return;
   var oldVal = product[field];
-  var isNum = field === 'pallet_qty';
+  var isInt = field === 'pallet_qty';
+  var isFloat = field === 'base_fob_usd';
+  var isNum = isInt || isFloat;
   var inp = document.createElement('input');
   inp.type = isNum ? 'number' : 'text';
+  if (isFloat) inp.setAttribute('step', '0.01');
   inp.value = oldVal == null ? '' : oldVal;
   inp.style.cssText = 'width:100%;height:26px;border:1px solid #185FA5;border-radius:4px;padding:0 6px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;' + (isNum ? 'text-align:right;' : 'text-align:left;');
   var orig = td.innerHTML;
@@ -21454,7 +21460,10 @@ function _ipv2InlineEdit(td, field, id) {
   function commit() {
     if (done) return;
     done = true;
-    var newVal = isNum ? (parseInt(inp.value, 10) || 0) : inp.value.trim();
+    var newVal;
+    if (isFloat) { var f = parseFloat(inp.value); newVal = Number.isFinite(f) && f >= 0 ? f : 0; }
+    else if (isInt) newVal = parseInt(inp.value, 10) || 0;
+    else newVal = inp.value.trim();
     if (String(newVal) === String(oldVal == null ? '' : oldVal)) {
       td.innerHTML = orig;
       return;
@@ -21534,6 +21543,8 @@ function _ipv2OpenModal(mode, id) {
   h += '<div><label style="' + lblS + '">품명</label><input id="ipv2-m-name" type="text" autocomplete="off" value="' + _ipv2Esc(editing ? (editing.product_name || '') : '') + '" style="' + inpS + '" placeholder="Air Compressor"></div>';
   h += '<div><label style="' + lblS + '">규격</label><input id="ipv2-m-spec" type="text" autocomplete="off" value="' + _ipv2Esc(editing ? (editing.spec || '') : '') + '" style="' + inpS + '" placeholder="25L"></div>';
   h += '<div><label style="' + lblS + '">팔렛당 수량</label><input id="ipv2-m-pallet" type="number" autocomplete="off" value="' + (editing ? (editing.pallet_qty || 0) : 0) + '" style="' + inpS + 'text-align:right;"></div>';
+  var baseFobVal = editing && Number(editing.base_fob_usd) > 0 ? Number(editing.base_fob_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+  h += '<div><label style="' + lblS + '">수입 기본 단가 ($)</label><input id="ipv2-m-basefob" type="text" inputmode="decimal" autocomplete="off" value="' + baseFobVal + '" placeholder="0.00" style="' + inpS + 'text-align:right;" onblur="_ipv2FormatBaseFob(this)"></div>';
   h += '<div><label style="' + lblS + '">비고</label><textarea id="ipv2-m-memo" rows="2" style="width:100%;border:1px solid #DDE1EB;border-radius:6px;padding:8px 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;resize:vertical;">' + _ipv2Esc(editing ? (editing.memo || '') : '') + '</textarea></div>';
   h += '<div id="ipv2-m-err" style="color:#CC2222;font-size:12px;display:none;"></div>';
   h += '</div></div>';
@@ -21551,12 +21562,26 @@ function _ipv2CloseModal() {
   if (root) root.innerHTML = '';
 }
 
+function _ipv2FormatBaseFob(inp) {
+  var n = parseFloat(String(inp.value || '').replace(/[^0-9.-]/g, ''));
+  if (!Number.isFinite(n) || n < 0) { inp.value = ''; return; }
+  inp.value = n > 0 ? n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+}
+
+function _ipv2FormatBaseFobDisplay(v) {
+  var n = Number(v || 0);
+  if (n <= 0) return '<span style="color:#9BA3B2">—</span>';
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function _ipv2SaveModal(id) {
   var brand = (document.getElementById('ipv2-m-brand').value || '').trim();
   var model = (document.getElementById('ipv2-m-model').value || '').trim();
   var name = (document.getElementById('ipv2-m-name').value || '').trim();
   var spec = (document.getElementById('ipv2-m-spec').value || '').trim();
   var pallet = parseInt(document.getElementById('ipv2-m-pallet').value, 10) || 0;
+  var baseFob = parseFloat(String(document.getElementById('ipv2-m-basefob').value || '').replace(/[^0-9.-]/g, '')) || 0;
+  if (baseFob < 0) baseFob = 0;
   var memo = (document.getElementById('ipv2-m-memo').value || '').trim();
   var err = document.getElementById('ipv2-m-err');
   function showErr(msg) { err.textContent = msg; err.style.display = 'block'; }
@@ -21565,7 +21590,7 @@ function _ipv2SaveModal(id) {
   err.style.display = 'none';
 
   var isEdit = !!id;
-  var payload = { brand: brand, model: model, product_name: name, spec: spec, pallet_qty: pallet, memo: memo };
+  var payload = { brand: brand, model: model, product_name: name, spec: spec, pallet_qty: pallet, base_fob_usd: baseFob, memo: memo };
   if (isEdit) payload.id = id;
 
   // 중복 체크 (클라이언트 측 사전 검증 — 편집 중인 본인 제외)
@@ -21612,8 +21637,8 @@ function _ipv2SaveModal(id) {
 function _ipv2Template() {
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); return; }
   var data = [
-    ['브랜드', '모델', '품명', '규격', '팔렛당 수량', '비고'],
-    ['Tichop', 'DC9925', 'Air Compressor', '25L', 13, '비고 예시 — 이 행은 업로드 시 자동으로 건너뜁니다'],
+    ['브랜드', '모델', '품명', '규격', '팔렛당 수량', '수입가($)', '비고'],
+    ['Tichop', 'DC9925', 'Air Compressor', '25L', 13, 500.00, '비고 예시 — 이 행은 업로드 시 자동으로 건너뜁니다'],
   ];
   var ws = XLSX.utils.aoa_to_sheet(data);
   var wb = XLSX.utils.book_new();
@@ -21678,9 +21703,9 @@ function _ipv2Backup() {
     var c = (a.brand || '').localeCompare(b.brand || '');
     return c !== 0 ? c : (a.model || '').localeCompare(b.model || '');
   });
-  var data = [['브랜드', '모델', '품명', '규격', '팔렛당 수량', '비고']];
+  var data = [['브랜드', '모델', '품명', '규격', '팔렛당 수량', '수입가($)', '비고']];
   rows.forEach(function(r) {
-    data.push([r.brand || '', r.model || '', r.product_name || '', r.spec || '', r.pallet_qty || 0, r.memo || '']);
+    data.push([r.brand || '', r.model || '', r.product_name || '', r.spec || '', r.pallet_qty || 0, Number(r.base_fob_usd || 0), r.memo || '']);
   });
   var ws = XLSX.utils.aoa_to_sheet(data);
   var wb = XLSX.utils.book_new();
@@ -21732,13 +21757,23 @@ function _ipv2Upload(input) {
       var r = raw[i] || [];
       // 완전 빈 행 무시 (오류 카운트 안 함)
       if ((!r[0] || String(r[0]).trim() === '') && (!r[1] || String(r[1]).trim() === '')) continue;
+      // 신 포맷(7컬럼: 수입가 포함) / 구 포맷(6컬럼) 호환
+      // 헤더 행을 통해 컬럼 위치 판별
+      var hasBaseFobCol = false;
+      if (raw[0] && raw[0].length >= 6) {
+        var hdrs = raw[0].map(function(c) { return String(c || '').trim(); });
+        hasBaseFobCol = hdrs.indexOf('수입가($)') !== -1 || hdrs.indexOf('수입가 ($)') !== -1;
+      }
+      var memoIdx = hasBaseFobCol ? 6 : 5;
+      var baseFobIdx = hasBaseFobCol ? 5 : -1;
       var row = {
         brand: r[0] || '',
         model: r[1] || '',
         product_name: r[2] || null,
         spec: r[3] || null,
         pallet_qty: r[4],
-        memo: r[5] || null,
+        base_fob_usd: baseFobIdx >= 0 ? r[baseFobIdx] : 0,
+        memo: r[memoIdx] || null,
       };
       if (_ipv2IsExampleRow(row)) { skipped++; continue; }
       rows.push(row);
@@ -21975,7 +22010,7 @@ function _ipinv2DoRenderList(container) {
 
   // 테이블
   h += '<div style="overflow:auto;max-height:calc(100vh - 200px);">';
-  h += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  h += '<table id="ipinv2-list-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup><col style="width:40px"><col style="width:150px"><col><col style="width:110px"><col style="width:130px"><col style="width:70px"><col style="width:120px"><col style="width:100px"><col style="width:110px"></colgroup>';
   var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;';
   h += '<thead><tr>';
@@ -22012,6 +22047,7 @@ function _ipinv2DoRenderList(container) {
   h += '</div>';
 
   container.innerHTML = h;
+  if (typeof initColumnResize === 'function') initColumnResize('ipinv2-list-table');
 }
 
 function _ipinv2FilterByStatus(status) {
@@ -22224,7 +22260,7 @@ function _ipinv2RenderItemsTable() {
   var items = _ipinv2CurrentItems;
 
   var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;';
-  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  var h = '<table id="ipinv2-items-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup><col style="width:36px"><col style="width:160px"><col><col style="width:70px"><col style="width:70px"><col style="width:110px"><col style="width:110px"><col style="width:50px"></colgroup>';
   h += '<thead><tr>';
   h += '<th style="' + thS + 'text-align:center;">No.</th>';
@@ -22262,6 +22298,7 @@ function _ipinv2RenderItemsTable() {
   }
   h += '</tbody></table>';
   wrap.innerHTML = h;
+  if (typeof initColumnResize === 'function') initColumnResize('ipinv2-items-table');
 
   // 업데이트 섹션 요약
   var totalQty = items.reduce(function(s, it) { return s + Number(it.qty || 0); }, 0);
@@ -23294,7 +23331,7 @@ function _ipbat2DoRenderList(container) {
   h += '</div>';
 
   h += '<div style="overflow:auto;max-height:calc(100vh - 200px);">';
-  h += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  h += '<table id="ipbat2-list-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup><col style="width:40px"><col style="width:150px"><col><col style="width:130px"><col style="width:120px"><col style="width:130px"><col style="width:110px"><col style="width:100px"><col style="width:110px"></colgroup>';
   var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;';
   h += '<thead><tr>';
@@ -23328,6 +23365,7 @@ function _ipbat2DoRenderList(container) {
   }
   h += '</tbody></table></div></div>';
   container.innerHTML = h;
+  if (typeof initColumnResize === 'function') initColumnResize('ipbat2-list-table');
 }
 
 function _ipbat2CreateNew() {
@@ -23788,7 +23826,7 @@ function _ipbat2RenderCostSection() {
   }
 
   h += '<div style="overflow-x:auto;">';
-  h += '<table style="min-width:1280px;width:100%;border-collapse:collapse;font-family:Pretendard,sans-serif;">';
+  h += '<table id="ipbat2-cost-table" style="min-width:1280px;width:100%;border-collapse:collapse;font-family:Pretendard,sans-serif;">';
   var thS = 'padding:8px 8px;font-size:11px;font-weight:600;background:#EAECF2;color:#5A6070;text-align:center;white-space:nowrap;';
   var thFob = 'padding:8px 8px;font-size:11px;font-weight:600;background:#E1F5EE;color:#085041;text-align:center;white-space:nowrap;';
   var thCost = 'padding:8px 8px;font-size:11px;font-weight:600;background:#E6F1FB;color:#0C447C;text-align:center;white-space:nowrap;';
@@ -23854,6 +23892,7 @@ function _ipbat2RenderCostSection() {
   }
   h += '</div>';
   root.innerHTML = h;
+  if (typeof initColumnResize === 'function' && document.getElementById('ipbat2-cost-table')) initColumnResize('ipbat2-cost-table');
 }
 
 function _ipbat2UpdateMarginRate(model, val) {
