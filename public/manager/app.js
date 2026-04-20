@@ -2358,7 +2358,7 @@ var _tabIdMap = {
   'import-product':   { contentId: 'tab-import-product',   render: 'importProduct' },
   'import-calc':      { contentId: 'tab-import-calc',      render: 'importCalc' },
   'import-invoice':   { contentId: 'tab-import-invoice',   render: 'importInvoice' },
-  'import-product-v2':{ contentId: 'tab-import-products-v2', placeholder: true },
+  'import-product-v2':{ contentId: 'tab-import-products-v2', render: 'importProductsV2' },
   'import-invoice-v2':{ contentId: 'tab-import-invoice-v2',  placeholder: true },
   'import-batch-v2':  { contentId: 'tab-import-batch-v2',    placeholder: true },
   'delivery':         { contentId: 'tab-delivery',         placeholder: true },
@@ -2430,6 +2430,7 @@ function switchTab(tab) {
       if (renderKey === 'importCalc') renderImportCalcTab();
       if (renderKey === 'importProduct') renderImportProductTab();
       if (renderKey === 'importInvoice') renderImportInvoiceTab();
+      if (renderKey === 'importProductsV2') _renderImportProductsV2();
       _renderedTabs[renderKey] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
@@ -21219,3 +21220,491 @@ document.addEventListener('DOMContentLoaded', function() {
     })
     .subscribe(function(s) { console.log('[Backorders Realtime]', s); });
 })();
+
+// ========================================
+// 제품V2 (import_products_v2) — Phase 1 Step 2
+// ========================================
+
+var _ipv2Data = [];
+var _ipv2Filter = 'all';      // 브랜드 필터: 'all' 또는 브랜드명
+var _ipv2Search = '';          // 모델/품명 검색어
+var _ipv2Sort = 'brand';       // 'brand' | 'model' | 'recent'
+var _ipv2SearchTimer = null;
+var _ipv2Loading = false;
+
+function _ipv2Esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _renderImportProductsV2() {
+  var container = document.getElementById('tab-import-products-v2');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
+  _ipv2FetchList(function() {
+    _ipv2RenderLayout(container);
+    _ipv2BindEvents();
+    _ipv2RenderTable();
+  });
+}
+
+function _ipv2FetchList(cb) {
+  _ipv2Loading = true;
+  fetch('/api/import-products-v2', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      _ipv2Loading = false;
+      if (json && json.success) { _ipv2Data = json.data || []; }
+      else { _ipv2Data = []; console.error('[ipv2] fetch error', json); }
+      if (typeof cb === 'function') cb();
+    })
+    .catch(function(err) {
+      _ipv2Loading = false;
+      console.error('[ipv2] fetch fail', err);
+      _ipv2Data = [];
+      if (typeof cb === 'function') cb();
+    });
+}
+
+function _ipv2RenderLayout(container) {
+  var h = '';
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;margin:0;">';
+
+  // 다크 헤더
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:12px 20px;background:#1A1D23;color:#fff;">';
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:10px;">';
+  h += '<span style="font-size:14px;font-weight:500;color:#fff;">제품V2</span>';
+  h += '<span id="ipv2-count" style="font-size:12px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);color:#fff;font-weight:500;">0건</span>';
+  h += '</div>';
+  h += '<div style="display:flex !important;flex-direction:row !important;gap:6px;">';
+  h += '<button onclick="_ipv2Template()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #fff;cursor:pointer;font-family:Pretendard,sans-serif;">↓ 템플릿</button>';
+  h += '<button onclick="_ipv2Backup()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #fff;cursor:pointer;font-family:Pretendard,sans-serif;">↓ 백업</button>';
+  h += '<label style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #fff;cursor:pointer;font-family:Pretendard,sans-serif;display:inline-flex;align-items:center;">↑ 복원<input type="file" accept=".xlsx,.xls" style="display:none" onchange="_ipv2Upload(this)"/></label>';
+  h += '<button onclick="_ipv2OpenModal(\'create\')" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">+ 제품 등록</button>';
+  h += '</div></div>';
+
+  // 필터 영역
+  h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:8px;padding:10px 20px;background:#fff;border-bottom:0.5px solid #eee;flex-wrap:wrap;">';
+  h += '<select id="ipv2-brand-filter" style="height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;min-width:140px;"><option value="all">전체 브랜드</option></select>';
+  h += '<input type="text" id="ipv2-search" value="' + _ipv2Esc(_ipv2Search) + '" placeholder="모델 / 품명 검색..." autocomplete="off" style="height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;flex:1;min-width:200px;">';
+  h += '<select id="ipv2-sort" style="height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;">';
+  h += '<option value="brand"' + (_ipv2Sort === 'brand' ? ' selected' : '') + '>브랜드순</option>';
+  h += '<option value="model"' + (_ipv2Sort === 'model' ? ' selected' : '') + '>모델순</option>';
+  h += '<option value="recent"' + (_ipv2Sort === 'recent' ? ' selected' : '') + '>최근 수정순</option>';
+  h += '</select>';
+  h += '</div>';
+
+  // 테이블 컨테이너
+  h += '<div id="ipv2-table-wrap" style="overflow:auto;max-height:calc(100vh - 220px);"></div>';
+
+  h += '</div>';
+
+  // 모달 자리
+  h += '<div id="ipv2-modal-root"></div>';
+
+  container.innerHTML = h;
+}
+
+function _ipv2BindEvents() {
+  var brandSel = document.getElementById('ipv2-brand-filter');
+  var searchInp = document.getElementById('ipv2-search');
+  var sortSel = document.getElementById('ipv2-sort');
+
+  if (brandSel) {
+    brandSel.value = _ipv2Filter;
+    brandSel.addEventListener('change', function() {
+      _ipv2Filter = this.value;
+      _ipv2RenderTable();
+    });
+  }
+  if (sortSel) {
+    sortSel.addEventListener('change', function() {
+      _ipv2Sort = this.value;
+      _ipv2RenderTable();
+    });
+  }
+  if (searchInp) {
+    var composing = false;
+    searchInp.addEventListener('compositionstart', function() { composing = true; });
+    searchInp.addEventListener('compositionend', function() {
+      composing = false;
+      _ipv2ScheduleSearch(searchInp.value);
+    });
+    searchInp.addEventListener('input', function() {
+      if (composing) return;
+      _ipv2ScheduleSearch(searchInp.value);
+    });
+  }
+}
+
+function _ipv2ScheduleSearch(value) {
+  if (_ipv2SearchTimer) clearTimeout(_ipv2SearchTimer);
+  _ipv2SearchTimer = setTimeout(function() {
+    _ipv2Search = value;
+    _ipv2RenderTable();
+  }, 300);
+}
+
+function _ipv2Filtered() {
+  var rows = _ipv2Data.slice();
+  if (_ipv2Filter !== 'all') rows = rows.filter(function(r) { return r.brand === _ipv2Filter; });
+  if (_ipv2Search && _ipv2Search.trim()) {
+    var q = _ipv2Search.trim().toLowerCase();
+    rows = rows.filter(function(r) {
+      return (r.model || '').toLowerCase().indexOf(q) >= 0 || (r.product_name || '').toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  if (_ipv2Sort === 'brand') {
+    rows.sort(function(a, b) {
+      var c = (a.brand || '').localeCompare(b.brand || '');
+      return c !== 0 ? c : (a.model || '').localeCompare(b.model || '');
+    });
+  } else if (_ipv2Sort === 'model') {
+    rows.sort(function(a, b) { return (a.model || '').localeCompare(b.model || ''); });
+  } else if (_ipv2Sort === 'recent') {
+    rows.sort(function(a, b) { return (b.updated_at || '').localeCompare(a.updated_at || ''); });
+  }
+  return rows;
+}
+
+function _ipv2PopulateBrandFilter() {
+  var sel = document.getElementById('ipv2-brand-filter');
+  if (!sel) return;
+  var brands = Array.from(new Set(_ipv2Data.map(function(r) { return r.brand || ''; }).filter(function(b) { return b; }))).sort();
+  var curr = _ipv2Filter;
+  var h = '<option value="all">전체 브랜드</option>';
+  brands.forEach(function(b) {
+    h += '<option value="' + _ipv2Esc(b) + '"' + (curr === b ? ' selected' : '') + '>' + _ipv2Esc(b) + '</option>';
+  });
+  sel.innerHTML = h;
+  if (curr !== 'all' && brands.indexOf(curr) < 0) { _ipv2Filter = 'all'; sel.value = 'all'; }
+}
+
+function _ipv2RenderTable() {
+  _ipv2PopulateBrandFilter();
+  var countEl = document.getElementById('ipv2-count');
+  if (countEl) countEl.textContent = _ipv2Data.length + '건';
+
+  var wrap = document.getElementById('ipv2-table-wrap');
+  if (!wrap) return;
+  var rows = _ipv2Filtered();
+
+  var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
+  var tdS = 'padding:9px 10px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
+
+  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  h += '<colgroup>';
+  h += '<col style="width:44px"><col style="width:140px"><col style=""><col style=""><col style="width:120px"><col style="width:96px"><col style="width:120px">';
+  h += '</colgroup>';
+  h += '<thead><tr>';
+  h += '<th style="' + thS + '">No.</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">브랜드</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">모델</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">품명</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">규격</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">팔렛당</th>';
+  h += '<th style="' + thS + '">액션</th>';
+  h += '</tr></thead><tbody>';
+
+  if (rows.length === 0) {
+    h += '<tr><td colspan="7" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 제품이 없습니다.</td></tr>';
+  } else {
+    rows.forEach(function(r, i) {
+      h += '<tr data-id="' + r.id + '" onmouseover="this.style.background=\'#FAFAF7\'" onmouseout="this.style.background=\'\'">';
+      h += '<td style="' + tdS + 'color:#9BA3B2;">' + (i + 1) + '</td>';
+      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;" data-field="brand" ondblclick="_ipv2InlineEdit(this,\'brand\',\'' + r.id + '\')">' + _ipv2Esc(r.brand) + '</td>';
+      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;font-weight:500;" data-field="model" ondblclick="_ipv2InlineEdit(this,\'model\',\'' + r.id + '\')">' + _ipv2Esc(r.model) + '</td>';
+      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;color:#5A6070;" data-field="product_name" ondblclick="_ipv2InlineEdit(this,\'product_name\',\'' + r.id + '\')">' + _ipv2Esc(r.product_name || '') + '</td>';
+      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;color:#5A6070;" data-field="spec" ondblclick="_ipv2InlineEdit(this,\'spec\',\'' + r.id + '\')">' + _ipv2Esc(r.spec || '') + '</td>';
+      h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;" data-field="pallet_qty" ondblclick="_ipv2InlineEdit(this,\'pallet_qty\',\'' + r.id + '\')">' + (r.pallet_qty ? r.pallet_qty + ' EA' : '<span style="color:#9BA3B2">-</span>') + '</td>';
+      h += '<td style="' + tdS + '">';
+      h += '<div style="display:inline-flex;gap:4px;">';
+      h += '<button onclick="_ipv2OpenModal(\'edit\',\'' + r.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #DDE1EB;background:#fff;color:#5A6070;cursor:pointer;font-family:Pretendard,sans-serif;">수정</button>';
+      h += '<button onclick="_ipv2Delete(\'' + r.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #F0D2D2;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
+      h += '</div></td>';
+      h += '</tr>';
+    });
+  }
+  h += '</tbody></table>';
+  wrap.innerHTML = h;
+}
+
+// ── 인라인 편집 ──
+function _ipv2InlineEdit(td, field, id) {
+  if (!td || td.querySelector('input')) return;
+  var product = _ipv2Data.find(function(r) { return r.id === id; });
+  if (!product) return;
+  var oldVal = product[field];
+  var isNum = field === 'pallet_qty';
+  var inp = document.createElement('input');
+  inp.type = isNum ? 'number' : 'text';
+  inp.value = oldVal == null ? '' : oldVal;
+  inp.style.cssText = 'width:100%;height:26px;border:1px solid #185FA5;border-radius:4px;padding:0 6px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;' + (isNum ? 'text-align:right;' : 'text-align:left;');
+  var orig = td.innerHTML;
+  td.innerHTML = '';
+  td.appendChild(inp);
+  inp.focus();
+  inp.select();
+  var done = false;
+  function commit() {
+    if (done) return;
+    done = true;
+    var newVal = isNum ? (parseInt(inp.value, 10) || 0) : inp.value.trim();
+    if (String(newVal) === String(oldVal == null ? '' : oldVal)) {
+      td.innerHTML = orig;
+      return;
+    }
+    td.style.opacity = '0.6';
+    var payload = { id: id };
+    payload[field] = newVal;
+    fetch('/api/import-products-v2', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(function(r) { return r.json(); })
+      .then(function(json) {
+        td.style.opacity = '';
+        if (json.success && json.data) {
+          var idx = _ipv2Data.findIndex(function(x) { return x.id === id; });
+          if (idx >= 0) _ipv2Data[idx] = json.data;
+          _ipv2RenderTable();
+        } else {
+          alert(json.error || '수정 실패');
+          td.innerHTML = orig;
+        }
+      })
+      .catch(function(err) {
+        td.style.opacity = '';
+        alert('수정 실패: ' + err.message);
+        td.innerHTML = orig;
+      });
+  }
+  function cancel() {
+    if (done) return;
+    done = true;
+    td.innerHTML = orig;
+  }
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+  });
+  inp.addEventListener('blur', commit);
+}
+
+// ── 삭제 ──
+function _ipv2Delete(id) {
+  var p = _ipv2Data.find(function(r) { return r.id === id; });
+  if (!p) return;
+  if (!confirm((p.brand || '') + ' ' + (p.model || '') + ' 제품을 삭제하시겠습니까?')) return;
+  fetch('/api/import-products-v2?id=' + encodeURIComponent(id), { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success) {
+        _ipv2Data = _ipv2Data.filter(function(r) { return r.id !== id; });
+        _ipv2RenderTable();
+      } else alert(json.error || '삭제 실패');
+    })
+    .catch(function(err) { alert('삭제 실패: ' + err.message); });
+}
+
+// ── 등록/수정 모달 ──
+function _ipv2OpenModal(mode, id) {
+  var editing = mode === 'edit' ? _ipv2Data.find(function(r) { return r.id === id; }) : null;
+  var title = editing ? '제품 수정' : '제품 등록';
+  var root = document.getElementById('ipv2-modal-root');
+  if (!root) return;
+  var brands = Array.from(new Set(_ipv2Data.map(function(r) { return r.brand || ''; }).filter(Boolean))).sort();
+  var datalist = brands.map(function(b) { return '<option value="' + _ipv2Esc(b) + '">'; }).join('');
+  var h = '';
+  h += '<div id="ipv2-overlay" onclick="if(event.target===this)_ipv2CloseModal()" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;">';
+  h += '<div style="background:#fff;border-radius:10px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 48px rgba(26,29,35,0.18);">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #DDE1EB;">';
+  h += '<h3 style="font-size:16px;font-weight:600;margin:0;color:#1A1D23;">' + title + '</h3>';
+  h += '<button onclick="_ipv2CloseModal()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#5A6070;padding:4px;">✕</button>';
+  h += '</div>';
+  h += '<div style="padding:20px;">';
+  h += '<datalist id="ipv2-brand-options">' + datalist + '</datalist>';
+  var lblS = 'display:block;font-size:12px;font-weight:500;color:#5A6070;margin-bottom:4px;';
+  var inpS = 'width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
+  h += '<div style="display:flex;flex-direction:column;gap:12px;">';
+  h += '<div><label style="' + lblS + '">브랜드 <span style="color:#CC2222">*</span></label><input id="ipv2-m-brand" type="text" list="ipv2-brand-options" autocomplete="off" value="' + _ipv2Esc(editing ? editing.brand : '') + '" style="' + inpS + '" placeholder="Tichop, Milwaukee, DeWalt ..."></div>';
+  h += '<div><label style="' + lblS + '">모델 <span style="color:#CC2222">*</span></label><input id="ipv2-m-model" type="text" autocomplete="off" value="' + _ipv2Esc(editing ? editing.model : '') + '" style="' + inpS + '" placeholder="DC9925"></div>';
+  h += '<div><label style="' + lblS + '">품명</label><input id="ipv2-m-name" type="text" autocomplete="off" value="' + _ipv2Esc(editing ? (editing.product_name || '') : '') + '" style="' + inpS + '" placeholder="Air Compressor"></div>';
+  h += '<div><label style="' + lblS + '">규격</label><input id="ipv2-m-spec" type="text" autocomplete="off" value="' + _ipv2Esc(editing ? (editing.spec || '') : '') + '" style="' + inpS + '" placeholder="25L"></div>';
+  h += '<div><label style="' + lblS + '">팔렛당 수량</label><input id="ipv2-m-pallet" type="number" autocomplete="off" value="' + (editing ? (editing.pallet_qty || 0) : 0) + '" style="' + inpS + 'text-align:right;"></div>';
+  h += '<div><label style="' + lblS + '">비고</label><textarea id="ipv2-m-memo" rows="2" style="width:100%;border:1px solid #DDE1EB;border-radius:6px;padding:8px 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;resize:vertical;">' + _ipv2Esc(editing ? (editing.memo || '') : '') + '</textarea></div>';
+  h += '<div id="ipv2-m-err" style="color:#CC2222;font-size:12px;display:none;"></div>';
+  h += '</div></div>';
+  h += '<div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid #DDE1EB;">';
+  h += '<button onclick="_ipv2CloseModal()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">취소</button>';
+  h += '<button id="ipv2-m-save" onclick="_ipv2SaveModal(\'' + (editing ? editing.id : '') + '\')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">저장</button>';
+  h += '</div>';
+  h += '</div></div>';
+  root.innerHTML = h;
+  setTimeout(function() { var el = document.getElementById('ipv2-m-brand'); if (el) el.focus(); }, 50);
+}
+
+function _ipv2CloseModal() {
+  var root = document.getElementById('ipv2-modal-root');
+  if (root) root.innerHTML = '';
+}
+
+function _ipv2SaveModal(id) {
+  var brand = (document.getElementById('ipv2-m-brand').value || '').trim();
+  var model = (document.getElementById('ipv2-m-model').value || '').trim();
+  var name = (document.getElementById('ipv2-m-name').value || '').trim();
+  var spec = (document.getElementById('ipv2-m-spec').value || '').trim();
+  var pallet = parseInt(document.getElementById('ipv2-m-pallet').value, 10) || 0;
+  var memo = (document.getElementById('ipv2-m-memo').value || '').trim();
+  var err = document.getElementById('ipv2-m-err');
+  function showErr(msg) { err.textContent = msg; err.style.display = 'block'; }
+  if (!brand) return showErr('브랜드를 입력하세요');
+  if (!model) return showErr('모델을 입력하세요');
+  err.style.display = 'none';
+
+  var isEdit = !!id;
+  var payload = { brand: brand, model: model, product_name: name, spec: spec, pallet_qty: pallet, memo: memo };
+  if (isEdit) payload.id = id;
+
+  // 중복 체크 (클라이언트 측 사전 검증 — 편집 중인 본인 제외)
+  if (!isEdit) {
+    var dup = _ipv2Data.find(function(r) { return r.brand === brand && r.model === model; });
+    if (dup) return showErr('이미 등록된 제품입니다');
+  } else {
+    var dup2 = _ipv2Data.find(function(r) { return r.brand === brand && r.model === model && r.id !== id; });
+    if (dup2) return showErr('이미 등록된 제품입니다');
+  }
+
+  var btn = document.getElementById('ipv2-m-save');
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
+
+  fetch('/api/import-products-v2', {
+    method: isEdit ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+    .then(function(r) { return r.json().then(function(json) { return { status: r.status, json: json }; }); })
+    .then(function(res) {
+      if (res.json.success) {
+        if (isEdit) {
+          var idx = _ipv2Data.findIndex(function(x) { return x.id === id; });
+          if (idx >= 0) _ipv2Data[idx] = res.json.data;
+        } else {
+          _ipv2Data.push(res.json.data);
+        }
+        _ipv2CloseModal();
+        _ipv2RenderTable();
+      } else {
+        if (res.json.code === 'DUPLICATE') showErr('이미 등록된 제품입니다');
+        else showErr(res.json.error || '저장 실패');
+        if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+      }
+    })
+    .catch(function(e) {
+      showErr('저장 실패: ' + e.message);
+      if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+    });
+}
+
+// ── 엑셀: 템플릿 ──
+function _ipv2Template() {
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); return; }
+  var data = [
+    ['브랜드', '모델', '품명', '규격', '팔렛당 수량', '비고'],
+    ['Tichop', 'DC9925', 'Air Compressor', '25L', 13, '예시 행 — 삭제 후 사용하세요'],
+  ];
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  // 예시 행 흐리게 (간단한 시각 표시: 엑셀 셀 스타일은 xlsx CE에서 제한적. 여기서는 값만 유지)
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '제품V2');
+  XLSX.writeFile(wb, 'import_products_template.xlsx');
+}
+
+// ── 엑셀: 백업 ──
+function _ipv2Backup() {
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); return; }
+  var rows = _ipv2Data.slice().sort(function(a, b) {
+    var c = (a.brand || '').localeCompare(b.brand || '');
+    return c !== 0 ? c : (a.model || '').localeCompare(b.model || '');
+  });
+  var data = [['브랜드', '모델', '품명', '규격', '팔렛당 수량', '비고']];
+  rows.forEach(function(r) {
+    data.push([r.brand || '', r.model || '', r.product_name || '', r.spec || '', r.pallet_qty || 0, r.memo || '']);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '제품V2');
+  var d = new Date();
+  var ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  XLSX.writeFile(wb, 'import_products_backup_' + ymd + '.xlsx');
+}
+
+// ── 엑셀: 복원 ──
+function _ipv2Upload(input) {
+  var f = input.files && input.files[0];
+  if (!f) return;
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); input.value = ''; return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      var rows = [];
+      for (var i = 1; i < raw.length; i++) {
+        var r = raw[i] || [];
+        rows.push({
+          brand: r[0] || '',
+          model: r[1] || '',
+          product_name: r[2] || null,
+          spec: r[3] || null,
+          pallet_qty: r[4],
+          memo: r[5] || null,
+        });
+      }
+      fetch('/api/import-products-v2/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows: rows }),
+      })
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+          if (!json.success) { alert(json.error || '업로드 실패'); return; }
+          var res = json.data || { created: 0, updated: 0, errors: [] };
+          _ipv2ShowUploadResult(res);
+          _ipv2FetchList(function() { _ipv2RenderTable(); });
+        })
+        .catch(function(err) { alert('업로드 실패: ' + err.message); });
+    } catch (err) {
+      alert('엑셀 파싱 실패: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(f);
+}
+
+function _ipv2ShowUploadResult(res) {
+  var root = document.getElementById('ipv2-modal-root');
+  if (!root) return;
+  var errs = Array.isArray(res.errors) ? res.errors : [];
+  var errLines = '';
+  if (errs.length > 0) {
+    errLines = '<div style="margin-top:12px;padding:10px;background:#FCEBEB;border-radius:6px;max-height:160px;overflow-y:auto;">';
+    errLines += '<div style="font-size:12px;color:#791F1F;font-weight:600;margin-bottom:4px;">오류 ' + errs.length + '건</div>';
+    errs.forEach(function(e) {
+      errLines += '<div style="font-size:12px;color:#791F1F;">' + e.row + '행: ' + _ipv2Esc(e.reason) + '</div>';
+    });
+    errLines += '</div>';
+  }
+  var h = '';
+  h += '<div id="ipv2-overlay" onclick="if(event.target===this)_ipv2CloseModal()" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;">';
+  h += '<div style="background:#fff;border-radius:10px;width:420px;max-width:95vw;box-shadow:0 20px 48px rgba(26,29,35,0.18);">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #DDE1EB;">';
+  h += '<h3 style="font-size:16px;font-weight:600;margin:0;color:#1A1D23;">업로드 결과</h3>';
+  h += '<button onclick="_ipv2CloseModal()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#5A6070;padding:4px;">✕</button>';
+  h += '</div>';
+  h += '<div style="padding:20px;font-size:13px;color:#1A1D23;">';
+  h += '<div>신규: <b>' + (res.created || 0) + '건</b> / 수정: <b>' + (res.updated || 0) + '건</b>' + (errs.length > 0 ? ' / 오류: <b style="color:#CC2222">' + errs.length + '건</b>' : '') + '</div>';
+  h += errLines;
+  h += '</div>';
+  h += '<div style="display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid #DDE1EB;">';
+  h += '<button onclick="_ipv2CloseModal()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">확인</button>';
+  h += '</div></div></div>';
+  root.innerHTML = h;
+}
