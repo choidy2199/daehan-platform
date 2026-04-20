@@ -21233,6 +21233,70 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 
 // ========================================
+// 공통 캐시 헬퍼 — Phase B1.5-A (수입 모듈 4개 탭 스마트 캐싱)
+// ========================================
+
+function _loadCache(key) {
+  try {
+    var raw = localStorage.getItem(key);
+    if (!raw) return null;
+    var parsed = JSON.parse(raw);
+    // 7일 경과 캐시 폐기
+    if (parsed && parsed._cachedAt) {
+      var age = Date.now() - Number(parsed._cachedAt);
+      if (age > 7 * 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(key);
+        return null;
+      }
+    }
+    return (parsed && parsed.data !== undefined) ? parsed.data : parsed;
+  } catch (e) {
+    console.error('[_loadCache] ' + key + ':', e);
+    return null;
+  }
+}
+
+function _saveCache(key, data) {
+  var payload = { _cachedAt: Date.now(), data: data };
+  try {
+    localStorage.setItem(key, JSON.stringify(payload));
+  } catch (e) {
+    if (e && e.name === 'QuotaExceededError') {
+      _clearOldCaches();
+      try { localStorage.setItem(key, JSON.stringify(payload)); }
+      catch (e2) { console.error('[_saveCache] ' + key + ' failed after cleanup:', e2); }
+    } else {
+      console.error('[_saveCache] ' + key + ':', e);
+    }
+  }
+}
+
+function _clearOldCaches() {
+  try {
+    var keys = Object.keys(localStorage).filter(function(k){ return k.indexOf('mw_cache_') === 0; });
+    keys.forEach(function(k) {
+      try {
+        var parsed = JSON.parse(localStorage.getItem(k));
+        if (parsed && parsed._cachedAt && (Date.now() - Number(parsed._cachedAt)) > 24 * 60 * 60 * 1000) {
+          localStorage.removeItem(k);
+        }
+      } catch (e) {
+        localStorage.removeItem(k);
+      }
+    });
+  } catch (e) {
+    console.error('[_clearOldCaches]', e);
+  }
+}
+
+function _hasDataChanged(oldData, newData) {
+  if (!oldData || !newData) return true;
+  if (Array.isArray(oldData) && Array.isArray(newData) && oldData.length !== newData.length) return true;
+  try { return JSON.stringify(oldData) !== JSON.stringify(newData); }
+  catch (e) { return true; }
+}
+
+// ========================================
 // 발주서V2 (import_po_headers / items) — Phase B1: 탭 + 목록
 // ========================================
 
@@ -21281,12 +21345,36 @@ function _poFormatUsd(n) {
 function _poInit() {
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
-  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
-  _poLoadList(function() {
+  var CACHE_KEY = 'mw_cache_import_po_v2';
+  var cached = _loadCache(CACHE_KEY);
+
+  function renderFromState() {
     _poRenderLayout(container);
     _poBindEvents();
     _poRenderList();
-  });
+  }
+
+  if (cached && Array.isArray(cached)) {
+    // 캐시 즉시 렌더 (0초)
+    _poList = cached;
+    renderFromState();
+    // 백그라운드 fetch (silent)
+    _poLoadList(function() {
+      if (_hasDataChanged(cached, _poList)) {
+        _saveCache(CACHE_KEY, _poList);
+        _poRenderList();
+      } else {
+        _saveCache(CACHE_KEY, _poList);
+      }
+    });
+  } else {
+    // 캐시 없음 → 기존 로딩 UI
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
+    _poLoadList(function() {
+      renderFromState();
+      _saveCache(CACHE_KEY, _poList);
+    });
+  }
 }
 
 function _poLoadList(cb) {
@@ -21509,12 +21597,33 @@ function _ipv2Esc(s) {
 function _renderImportProductsV2() {
   var container = document.getElementById('tab-import-products-v2');
   if (!container) return;
-  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
-  _ipv2FetchList(function() {
+  var CACHE_KEY = 'mw_cache_import_products_v2';
+  var cached = _loadCache(CACHE_KEY);
+
+  function renderFromState() {
     _ipv2RenderLayout(container);
     _ipv2BindEvents();
     _ipv2RenderTable();
-  });
+  }
+
+  if (cached && Array.isArray(cached)) {
+    _ipv2Data = cached;
+    renderFromState();
+    _ipv2FetchList(function() {
+      if (_hasDataChanged(cached, _ipv2Data)) {
+        _saveCache(CACHE_KEY, _ipv2Data);
+        _ipv2RenderTable();
+      } else {
+        _saveCache(CACHE_KEY, _ipv2Data);
+      }
+    });
+  } else {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
+    _ipv2FetchList(function() {
+      renderFromState();
+      _saveCache(CACHE_KEY, _ipv2Data);
+    });
+  }
 }
 
 function _ipv2FetchList(cb) {
@@ -22438,10 +22547,30 @@ function _ipinv2LoadList(cb) {
 function _ipinv2RenderList() {
   var container = document.getElementById('tab-import-invoice-v2');
   if (!container) return;
-  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
-  _ipinv2LoadList(function() {
+  var CACHE_KEY = 'mw_cache_import_invoices_v2';
+  var cached = _loadCache(CACHE_KEY);
+
+  if (cached && Array.isArray(cached)) {
+    _ipinv2Invoices = cached;
     _ipinv2DoRenderList(container);
-  });
+    _ipinv2LoadList(function() {
+      if (_hasDataChanged(cached, _ipinv2Invoices)) {
+        _saveCache(CACHE_KEY, _ipinv2Invoices);
+        // 상세 화면 진입 중이면 재렌더 건너뜀 (상태 변경 방지)
+        if (_ipinv2State && _ipinv2State.mode === 'list') {
+          _ipinv2DoRenderList(container);
+        }
+      } else {
+        _saveCache(CACHE_KEY, _ipinv2Invoices);
+      }
+    });
+  } else {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
+    _ipinv2LoadList(function() {
+      _ipinv2DoRenderList(container);
+      _saveCache(CACHE_KEY, _ipinv2Invoices);
+    });
+  }
 }
 
 function _ipinv2DoRenderList(container) {
@@ -24192,8 +24321,29 @@ function _ipbat2LoadList(cb) {
 function _ipbat2RenderList() {
   var container = document.getElementById('tab-import-batch-v2');
   if (!container) return;
-  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
-  _ipbat2LoadList(function() { _ipbat2DoRenderList(container); });
+  var CACHE_KEY = 'mw_cache_import_batches_v2';
+  var cached = _loadCache(CACHE_KEY);
+
+  if (cached && Array.isArray(cached)) {
+    _ipbat2Batches = cached;
+    _ipbat2DoRenderList(container);
+    _ipbat2LoadList(function() {
+      if (_hasDataChanged(cached, _ipbat2Batches)) {
+        _saveCache(CACHE_KEY, _ipbat2Batches);
+        if (_ipbat2State && _ipbat2State.mode === 'list') {
+          _ipbat2DoRenderList(container);
+        }
+      } else {
+        _saveCache(CACHE_KEY, _ipbat2Batches);
+      }
+    });
+  } else {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
+    _ipbat2LoadList(function() {
+      _ipbat2DoRenderList(container);
+      _saveCache(CACHE_KEY, _ipbat2Batches);
+    });
+  }
 }
 
 function _ipbat2DoRenderList(container) {
