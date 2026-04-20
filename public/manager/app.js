@@ -21969,7 +21969,20 @@ function _ipinv2DoRenderDetail(container) {
   h += '<button onclick="_ipinv2OpenPasteModal()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">📋 엑셀 붙여넣기</button>';
   h += '<button onclick="_ipinv2AddItem()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">+ 제품 추가</button>';
   h += '</div></div>';
-  h += '<div id="ipinv2-items-wrap" style="overflow:auto;max-height:calc(100vh - 440px);"></div>';
+  h += '<div id="ipinv2-items-wrap" style="overflow:auto;max-height:calc(100vh - 640px);min-height:120px;"></div>';
+  h += '</div>';
+
+  // 송금 스케줄 섹션
+  h += '<div id="ipinv2-payments-section" style="padding:0;background:#fff;border-top:0.5px solid #eee;">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:0.5px solid #eee;">';
+  h += '<div style="display:flex;align-items:center;gap:10px;">';
+  h += '<span style="font-size:11px;color:#5A6070;letter-spacing:0.04em;font-weight:600;text-transform:uppercase;">송금 스케줄</span>';
+  h += '<span id="ipinv2-pay-count" style="font-size:12px;color:#5A6070;">(0회 완료)</span>';
+  h += '</div>';
+  h += '<button onclick="_ipinv2AddPayment()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">+ 분할 추가</button>';
+  h += '</div>';
+  h += '<div id="ipinv2-payments-cards" style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;"></div>';
+  h += '<div id="ipinv2-payments-summary" style="padding:14px 20px;background:#1A1D23;color:#fff;font-family:Pretendard,sans-serif;"></div>';
   h += '</div>';
 
   // Sticky summary bar
@@ -21988,6 +22001,7 @@ function _ipinv2DoRenderDetail(container) {
   _ipinv2RenderItemsTable();
   _ipinv2RenderSummaryBar();
   _ipinv2BindAcOutsideClick();
+  _ipinv2LoadPayments(_ipinv2CurrentInvoice.id);
 }
 
 // ── 기본 정보 저장 ──
@@ -22522,5 +22536,450 @@ function _ipinv2ConfirmPaste() {
         _ipinv2RenderItemsTable();
         _ipinv2RefreshInvoiceTotals();
       } else alert(json.error || '추가 실패');
+    });
+}
+
+// ========================================
+// 인보이스V2 — 송금 스케줄 (Phase 1 Step 3-B)
+// ========================================
+
+var _ipinv2Payments = [];
+
+function _ipinv2Krw(n) {
+  var v = Math.round(Number(n || 0));
+  return '₩' + v.toLocaleString('en-US');
+}
+
+function _ipinv2LoadPayments(invoiceId) {
+  if (!invoiceId) return;
+  fetch('/api/import-invoices/' + invoiceId + '/payments', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      _ipinv2Payments = (json && json.success) ? (json.data || []) : [];
+      _ipinv2RenderPaymentsSection();
+    })
+    .catch(function(e) { console.error('[ipinv2] payments fetch', e); _ipinv2Payments = []; _ipinv2RenderPaymentsSection(); });
+}
+
+function _ipinv2RenderPaymentsSection() {
+  var cards = document.getElementById('ipinv2-payments-cards');
+  var count = document.getElementById('ipinv2-pay-count');
+  if (!cards) return;
+  var completedCnt = _ipinv2Payments.filter(function(p) { return p.status === 'completed'; }).length;
+  if (count) count.textContent = '(' + completedCnt + '회 완료 / ' + _ipinv2Payments.length + '회)';
+  if (_ipinv2Payments.length === 0) {
+    cards.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#9BA3B2;font-size:13px;">송금 스케줄이 없습니다. [+ 분할 추가] 버튼으로 첫 차수를 생성하세요.</div>';
+  } else {
+    var h = '';
+    _ipinv2Payments.forEach(function(p) { h += _ipinv2RenderPaymentCard(p); });
+    cards.innerHTML = h;
+  }
+  _ipinv2RenderPaymentSummary();
+}
+
+function _ipinv2RenderPaymentCard(p) {
+  var isCompleted = p.status === 'completed';
+  var bg = isCompleted ? '#F5FBF5' : '#FEFBF3';
+  var border = isCompleted ? '0.5px solid #B5E0C3' : '0.5px solid #EF9F27';
+  var checkBg = isCompleted ? '#0F6E56' : '#fff';
+  var checkBorder = isCompleted ? '#0F6E56' : '#DDE1EB';
+  var checkText = isCompleted ? '✓' : '';
+  var canDelete = _ipinv2Payments.length > 1;
+
+  var h = '';
+  h += '<div data-pay-id="' + p.id + '" style="border:' + border + ';background:' + bg + ';border-radius:8px;padding:14px 16px;font-family:Pretendard,sans-serif;">';
+
+  // 카드 헤더
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">';
+  h += '<div style="display:flex;align-items:center;gap:8px;">';
+  h += '<div style="width:18px;height:18px;border-radius:4px;background:' + checkBg + ';border:1px solid ' + checkBorder + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">' + checkText + '</div>';
+  h += '<span style="font-size:13px;font-weight:500;color:#1A1D23;">' + p.seq + '차</span>';
+  h += '<span style="font-size:11px;padding:2px 8px;border-radius:10px;background:' + (isCompleted ? '#E1F5EE' : '#FAEEDA') + ';color:' + (isCompleted ? '#085041' : '#633806') + ';font-weight:500;">' + (isCompleted ? '완료' : '계획') + '</span>';
+  h += '</div>';
+  if (canDelete) h += '<a onclick="_ipinv2DeletePayment(\'' + p.id + '\')" style="font-size:11px;color:#CC2222;cursor:pointer;text-decoration:underline;">삭제</a>';
+  h += '</div>';
+
+  // 송금 계획 섹션
+  h += '<div style="margin-bottom:12px;">';
+  h += '<div style="font-size:10px;font-weight:500;color:#5A6070;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">송금 계획</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">';
+  var lblS = 'display:block;font-size:10px;color:#5A6070;margin-bottom:3px;';
+  var inpS = 'width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif;box-sizing:border-box;background:#fff;';
+  var planBorder = 'border:1px solid #185FA5;';
+  h += '<div><label style="' + lblS + '">송금 예정일</label><input type="date" value="' + _ipinv2Esc((p.planned_date || '').substring(0, 10)) + '" style="' + inpS + '" onblur="_ipinv2UpdatePaymentPlanned(\'' + p.id + '\',\'planned_date\',this.value)"></div>';
+  h += '<div><label style="' + lblS + '">예정 금액 ($)</label><input type="number" step="0.01" data-pay-field="planned_usd" value="' + (p.planned_usd || 0) + '" style="' + inpS + planBorder + 'text-align:right;" oninput="_ipinv2OnPlannedInput(event,\'' + p.id + '\',\'planned_usd\')" onblur="_ipinv2UpdatePaymentPlanned(\'' + p.id + '\',\'planned_usd\',this.value)"></div>';
+  h += '<div><label style="' + lblS + '">비율 (%)</label><input type="number" step="0.01" data-pay-field="planned_ratio" value="' + (p.planned_ratio || 0) + '" style="' + inpS + planBorder + 'text-align:right;" oninput="_ipinv2OnPlannedInput(event,\'' + p.id + '\',\'planned_ratio\')" onblur="_ipinv2UpdatePaymentPlanned(\'' + p.id + '\',\'planned_ratio\',this.value)"></div>';
+  h += '</div></div>';
+
+  // 송금 실행 섹션
+  h += '<div>';
+  h += '<div style="font-size:10px;font-weight:500;color:#0F6E56;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">송금 실행 (외국환 거래 계산서 기반)</div>';
+  var disabledAttr = isCompleted ? '' : '';
+  var actBg = '#fff';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:8px;">';
+  h += '<div><label style="' + lblS + '">실제 송금일</label><input type="date" value="' + _ipinv2Esc((p.actual_date || '').substring(0, 10)) + '" style="' + inpS + 'background:' + actBg + ';" onblur="_ipinv2UpdatePaymentActual(\'' + p.id + '\',\'actual_date\',this.value)"' + disabledAttr + '></div>';
+  h += '<div><label style="' + lblS + '">실제 송금액 ($)</label><input type="number" step="0.01" data-pay-field="actual_usd" value="' + (p.actual_usd || 0) + '" style="' + inpS + 'text-align:right;background:' + actBg + ';" oninput="_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2UpdatePaymentActual(\'' + p.id + '\',\'actual_usd\',this.value)"></div>';
+  h += '<div><label style="' + lblS + '">적용 환율</label><input type="number" step="0.0001" data-pay-field="exchange_rate" value="' + (p.exchange_rate || 0) + '" style="' + inpS + 'text-align:right;background:' + actBg + ';" oninput="_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2UpdatePaymentActual(\'' + p.id + '\',\'exchange_rate\',this.value)"></div>';
+  h += '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:8px;">';
+  h += '<div><label style="' + lblS + '">송금액 (₩)</label><input type="number" data-pay-field="remittance_krw" value="' + (p.remittance_krw || 0) + '" style="' + inpS + 'text-align:right;background:#F4F6FA;color:#5A6070;" oninput="_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2UpdatePaymentActual(\'' + p.id + '\',\'remittance_krw\',this.value)"></div>';
+  h += '<div><label style="' + lblS + '">송금 수수료 (₩)</label><input type="number" data-pay-field="fee_krw" value="' + (p.fee_krw || 0) + '" style="' + inpS + 'text-align:right;background:' + actBg + ';" oninput="_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2UpdatePaymentActual(\'' + p.id + '\',\'fee_krw\',this.value)"></div>';
+  h += '<div><label style="' + lblS + '">전신료 (₩)</label><input type="number" data-pay-field="telegram_fee_krw" value="' + (p.telegram_fee_krw || 0) + '" style="' + inpS + 'text-align:right;background:' + actBg + ';" oninput="_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2UpdatePaymentActual(\'' + p.id + '\',\'telegram_fee_krw\',this.value)"></div>';
+  h += '</div>';
+
+  // 부가세 체크박스
+  var vatAmount = p.fee_vat_included ? (p.fee_vat_krw || 0) : 0;
+  h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">';
+  h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#1A1D23;"><input type="checkbox" data-pay-field="fee_vat_included"' + (p.fee_vat_included ? ' checked' : '') + ' onchange="_ipinv2ToggleFeeVat(event,\'' + p.id + '\')"> 수수료·전신료 부가세 포함 (10%)</label>';
+  h += '<span data-pay-field="fee_vat_display" style="font-size:12px;color:#5A6070;">' + (p.fee_vat_included ? '부가세 ' + _ipinv2Krw(vatAmount) : '') + '</span>';
+  h += '</div>';
+
+  // 계획만 입력된 미완료 차수 안내
+  if (!isCompleted) {
+    h += '<div style="padding:8px 12px;background:#FFF3DC;border-radius:4px;font-size:11px;color:#633806;margin-bottom:10px;">송금 후 외국환 거래 계산서 기반으로 실제 환율·수수료 입력 예정</div>';
+  }
+
+  // 요약 바
+  h += '<div style="background:#1A1D23;color:#fff;border-radius:6px;padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+  h += '<div>';
+  h += '<div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:2px;">원화 총 지불액</div>';
+  h += '<div data-pay-field="total_display" style="font-size:14px;font-weight:500;">' + _ipinv2Krw(p.total_paid_krw || 0) + '</div>';
+  h += '<div data-pay-field="total_desc" style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;">' + _ipinv2PaymentTotalDesc(p) + '</div>';
+  h += '</div>';
+  h += '<div style="text-align:right;">';
+  h += '<div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:2px;">실효 환율</div>';
+  h += '<div data-pay-field="effective_display" style="font-size:14px;font-weight:500;color:#EF9F27;">' + (Number(p.effective_rate || 0) > 0 ? Number(p.effective_rate).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '-') + '</div>';
+  h += '<div data-pay-field="effective_desc" style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:2px;">' + _ipinv2PaymentEffectiveDesc(p) + '</div>';
+  h += '</div>';
+  h += '</div>';
+
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function _ipinv2PaymentTotalDesc(p) {
+  var remit = Number(p.remittance_krw || 0);
+  var fee = Number(p.fee_krw || 0);
+  var tele = Number(p.telegram_fee_krw || 0);
+  var vat = p.fee_vat_included ? Math.round((fee + tele) * 0.1) : 0;
+  var parts = [_ipinv2Krw(remit) + ' + 수수료 ' + _ipinv2Krw(fee) + ' + 전신료 ' + _ipinv2Krw(tele)];
+  if (p.fee_vat_included) parts.push('부가세 ' + _ipinv2Krw(vat));
+  return parts.join(' ');
+}
+
+function _ipinv2PaymentEffectiveDesc(p) {
+  var total = Number(p.total_paid_krw || 0);
+  var usd = Number(p.actual_usd || 0);
+  if (usd <= 0) return '-';
+  return _ipinv2Krw(total) + ' ÷ $' + Number(usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' · 수수료 포함';
+}
+
+// ── 계획 금액/비율 양방향 바인딩 (로컬 실시간) ──
+function _ipinv2OnPlannedInput(ev, paymentId, field) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var total = Number(inv.final_amount_usd || 0);
+  var card = document.querySelector('[data-pay-id="' + paymentId + '"]');
+  if (!card) return;
+  var val = Number(ev.target.value) || 0;
+  if (field === 'planned_usd' && total > 0) {
+    var ratio = (val / total) * 100;
+    var ratioEl = card.querySelector('[data-pay-field="planned_ratio"]');
+    if (ratioEl) ratioEl.value = Number(ratio.toFixed(2));
+  } else if (field === 'planned_ratio' && total > 0) {
+    var usd = total * (val / 100);
+    var usdEl = card.querySelector('[data-pay-field="planned_usd"]');
+    if (usdEl) usdEl.value = Number(usd.toFixed(2));
+  }
+  _ipinv2RenderPaymentSummaryFromDom();
+}
+
+function _ipinv2UpdatePaymentPlanned(paymentId, field, value) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var total = Number(inv.final_amount_usd || 0);
+  var card = document.querySelector('[data-pay-id="' + paymentId + '"]');
+  if (!card) return;
+  // 현재 카드의 DOM 값들에서 planned_usd/ratio/date 수집
+  var usdEl = card.querySelector('[data-pay-field="planned_usd"]');
+  var ratioEl = card.querySelector('[data-pay-field="planned_ratio"]');
+  var dateEl = card.querySelector('input[type="date"]');
+  var planned_usd = usdEl ? Number(usdEl.value) || 0 : 0;
+  var planned_ratio = ratioEl ? Number(ratioEl.value) || 0 : 0;
+  var planned_date = dateEl ? dateEl.value : null;
+  // planned_krw는 Step 3-B에서 예상환율 미정이므로 비워둠
+  var payload = {
+    id: paymentId,
+    planned_date: planned_date || null,
+    planned_usd: planned_usd,
+    planned_ratio: planned_ratio,
+    planned_krw: 0,
+  };
+  fetch('/api/import-invoices/' + inv.id + '/payments', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        var idx = _ipinv2Payments.findIndex(function(x) { return x.id === paymentId; });
+        if (idx >= 0) _ipinv2Payments[idx] = json.data;
+        _ipinv2RenderPaymentSummary();
+        _ipinv2RefreshInvoiceStatus();
+      } else alert(json.error || '송금 계획 저장 실패');
+    });
+}
+
+// ── 실제 송금 정보 로컬 계산 ──
+function _ipinv2OnActualInput(ev, paymentId) {
+  var card = document.querySelector('[data-pay-id="' + paymentId + '"]');
+  if (!card) return;
+  var actualUsdEl = card.querySelector('[data-pay-field="actual_usd"]');
+  var rateEl = card.querySelector('[data-pay-field="exchange_rate"]');
+  var remitEl = card.querySelector('[data-pay-field="remittance_krw"]');
+  var feeEl = card.querySelector('[data-pay-field="fee_krw"]');
+  var teleEl = card.querySelector('[data-pay-field="telegram_fee_krw"]');
+  var vatChk = card.querySelector('[data-pay-field="fee_vat_included"]');
+  var usd = Number(actualUsdEl.value) || 0;
+  var rate = Number(rateEl.value) || 0;
+  // 송금액 자동 계산 (사용자가 수동 수정하지 않았을 때만 — 여기선 환율/실송금액 변경 시 덮어씀)
+  var field = ev.target.getAttribute('data-pay-field');
+  if (field === 'actual_usd' || field === 'exchange_rate') {
+    if (usd > 0 && rate > 0) {
+      remitEl.value = Math.round(usd * rate);
+    }
+  }
+  var remit = Number(remitEl.value) || 0;
+  var fee = Number(feeEl.value) || 0;
+  var tele = Number(teleEl.value) || 0;
+  var vat = vatChk.checked ? Math.round((fee + tele) * 0.1) : 0;
+  var total = remit + fee + tele + vat;
+  var effective = usd > 0 ? (total / usd) : 0;
+
+  var totalEl = card.querySelector('[data-pay-field="total_display"]');
+  if (totalEl) totalEl.textContent = _ipinv2Krw(total);
+  var totalDesc = card.querySelector('[data-pay-field="total_desc"]');
+  if (totalDesc) {
+    var parts = [_ipinv2Krw(remit) + ' + 수수료 ' + _ipinv2Krw(fee) + ' + 전신료 ' + _ipinv2Krw(tele)];
+    if (vatChk.checked) parts.push('부가세 ' + _ipinv2Krw(vat));
+    totalDesc.textContent = parts.join(' ');
+  }
+  var effEl = card.querySelector('[data-pay-field="effective_display"]');
+  if (effEl) effEl.textContent = effective > 0 ? effective.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '-';
+  var effDesc = card.querySelector('[data-pay-field="effective_desc"]');
+  if (effDesc) effDesc.textContent = usd > 0 ? (_ipinv2Krw(total) + ' ÷ $' + usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' · 수수료 포함') : '-';
+  var vatDisp = card.querySelector('[data-pay-field="fee_vat_display"]');
+  if (vatDisp) vatDisp.textContent = vatChk.checked ? '부가세 ' + _ipinv2Krw(vat) : '';
+}
+
+function _ipinv2UpdatePaymentActual(paymentId, field, value) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var card = document.querySelector('[data-pay-id="' + paymentId + '"]');
+  if (!card) return;
+  var payload = {
+    id: paymentId,
+    actual_date: card.querySelector('input[type="date"][onblur*="actual_date"]') ? (card.querySelectorAll('input[type="date"]')[1] ? card.querySelectorAll('input[type="date"]')[1].value : null) : null,
+    actual_usd: Number(card.querySelector('[data-pay-field="actual_usd"]').value) || 0,
+    exchange_rate: Number(card.querySelector('[data-pay-field="exchange_rate"]').value) || 0,
+    remittance_krw: Number(card.querySelector('[data-pay-field="remittance_krw"]').value) || 0,
+    fee_krw: Number(card.querySelector('[data-pay-field="fee_krw"]').value) || 0,
+    telegram_fee_krw: Number(card.querySelector('[data-pay-field="telegram_fee_krw"]').value) || 0,
+    fee_vat_included: !!card.querySelector('[data-pay-field="fee_vat_included"]').checked,
+  };
+  fetch('/api/import-invoices/' + inv.id + '/payments', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        var idx = _ipinv2Payments.findIndex(function(x) { return x.id === paymentId; });
+        if (idx >= 0) _ipinv2Payments[idx] = json.data;
+        // 카드 재렌더 (status 변경으로 색상 업데이트)
+        _ipinv2RenderPaymentsSection();
+        _ipinv2RefreshInvoiceStatus();
+      } else alert(json.error || '송금 실행 저장 실패');
+    });
+}
+
+function _ipinv2ToggleFeeVat(ev, paymentId) {
+  _ipinv2OnActualInput(ev, paymentId); // 로컬 갱신
+  _ipinv2UpdatePaymentActual(paymentId, 'fee_vat_included', ev.target.checked);
+}
+
+// ── 추가/삭제 ──
+function _ipinv2AddPayment() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var nextSeq = _ipinv2Payments.length > 0 ? Math.max.apply(null, _ipinv2Payments.map(function(p) { return p.seq; })) + 1 : 1;
+  var payload = { seq: nextSeq, planned_usd: 0, planned_ratio: 0 };
+  fetch('/api/import-invoices/' + inv.id + '/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        _ipinv2Payments.push(json.data);
+        _ipinv2RenderPaymentsSection();
+        _ipinv2RefreshInvoiceStatus();
+      } else alert(json.error || '송금 차수 추가 실패');
+    });
+}
+
+function _ipinv2DeletePayment(paymentId) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  if (_ipinv2Payments.length <= 1) return;
+  if (!confirm('이 송금 차수를 삭제하시겠습니까?')) return;
+  fetch('/api/import-invoices/' + inv.id + '/payments?id=' + encodeURIComponent(paymentId), { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success) {
+        _ipinv2Payments = _ipinv2Payments.filter(function(x) { return x.id !== paymentId; });
+        _ipinv2RenderPaymentsSection();
+        _ipinv2RefreshInvoiceStatus();
+      } else alert(json.error || '삭제 실패');
+    });
+}
+
+// ── 송금 요약 바 ──
+function _ipinv2RenderPaymentSummary() {
+  var bar = document.getElementById('ipinv2-payments-summary');
+  if (!bar) return;
+  var list = _ipinv2Payments;
+  var inv = _ipinv2CurrentInvoice;
+  var totalFinal = Number(inv && inv.final_amount_usd || 0);
+
+  var completed = list.filter(function(p) { return p.status === 'completed'; });
+  var pending = list.filter(function(p) { return p.status !== 'completed'; });
+  var sumCompletedUsd = completed.reduce(function(s, p) { return s + Number(p.actual_usd || 0); }, 0);
+  var sumCompletedKrw = completed.reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
+  var sumPendingUsd = pending.reduce(function(s, p) { return s + Number(p.planned_usd || 0); }, 0);
+  var completedRatio = totalFinal > 0 ? (sumCompletedUsd / totalFinal) * 100 : 0;
+  var pendingRatio = totalFinal > 0 ? (sumPendingUsd / totalFinal) * 100 : 0;
+
+  // 가중평균
+  var weightedAvg = null;
+  if (list.length > 0 && completed.length === list.length && sumCompletedUsd > 0) {
+    weightedAvg = sumCompletedKrw / sumCompletedUsd;
+  }
+
+  // 다음 송금
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var upcoming = pending
+    .filter(function(p) { return p.planned_date; })
+    .sort(function(a, b) { return a.planned_date.localeCompare(b.planned_date); });
+  var next = upcoming[0] || null;
+  var daysLeft = null;
+  if (next && next.planned_date) {
+    var nd = new Date(next.planned_date); nd.setHours(0, 0, 0, 0);
+    daysLeft = Math.round((nd.getTime() - today.getTime()) / (24 * 3600 * 1000));
+  }
+
+  // 계획 합계 (%)
+  var planRatioSum = list.reduce(function(s, p) { return s + Number(p.planned_ratio || 0); }, 0);
+  var planUsdSum = list.reduce(function(s, p) { return s + Number(p.planned_usd || 0); }, 0);
+
+  var h = '';
+
+  // 계획 합계 경고 (있을 때만)
+  if (list.length > 0 && Math.abs(planRatioSum - 100) > 0.1) {
+    var diffUsd = totalFinal - planUsdSum;
+    var warnBg, warnColor, warnMsg;
+    if (planRatioSum < 100) {
+      warnBg = '#4A1D1D'; warnColor = '#FDB5B5';
+      warnMsg = '송금 계획 합계 ' + planRatioSum.toFixed(1) + '% · $' + Math.abs(diffUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 미배정';
+    } else {
+      warnBg = '#4A3A1D'; warnColor = '#FED5A3';
+      warnMsg = '송금 계획 합계 ' + planRatioSum.toFixed(1) + '% · $' + Math.abs(diffUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 초과';
+    }
+    h += '<div style="background:' + warnBg + ';color:' + warnColor + ';padding:8px 12px;border-radius:4px;font-size:12px;margin-bottom:10px;">⚠ ' + warnMsg + '</div>';
+  }
+
+  // 4열 그리드
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">';
+  // 완료 송금 (녹색)
+  h += '<div>';
+  h += '<div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:2px;">완료 송금</div>';
+  h += '<div style="font-size:14px;font-weight:500;color:#6EE7B7;">$' + sumCompletedUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' · ' + completedRatio.toFixed(1) + '%</div>';
+  h += '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;">' + _ipinv2Krw(sumCompletedKrw) + '</div>';
+  h += '</div>';
+  // 미완료 잔액 (주황)
+  h += '<div>';
+  h += '<div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:2px;">미완료 잔액</div>';
+  h += '<div style="font-size:14px;font-weight:500;color:#FED5A3;">$' + sumPendingUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' · ' + pendingRatio.toFixed(1) + '%</div>';
+  h += '</div>';
+  // 가중평균 환율
+  h += '<div>';
+  h += '<div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:2px;">가중평균 환율</div>';
+  if (weightedAvg != null) {
+    h += '<div style="font-size:14px;font-weight:500;color:#93C5FD;">₩' + weightedAvg.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) + '</div>';
+  } else {
+    h += '<div style="font-size:14px;font-weight:500;color:rgba(255,255,255,0.5);">미확정</div>';
+  }
+  h += '</div>';
+  // 다음 송금 예정
+  h += '<div>';
+  h += '<div style="font-size:10px;color:rgba(255,255,255,0.5);margin-bottom:2px;">다음 송금 예정</div>';
+  if (next) {
+    var dColor = (daysLeft != null && daysLeft <= 7) ? '#FED5A3' : '#fff';
+    h += '<div style="font-size:14px;font-weight:500;color:' + dColor + ';">' + _ipinv2Date(next.planned_date);
+    if (daysLeft != null) {
+      if (daysLeft > 0) h += ' · D-' + daysLeft;
+      else if (daysLeft === 0) h += ' · 오늘';
+      else h += ' · D+' + Math.abs(daysLeft);
+    }
+    h += '</div>';
+  } else {
+    h += '<div style="font-size:14px;font-weight:500;color:rgba(255,255,255,0.5);">-</div>';
+  }
+  h += '</div>';
+  h += '</div>';
+
+  // 진행률 바
+  h += '<div style="margin-top:12px;height:6px;border-radius:3px;background:rgba(255,255,255,0.1);overflow:hidden;display:flex;">';
+  h += '<div style="width:' + Math.min(100, completedRatio) + '%;background:#10B981;"></div>';
+  var remainPct = Math.max(0, 100 - Math.min(100, completedRatio));
+  h += '<div style="width:' + remainPct + '%;background:rgba(255,255,255,0.15);"></div>';
+  h += '</div>';
+
+  bar.innerHTML = h;
+}
+
+function _ipinv2RenderPaymentSummaryFromDom() {
+  // 계획 금액 실시간 변경 시 요약 바만 부분 업데이트 (합계 경고용)
+  var cards = document.querySelectorAll('[data-pay-id]');
+  var planRatioSum = 0;
+  var planUsdSum = 0;
+  cards.forEach(function(c) {
+    var uEl = c.querySelector('[data-pay-field="planned_usd"]');
+    var rEl = c.querySelector('[data-pay-field="planned_ratio"]');
+    if (uEl) planUsdSum += Number(uEl.value) || 0;
+    if (rEl) planRatioSum += Number(rEl.value) || 0;
+  });
+  // 로컬 state에만 반영 (서버 저장은 blur 시)
+  _ipinv2Payments.forEach(function(p) {
+    var c = document.querySelector('[data-pay-id="' + p.id + '"]');
+    if (!c) return;
+    var uEl = c.querySelector('[data-pay-field="planned_usd"]');
+    var rEl = c.querySelector('[data-pay-field="planned_ratio"]');
+    if (uEl) p.planned_usd = Number(uEl.value) || 0;
+    if (rEl) p.planned_ratio = Number(rEl.value) || 0;
+  });
+  _ipinv2RenderPaymentSummary();
+}
+
+// ── invoice status/가중평균 재조회 ──
+function _ipinv2RefreshInvoiceStatus() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  fetch('/api/import-invoices', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success) {
+        _ipinv2Invoices = json.data || [];
+        var latest = _ipinv2Invoices.find(function(x) { return x.id === inv.id; });
+        if (latest) {
+          _ipinv2CurrentInvoice = latest;
+          // 헤더 상태 뱃지 갱신
+          var statusEl = document.getElementById('ipinv2-hdr-status');
+          if (statusEl) statusEl.innerHTML = _ipinv2StatusBadge(latest.status);
+          _ipinv2RenderPaymentSummary();
+        }
+      }
     });
 }

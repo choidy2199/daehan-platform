@@ -510,26 +510,132 @@ export async function recalcInvoiceTotals(invoiceId: string): Promise<void> {
 
 // ========== Payment (송금 스케줄) ==========
 
-export async function createPayment(data: Partial<Payment>): Promise<string> {
-  // TODO Step 3: insert into import_payments, return new id
-  void supabase; void data;
-  throw new Error('createPayment: not implemented (Phase 1 Step 3)');
+export type PaymentV2 = Payment & {
+  fee_vat_included: boolean;
+  fee_vat_krw: number;
+};
+
+function _paymentDerived(p: Partial<PaymentV2>): {
+  fee_vat_krw: number;
+  total_paid_krw: number;
+  effective_rate: number;
+  diff_krw: number;
+} {
+  const remittance = Number(p.remittance_krw || 0);
+  const fee = Number(p.fee_krw || 0);
+  const tele = Number(p.telegram_fee_krw || 0);
+  const vat = p.fee_vat_included ? Math.round((fee + tele) * 0.1) : 0;
+  const total = remittance + fee + tele + vat;
+  const actualUsd = Number(p.actual_usd || 0);
+  const effective = actualUsd > 0 ? Number((total / actualUsd).toFixed(4)) : 0;
+  const diff = Number(p.planned_krw || 0) - total;
+  return { fee_vat_krw: vat, total_paid_krw: total, effective_rate: effective, diff_krw: diff };
 }
 
-export async function listPayments(invoiceId: string): Promise<Payment[]> {
-  // TODO Step 3: select * from import_payments where invoice_id = ... order by seq
-  void supabase; void invoiceId;
-  return [];
+function _paymentStatus(p: Partial<PaymentV2>): 'planned' | 'completed' {
+  return !!p.actual_date && Number(p.actual_usd || 0) > 0 && Number(p.exchange_rate || 0) > 0 && Number(p.remittance_krw || 0) > 0
+    ? 'completed'
+    : 'planned';
 }
 
-export async function updatePayment(id: string, data: Partial<Payment>): Promise<void> {
-  // TODO Step 3: update import_payments set ... where id = ...
-  void supabase; void id; void data;
+export async function createPayment(data: Partial<PaymentV2>): Promise<string> {
+  if (!data.invoice_id) throw new Error('invoice_id는 필수입니다');
+  const payload = {
+    invoice_id: data.invoice_id,
+    seq: Number(data.seq ?? 1),
+    planned_date: data.planned_date ?? null,
+    planned_usd: Number(data.planned_usd ?? 0),
+    planned_ratio: Number(data.planned_ratio ?? 0),
+    planned_krw: Number(data.planned_krw ?? 0),
+    status: 'planned' as const,
+  };
+  const { data: row, error } = await supabase
+    .from('import_payments')
+    .insert(payload)
+    .select('id')
+    .single();
+  if (error) throw error;
+  await recalcInvoiceStatus(data.invoice_id);
+  return (row as { id: string }).id;
+}
+
+export async function listPayments(invoiceId: string): Promise<PaymentV2[]> {
+  const { data, error } = await supabase
+    .from('import_payments')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .order('seq', { ascending: true });
+  if (error) throw error;
+  return (data || []) as PaymentV2[];
+}
+
+export async function updatePayment(id: string, data: Partial<PaymentV2>): Promise<void> {
+  const allowed = ['seq', 'planned_date', 'planned_usd', 'planned_ratio', 'planned_krw', 'actual_date', 'actual_usd', 'exchange_rate', 'remittance_krw', 'fee_krw', 'telegram_fee_krw', 'fee_vat_included'];
+  const payload: Record<string, unknown> = {};
+  for (const k of allowed) {
+    if (k in data) payload[k] = (data as Record<string, unknown>)[k];
+  }
+  const { data: cur, error: cErr } = await supabase.from('import_payments').select('*').eq('id', id).single();
+  if (cErr) throw cErr;
+  const merged = { ...(cur as PaymentV2), ...payload } as PaymentV2;
+  const derived = _paymentDerived(merged);
+  payload.fee_vat_krw = derived.fee_vat_krw;
+  payload.total_paid_krw = derived.total_paid_krw;
+  payload.effective_rate = derived.effective_rate;
+  payload.diff_krw = derived.diff_krw;
+  payload.status = _paymentStatus(merged);
+
+  const { error } = await supabase.from('import_payments').update(payload).eq('id', id);
+  if (error) throw error;
+  const invoiceId = (cur as { invoice_id: string }).invoice_id;
+  await recalcInvoiceStatus(invoiceId);
 }
 
 export async function deletePayment(id: string): Promise<void> {
-  // TODO Step 3: delete from import_payments where id = ...
-  void supabase; void id;
+  const { data: cur } = await supabase.from('import_payments').select('invoice_id').eq('id', id).single();
+  const invoiceId = (cur as { invoice_id: string } | null)?.invoice_id || null;
+  const { error } = await supabase.from('import_payments').delete().eq('id', id);
+  if (error) throw error;
+  if (invoiceId) await recalcInvoiceStatus(invoiceId);
+}
+
+export async function recalcInvoiceStatus(invoiceId: string): Promise<void> {
+  const { data: payments, error } = await supabase
+    .from('import_payments')
+    .select('status, actual_usd, total_paid_krw')
+    .eq('invoice_id', invoiceId);
+  if (error) throw error;
+  const list = (payments || []) as Array<{ status: string; actual_usd: number; total_paid_krw: number }>;
+
+  const { data: inv, error: iErr } = await supabase
+    .from('import_invoices')
+    .select('status')
+    .eq('id', invoiceId)
+    .single();
+  if (iErr) throw iErr;
+  const curStatus = (inv as { status: string }).status;
+  if (curStatus === 'customs_done') return;
+
+  let newStatus: 'draft' | 'partial_paid' | 'paid';
+  let weightedAvg: number | null = null;
+
+  if (list.length === 0) {
+    newStatus = 'draft';
+  } else {
+    const completed = list.filter(p => p.status === 'completed');
+    if (completed.length === 0) newStatus = 'draft';
+    else if (completed.length < list.length) newStatus = 'partial_paid';
+    else {
+      newStatus = 'paid';
+      const sumKrw = completed.reduce((s, p) => s + Number(p.total_paid_krw || 0), 0);
+      const sumUsd = completed.reduce((s, p) => s + Number(p.actual_usd || 0), 0);
+      weightedAvg = sumUsd > 0 ? Number((sumKrw / sumUsd).toFixed(4)) : null;
+    }
+  }
+
+  const patch: Record<string, unknown> = { status: newStatus, updated_at: new Date().toISOString() };
+  patch.weighted_avg_rate = newStatus === 'paid' ? weightedAvg : null;
+  await supabase.from('import_invoices').update(patch).eq('id', invoiceId);
 }
 
 // ========== CustomsCost (통관 비용) ==========
