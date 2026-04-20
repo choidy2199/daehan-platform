@@ -6,6 +6,8 @@ import { supabase as defaultClient } from './supabase';
 export type DocType = 'sales' | 'purchase' | 'quote';
 export type TransactionStatus = 'draft' | 'saved' | 'erp_sent' | 'cancelled';
 
+export type PriceGrade = 'in' | 'out' | 'pallet';
+
 export interface Transaction {
   id: string;
   doc_type: DocType;
@@ -21,6 +23,7 @@ export interface Transaction {
   status: TransactionStatus;
   erp_sent_at: string | null;
   converted_from_id: string | null;
+  price_grade: PriceGrade | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -69,6 +72,7 @@ export interface TransactionInput {
   total_amount: number;
   status?: TransactionStatus;
   converted_from_id?: string | null;
+  price_grade?: PriceGrade | null;
   created_by: string;
   items: TransactionItemInput[];
 }

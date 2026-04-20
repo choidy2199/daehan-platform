@@ -2010,3 +2010,90 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .tx-search-settings-footer button:hover {
   background: #0C447C;
 }
+
+/* =================================================================
+   거래명세서 Phase 3B-5 — 가격 등급 뱃지 + 인라인 드롭다운
+   ================================================================= */
+
+/* 거래처명 옆 인라인 뱃지 (거래명세서 탭) */
+.tx-grade-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  padding: 0 8px;
+  margin-left: 4px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #FFFFFF;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* 거래처 드롭다운 항목 안의 뱃지 */
+.tx-grade-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #FFFFFF;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* 등급별 색상 (뱃지 양쪽 공통) */
+.tx-grade-badge-inline.tx-grade-none {
+  background: #B0B8CC;
+  color: #FFFFFF;
+}
+.tx-grade-badge-inline.tx-grade-none:hover { background: #9BA3B2; }
+
+.tx-grade-in,
+.tx-grade-badge-inline.tx-grade-in     { background: #5A6070; }
+.tx-grade-badge-inline.tx-grade-in:hover     { background: #474C5A; }
+
+.tx-grade-out,
+.tx-grade-badge-inline.tx-grade-out    { background: #185FA5; }
+.tx-grade-badge-inline.tx-grade-out:hover    { background: #0C447C; }
+
+.tx-grade-pallet,
+.tx-grade-badge-inline.tx-grade-pallet { background: #CC2222; }
+.tx-grade-badge-inline.tx-grade-pallet:hover { background: #A81A1A; }
+
+/* 뱃지 클릭 → 드롭다운 메뉴 */
+.tx-grade-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 180px;
+  background: #FFFFFF;
+  border: 1px solid #DDE1EB;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(26, 29, 35, 0.12);
+  padding: 4px;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+.tx-grade-menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #1A1D23;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.tx-grade-menu-item:hover { background: #F4F6FA; }
+.tx-grade-menu-item-active {
+  background: #E6F1FB;
+  color: #185FA5;
+  font-weight: 600;
+}

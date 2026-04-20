@@ -24719,9 +24719,10 @@ const _tx = {
     docType: 'sales',           // 'sales' | 'purchase' | 'quote'
     customerCode: '',
     customerName: '',
+    customerPriceGrade: null,   // Phase 3B-5: null | 'in' | 'out' | 'pallet'
     transactionDate: null,
     manager: '',
-    items: [],                  // { code, name, qty, unitPrice, spec, supplyAmount, vatAmount, isAuto, productRef }
+    items: [],                  // { code, name, qty, unitPrice, spec, supplyAmount, vatAmount, isAuto, productRef, source, priceTiers }
   },
 
   _initialized: false,
@@ -24772,6 +24773,9 @@ const _tx = {
 
     // Phase 3B-2: 초기 기본 4개 표시 (검색창이 비어있을 때만)
     this.search._showDefaultsIfEmpty();
+
+    // Phase 3B-5: 가격 등급 뱃지 초기 렌더 (거래처 미선택 상태면 숨김)
+    if (this.grade && typeof this.grade.renderBadge === 'function') this.grade.renderBadge();
 
     // 초기 상태: 상품 라인 빈 안내 행
     this.renderItemsTable();
@@ -24940,19 +24944,39 @@ const _tx = {
     return matched ? matched.price : null;
   },
 
+  // Phase 3B-5: 단가 우선순위 체인 (사용자 수동 입력과 last-price는 호출부에서 처리)
+  // 1) 거래처 가격 등급 (일반제품만) → 해당 tier 가격
+  // 2) 수량 기반 구간 단가 (일반제품만)
+  // 3) 제품 기본 단가 (_defaultUnitPrice)
+  // 각 단계 실패 시 다음 단계로 폴백. 밀워키 제품은 1·2 건너뛰고 바로 3단계.
+  _determineUnitPrice(item) {
+    // 1) 거래처 가격 등급 — 일반제품만
+    if (item && item.source === 'general' && item.priceTiers && this.state.customerPriceGrade) {
+      const tier = item.priceTiers[this.state.customerPriceGrade];
+      if (tier && Number(tier.price) > 0) return Number(tier.price);
+    }
+    // 2) 수량 기반 구간 단가 — 일반제품만
+    if (item && item.source === 'general' && item.priceTiers && Number(item.qty) > 0) {
+      const tierPrice = this._calcTierPrice(item.priceTiers, item.qty);
+      if (tierPrice !== null) return tierPrice;
+    }
+    // 3) 제품 기본 단가
+    return this._defaultUnitPrice(item ? item.productRef : null, this.state.docType, null);
+  },
+
   // ---- 상품 라인 관리 ----
   addItem(code, opt) {
     opt = opt || {};
     const hit = this._findProduct(code);
     const name = this._productName(hit, opt.fallbackName);
-    const unitPrice = this._defaultUnitPrice(hit, this.state.docType, opt);
+    const defaultPrice = this._defaultUnitPrice(hit, this.state.docType, opt);
     const spec = (hit && hit.data && hit.data.detail) ? String(hit.data.detail) : null;
 
     const item = {
       code: code,
       name: name,
       qty: 1,
-      unitPrice: unitPrice,
+      unitPrice: defaultPrice,
       spec: spec,
       supplyAmount: 0,
       vatAmount: 0,
@@ -24961,6 +24985,11 @@ const _tx = {
       source: hit ? hit.source : null,                // Phase 3B-4b
       priceTiers: this._extractPriceTiers(hit),       // Phase 3B-4b — 일반제품만, 밀워키/폴백은 null
     };
+    // Phase 3B-5: 거래처 등급 + 수량 구간 우선순위 적용
+    const resolved = this._determineUnitPrice(item);
+    if (resolved !== null && resolved !== undefined && Number(resolved) > 0) {
+      item.unitPrice = Number(resolved);
+    }
     const idx = this.state.items.push(item) - 1;
     this.recalcItem(idx);
     this.renderItemsTable();
@@ -24983,11 +25012,15 @@ const _tx = {
     if (idx < 0 || idx >= this.state.items.length) return;
     const it = this.state.items[idx];
     it.qty = Math.max(0, qty);
-    // Phase 3B-4b: 일반제품 + isAuto + 구간 캐시 있을 때만 구간 단가 자동 반영
-    // 구간 미매칭이면 이전 단가 유지 (수량 100→5 하락 시에도 동일 — 스펙 일관 정책)
+    // Phase 3B-5: isAuto && 일반제품일 때 단가 우선순위 체인 적용
+    //   1) 거래처 등급 가격 → 수량 무관 고정
+    //   2) 수량 기반 구간 단가 → 수량 상승 시 자동 반영
+    //   3) 기본가 (미매칭 시 이전 값 유지 정책)
     if (it.isAuto && it.source === 'general' && it.priceTiers) {
-      const tierPrice = this._calcTierPrice(it.priceTiers, it.qty);
-      if (tierPrice !== null) it.unitPrice = tierPrice;
+      const newPrice = this._determineUnitPrice(it);
+      if (newPrice !== null && newPrice !== undefined && Number(newPrice) > 0) {
+        it.unitPrice = Number(newPrice);
+      }
     }
     this.recalcItem(idx);
     this.renderItemsTable();
@@ -25739,9 +25772,14 @@ const _tx = {
         const c = customers[i];
         const origIdx = all.indexOf(c);
         const meta = c.bizNo || c.phone || c.mobile || c.manager || '';
+        // Phase 3B-5: 드롭다운 각 항목에도 등급 뱃지 표시
+        const g = _tx._normalizeGrade(c.priceGrade);
+        const gradeBadge = g
+          ? '<span class="tx-grade-badge tx-grade-' + g + '">' + _tx._gradeLabel(g) + '</span>'
+          : '';
         html +=
           '<div class="tx-customer-item" data-idx="' + origIdx + '">' +
-            '<span class="tx-customer-item-name">' + esc(c.name || '(이름 없음)') + '</span>' +
+            '<span class="tx-customer-item-name">' + esc(c.name || '(이름 없음)') + gradeBadge + '</span>' +
             '<span class="tx-customer-item-meta">' + esc(meta) + '</span>' +
           '</div>';
       }
@@ -25751,9 +25789,28 @@ const _tx = {
     select(c) {
       _tx.state.customerCode = c.code || c.manageCode || c.bizNo || '';
       _tx.state.customerName = c.name || '';
+      // Phase 3B-5: 거래처 가격 등급 스냅샷 (숫자는 null 취급, 'in'/'out'/'pallet'만 유효)
+      _tx.state.customerPriceGrade = _tx._normalizeGrade(c.priceGrade);
       const input = document.getElementById('tx-customer-input');
       if (input) input.value = _tx.state.customerName;
       this.closeDropdown();
+
+      // Phase 3B-5: 기존 라인 재계산 (isAuto true + general만 등급 반영)
+      for (let i = 0; i < _tx.state.items.length; i++) {
+        const it = _tx.state.items[i];
+        if (it.isAuto && it.source === 'general' && it.priceTiers) {
+          const np = _tx._determineUnitPrice(it);
+          if (np !== null && np !== undefined && Number(np) > 0) it.unitPrice = Number(np);
+          _tx.recalcItem(i);
+        }
+      }
+      _tx.renderItemsTable();
+      _tx.renderSummary();
+
+      // Phase 3B-5: 등급 뱃지 업데이트
+      if (_tx.grade && typeof _tx.grade.renderBadge === 'function') _tx.grade.renderBadge();
+
+      // 기존: 과거거래 + 라인별 last-price 자동채움
       _tx.loadCustomerData();
     },
   },
@@ -25773,6 +25830,158 @@ const _tx = {
         _tx.customer.openDropdown();
       });
     }
+  },
+
+  // ================================================================
+  // Phase 3B-5 — 가격 등급 정규화 / 라벨 / 인라인 뱃지 + 드롭다운
+  // ================================================================
+  _normalizeGrade(raw) {
+    if (raw === 'in' || raw === 'out' || raw === 'pallet') return raw;
+    return null; // 숫자·null·undefined·빈문자 모두 null 취급
+  },
+
+  _gradeLabel(g) {
+    if (g === 'in')     return 'IN단가';
+    if (g === 'out')    return 'OUT단가';
+    if (g === 'pallet') return '파렛단가';
+    return '등급 설정';
+  },
+
+  grade: {
+    _badge: null,
+    _menu: null,
+
+    _ensureBadge() {
+      if (this._badge && document.body.contains(this._badge)) return this._badge;
+      const combo = document.querySelector('#tab-transactions .tx-input-combo');
+      if (!combo) return null;
+      let b = combo.querySelector('.tx-grade-badge-inline');
+      if (!b) {
+        b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tx-grade-badge-inline';
+        b.style.display = 'none';
+        combo.appendChild(b);
+      }
+      if (!b._txBound) {
+        b._txBound = true;
+        b.addEventListener('click', function(e) {
+          e.stopPropagation();
+          _tx.grade._toggleMenu(b);
+        });
+      }
+      this._badge = b;
+      return b;
+    },
+
+    renderBadge() {
+      const b = this._ensureBadge();
+      if (!b) return;
+      const hasCustomer = !!_tx.state.customerCode;
+      if (!hasCustomer) {
+        b.style.display = 'none';
+        return;
+      }
+      const g = _tx.state.customerPriceGrade;
+      b.className = 'tx-grade-badge-inline tx-grade-' + (g || 'none');
+      b.innerHTML = _tx._gradeLabel(g) + ' <span style="font-size:10px;opacity:0.8">▼</span>';
+      b.style.display = 'inline-flex';
+    },
+
+    _toggleMenu(anchor) {
+      if (this._menu && this._menu.style.display !== 'none') {
+        this._menu.style.display = 'none';
+        return;
+      }
+      this._openMenu(anchor);
+    },
+
+    _openMenu(anchor) {
+      let m = this._menu;
+      if (!m) {
+        m = document.createElement('div');
+        m.className = 'tx-grade-menu';
+        m.style.display = 'none';
+        document.body.appendChild(m);
+        this._menu = m;
+        // 외부 클릭 닫기
+        document.addEventListener('mousedown', function(e) {
+          const mm = _tx.grade._menu;
+          const bb = _tx.grade._badge;
+          if (!mm || mm.style.display === 'none') return;
+          if (mm.contains(e.target)) return;
+          if (bb && bb.contains(e.target)) return;
+          mm.style.display = 'none';
+        });
+      }
+      const cur = _tx.state.customerPriceGrade;
+      const opts = [
+        { v: null,     label: '기본 (수량 구간)' },
+        { v: 'in',     label: 'IN 단가 고정' },
+        { v: 'out',    label: 'OUT 단가 고정' },
+        { v: 'pallet', label: '파렛 단가 고정' },
+      ];
+      let html = '';
+      for (let i = 0; i < opts.length; i++) {
+        const o = opts[i];
+        const active = cur === o.v ? ' tx-grade-menu-item-active' : '';
+        html += '<div class="tx-grade-menu-item' + active + '" data-val="' + (o.v || '') + '">' + o.label + '</div>';
+      }
+      m.innerHTML = html;
+
+      // 좌표
+      const r = anchor.getBoundingClientRect();
+      m.style.position = 'fixed';
+      m.style.top = (r.bottom + 4) + 'px';
+      m.style.left = r.left + 'px';
+      m.style.display = 'flex';
+
+      // 이벤트
+      m.querySelectorAll('.tx-grade-menu-item').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const raw = el.getAttribute('data-val');
+          const v = raw === '' ? null : raw;
+          _tx.grade._applyGrade(v);
+          m.style.display = 'none';
+        });
+      });
+    },
+
+    _applyGrade(grade) {
+      const code = _tx.state.customerCode;
+      if (!code) return;
+      const normalized = _tx._normalizeGrade(grade);
+      // 1) mw_clients 업데이트 (해당 거래처)
+      if (typeof clientData !== 'undefined' && Array.isArray(clientData)) {
+        for (let i = 0; i < clientData.length; i++) {
+          const c = clientData[i];
+          const ccode = c.code || c.manageCode || c.bizNo || '';
+          if (String(ccode) === String(code)) {
+            c.priceGrade = normalized || null;
+            break;
+          }
+        }
+        // localStorage 저장 (autoSyncToSupabase도 호출됨)
+        if (typeof saveClients === 'function') saveClients();
+      }
+      // 2) _tx.customer 캐시도 갱신 (다음 드롭다운 열 때 반영)
+      if (_tx.customer) _tx.customer._cache = null;
+
+      // 3) state 갱신 + 기존 라인 재계산
+      _tx.state.customerPriceGrade = normalized;
+      for (let i = 0; i < _tx.state.items.length; i++) {
+        const it = _tx.state.items[i];
+        if (it.isAuto && it.source === 'general' && it.priceTiers) {
+          const np = _tx._determineUnitPrice(it);
+          if (np !== null && np !== undefined && Number(np) > 0) it.unitPrice = Number(np);
+          _tx.recalcItem(i);
+        }
+      }
+      _tx.renderItemsTable();
+      _tx.renderSummary();
+      _tx.grade.renderBadge();
+    },
   },
 
   // ================================================================

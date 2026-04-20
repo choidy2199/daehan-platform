@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       total_amount,
       status,
       converted_from_id,
+      price_grade,
       created_by,
       items,
     } = body;
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
         total_amount: Number(total_amount) || 0,
         status: status ?? 'draft',
         converted_from_id: converted_from_id ?? null,
+        price_grade: price_grade ?? null,
         created_by,
         items,
       },
