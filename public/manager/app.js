@@ -21612,13 +21612,62 @@ function _ipv2Template() {
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); return; }
   var data = [
     ['브랜드', '모델', '품명', '규격', '팔렛당 수량', '비고'],
-    ['Tichop', 'DC9925', 'Air Compressor', '25L', 13, '예시 행 — 삭제 후 사용하세요'],
+    ['Tichop', 'DC9925', 'Air Compressor', '25L', 13, '비고 예시 — 이 행은 업로드 시 자동으로 건너뜁니다'],
   ];
   var ws = XLSX.utils.aoa_to_sheet(data);
-  // 예시 행 흐리게 (간단한 시각 표시: 엑셀 셀 스타일은 xlsx CE에서 제한적. 여기서는 값만 유지)
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '제품V2');
   XLSX.writeFile(wb, 'import_products_template.xlsx');
+}
+
+// 에러 객체를 사용자용 문자열로 안전 변환
+function _ipv2FormatError(err) {
+  if (err == null) return '알 수 없는 오류가 발생했습니다';
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message || err.toString();
+  var codeMap = {
+    DUPLICATE: '이미 등록된 제품입니다',
+    VALIDATION: '입력값이 올바르지 않습니다',
+    MISSING_REQUIRED: '필수 항목이 누락되었습니다',
+    NETWORK: '서버 연결에 실패했습니다. 다시 시도해주세요',
+  };
+  if (typeof err === 'object') {
+    if (err.code && codeMap[err.code]) {
+      var base = codeMap[err.code];
+      if (err.field) {
+        if (err.code === 'VALIDATION') base = err.field + '이(가) 올바르지 않습니다';
+        else if (err.code === 'MISSING_REQUIRED') base = '필수 항목(' + err.field + ')이 누락되었습니다';
+      }
+      return base;
+    }
+    if (typeof err.message === 'string' && err.message) return err.message;
+    if (typeof err.error === 'string' && err.error) return err.error;
+    try { return JSON.stringify(err); } catch (e) { return '알 수 없는 오류가 발생했습니다'; }
+  }
+  return String(err);
+}
+
+function _ipv2IsExampleRow(r) {
+  var brand = (r.brand || '').toString().trim();
+  var model = (r.model || '').toString().trim();
+  var memo = (r.memo || '').toString();
+  return brand === 'Tichop' && model === 'DC9925' && memo.indexOf('비고 예시') !== -1;
+}
+
+function _ipv2ValidateUploadStructure(raw) {
+  if (!raw || raw.length === 0) return '빈 파일입니다. 내용을 확인해주세요';
+  var header = raw[0] || [];
+  var expected = ['브랜드', '모델', '품명', '규격', '팔렛당 수량', '비고'];
+  if (header.length < 2) return '헤더 행이 비어있습니다';
+  if ((header[0] || '').toString().trim() !== '브랜드') return '1번 컬럼 헤더가 "브랜드"여야 합니다 (현재: "' + (header[0] || '') + '")';
+  if ((header[1] || '').toString().trim() !== '모델') return '2번 컬럼 헤더가 "모델"여야 합니다 (현재: "' + (header[1] || '') + '")';
+  if (raw.length < 2) return '데이터 행이 없습니다. 제품을 입력한 뒤 다시 업로드해주세요';
+  var allEmpty = raw.slice(1).every(function(r) {
+    if (!r || r.length === 0) return true;
+    return (!r[0] || String(r[0]).trim() === '') && (!r[1] || String(r[1]).trim() === '');
+  });
+  if (allEmpty) return '모든 행의 브랜드·모델이 비어있습니다';
+  return null;
 }
 
 // ── 엑셀: 백업 ──
@@ -21645,40 +21694,95 @@ function _ipv2Upload(input) {
   var f = input.files && input.files[0];
   if (!f) return;
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); input.value = ''; return; }
+
+  // 확장자 사전 검증
+  var fname = (f.name || '').toLowerCase();
+  if (!/\.(xlsx|xls)$/.test(fname)) {
+    alert('엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.\n\n선택한 파일: ' + f.name);
+    input.value = '';
+    return;
+  }
+
   var reader = new FileReader();
   reader.onload = function(e) {
+    var raw;
     try {
       var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
       var ws = wb.Sheets[wb.SheetNames[0]];
-      var raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      var rows = [];
-      for (var i = 1; i < raw.length; i++) {
-        var r = raw[i] || [];
-        rows.push({
-          brand: r[0] || '',
-          model: r[1] || '',
-          product_name: r[2] || null,
-          spec: r[3] || null,
-          pallet_qty: r[4],
-          memo: r[5] || null,
-        });
-      }
-      fetch('/api/import-products-v2/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: rows }),
-      })
-        .then(function(r) { return r.json(); })
-        .then(function(json) {
-          if (!json.success) { alert(json.error || '업로드 실패'); return; }
-          var res = json.data || { created: 0, updated: 0, errors: [] };
-          _ipv2ShowUploadResult(res);
-          _ipv2FetchList(function() { _ipv2RenderTable(); });
-        })
-        .catch(function(err) { alert('업로드 실패: ' + err.message); });
+      raw = XLSX.utils.sheet_to_json(ws, { header: 1 });
     } catch (err) {
-      alert('엑셀 파싱 실패: ' + err.message);
+      alert('엑셀 파싱 실패\n\n' + _ipv2FormatError(err) + '\n\n올바른 xlsx 파일인지 확인해주세요.');
+      input.value = '';
+      return;
     }
+
+    // 구조 사전 검증
+    var structErr = _ipv2ValidateUploadStructure(raw);
+    if (structErr) {
+      alert('업로드 실패\n\n' + structErr);
+      input.value = '';
+      return;
+    }
+
+    // 행 파싱 + 예시 행 스킵
+    var rows = [];
+    var skipped = 0;
+    for (var i = 1; i < raw.length; i++) {
+      var r = raw[i] || [];
+      // 완전 빈 행 무시 (오류 카운트 안 함)
+      if ((!r[0] || String(r[0]).trim() === '') && (!r[1] || String(r[1]).trim() === '')) continue;
+      var row = {
+        brand: r[0] || '',
+        model: r[1] || '',
+        product_name: r[2] || null,
+        spec: r[3] || null,
+        pallet_qty: r[4],
+        memo: r[5] || null,
+      };
+      if (_ipv2IsExampleRow(row)) { skipped++; continue; }
+      rows.push(row);
+    }
+
+    if (rows.length === 0 && skipped === 0) {
+      alert('업로드 실패\n\n등록할 제품이 없습니다.');
+      input.value = '';
+      return;
+    }
+
+    if (rows.length === 0 && skipped > 0) {
+      _ipv2ShowUploadResult({ created: 0, updated: 0, errors: [], skipped: skipped });
+      input.value = '';
+      return;
+    }
+
+    fetch('/api/import-products-v2/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: rows }),
+    })
+      .then(function(r) {
+        return r.json().then(function(json) { return { status: r.status, ok: r.ok, json: json }; });
+      })
+      .then(function(res) {
+        if (!res.json.success) {
+          var msg = _ipv2FormatError(res.json.error != null ? res.json.error : res.json);
+          alert('업로드 실패\n\n' + msg);
+          return;
+        }
+        var data = res.json.data || { created: 0, updated: 0, errors: [] };
+        data.skipped = skipped;
+        _ipv2ShowUploadResult(data);
+        _ipv2FetchList(function() { _ipv2RenderTable(); });
+      })
+      .catch(function(err) {
+        var isNetwork = err && (err.name === 'TypeError' || /NetworkError|Failed to fetch/i.test(err.message || ''));
+        var msg = isNetwork ? '서버 연결에 실패했습니다. 네트워크를 확인한 뒤 다시 시도해주세요.' : _ipv2FormatError(err);
+        alert('업로드 실패\n\n' + msg);
+      });
+    input.value = '';
+  };
+  reader.onerror = function() {
+    alert('파일 읽기 실패\n\n파일을 다시 선택해주세요.');
     input.value = '';
   };
   reader.readAsArrayBuffer(f);
@@ -21688,25 +21792,52 @@ function _ipv2ShowUploadResult(res) {
   var root = document.getElementById('ipv2-modal-root');
   if (!root) return;
   var errs = Array.isArray(res.errors) ? res.errors : [];
-  var errLines = '';
-  if (errs.length > 0) {
-    errLines = '<div style="margin-top:12px;padding:10px;background:#FCEBEB;border-radius:6px;max-height:160px;overflow-y:auto;">';
-    errLines += '<div style="font-size:12px;color:#791F1F;font-weight:600;margin-bottom:4px;">오류 ' + errs.length + '건</div>';
-    errs.forEach(function(e) {
-      errLines += '<div style="font-size:12px;color:#791F1F;">' + e.row + '행: ' + _ipv2Esc(e.reason) + '</div>';
-    });
-    errLines += '</div>';
-  }
+  var created = Number(res.created || 0);
+  var updated = Number(res.updated || 0);
+  var skipped = Number(res.skipped || 0);
+
   var h = '';
   h += '<div id="ipv2-overlay" onclick="if(event.target===this)_ipv2CloseModal()" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;">';
-  h += '<div style="background:#fff;border-radius:10px;width:420px;max-width:95vw;box-shadow:0 20px 48px rgba(26,29,35,0.18);">';
+  h += '<div style="background:#fff;border-radius:10px;width:460px;max-width:95vw;box-shadow:0 20px 48px rgba(26,29,35,0.18);">';
   h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #DDE1EB;">';
   h += '<h3 style="font-size:16px;font-weight:600;margin:0;color:#1A1D23;">업로드 결과</h3>';
   h += '<button onclick="_ipv2CloseModal()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#5A6070;padding:4px;">✕</button>';
   h += '</div>';
-  h += '<div style="padding:20px;font-size:13px;color:#1A1D23;">';
-  h += '<div>신규: <b>' + (res.created || 0) + '건</b> / 수정: <b>' + (res.updated || 0) + '건</b>' + (errs.length > 0 ? ' / 오류: <b style="color:#CC2222">' + errs.length + '건</b>' : '') + '</div>';
-  h += errLines;
+  h += '<div style="padding:20px;">';
+
+  // 4카운트 그리드 (신규/수정/오류/건너뜀)
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;">';
+  h += '<div style="padding:10px 12px;background:#E1F5EE;border-radius:6px;text-align:center;">';
+  h += '<div style="font-size:11px;color:#085041;margin-bottom:2px;">신규 등록</div>';
+  h += '<div style="font-size:18px;font-weight:500;color:#085041;">' + created + '<span style="font-size:11px;font-weight:400;margin-left:2px;">건</span></div>';
+  h += '</div>';
+  h += '<div style="padding:10px 12px;background:#E6F1FB;border-radius:6px;text-align:center;">';
+  h += '<div style="font-size:11px;color:#0C447C;margin-bottom:2px;">수정</div>';
+  h += '<div style="font-size:18px;font-weight:500;color:#0C447C;">' + updated + '<span style="font-size:11px;font-weight:400;margin-left:2px;">건</span></div>';
+  h += '</div>';
+  h += '<div style="padding:10px 12px;background:' + (errs.length > 0 ? '#FCEBEB' : '#F4F6FA') + ';border-radius:6px;text-align:center;">';
+  h += '<div style="font-size:11px;color:' + (errs.length > 0 ? '#791F1F' : '#9BA3B2') + ';margin-bottom:2px;">오류</div>';
+  h += '<div style="font-size:18px;font-weight:500;color:' + (errs.length > 0 ? '#791F1F' : '#9BA3B2') + ';">' + errs.length + '<span style="font-size:11px;font-weight:400;margin-left:2px;">건</span></div>';
+  h += '</div>';
+  h += '<div style="padding:10px 12px;background:#F1EFE8;border-radius:6px;text-align:center;">';
+  h += '<div style="font-size:11px;color:#5F5E5A;margin-bottom:2px;">건너뜀</div>';
+  h += '<div style="font-size:18px;font-weight:500;color:#5F5E5A;">' + skipped + '<span style="font-size:11px;font-weight:400;margin-left:2px;">건</span></div>';
+  h += '</div>';
+  h += '</div>';
+
+  if (skipped > 0) {
+    h += '<div style="padding:8px 12px;background:#F9FAFB;border-radius:6px;font-size:12px;color:#5A6070;margin-bottom:' + (errs.length > 0 ? '8' : '0') + 'px;">';
+    h += '예시 행 ' + skipped + '건을 자동으로 건너뛰었습니다.';
+    h += '</div>';
+  }
+  if (errs.length > 0) {
+    h += '<div style="padding:10px 12px;background:#FCEBEB;border-radius:6px;max-height:160px;overflow-y:auto;">';
+    h += '<div style="font-size:12px;color:#791F1F;font-weight:600;margin-bottom:4px;">오류 ' + errs.length + '건 — 해당 행은 등록되지 않았습니다</div>';
+    errs.forEach(function(e) {
+      h += '<div style="font-size:12px;color:#791F1F;">' + (e.row ? e.row + '행: ' : '') + _ipv2Esc(e.reason || '알 수 없는 오류') + '</div>';
+    });
+    h += '</div>';
+  }
   h += '</div>';
   h += '<div style="display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid #DDE1EB;">';
   h += '<button onclick="_ipv2CloseModal()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">확인</button>';
