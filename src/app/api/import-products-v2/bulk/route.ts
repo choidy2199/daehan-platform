@@ -13,6 +13,7 @@ type UpsertRow = {
   spec?: string | null;
   pallet_qty?: unknown;
   base_fob_usd?: unknown;
+  erp_code?: string | null;
   memo?: string | null;
 };
 
@@ -23,6 +24,7 @@ type NormalizedRow = {
   spec: string | null;
   pallet_qty: number;
   base_fob_usd: number;
+  erp_code: string | null;
   memo: string | null;
 };
 
@@ -91,6 +93,7 @@ export async function POST(request: NextRequest) {
           spec: r?.spec ? String(r.spec).trim() || null : null,
           pallet_qty: pallet,
           base_fob_usd: baseFob,
+          erp_code: r?.erp_code ? String(r.erp_code).trim() || null : null,
           memo: r?.memo ? String(r.memo).trim() || null : null,
         });
       } catch (rowErr) {
