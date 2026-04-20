@@ -1865,34 +1865,36 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
    거래명세서 Phase 3B-1 — 검색 드롭다운 14컬럼 + 리사이즈 + 설정 팝업
    ================================================================= */
 
-/* 검색 입력 좌측 padding (톱니바퀴 공간 확보) */
-#tab-transactions .tx-search-wrap { position: relative; }
-#tab-transactions .tx-search-input { padding-right: 36px; }
-
-/* 톱니바퀴 버튼 */
-.tx-search-settings-btn {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 26px;
-  height: 26px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  color: #5A6070;
-  cursor: pointer;
-  font-family: inherit;
+/* Phase 3B-2: 검색창 + 톱니바퀴 flex 레이아웃 */
+#tab-transactions .tx-search-wrap {
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+#tab-transactions .tx-search-wrap .tx-search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 톱니바퀴 버튼 — 검은 배경 흰 아이콘, 검색창 우측 외부 배치 */
+.tx-search-settings-btn {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  background: #1A1D23;
+  border: none;
+  border-radius: 6px;
+  color: #FFFFFF;
+  font-size: 16px;
+  cursor: pointer;
+  font-family: inherit;
   padding: 0;
 }
-.tx-search-settings-btn:hover {
-  background: #EAECF2;
-  color: #1A1D23;
-}
+.tx-search-settings-btn:hover { background: #2A2D35; }
+.tx-search-settings-btn:active { background: #000000; }
 
 /* 드롭다운 가로 스크롤 (14컬럼 전부 표시 시) */
 #tab-transactions #tx-search-results {

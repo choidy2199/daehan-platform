@@ -2445,6 +2445,8 @@ function switchTab(tab) {
     if (renderKey === 'estimate' && !_estDateManuallySet) {
       document.getElementById('est-date').value = getTodayStr();
     }
+    // Phase 3B-2: 거래명세서 탭 재진입 시 기본 4개 재표시 (검색창 비어있을 때만)
+    if (renderKey === 'tx' && typeof _tx !== 'undefined' && _tx._onReenter) _tx._onReenter();
     console.log('[PERF] switchTab(' + tab + ') 캐시 히트: ' + (performance.now() - t0).toFixed(0) + 'ms');
   }
 }
@@ -22983,6 +22985,67 @@ function _ipinv2Krw(n) {
   return '₩' + v.toLocaleString('en-US');
 }
 
+// 편집 모드 상태 — 저장된 차수를 [수정] 클릭으로 다시 편집 중인 paymentId 집합
+var _ipinv2EditingPayments = new Set();
+
+// 달러 포맷 ($X,XXX.XX)
+function _ipinv2FormatUsd(amount) {
+  var n = Number(amount || 0);
+  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// 환율 포맷 (2자리, 통화 기호 없음)
+function _ipinv2FormatRate(rate) {
+  var n = Number(rate || 0);
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// 저장된 차수인지 (status === 'completed')
+function _ipinv2IsPaymentConfirmed(p) {
+  return !!(p && p.status === 'completed');
+}
+
+// DOM 기준 6필드 모두 채워졌는지 (저장 가능 여부 판정)
+function _ipinv2IsPaymentCompleteFromDom(card) {
+  if (!card) return false;
+  var dateEl = card.querySelector('[data-pay-field="actual_date"]');
+  if (!dateEl || !dateEl.value) return false;
+  var numFields = ['actual_usd', 'remittance_krw', 'fee_krw', 'telegram_fee_krw', 'exchange_rate'];
+  for (var i = 0; i < numFields.length; i++) {
+    var el = card.querySelector('[data-pay-field="' + numFields[i] + '"]');
+    if (!el) return false;
+    var v = String(el.value || '').replace(/,/g, '').trim();
+    if (!v || Number(v) <= 0) return false;
+  }
+  return true;
+}
+
+// 이전 차수들의 확정된 실제 송금액 합계를 뺀 잔액 (현재 차수 placeholder)
+function _ipinv2CalcRemainingBalance(currentSeq) {
+  var inv = _ipinv2CurrentInvoice;
+  var finalTotal = Number(inv && (inv.final_total_usd || inv.final_amount_usd) || 0);
+  if (finalTotal <= 0) return 0;
+  var sumPrevConfirmed = 0;
+  _ipinv2Payments.forEach(function(p) {
+    if (p.seq < currentSeq && _ipinv2IsPaymentConfirmed(p)) {
+      sumPrevConfirmed += Number(p.actual_usd || 0);
+    }
+  });
+  return Math.max(0, finalTotal - sumPrevConfirmed);
+}
+
+// 저장 버튼 enabled/disabled 상태 실시간 갱신
+function _ipinv2UpdateSaveButtonState(paymentId) {
+  var card = document.querySelector('[data-pay-id="' + paymentId + '"]');
+  if (!card) return;
+  var btn = card.querySelector('[data-pay-save-btn]');
+  if (!btn) return;
+  var isComplete = _ipinv2IsPaymentCompleteFromDom(card);
+  btn.disabled = !isComplete;
+  btn.style.opacity = isComplete ? '1' : '0.4';
+  btn.style.cursor = isComplete ? 'pointer' : 'not-allowed';
+}
+
 function _ipinv2LoadPayments(invoiceId) {
   if (!invoiceId) return;
   fetch('/api/import-invoices/' + invoiceId + '/payments', { cache: 'no-store' })
@@ -23003,17 +23066,16 @@ function _ipinv2RenderPaymentsSection() {
   if (_ipinv2Payments.length === 0) {
     cards.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#9BA3B2;font-size:13px;">송금 스케줄이 없습니다. [+ 분할 추가] 버튼으로 첫 차수를 생성하세요.</div>';
   } else {
-    var inv = _ipinv2CurrentInvoice;
-    var finalTotal = Number(inv && (inv.final_total_usd || inv.final_amount_usd) || 0);
-    // 이전 차수들까지의 실제 송금액 누적 → 현재 대기 카드의 placeholder "잔액"
-    var cumulativePaidUsd = 0;
+    // 이전 차수들의 확정된 실제 송금액 누적 → 현재 대기 카드의 placeholder "잔액"
     var h = '';
     _ipinv2Payments.forEach(function(p) {
-      var isCompleted = !!(p.actual_date && Number(p.actual_usd || 0) > 0);
+      var isConfirmed = _ipinv2IsPaymentConfirmed(p);
       var placeholder = 0;
-      if (!isCompleted && finalTotal > 0) placeholder = Math.max(0, finalTotal - cumulativePaidUsd);
+      // 1차 카드는 placeholder 없음 (p.seq === 1이거나 첫 번째)
+      if (!isConfirmed && p.seq > 1) {
+        placeholder = _ipinv2CalcRemainingBalance(p.seq);
+      }
       h += _ipinv2RenderPaymentCard(p, placeholder);
-      if (isCompleted) cumulativePaidUsd += Number(p.actual_usd || 0);
     });
     cards.innerHTML = h;
   }
@@ -24278,9 +24340,8 @@ const _tx = {
     this.search.loadConfig();
     this.search._ensureSettingsBtn();
 
-    // 초기: 검색 드롭다운 접힘
-    const searchResults = document.getElementById('tx-search-results');
-    if (searchResults) searchResults.classList.add('tx-hidden');
+    // Phase 3B-2: 초기 기본 4개 표시 (검색창이 비어있을 때만)
+    this.search._showDefaultsIfEmpty();
 
     // 초기 상태: 상품 라인 빈 안내 행
     this.renderItemsTable();
@@ -24703,7 +24764,32 @@ const _tx = {
     onInput(queryText) {
       if (this._debounceTimer) clearTimeout(this._debounceTimer);
       const q = String(queryText || '').trim();
+      if (q.length === 0) {
+        // 빈 검색창: 기본 4개 즉시 표시 (디바운스 없음)
+        const defaults = this._getDefaultProducts();
+        this._lastResults = defaults;
+        this.render(defaults);
+        return;
+      }
       this._debounceTimer = setTimeout(function() { _tx.search._run(q); }, 150);
+    },
+
+    // Phase 3B-2: 빈 검색창에서 기본 제품 4개 (mw_products 배열 끝 역순)
+    _getDefaultProducts() {
+      const mw = (typeof DB !== 'undefined' && DB.products) ? DB.products : [];
+      const last4 = mw.slice(-4).reverse();
+      return last4.map(function(p) {
+        return { score: 0, entry: { source: 'milwaukee', data: p } };
+      });
+    },
+
+    // 검색창이 비어있을 때만 기본 4개 표시 (타이핑 중인 검색어는 덮어쓰지 않음)
+    _showDefaultsIfEmpty() {
+      const input = document.getElementById('tx-search-input');
+      if (input && String(input.value || '').trim().length > 0) return;
+      const defaults = this._getDefaultProducts();
+      this._lastResults = defaults;
+      this.render(defaults);
     },
 
     _run(query) {
@@ -25329,6 +25415,13 @@ const _tx = {
         '</div>';
     }
     listEl.innerHTML = html;
+  },
+
+  // Phase 3B-2: 탭 재진입 훅 (switchTab else 브랜치에서 호출)
+  // — 검색창이 비어있을 때만 기본 4개 재표시, 타이핑 중인 검색어는 유지
+  _onReenter() {
+    if (!this._initialized) return;
+    this.search._showDefaultsIfEmpty();
   },
 };
 
