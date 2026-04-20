@@ -21934,13 +21934,39 @@ function _ipinv2Date(s) {
 }
 function _ipinv2StatusBadge(status) {
   var map = {
-    draft:        { bg: '#F1EFE8', color: '#5F5E5A', label: '초안' },
+    draft:        { bg: '#E1F5EE', color: '#085041', label: '미송금' },
     partial_paid: { bg: '#FAEEDA', color: '#633806', label: '송금중' },
-    paid:         { bg: '#E1F5EE', color: '#085041', label: '완료' },
+    paid:         { bg: '#1D9E75', color: '#fff',    label: '송금완료' },
     customs_done: { bg: '#E6F1FB', color: '#0C447C', label: '통관완료' },
   };
   var m = map[status] || map.draft;
   return '<span style="display:inline-block;font-size:11px;padding:3px 9px;border-radius:10px;background:' + m.bg + ';color:' + m.color + ';font-weight:500;">' + m.label + '</span>';
+}
+
+// 편집 중인 차수가 있으면 paid → partial_paid 표시 전환
+function _ipinv2DisplayStatus(inv) {
+  if (!inv) return 'draft';
+  if (inv.status === 'paid' && _ipinv2EditingPayments && _ipinv2EditingPayments.size > 0) {
+    return 'partial_paid';
+  }
+  return inv.status;
+}
+
+function _ipinv2UpdateHeaderStatusBadge() {
+  var el = document.getElementById('ipinv2-hdr-status');
+  if (!el || !_ipinv2CurrentInvoice) return;
+  el.innerHTML = _ipinv2StatusBadge(_ipinv2DisplayStatus(_ipinv2CurrentInvoice));
+}
+
+// 간이 토스트 (ipinv2 전용, 기존 전역 toast와 분리)
+function _ipinv2Toast(msg, type) {
+  type = type || 'success';
+  var bg = type === 'error' ? '#CC2222' : (type === 'success' ? '#1D9E75' : '#185FA5');
+  var el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:16px;right:16px;padding:10px 16px;background:' + bg + ';color:#fff;border-radius:6px;font-size:13px;font-weight:500;font-family:Pretendard,sans-serif;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);animation:ipinv2-toast-in 0.15s ease-out;';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { if (el && el.parentNode) el.parentNode.removeChild(el); }, 2000);
 }
 
 // ── 진입 ──
@@ -22144,10 +22170,10 @@ function _ipinv2DoRenderDetail(container) {
   var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:3px;font-weight:500;';
   var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
   h += '<div style="display:grid;grid-template-columns:repeat(6, minmax(120px, 1fr));gap:10px;">';
-  h += '<div><label style="' + lblS + '">인보이스 번호 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-invno" type="text" value="' + _ipinv2Esc(inv.invoice_no) + '" style="' + inpS + '" placeholder="INV-2026-001"></div>';
-  h += '<div><label style="' + lblS + '">공장명 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-factory" type="text" value="' + _ipinv2Esc(inv.factory_name) + '" style="' + inpS + '"></div>';
-  h += '<div><label style="' + lblS + '">공장 코드</label><input id="ipinv2-f-code" type="text" value="' + _ipinv2Esc(inv.factory_code || '') + '" style="' + inpS + '" placeholder="CODE2"></div>';
-  h += '<div><label style="' + lblS + '">인보이스 일자 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-date" type="date" value="' + _ipinv2Esc((inv.invoice_date || '').substring(0, 10)) + '" style="' + inpS + '"></div>';
+  h += '<div><label style="' + lblS + '">인보이스 번호 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-invno" type="text" value="' + _ipinv2Esc(inv.invoice_no) + '" style="' + inpS + '" placeholder="INV-2026-001" onblur="_ipinv2OnHeaderBlur(\'invoice_no\',this)"></div>';
+  h += '<div><label style="' + lblS + '">공장명 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-factory" type="text" value="' + _ipinv2Esc(inv.factory_name) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'factory_name\',this)"></div>';
+  h += '<div><label style="' + lblS + '">공장 코드</label><input id="ipinv2-f-code" type="text" value="' + _ipinv2Esc(inv.factory_code || '') + '" style="' + inpS + '" placeholder="CODE2" onblur="_ipinv2OnHeaderBlur(\'factory_code\',this)"></div>';
+  h += '<div><label style="' + lblS + '">인보이스 일자 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-date" type="date" value="' + _ipinv2Esc((inv.invoice_date || '').substring(0, 10)) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'invoice_date\',this)"></div>';
   h += '<div><label style="' + lblS + '">할인율 (%)</label><input id="ipinv2-f-discrate" type="number" step="0.01" value="' + (inv.discount_rate || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'discount_rate\',this.value)"></div>';
   h += '<div><label style="' + lblS + '">팔렛 단가 ($)</label><input id="ipinv2-f-palletunit" type="number" step="0.01" value="' + (inv.pallet_unit_price_usd || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'pallet_unit_price_usd\',this.value)"></div>';
   h += '</div></div>';
@@ -22225,15 +22251,58 @@ function _ipinv2SaveBasicInfo() {
         _ipinv2CurrentInvoice = res.json.data;
         var hdrNo = document.getElementById('ipinv2-hdr-invno'); if (hdrNo) hdrNo.textContent = res.json.data.invoice_no;
         var hdrFc = document.getElementById('ipinv2-hdr-factory'); if (hdrFc) hdrFc.textContent = res.json.data.factory_name;
-        alert('저장 완료');
+        _ipinv2Toast('저장되었습니다', 'success');
       } else {
-        if (res.json.code === 'DUPLICATE') alert('이미 등록된 인보이스 번호입니다');
-        else alert(res.json.error || '저장 실패');
+        if (res.json.code === 'DUPLICATE') _ipinv2Toast('이미 등록된 인보이스 번호입니다', 'error');
+        else _ipinv2Toast(res.json.error || '저장 실패', 'error');
       }
     })
     .catch(function(e) {
       if (btn) { btn.disabled = false; btn.textContent = '저장'; }
-      alert('저장 실패: ' + e.message);
+      _ipinv2Toast('저장 실패: ' + e.message, 'error');
+    });
+}
+
+// ── 헤더 필드 blur autosave (invoice_no, factory_name, factory_code, invoice_date) ──
+function _ipinv2OnHeaderBlur(field, el) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var newVal = String(el.value || '').trim();
+  var oldVal;
+  if (field === 'invoice_date') oldVal = (inv.invoice_date || '').substring(0, 10);
+  else oldVal = inv[field] != null ? String(inv[field]) : '';
+  if (newVal === oldVal) return; // 변경 없음 → 네트워크 요청 스킵
+
+  // 필수 필드 공백 방지
+  if ((field === 'invoice_no' || field === 'factory_name' || field === 'invoice_date') && !newVal) {
+    el.style.borderColor = '#CC2222';
+    var label = field === 'invoice_no' ? '인보이스 번호' : field === 'factory_name' ? '공장명' : '인보이스 일자';
+    _ipinv2Toast(label + '는 필수입니다', 'error');
+    return;
+  }
+
+  var payload = { id: inv.id };
+  payload[field] = newVal || null;
+
+  fetch('/api/import-invoices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        el.style.borderColor = '';
+        _ipinv2CurrentInvoice = json.data;
+        // 다크 헤더 요소 텍스트 갱신
+        if (field === 'invoice_no') { var h1 = document.getElementById('ipinv2-hdr-invno'); if (h1) h1.textContent = newVal; }
+        if (field === 'factory_name') { var h2 = document.getElementById('ipinv2-hdr-factory'); if (h2) h2.textContent = newVal; }
+        _ipinv2Toast('저장되었습니다', 'success');
+      } else {
+        el.style.borderColor = '#CC2222';
+        if (json && json.code === 'DUPLICATE') _ipinv2Toast('이미 등록된 인보이스 번호입니다', 'error');
+        else _ipinv2Toast((json && json.error) || '저장 실패', 'error');
+      }
+    })
+    .catch(function(e) {
+      el.style.borderColor = '#CC2222';
+      _ipinv2Toast('네트워크 오류: ' + (e && e.message || e), 'error');
     });
 }
 
@@ -23086,6 +23155,7 @@ function _ipinv2RenderPaymentsSection() {
     });
   }
   _ipinv2RenderPaymentSummary();
+  _ipinv2UpdateHeaderStatusBadge();
 }
 
 function _ipinv2RenderPaymentCard(p, pendingPlaceholder) {
@@ -23144,7 +23214,10 @@ function _ipinv2RenderPaymentCard(p, pendingPlaceholder) {
   h += '<div style="display:grid;grid-template-columns:1.2fr 1.2fr 1.2fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;">';
   h += '<div><label style="' + lblS + '">실제 송금일</label><input type="date" data-pay-field="actual_date" value="' + _ipinv2Esc((p.actual_date || '').substring(0, 10)) + '" tabindex="1"' + roAttr + ' style="' + roStyle + '" oninput="_ipinv2UpdateSaveButtonState(\'' + p.id + '\')"></div>';
   h += '<div><label style="' + lblS + '">실제 송금액 ($)</label><div style="position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#5A6070;font-size:12px;">$</span><input type="text" inputmode="decimal" data-pay-field="actual_usd" value="' + actualUsdVal + '" placeholder="' + actualUsdPlaceholder + '" tabindex="2"' + roAttr + ' style="' + roStyle + 'text-align:right;padding-left:18px;" oninput="_ipinv2FormatNumberInput(this,{decimals:2});_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2OnActualBlur(event,\'' + p.id + '\',\'actual_usd\',2)"></div></div>';
-  h += '<div><label style="' + lblS + '">송금액 (₩)</label><div style="position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#5A6070;font-size:12px;">₩</span><input type="text" data-pay-field="remittance_krw" value="' + remittanceVal + '" tabindex="-1" readonly style="' + readonlyS + 'text-align:right;padding-left:18px;" title="실제 송금액 × 적용 환율 (자동)"></div></div>';
+  // 송금액(₩): 수동 입력 가능 — actual_usd × rate 자동 채움, 수동 편집 시 manualEdit 플래그로 덮어쓰기 방지
+  var remitManual = (() => { var usd = Number(p.actual_usd || 0); var rt = Number(p.exchange_rate || 0); var expected = Math.round(usd * rt); var cur = Number(p.remittance_krw || 0); return (cur > 0 && expected > 0 && cur !== expected); })();
+  var remitDataAttr = remitManual ? ' data-manual-edit="1"' : '';
+  h += '<div><label style="' + lblS + '">송금액 (₩)</label><div style="position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#5A6070;font-size:12px;">₩</span><input type="text" inputmode="numeric" data-pay-field="remittance_krw"' + remitDataAttr + ' value="' + remittanceVal + '" placeholder="자동 계산 또는 직접 입력" tabindex="6"' + roAttr + ' style="' + roStyle + 'text-align:right;padding-left:18px;" title="실제 송금액 × 적용 환율 또는 직접 입력" oninput="_ipinv2FormatNumberInput(this,{decimals:0});_ipinv2OnRemittanceManualInput(event,\'' + p.id + '\')" onblur="_ipinv2OnActualBlur(event,\'' + p.id + '\',\'remittance_krw\',0)"></div></div>';
   h += '<div><label style="' + lblS + '">수수료 (₩)</label><div style="position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#5A6070;font-size:12px;">₩</span><input type="text" inputmode="numeric" data-pay-field="fee_krw" value="' + feeVal + '" placeholder="0" tabindex="3"' + roAttr + ' style="' + roStyle + 'text-align:right;padding-left:18px;" oninput="_ipinv2FormatNumberInput(this,{decimals:0});_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2OnActualBlur(event,\'' + p.id + '\',\'fee_krw\',0)"></div></div>';
   h += '<div><label style="' + lblS + '">전신료 (₩)</label><div style="position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#5A6070;font-size:12px;">₩</span><input type="text" inputmode="numeric" data-pay-field="telegram_fee_krw" value="' + wireVal + '" placeholder="0" tabindex="4"' + roAttr + ' style="' + roStyle + 'text-align:right;padding-left:18px;" oninput="_ipinv2FormatNumberInput(this,{decimals:0});_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2OnActualBlur(event,\'' + p.id + '\',\'telegram_fee_krw\',0)"></div></div>';
   h += '<div><label style="' + lblS + '">적용 환율</label><input type="text" inputmode="decimal" data-pay-field="exchange_rate" value="' + rateVal + '" placeholder="0.00" tabindex="5"' + roAttr + ' style="' + roStyle + 'text-align:right;" oninput="_ipinv2FormatNumberInput(this,{decimals:2});_ipinv2OnActualInput(event,\'' + p.id + '\')" onblur="_ipinv2OnActualBlur(event,\'' + p.id + '\',\'exchange_rate\',2)"></div>';
@@ -23334,16 +23407,24 @@ function _ipinv2OnActualInput(ev, paymentId) {
   var rateRaw = String(rateEl.value || '').replace(/,/g, '');
   var usd = Number(usdRaw) || 0;
   var rate = Number(rateRaw) || 0;
-  // 송금액(₩) 자동 계산 — 실송금액 또는 환율 변경 시
+  // 송금액(₩) 자동 계산 — 실송금액 또는 환율 변경 시, 사용자 수동 편집 안 했으면만
   var field = ev.target.getAttribute('data-pay-field');
   if (field === 'actual_usd' || field === 'exchange_rate') {
-    if (usd > 0 && rate > 0) {
-      remitEl.value = Math.round(usd * rate).toLocaleString('en-US');
-    } else {
-      remitEl.value = '';
+    var manual = remitEl.dataset.manualEdit === '1';
+    if (!manual) {
+      if (usd > 0 && rate > 0) {
+        remitEl.value = Math.round(usd * rate).toLocaleString('en-US');
+      } else {
+        remitEl.value = '';
+      }
     }
   }
-  // 저장 버튼 상태 갱신
+  _ipinv2UpdateSaveButtonState(paymentId);
+}
+
+// 송금액(₩) 필드 수동 입력 — manualEdit 플래그 세팅
+function _ipinv2OnRemittanceManualInput(ev, paymentId) {
+  ev.target.dataset.manualEdit = '1';
   _ipinv2UpdateSaveButtonState(paymentId);
 }
 
@@ -23554,9 +23635,7 @@ function _ipinv2RefreshInvoiceStatus() {
         var latest = _ipinv2Invoices.find(function(x) { return x.id === inv.id; });
         if (latest) {
           _ipinv2CurrentInvoice = latest;
-          // 헤더 상태 뱃지 갱신
-          var statusEl = document.getElementById('ipinv2-hdr-status');
-          if (statusEl) statusEl.innerHTML = _ipinv2StatusBadge(latest.status);
+          _ipinv2UpdateHeaderStatusBadge();
           _ipinv2RenderPaymentSummary();
         }
       }
