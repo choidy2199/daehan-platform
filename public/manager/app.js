@@ -21632,7 +21632,7 @@ function _poRenderDetail() {
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
   var h = '';
-  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;">';
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;margin-bottom:24px;">';
   h += _poRenderDetailHeader();
   h += _poRenderDetailInfo();
   h += _poRenderDetailProductsSection();
@@ -21725,7 +21725,8 @@ function _poRenderDetailTable() {
   var tdS = 'padding:9px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
   var hiBg = '#BA7517';
 
-  var h = '<div style="overflow:auto;max-height:calc(100vh - 420px);min-height:200px;">';
+  // 테이블은 자연 높이 — 많은 건수는 페이지 자체 스크롤로 해결 (내부 스크롤 X)
+  var h = '<div style="overflow:visible;">';
 
   if (!po || !po.brand) {
     h += '<div style="padding:80px 20px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">공장/브랜드를 선택하면 제품이 자동으로 로드됩니다</div></div>';
@@ -21791,11 +21792,11 @@ function _poRenderDetailSummary() {
   var totalFob = 0;     // B2-B
 
   var h = '';
-  h += '<div style="padding:12px 20px;background:#1A1D23;color:#fff;font-family:Pretendard,sans-serif;display:flex;align-items:center;">';
+  h += '<div style="padding:14px 20px;background:#1A1D23;color:#fff;font-family:Pretendard,sans-serif;display:flex;align-items:center;min-height:56px;box-sizing:border-box;">';
   var colStyle = 'flex:1;padding:0 14px;';
-  var lblS = 'font-size:11px;color:#aaa;margin-bottom:3px;';
-  var valS = 'font-size:15px;font-weight:500;color:#fff;';
-  var orgS = 'font-size:15px;font-weight:600;color:#EF9F27;';
+  var lblS = 'font-size:11px;color:#aaa;margin-bottom:3px;line-height:1.3;';
+  var valS = 'font-size:15px;font-weight:500;color:#fff;line-height:1.3;';
+  var orgS = 'font-size:15px;font-weight:600;color:#EF9F27;line-height:1.3;';
   var sepS = 'width:1px;height:24px;background:rgba(255,255,255,0.15);flex-shrink:0;';
   h += '<div style="' + colStyle + '"><div style="' + lblS + '">총 수량</div><div style="' + valS + '">' + totalQty.toLocaleString('en-US') + ' EA <span style="font-size:11px;color:#aaa;margin-left:4px;">(' + kinds + '종)</span></div></div>';
   h += '<div style="' + sepS + '"></div>';
