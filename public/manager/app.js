@@ -24797,6 +24797,9 @@ const _tx = {
       { id: 'naver',       label: '스토어팜', defaultWidth: 90,  defaultVisible: false },
       { id: 'open',        label: '오픈마켓', defaultWidth: 90,  defaultVisible: false },
       { id: 'ssg',         label: 'SSG',      defaultWidth: 90,  defaultVisible: false },
+      { id: 'in',          label: 'IN',       defaultWidth: 70,  defaultVisible: false },
+      { id: 'out',         label: 'OUT',      defaultWidth: 70,  defaultVisible: false },
+      { id: 'pallet',      label: '파렛',     defaultWidth: 70,  defaultVisible: false },
       { id: 'memo',        label: '비고',     defaultWidth: 200, defaultVisible: false },
     ],
 
@@ -25002,6 +25005,9 @@ const _tx = {
         case 'naver':   return (source === 'milwaukee' && p.priceNaver)  ? fmt(p.priceNaver)  : '-';
         case 'open':    return (source === 'milwaukee' && p.priceOpen)   ? fmt(p.priceOpen)   : '-';
         case 'ssg':     return (source === 'milwaukee' && p.priceSsg)    ? fmt(p.priceSsg)    : '-';
+        case 'in':      return (source === 'general' && Number(p.inPrice)     > 0) ? fmt(p.inPrice)     : '-';
+        case 'out':     return (source === 'general' && Number(p.outPrice)    > 0) ? fmt(p.outPrice)    : '-';
+        case 'pallet':  return (source === 'general' && Number(p.palletPrice) > 0) ? fmt(p.palletPrice) : '-';
         case 'memo':    return esc(p.memo || '-');
       }
       return '-';
