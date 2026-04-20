@@ -93,6 +93,9 @@ document.head.appendChild(s);
         <div class="sidebar-sub-item" data-tab="tab-import-product" data-window="제품" onclick="_sidebarOpenWindow('제품')"><span>제품</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('제품')">★</button></div>
         <div class="sidebar-sub-item" data-tab="tab-import-calc" data-window="수입계산기" onclick="_sidebarOpenWindow('수입계산기')"><span>수입계산기</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('수입계산기')">★</button></div>
         <div class="sidebar-sub-item" data-tab="tab-import-invoice" data-window="인보이스" onclick="_sidebarOpenWindow('인보이스')"><span>인보이스</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('인보이스')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-import-products-v2" data-window="제품V2" onclick="_sidebarOpenWindow('제품V2')"><span>제품V2</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('제품V2')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-import-invoice-v2" data-window="인보이스V2" onclick="_sidebarOpenWindow('인보이스V2')"><span>인보이스V2</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('인보이스V2')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-import-batch-v2" data-window="수입건V2" onclick="_sidebarOpenWindow('수입건V2')"><span>수입건V2</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('수입건V2')">★</button></div>
       </div>
     </div>
 
@@ -208,6 +211,9 @@ document.head.appendChild(s);
         <div class="tb-dd-item" onclick="openWindow('제품')">제품</div>
         <div class="tb-dd-item" onclick="openWindow('수입계산기')">수입계산기</div>
         <div class="tb-dd-item" onclick="openWindow('인보이스')">인보이스</div>
+        <div class="tb-dd-item" onclick="openWindow('제품V2')">제품V2</div>
+        <div class="tb-dd-item" onclick="openWindow('인보이스V2')">인보이스V2</div>
+        <div class="tb-dd-item" onclick="openWindow('수입건V2')">수입건V2</div>
       </div>
     </div>
     <div class="tb-sep"></div>
@@ -849,6 +855,27 @@ document.head.appendChild(s);
 <div id="tab-import-product" class="tab-content"></div>
 <div id="tab-import-calc" class="tab-content"></div>
 <div id="tab-import-invoice" class="tab-content"></div>
+<div id="tab-import-products-v2" class="tab-content">
+  <div style="padding:120px 40px;text-align:center;font-family:Pretendard,sans-serif;">
+    <span style="display:inline-block;background:#FAEEDA;color:#633806;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;margin-bottom:16px;">Step 2 예정</span>
+    <div style="font-size:18px;font-weight:600;color:#1A1D23;margin-bottom:8px;">제품V2</div>
+    <div style="font-size:13px;color:var(--tl-text-secondary, #5A6070);">개발 중 — Phase 1 Step 2에서 구현 예정입니다.</div>
+  </div>
+</div>
+<div id="tab-import-invoice-v2" class="tab-content">
+  <div style="padding:120px 40px;text-align:center;font-family:Pretendard,sans-serif;">
+    <span style="display:inline-block;background:#FAEEDA;color:#633806;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;margin-bottom:16px;">Step 3 예정</span>
+    <div style="font-size:18px;font-weight:600;color:#1A1D23;margin-bottom:8px;">인보이스V2</div>
+    <div style="font-size:13px;color:var(--tl-text-secondary, #5A6070);">개발 중 — Phase 1 Step 3에서 구현 예정입니다.</div>
+  </div>
+</div>
+<div id="tab-import-batch-v2" class="tab-content">
+  <div style="padding:120px 40px;text-align:center;font-family:Pretendard,sans-serif;">
+    <span style="display:inline-block;background:#FAEEDA;color:#633806;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;margin-bottom:16px;">Step 4 예정</span>
+    <div style="font-size:18px;font-weight:600;color:#1A1D23;margin-bottom:8px;">수입건V2</div>
+    <div style="font-size:13px;color:var(--tl-text-secondary, #5A6070);">개발 중 — Phase 1 Step 4에서 구현 예정입니다.</div>
+  </div>
+</div>
 <div id="tab-notice" class="tab-content"></div>
 <div id="tab-backorder" class="tab-content"></div>
 <div id="tab-delivery" class="tab-content">
