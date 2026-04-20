@@ -1732,7 +1732,6 @@ var _windowConfig = {
   '제품':       { tabId: 'import-product', color: 'purple' },
   '수입계산기': { tabId: 'import-calc',    color: 'purple' },
   '인보이스':   { tabId: 'import-invoice', color: 'purple' },
-  '제품V2':     { tabId: 'import-product-v2', color: 'purple' },
   '인보이스V2': { tabId: 'import-invoice-v2', color: 'purple' },
   '수입건V2':   { tabId: 'import-batch-v2',   color: 'purple' },
   '택배':       { tabId: 'delivery',       color: 'gray' },
@@ -1744,7 +1743,7 @@ var _windowConfig = {
 };
 
 // 삭제된 탭 ID (즐겨찾기/열린창 자동 정리용)
-var _removedWindowNames = ['매출', '매입', '견적'];
+var _removedWindowNames = ['매출', '매입', '견적', '제품V2'];
 
 var _openWindows = [];    // 열린 창 이름 목록 (순서 유지)
 var _activeWindow = null; // 현재 활성 창 이름
@@ -2363,7 +2362,6 @@ var _tabIdMap = {
   'import-calc':      { contentId: 'tab-import-calc',      render: 'importCalc' },
   'import-invoice':   { contentId: 'tab-import-invoice',   render: 'importInvoice' },
   'import-po-v2':     { contentId: 'tab-import-po-v2',       render: 'importPoV2' },
-  'import-product-v2':{ contentId: 'tab-import-products-v2', render: 'importProductsV2' },
   'import-invoice-v2':{ contentId: 'tab-import-invoice-v2',  render: 'importInvoiceV2' },
   'import-batch-v2':  { contentId: 'tab-import-batch-v2',    render: 'importBatchV2' },
   'delivery':         { contentId: 'tab-delivery',         placeholder: true },
@@ -2436,7 +2434,6 @@ function switchTab(tab) {
       if (renderKey === 'importProduct') renderImportProductTab();
       if (renderKey === 'importInvoice') renderImportInvoiceTab();
       if (renderKey === 'importPoV2') _poInit();
-      if (renderKey === 'importProductsV2') _renderImportProductsV2();
       if (renderKey === 'importInvoiceV2') _ipinv2Render();
       if (renderKey === 'importBatchV2') _ipbat2Render();
       if (renderKey === 'tx') _tx.init();
@@ -21634,18 +21631,69 @@ function _poLoadDetail(poId) {
 function _poRenderDetail() {
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
-  // 발주서V2 상세: 탭 컨테이너 자체를 스크롤 영역으로 (스크롤바는 탭 오른쪽 = 페이지 스크롤 느낌)
-  // 내부는 전부 자연 흐름 → 테이블이 24건이든 100건이든 전부 펼쳐서 렌더, 페이지 스크롤로 접근
+  // 제품·발주 상세: 탭 컨테이너 자체를 스크롤 영역으로 (P3-B2-A 스크롤 설정 유지)
   container.style.overflowY = 'auto';
   container.style.height = '100%';
+
+  var po = _poState.currentPo || {};
+  var poNumber = _poEsc(po.po_number || '');
+  var statusBadge = _poFormatStatusBadge(po.status || 'draft');
+  var poDate = _poFormatDate(po.po_date);
+  var brand = _poEsc(po.brand || '-');
+  var itemCount = (_poState.currentItems || []).length;
+  var placeholderAlert = "alert('P2~P9에서 구현 예정')";
+
   var h = '';
-  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;margin-bottom:24px;">';
-  h += _poRenderDetailHeader();
-  h += _poRenderDetailInfo();
-  h += _poRenderDetailProductsSection();
-  h += _poRenderDetailTable();
-  h += _poRenderDetailSummary();
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;margin-bottom:24px;overflow:hidden;">';
+
+  // 상단 다크 헤더 (버튼 제거, 메타 정보만)
+  h += '<div class="pc-main-header">';
+  h += '<div class="pc-mh-left">';
+  h += '<button onclick="_poBackToList()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
+  h += '<span class="pc-mh-title">' + poNumber + '</span>';
+  h += statusBadge;
+  h += '<span class="pc-mh-meta">· ' + poDate + ' · ' + brand + ' (' + itemCount + '개 제품)</span>';
   h += '</div>';
+  h += '</div>';
+
+  // 본문 2분할 (65/35)
+  h += '<div class="pc-split">';
+
+  // 좌측 패널 (65% — 제품목록, P2에서 구현)
+  h += '<div class="pc-panel pc-panel-left">';
+  h += '<div class="pc-panel-header">';
+  h += '<div class="pc-panel-title">제품목록 <span class="pc-panel-count">' + itemCount + '건</span></div>';
+  h += '<div class="pc-panel-actions">';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">템플릿</button>';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">백업</button>';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">복원</button>';
+  h += '<button class="btn-mini btn-mini-p" onclick="' + placeholderAlert + '">+ 제품등록</button>';
+  h += '<button class="btn-mini btn-mini-erp" onclick="' + placeholderAlert + '">↻ 경영박사 재고</button>';
+  h += '</div></div>';
+  h += '<div class="pc-search-bar">';
+  h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" disabled>';
+  h += '<select class="pc-search-sel" disabled><option>전체 브랜드</option></select>';
+  h += '</div>';
+  h += '<div class="pc-tbl-placeholder">제품목록 준비중 (P2에서 구현)</div>';
+  h += '</div>';
+
+  // 우측 패널 (35% — 제품발주, P4에서 구현)
+  h += '<div class="pc-panel pc-panel-right">';
+  h += '<div class="pc-panel-header">';
+  h += '<div class="pc-panel-title">제품발주 <span class="pc-panel-count">0건</span></div>';
+  h += '<div class="pc-panel-actions">';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">발주서 리스트</button>';
+  h += '<button class="btn-mini" onclick="' + placeholderAlert + '">비우기</button>';
+  h += '<button class="btn-mini btn-mini-confirm" onclick="' + placeholderAlert + '">✓ 발주확정</button>';
+  h += '</div></div>';
+  h += '<div class="pc-info-strip">발주번호: <strong>' + poNumber + '</strong> · 자동부여</div>';
+  h += '<div class="pc-tbl-placeholder">발주목록 준비중 (P4에서 구현)</div>';
+  h += '<div class="pc-right-summary-skeleton">요약 준비중 (P4)</div>';
+  h += '</div>';
+
+  h += '</div>'; // .pc-split
+  h += '</div>'; // wrapper
+
   // 모달 자리
   h += '<div id="po-modal-root"></div>';
   container.innerHTML = h;
@@ -21952,6 +22000,7 @@ var _ipv2Sort = 'brand';       // 'brand' | 'model' | 'recent'
 var _ipv2SearchTimer = null;
 var _ipv2Loading = false;
 
+/* P1: 제품V2 UI 제거됨, P2에서 재평가 (블록 1/2: _ipv2Esc + _renderImportProductsV2)
 function _ipv2Esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -21987,6 +22036,7 @@ function _renderImportProductsV2() {
     });
   }
 }
+*/
 
 function _ipv2FetchList(cb) {
   _ipv2Loading = true;
@@ -22006,6 +22056,7 @@ function _ipv2FetchList(cb) {
     });
 }
 
+/* P1: 제품V2 UI 제거됨, P2에서 재평가 (블록 2/2: _ipv2RenderLayout ~ _ipv2ShowOverwriteModal — 모든 UI/엑셀 함수, 호출처는 제품V2 탭 내부뿐)
 function _ipv2RenderLayout(container) {
   var h = '';
   h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;margin:0;">';
@@ -22819,6 +22870,7 @@ function _ipv2ShowOverwriteModal(changes, conflicts, onDone) {
   h += '</div></div></div>';
   root.innerHTML = h;
 }
+*/
 
 
 // ========================================

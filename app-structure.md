@@ -532,3 +532,52 @@ public/manager/index.html:1783:        <input class="input" id="picker-search" t
 2401:  localStorage.setItem('mw_sales_items', JSON.stringify(salesItems));
 2440:    localStorage.setItem(OS_MONTH_KEY, JSON.stringify(onlineSalesMonth));
 ```
+
+## 9. [2026-04-21] P1 변경 — 제품V2 제거 + 제품·발주 통합탭 뼈대
+
+### 파일 라인 수 갱신
+- public/manager/app.js: **27,058줄** (기존 27,006 → UI 주석 처리 + 65/35 레이아웃 교체로 증가)
+- public/manager/style.css: **2,233줄** (기존 2,204 → .pc- 블록 추가)
+- public/manager/index.html: **1,911줄** (기존 1,914 → 제품V2 DOM 3줄 제거)
+
+### 탭 구조 변경
+| 변경 유형 | 항목 | 비고 |
+|---|---|---|
+| 삭제 | `tab-import-products-v2` 빈 div (index.html:1096) | |
+| 삭제 | 사이드바 "제품V2" 아이템 (index.html:98) | |
+| 삭제 | 탑바 드롭다운 "제품V2" (index.html:216) | |
+| 삭제 | `_windowConfig['제품V2']` | |
+| 삭제 | `_tabIdMap['import-product-v2']` | |
+| 삭제 | switchTab `importProductsV2` 분기 | |
+| 추가 | `_removedWindowNames` 에 '제품V2' 포함 | 즐겨찾기 자동 정리 |
+| **표시명만 변경** | 사이드바 "발주서V2" → "제품·발주" | 내부 윈도우키 `'발주서V2'`, 탭ID `tab-import-po-v2`, 함수 prefix `_po*`, localStorage 키 `mw_cache_import_po_v2` 전부 유지 |
+
+### 주석 처리 블록 (P2에서 재평가 — 엑셀 파싱/검증 로직 재활용 가능성)
+- 블록 1: `_ipv2Esc`, `_renderImportProductsV2`
+- 블록 2: `_ipv2RenderLayout`, `_ipv2BindEvents`, `_ipv2ScheduleSearch`, `_ipv2Filtered`, `_ipv2PopulateBrandFilter`, `_ipv2RenderTable`, `_ipv2InlineEdit`, `_ipv2Delete`, `_ipv2OpenModal`, `_ipv2CloseModal`, `_ipv2FormatBaseFob`, `_ipv2FormatBaseFobDisplay`, `_ipv2SaveModal`, `_ipv2Template`, `_ipv2FormatError`, `_ipv2IsExampleRow`, `_ipv2ValidateUploadStructure`, `_ipv2Backup`, `_ipv2Upload`, `_ipv2ShowUploadResult`, `_ipv2Toast`, `_ipv2FlashRow`, `_ipv2FlashInternalCodeCell`, `_ipv2FetchByInternalCode`, `_ipv2ShowOverwriteModal`
+
+### 유지된 제품V2 자원 (발주서V2가 의존하거나 P2 재연결 대상)
+- Supabase 테이블 `import_products_v2` (데이터 보존)
+- API 라우트 `/api/import-products-v2`, `/api/import-products-v2/bulk`
+- JS 상태변수 `_ipv2Data`, `_ipv2Loading`, `_ipv2Filter`, `_ipv2Search`, `_ipv2Sort`, `_ipv2SearchTimer`
+- JS 함수 `_ipv2FetchList()` (발주서V2 상세 화면이 브랜드 드롭다운/제품 로드에 의존)
+- localStorage 캐시 키 `mw_cache_import_products_v2`
+- 엑셀 유틸 `src/lib/import-v2.ts` — `importProductsV2FromExcel`
+
+### 65/35 레이아웃 뼈대
+- `_poRenderDetail()` 전면 재작성 — 기존 `_poRenderDetailHeader/Info/ProductsSection/Table/Summary` 미호출 (함수 자체는 보존, P7에서 재활용 가능)
+- CSS 신규 prefix `.pc-*` (style.css 말단) — 기존 `_po*` 함수와 `po-*` 클래스는 변경 없음
+- 버튼은 전부 `onclick="alert('P2~P9에서 구현 예정')"` placeholder
+- 좌측 패널 65%, 우측 패널 35%, 상단 다크바 1줄 (← 목록 버튼 + PO번호 + 상태뱃지 + 날짜/브랜드/제품수)
+
+### P2~P9 계획 요약
+| Phase | 범위 |
+|---|---|
+| P2 | 좌측 "제품목록" 테이블 13컬럼 구현 + 주석 처리된 엑셀/템플릿/백업복원 로직 재연결 |
+| P3 | 좌측 테이블 컬럼 리사이저 |
+| P4 | 우측 "제품발주" 테이블 8컬럼 + 🛒 제품→발주 복사 로직 + 요약 섹션 |
+| P5 | 경영박사 재고 연동 (↻ 버튼) |
+| P6 | 발주확정 → 리스트 전환 |
+| P7 | 발주서 리스트 화면 (기존 `_poRenderList` 재활용) |
+| P8 | PDF 내보내기 |
+| P9 | 폴리싱/QA |

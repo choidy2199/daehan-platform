@@ -873,10 +873,6 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #tab-backorder.tab-content.active { display:block !important; overflow-y:auto; }
 #tab-backorder.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
 
-/* 제품V2 — tab-content flex 무효화 */
-#tab-import-products-v2.tab-content.active { display:block !important; overflow-y:auto; }
-#tab-import-products-v2.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
-
 /* 인보이스V2 — tab-content flex 무효화 */
 #tab-import-invoice-v2.tab-content.active { display:block !important; overflow-y:auto; }
 #tab-import-invoice-v2.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
@@ -2201,3 +2197,37 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   cursor: pointer;
   border-radius: 6px;
 }
+
+/* ===== 제품·발주 통합탭 (P1 뼈대) ===== */
+.pc-main-header { display:flex; align-items:center; padding:10px 14px; background:#1A1D23; color:white; gap:8px; }
+.pc-mh-left { display:flex; align-items:center; gap:10px; flex:1; }
+.pc-mh-title { font-size:15px; font-weight:600; font-family:Pretendard,sans-serif; }
+.pc-badge-state { background:#EF9F27; color:#1A1D23; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.pc-mh-meta { font-size:12px; color:#aaa; font-family:Pretendard,sans-serif; }
+
+.pc-split { display:grid; grid-template-columns:65fr 35fr; background:#fff; min-height:640px; }
+.pc-panel { display:flex; flex-direction:column; min-width:0; border-right:1px solid #DDE1EB; }
+.pc-panel:last-child { border-right:none; }
+
+.pc-panel-header { display:flex; align-items:center; justify-content:space-between; padding:0 14px; height:40px; background:#1A1D23; color:white; }
+.pc-panel-title { font-size:14px; font-weight:600; display:flex; align-items:center; gap:10px; font-family:Pretendard,sans-serif; }
+.pc-panel-count { font-size:12px; color:#ccc; font-weight:400; }
+.pc-panel-actions { display:flex; gap:6px; }
+
+.btn-mini { font-size:11px; padding:4px 10px; border-radius:4px; background:#2a2d33; color:#ccc; border:1px solid #444; cursor:pointer; font-family:Pretendard,sans-serif; }
+.btn-mini:hover { background:#3a3d43; }
+.btn-mini-p { background:#185FA5; color:white; border-color:#185FA5; }
+.btn-mini-p:hover { background:#1a6bb8; }
+.btn-mini-erp { background:#F0997B; color:#4A1B0C; border-color:#D85A30; font-weight:600; }
+.btn-mini-erp:hover { background:#ec8866; }
+.btn-mini-confirm { background:#1D9E75; color:white; border-color:#1D9E75; font-weight:600; }
+.btn-mini-confirm:hover { background:#23b384; }
+
+.pc-search-bar { display:flex; gap:6px; padding:8px 12px; background:#FAFAF7; border-bottom:1px solid #DDE1EB; }
+.pc-search-input { flex:1; height:32px; border:1px solid #DDE1EB; border-radius:4px; padding:0 10px; font-size:12px; font-family:Pretendard,sans-serif; }
+.pc-search-sel { height:32px; min-width:120px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:12px; background:#fff; font-family:Pretendard,sans-serif; }
+
+.pc-info-strip { padding:6px 14px; background:#FAFAF7; border-bottom:1px solid #DDE1EB; font-size:12px; color:#5A6070; font-family:Pretendard,sans-serif; }
+
+.pc-tbl-placeholder { flex:1; display:flex; align-items:center; justify-content:center; color:#9BA3B2; font-size:13px; background:#F8F9FB; padding:40px; font-family:Pretendard,sans-serif; }
+.pc-right-summary-skeleton { padding:12px 14px; border-top:1px solid #DDE1EB; background:#FAFAF7; color:#9BA3B2; font-size:12px; font-family:Pretendard,sans-serif; }
