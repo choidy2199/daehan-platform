@@ -2361,6 +2361,7 @@ var _tabIdMap = {
   'import-product':   { contentId: 'tab-import-product',   render: 'importProduct' },
   'import-calc':      { contentId: 'tab-import-calc',      render: 'importCalc' },
   'import-invoice':   { contentId: 'tab-import-invoice',   render: 'importInvoice' },
+  'import-po-v2':     { contentId: 'tab-import-po-v2',       render: 'importPoV2' },
   'import-product-v2':{ contentId: 'tab-import-products-v2', render: 'importProductsV2' },
   'import-invoice-v2':{ contentId: 'tab-import-invoice-v2',  render: 'importInvoiceV2' },
   'import-batch-v2':  { contentId: 'tab-import-batch-v2',    render: 'importBatchV2' },
@@ -2433,6 +2434,7 @@ function switchTab(tab) {
       if (renderKey === 'importCalc') renderImportCalcTab();
       if (renderKey === 'importProduct') renderImportProductTab();
       if (renderKey === 'importInvoice') renderImportInvoiceTab();
+      if (renderKey === 'importPoV2') _poInit();
       if (renderKey === 'importProductsV2') _renderImportProductsV2();
       if (renderKey === 'importInvoiceV2') _ipinv2Render();
       if (renderKey === 'importBatchV2') _ipbat2Render();
@@ -21230,6 +21232,265 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 
 // ========================================
+// 발주서V2 (import_po_headers / items) — Phase B1: 탭 + 목록
+// ========================================
+
+var _poList = [];
+var _poFilter = 'all';       // 'all' | 'draft' | 'confirmed' | 'linked' | 'completed'
+var _poSearch = '';
+var _poSearchTimer = null;
+var _poLoading = false;
+
+function _poEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _poToast(msg, type, ms) {
+  var bg = type === 'error' ? '#CC2222' : (type === 'success' ? '#1D9E75' : '#185FA5');
+  var el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:16px;right:16px;padding:10px 16px;background:' + bg + ';color:#fff;border-radius:6px;font-size:13px;font-weight:500;font-family:Pretendard,sans-serif;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function(){ if (el && el.parentNode) el.parentNode.removeChild(el); }, ms || 2500);
+}
+
+function _poFormatStatusBadge(status) {
+  var map = {
+    draft:     { bg:'#FAEEDA', color:'#854F0B', label:'작성중' },
+    confirmed: { bg:'#E6F1FB', color:'#0C447C', label:'확정' },
+    linked:    { bg:'#EEEDFE', color:'#3C3489', label:'인보이스연결' },
+    completed: { bg:'#E1F5EE', color:'#085041', label:'완료' },
+  };
+  var m = map[status] || map.draft;
+  return '<span style="display:inline-block;font-size:11px;padding:3px 9px;border-radius:10px;background:' + m.bg + ';color:' + m.color + ';font-weight:500;white-space:nowrap;">' + m.label + '</span>';
+}
+
+function _poFormatDate(s) {
+  if (!s) return '-';
+  var d = new Date(s);
+  if (isNaN(d.getTime())) return '-';
+  return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+}
+
+function _poFormatUsd(n) {
+  var v = Number(n || 0);
+  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function _poInit() {
+  var container = document.getElementById('tab-import-po-v2');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
+  _poLoadList(function() {
+    _poRenderLayout(container);
+    _poBindEvents();
+    _poRenderList();
+  });
+}
+
+function _poLoadList(cb) {
+  _poLoading = true;
+  fetch('/api/import-po', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      _poList = (json && json.success) ? (json.data || []) : [];
+      _poLoading = false;
+      if (typeof cb === 'function') cb();
+    })
+    .catch(function(e) {
+      console.error('[po] list fetch', e);
+      _poList = [];
+      _poLoading = false;
+      if (typeof cb === 'function') cb();
+    });
+}
+
+function _poFiltered() {
+  var arr = _poList.slice();
+  if (_poFilter !== 'all') arr = arr.filter(function(p) { return p.status === _poFilter; });
+  var q = (_poSearch || '').trim().toLowerCase();
+  if (q) {
+    arr = arr.filter(function(p) {
+      return String(p.po_number || '').toLowerCase().indexOf(q) !== -1
+        || String(p.brand || '').toLowerCase().indexOf(q) !== -1
+        || String(p.factory_code || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  return arr;
+}
+
+function _poCountByStatus() {
+  var c = { all: _poList.length, draft: 0, confirmed: 0, linked: 0, completed: 0 };
+  _poList.forEach(function(p) { if (c[p.status] !== undefined) c[p.status]++; });
+  return c;
+}
+
+function _poRenderLayout(container) {
+  var h = '';
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;margin:0;">';
+  // 다크 헤더
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#1A1D23;color:#fff;">';
+  h += '<div style="display:flex;align-items:center;gap:10px;">';
+  h += '<span style="font-size:14px;font-weight:500;color:#fff;">발주서V2</span>';
+  h += '<span id="po-count" style="font-size:12px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);color:#fff;font-weight:500;">0건</span>';
+  h += '</div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;">';
+  h += '<input type="text" id="po-search" value="' + _poEsc(_poSearch) + '" placeholder="발주번호 / 브랜드 / 공장코드 검색..." autocomplete="off" style="height:32px;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;background:rgba(255,255,255,0.08);color:#fff;min-width:260px;">';
+  h += '<button onclick="_poOnCreateClick()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">+ 새 발주서</button>';
+  h += '</div></div>';
+
+  // 필터 칩 영역
+  h += '<div id="po-filter-bar" style="display:flex;align-items:center;gap:6px;padding:10px 20px;background:#fff;border-bottom:0.5px solid #eee;flex-wrap:wrap;"></div>';
+
+  // 테이블 컨테이너
+  h += '<div id="po-table-wrap" style="overflow:auto;max-height:calc(100vh - 220px);"></div>';
+  h += '</div>';
+
+  // 모달 자리
+  h += '<div id="po-modal-root"></div>';
+
+  container.innerHTML = h;
+}
+
+function _poRenderFilterChips() {
+  var bar = document.getElementById('po-filter-bar');
+  if (!bar) return;
+  var counts = _poCountByStatus();
+  var chips = [
+    { key: 'all',       label: '전체',         bg: '#1A1D23', color: '#fff' },
+    { key: 'draft',     label: '작성중',       bg: '#FAEEDA', color: '#854F0B' },
+    { key: 'confirmed', label: '확정',         bg: '#E6F1FB', color: '#0C447C' },
+    { key: 'linked',    label: '인보이스연결', bg: '#EEEDFE', color: '#3C3489' },
+    { key: 'completed', label: '완료',         bg: '#E1F5EE', color: '#085041' },
+  ];
+  var h = '';
+  chips.forEach(function(c) {
+    var active = _poFilter === c.key;
+    var bg = active ? c.bg : '#fff';
+    var col = active ? c.color : '#5A6070';
+    var border = active ? c.bg : '#DDE1EB';
+    h += '<button onclick="_poOnFilterClick(\'' + c.key + '\')" style="font-size:12px;padding:5px 12px;border-radius:999px;background:' + bg + ';color:' + col + ';border:1px solid ' + border + ';cursor:pointer;font-family:Pretendard,sans-serif;font-weight:' + (active ? '600' : '500') + ';white-space:nowrap;">' + c.label + ' <span style="opacity:0.7;margin-left:3px;">(' + counts[c.key] + ')</span></button>';
+  });
+  bar.innerHTML = h;
+}
+
+function _poRenderList() {
+  _poRenderFilterChips();
+
+  var countEl = document.getElementById('po-count');
+  if (countEl) countEl.textContent = _poList.length + '건';
+
+  var wrap = document.getElementById('po-table-wrap');
+  if (!wrap) return;
+  var rows = _poFiltered();
+
+  if (_poList.length === 0) {
+    _poRenderEmpty(wrap);
+    return;
+  }
+
+  var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
+  var tdS = 'padding:9px 10px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
+
+  var h = '<table id="po-list-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  h += '<colgroup>';
+  // No / 발주번호 / 발주일 / 브랜드 / 수량 / 금액 / 상태 / 연결인보이스 / 액션
+  h += '<col style="width:40px"><col style="width:130px"><col style="width:100px"><col style="width:100px"><col style="width:80px"><col style="width:110px"><col style="width:110px"><col style="width:120px"><col style="width:110px">';
+  h += '</colgroup>';
+  h += '<thead><tr>';
+  h += '<th style="' + thS + '">No.</th>';
+  h += '<th style="' + thS + '">발주번호</th>';
+  h += '<th style="' + thS + '">발주일</th>';
+  h += '<th style="' + thS + '">브랜드</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">수량</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">금액</th>';
+  h += '<th style="' + thS + '">상태</th>';
+  h += '<th style="' + thS + '">연결 인보이스</th>';
+  h += '<th style="' + thS + '">액션</th>';
+  h += '</tr></thead><tbody>';
+
+  if (rows.length === 0) {
+    h += '<tr><td colspan="9" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">필터 조건에 해당하는 발주서가 없습니다.</td></tr>';
+  } else {
+    rows.forEach(function(r, i) {
+      h += '<tr data-po-id="' + r.id + '" onmouseover="this.style.background=\'#FAFAF7\'" onmouseout="this.style.background=\'\'">';
+      h += '<td style="' + tdS + 'color:#9BA3B2;">' + (i + 1) + '</td>';
+      h += '<td style="' + tdS + '"><span onclick="_poOnRowClick(\'' + r.id + '\')" style="color:#185FA5;cursor:pointer;font-family:monospace;font-size:12px;font-weight:600;">' + _poEsc(r.po_number) + '</span></td>';
+      h += '<td style="' + tdS + 'color:#5A6070;">' + _poFormatDate(r.po_date) + '</td>';
+      h += '<td style="' + tdS + '">' + (r.brand ? _poEsc(r.brand) : '<span style="color:#9BA3B2">-</span>') + '</td>';
+      h += '<td style="' + tdS + 'text-align:right;padding-right:12px;">' + (Number(r.total_quantity || 0) > 0 ? (Number(r.total_quantity) + ' EA') : '<span style="color:#9BA3B2">0 EA</span>') + '</td>';
+      h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;">' + _poFormatUsd(r.total_fob_usd) + '</td>';
+      h += '<td style="' + tdS + '">' + _poFormatStatusBadge(r.status) + '</td>';
+      if (r.linked_invoice_id) {
+        h += '<td style="' + tdS + '"><span style="color:#185FA5;cursor:pointer;font-family:monospace;font-size:12px;">연결됨</span></td>';
+      } else {
+        h += '<td style="' + tdS + 'color:#9BA3B2;font-size:12px;">미연결</td>';
+      }
+      var isDraft = r.status === 'draft';
+      var actLabel = isDraft ? '편집' : '보기';
+      h += '<td style="' + tdS + '"><button onclick="_poOnRowClick(\'' + r.id + '\')" style="font-size:11px;padding:3px 10px;border-radius:4px;border:1px solid ' + (isDraft ? '#854F0B' : '#DDE1EB') + ';background:' + (isDraft ? '#FAEEDA' : '#fff') + ';color:' + (isDraft ? '#854F0B' : '#5A6070') + ';cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">' + actLabel + '</button></td>';
+      h += '</tr>';
+    });
+  }
+  h += '</tbody></table>';
+  wrap.innerHTML = h;
+  if (typeof initColumnResize === 'function') initColumnResize('po-list-table');
+}
+
+function _poRenderEmpty(wrap) {
+  var h = '';
+  h += '<div style="padding:80px 20px;text-align:center;font-family:Pretendard,sans-serif;">';
+  h += '<div style="font-size:40px;color:#DDE1EB;margin-bottom:14px;">📋</div>';
+  h += '<div style="font-size:15px;color:#5A6070;margin-bottom:8px;font-weight:500;">등록된 발주서가 없습니다</div>';
+  h += '<div style="font-size:12px;color:#9BA3B2;margin-bottom:20px;">첫 발주서를 만들어 수입 흐름을 시작하세요.</div>';
+  h += '<button onclick="_poOnCreateClick()" style="font-size:13px;padding:8px 18px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:600;">+ 새 발주서 만들기</button>';
+  h += '</div>';
+  wrap.innerHTML = h;
+}
+
+function _poBindEvents() {
+  var searchInp = document.getElementById('po-search');
+  if (searchInp) {
+    var composing = false;
+    searchInp.addEventListener('compositionstart', function(){ composing = true; });
+    searchInp.addEventListener('compositionend', function(e){ composing = false; _poOnSearchInput(e.target.value); });
+    searchInp.addEventListener('input', function(e){ if (!composing) _poOnSearchInput(e.target.value); });
+  }
+}
+
+function _poOnSearchInput(value) {
+  if (_poSearchTimer) clearTimeout(_poSearchTimer);
+  _poSearchTimer = setTimeout(function() {
+    _poSearch = value;
+    _poRenderList();
+  }, 300);
+}
+
+function _poOnFilterClick(key) {
+  _poFilter = key;
+  _poRenderList();
+}
+
+function _poOnCreateClick() {
+  fetch('/api/import-po', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        _poToast('새 발주서 생성: ' + json.data.po_number, 'success');
+        _poLoadList(function() { _poRenderList(); });
+      } else {
+        _poToast(json.error || '발주서 생성 실패', 'error');
+      }
+    })
+    .catch(function(err) { _poToast('네트워크 오류: ' + (err && err.message || err), 'error'); });
+}
+
+function _poOnRowClick(poId) {
+  // Phase B2 placeholder
+  _poToast('상세 화면은 Phase B2에서 구현됩니다', 'info');
+}
+
+// ========================================
 // 제품V2 (import_products_v2) — Phase 1 Step 2
 // ========================================
 
@@ -24623,6 +24884,8 @@ const _tx = {
     transactionDate: null,
     manager: '',
     items: [],                  // { code, name, qty, unitPrice, spec, supplyAmount, vatAmount, isAuto, productRef, source, priceTiers }
+    savedId: null,              // Phase 4: 저장된 전표 UUID (수정 모드 판정)
+    documentNo: null,           // Phase 4: DH-YYYYMMDD-NNNN
   },
 
   _initialized: false,
@@ -24676,6 +24939,9 @@ const _tx = {
 
     // Phase 3B-5: 가격 등급 뱃지 초기 렌더 (거래처 미선택 상태면 숨김)
     if (this.grade && typeof this.grade.renderBadge === 'function') this.grade.renderBadge();
+
+    // Phase 4: 수정 모드 UI 초기화 (신규 작성 모드)
+    this._updateSaveModeUI();
 
     // 초기 상태: 상품 라인 빈 안내 행
     this.renderItemsTable();
@@ -24765,8 +25031,29 @@ const _tx = {
     }
     const saveBtn = document.getElementById('tx-btn-save');
     if (saveBtn) {
-      saveBtn.addEventListener('click', function() {
-        console.log('[TX] 저장 버튼 클릭 — Phase 5에서 구현 예정', JSON.parse(JSON.stringify(_tx.state)));
+      saveBtn.addEventListener('click', function() { _tx.save(); });
+    }
+    const delBtn = document.getElementById('tx-btn-delete');
+    if (delBtn) {
+      delBtn.addEventListener('click', function() { _tx.delete(); });
+    }
+    // 저장 성공 팝업 버튼
+    const newBtn = document.getElementById('tx-btn-new-doc');
+    if (newBtn) {
+      newBtn.addEventListener('click', function() {
+        _tx._hideSavePopup();
+        _tx._resetToNew();
+      });
+    }
+    const contBtn = document.getElementById('tx-btn-continue');
+    if (contBtn) {
+      contBtn.addEventListener('click', function() { _tx._hideSavePopup(); });
+    }
+    const popup = document.getElementById('tx-save-popup');
+    if (popup) {
+      popup.addEventListener('click', function(e) {
+        // 배경(backdrop) 클릭 시 "계속 수정"과 동일 동작 — 내부 .tx-save-popup 클릭은 제외
+        if (e.target === popup) _tx._hideSavePopup();
       });
     }
   },
@@ -26020,6 +26307,185 @@ const _tx = {
   _onReenter() {
     if (!this._initialized) return;
     this.search._showDefaultsIfEmpty();
+  },
+
+  // ================================================================
+  // Phase 4 — 저장/수정/삭제 CRUD + 수정 모드 UI + 저장 성공 팝업
+  // ================================================================
+  _validate() {
+    const errors = [];
+    const s = this.state;
+    if (!s.customerCode || !s.customerName) errors.push('• 거래처를 선택해주세요');
+    if (!s.transactionDate) errors.push('• 거래일자를 입력해주세요');
+    if (!Array.isArray(s.items) || s.items.length === 0) {
+      errors.push('• 상품을 하나 이상 추가해주세요');
+    } else {
+      for (let i = 0; i < s.items.length; i++) {
+        const it = s.items[i];
+        const qty = Number(it.qty);
+        const price = Number(it.unitPrice);
+        if (!qty || qty <= 0) errors.push('• ' + (i + 1) + '번 상품의 수량이 올바르지 않습니다');
+        if (it.unitPrice == null || isNaN(price) || price < 0) {
+          errors.push('• ' + (i + 1) + '번 상품의 단가가 올바르지 않습니다');
+        }
+      }
+    }
+    return errors;
+  },
+
+  _buildSavePayload() {
+    const s = this.state;
+    const totals = this.recalcTotals();
+    return {
+      doc_type: s.docType,
+      transaction_date: s.transactionDate,
+      customer_code: s.customerCode,
+      customer_name: s.customerName,
+      manager: s.manager || null,
+      price_grade: s.customerPriceGrade || null,
+      status: 'saved',
+      supply_amount: totals.supply,
+      vat_amount: totals.vat,
+      total_amount: totals.total,
+      created_by: s.manager || ((window.currentUser && window.currentUser.loginId) || 'admin'),
+      items: s.items.map(function(it, idx) {
+        return {
+          line_no: idx + 1,
+          product_code: it.code,
+          product_name: it.name,
+          spec: it.spec || null,
+          quantity: Number(it.qty) || 0,
+          unit_price: Number(it.unitPrice) || 0,
+          supply_amount: Number(it.supplyAmount) || 0,
+          vat_amount: Number(it.vatAmount) || 0,
+          is_auto: it.isAuto !== false,
+          source: it.source || null,
+          memo: it.memo || null,
+        };
+      }),
+    };
+  },
+
+  async save() {
+    const errors = this._validate();
+    if (errors.length > 0) {
+      alert('저장할 수 없습니다:\n\n' + errors.join('\n'));
+      return;
+    }
+    const payload = this._buildSavePayload();
+    const isUpdate = !!this.state.savedId;
+    const url = isUpdate ? '/api/transactions/' + this.state.savedId : '/api/transactions';
+    const method = isUpdate ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!data || !data.success) {
+        alert('저장 실패: ' + ((data && data.error) || 'HTTP ' + res.status));
+        return;
+      }
+      this.state.savedId = data.data.id;
+      this.state.documentNo = data.data.doc_number;
+      this._updateSaveModeUI();
+      await this.loadHistoryPanel();
+      this._showSavePopup(isUpdate);
+    } catch (err) {
+      console.error('[TX] 저장 실패', err);
+      alert('저장 실패: ' + (err && err.message ? err.message : err));
+    }
+  },
+
+  async delete() {
+    if (!this.state.savedId) return;
+    const confirmed = confirm(
+      '이 거래명세서를 삭제하시겠습니까?\n\n' +
+      '전표번호: ' + (this.state.documentNo || '(번호 없음)') + '\n' +
+      '거래처: ' + (this.state.customerName || '-') + '\n\n' +
+      '삭제 후 복구할 수 없습니다.'
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch('/api/transactions/' + this.state.savedId, { method: 'DELETE' });
+      const data = await res.json();
+      if (!data || !data.success) {
+        alert('삭제 실패: ' + ((data && data.error) || 'HTTP ' + res.status));
+        return;
+      }
+      await this.loadHistoryPanel();
+      this._resetToNew();
+      alert('삭제되었습니다.');
+    } catch (err) {
+      console.error('[TX] 삭제 실패', err);
+      alert('삭제 실패: ' + (err && err.message ? err.message : err));
+    }
+  },
+
+  _resetToNew() {
+    this.state.savedId = null;
+    this.state.documentNo = null;
+    this.state.customerCode = '';
+    this.state.customerName = '';
+    this.state.customerPriceGrade = null;
+    this.state.items = [];
+
+    const cu = (typeof window !== 'undefined' && window.currentUser) ? window.currentUser : null;
+    this.state.manager = (cu && (cu.name || cu.loginId)) || 'admin';
+
+    // 오늘 날짜 재세팅
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    this.state.transactionDate = y + '-' + m + '-' + d;
+
+    const custInput = document.getElementById('tx-customer-input');
+    if (custInput) custInput.value = '';
+    const searchInput = document.getElementById('tx-search-input');
+    if (searchInput) searchInput.value = '';
+    const dateEl = document.querySelector('#tab-transactions .tx-input[type="date"]');
+    if (dateEl) dateEl.value = this.state.transactionDate;
+
+    this._updateSaveModeUI();
+    this.renderItemsTable();
+    this.renderSummary();
+    if (this.grade && typeof this.grade.renderBadge === 'function') this.grade.renderBadge();
+    if (this.search && typeof this.search._showDefaultsIfEmpty === 'function') {
+      this.search._showDefaultsIfEmpty();
+    }
+    this.renderHistoryPanel(null, null);
+  },
+
+  _updateSaveModeUI() {
+    const saved = !!this.state.savedId;
+    const saveBtn = document.getElementById('tx-btn-save');
+    const delBtn = document.getElementById('tx-btn-delete');
+    const status = document.getElementById('tx-save-status');
+    const statusNo = document.getElementById('tx-save-status-no');
+    const autoHint = document.getElementById('tx-autosave-hint');
+    if (saveBtn) saveBtn.textContent = saved ? '수정' : '저장';
+    if (delBtn) delBtn.classList.toggle('tx-hidden', !saved);
+    if (status) status.classList.toggle('tx-hidden', !saved);
+    if (statusNo) statusNo.textContent = saved ? ('· ' + (this.state.documentNo || '')) : '';
+    if (autoHint) autoHint.style.display = saved ? 'none' : '';
+  },
+
+  _showSavePopup(isUpdate) {
+    const popup = document.getElementById('tx-save-popup');
+    const docEl = document.getElementById('tx-save-doc-no');
+    const titleEl = document.getElementById('tx-save-popup-title');
+    if (titleEl) titleEl.textContent = isUpdate ? '수정되었습니다' : '저장되었습니다';
+    if (docEl) docEl.textContent = this.state.documentNo || '';
+    if (popup) popup.classList.remove('tx-hidden');
+  },
+
+  _hideSavePopup() {
+    const popup = document.getElementById('tx-save-popup');
+    if (popup) popup.classList.add('tx-hidden');
   },
 };
 

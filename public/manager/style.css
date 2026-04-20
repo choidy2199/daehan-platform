@@ -2097,3 +2097,107 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   color: #185FA5;
   font-weight: 600;
 }
+
+/* =================================================================
+   거래명세서 Phase 4 — 저장 상태 표시 / 삭제 버튼 / 저장 팝업
+   ================================================================= */
+
+/* 저장됨 상태 표시 (하단 좌측 autosave 영역) */
+.tx-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #1D9E75;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.tx-save-status-dot { color: #1D9E75; font-size: 10px; }
+.tx-save-status-no  { color: #5A6070; font-weight: 400; margin-left: 2px; }
+
+/* 삭제 버튼 (빨강 강조) */
+.tx-btn-delete {
+  height: 32px;
+  padding: 0 14px;
+  background: #CC2222;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tx-btn-delete:hover { background: #A81A1A; }
+
+/* 저장 성공 팝업 */
+.tx-save-popup-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tx-save-popup-backdrop.tx-hidden { display: none; }
+
+.tx-save-popup {
+  width: 360px;
+  background: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0 20px 48px rgba(26, 29, 35, 0.18);
+  padding: 24px;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.tx-save-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tx-save-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #1D9E75;
+  color: #FFFFFF;
+  border-radius: 999px;
+  font-size: 20px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.tx-save-popup-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.tx-save-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A1D23;
+}
+.tx-save-doc-no {
+  font-size: 13px;
+  color: #5A6070;
+  font-variant-numeric: tabular-nums;
+}
+.tx-save-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.tx-save-popup-actions button {
+  height: 36px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+}

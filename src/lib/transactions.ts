@@ -41,6 +41,8 @@ export interface TransactionItem {
   supply_amount: number;
   vat_amount: number;
   memo: string | null;
+  is_auto: boolean | null;
+  source: string | null;
 }
 
 export interface TransactionWithItems extends Transaction {
@@ -55,6 +57,8 @@ export interface TransactionItemInput {
   quantity: number;
   unit_price: number;
   supply_amount: number;
+  is_auto?: boolean | null;
+  source?: string | null;
   vat_amount?: number;
   memo?: string | null;
 }
@@ -113,7 +117,36 @@ function mapItems(transactionId: string, items: TransactionItemInput[]) {
     supply_amount: it.supply_amount,
     vat_amount: it.vat_amount ?? 0,
     memo: it.memo ?? null,
+    is_auto: it.is_auto ?? true,
+    source: it.source ?? null,
   }));
+}
+
+// ========== 0. generateDocNumber — 전표번호 채번 (DH-YYYYMMDD-NNNN) ==========
+
+export async function generateDocNumber(
+  transactionDate: string,
+  client?: Client
+): Promise<string> {
+  const sb = getClient(client);
+  const yyyymmdd = String(transactionDate || '').replace(/-/g, '');
+  const prefix = `DH-${yyyymmdd}-`;
+
+  const { data, error } = await sb
+    .from('dh_transactions')
+    .select('doc_number')
+    .like('doc_number', `${prefix}%`)
+    .order('doc_number', { ascending: false })
+    .limit(1);
+
+  if (error) throw new Error(`채번 조회 실패: ${error.message}`);
+
+  let seq = 1;
+  if (data && data.length > 0 && data[0].doc_number) {
+    const m = String(data[0].doc_number).match(/-(\d+)$/);
+    if (m) seq = parseInt(m[1], 10) + 1;
+  }
+  return `${prefix}${String(seq).padStart(4, '0')}`;
 }
 
 // ========== 1. createTransaction ==========
@@ -124,16 +157,39 @@ export async function createTransaction(
 ): Promise<TransactionWithItems> {
   const sb = getClient(client);
   try {
-    const { items, ...header } = data;
+    const { items, ...headerIn } = data;
 
-    const { data: inserted, error: headerErr } = await sb
-      .from('dh_transactions')
-      .insert(header)
-      .select()
-      .single();
+    // 전표번호 없으면 자동 채번 (UNIQUE 충돌 시 3회 재시도)
+    let header = { ...headerIn } as Record<string, unknown>;
+    let inserted: { id: string } | null = null;
+    let attempt = 0;
+    const MAX_RETRY = 4; // 최초 1회 + 재시도 3회
 
-    if (headerErr) throw headerErr;
-    if (!inserted) throw new Error('헤더 insert 실패 — 데이터 없음');
+    while (!inserted && attempt < MAX_RETRY) {
+      attempt++;
+      if (!header.doc_number) {
+        header.doc_number = await generateDocNumber(String(headerIn.transaction_date), sb);
+      }
+      const { data: ins, error: hErr } = await sb
+        .from('dh_transactions')
+        .insert(header)
+        .select()
+        .single();
+
+      if (!hErr && ins) { inserted = ins as { id: string }; break; }
+
+      // UNIQUE 충돌(23505) → doc_number 재채번 후 재시도
+      const code = (hErr as unknown as { code?: string })?.code;
+      const msg = (hErr as unknown as { message?: string })?.message || '';
+      const isConflict = code === '23505' || /duplicate|unique/i.test(msg);
+      if (isConflict && attempt < MAX_RETRY) {
+        header.doc_number = null;
+        continue;
+      }
+      throw hErr;
+    }
+
+    if (!inserted) throw new Error('헤더 insert 실패 — 재시도 초과');
 
     const transactionId = inserted.id as string;
 

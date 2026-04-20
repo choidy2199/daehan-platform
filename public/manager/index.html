@@ -91,6 +91,7 @@ document.head.appendChild(s);
         <span class="sidebar-arrow"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
       </button>
       <div class="sidebar-sub">
+        <div class="sidebar-sub-item" data-tab="tab-import-po-v2" data-window="발주서V2" onclick="_sidebarOpenWindow('발주서V2')"><span>발주서V2</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('발주서V2')">★</button></div>
         <div class="sidebar-sub-item" data-tab="tab-import-product" data-window="제품" onclick="_sidebarOpenWindow('제품')"><span>제품</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('제품')">★</button></div>
         <div class="sidebar-sub-item" data-tab="tab-import-calc" data-window="수입계산기" onclick="_sidebarOpenWindow('수입계산기')"><span>수입계산기</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('수입계산기')">★</button></div>
         <div class="sidebar-sub-item" data-tab="tab-import-invoice" data-window="인보이스" onclick="_sidebarOpenWindow('인보이스')"><span>인보이스</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('인보이스')">★</button></div>
@@ -818,8 +819,16 @@ document.head.appendChild(s);
 
       <!-- 하단 버튼 행 -->
       <div class="tx-actions-row">
-        <div class="tx-autosave">💾 자동 임시저장 · 2분 전</div>
+        <div class="tx-autosave">
+          <span id="tx-save-status" class="tx-save-status tx-hidden">
+            <span class="tx-save-status-dot">●</span>
+            <span class="tx-save-status-text">저장됨</span>
+            <span class="tx-save-status-no" id="tx-save-status-no"></span>
+          </span>
+          <span id="tx-autosave-hint">💾 자동 임시저장 · 2분 전</span>
+        </div>
         <div class="tx-actions">
+          <button type="button" id="tx-btn-delete" class="tx-btn tx-btn-delete tx-hidden">삭제</button>
           <button type="button" id="tx-btn-reset" class="tx-btn tx-btn-ghost">초기화</button>
           <button type="button" id="tx-btn-save" class="tx-btn tx-btn-primary">저장</button>
         </div>
@@ -893,6 +902,23 @@ document.head.appendChild(s);
         <a class="tx-history-more" href="#">전체 거래내역 보기 →</a>
       </div>
     </aside>
+  </div>
+
+  <!-- Phase 4: 저장 성공 팝업 -->
+  <div id="tx-save-popup" class="tx-save-popup-backdrop tx-hidden">
+    <div class="tx-save-popup">
+      <div class="tx-save-popup-header">
+        <span class="tx-save-icon">✓</span>
+        <div class="tx-save-popup-text">
+          <div class="tx-save-title" id="tx-save-popup-title">저장되었습니다</div>
+          <div class="tx-save-doc-no" id="tx-save-doc-no"></div>
+        </div>
+      </div>
+      <div class="tx-save-popup-actions">
+        <button type="button" id="tx-btn-new-doc" class="tx-btn tx-btn-ghost">새 작성</button>
+        <button type="button" id="tx-btn-continue" class="tx-btn tx-btn-primary">계속 수정</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1066,6 +1092,7 @@ document.head.appendChild(s);
 <div id="tab-import-product" class="tab-content"></div>
 <div id="tab-import-calc" class="tab-content"></div>
 <div id="tab-import-invoice" class="tab-content"></div>
+<div id="tab-import-po-v2" class="tab-content"></div>
 <div id="tab-import-products-v2" class="tab-content"></div>
 <div id="tab-import-invoice-v2" class="tab-content"></div>
 <div id="tab-import-batch-v2" class="tab-content"></div>
