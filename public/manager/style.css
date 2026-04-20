@@ -1558,6 +1558,13 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   font-weight: 600;
   text-align: right !important;
 }
+.tx-input-warn {
+  background: #FCEBEB;
+  border-left: 2px solid #CC2222;
+  color: #CC2222;
+  font-weight: 600;
+  text-align: right !important;
+}
 .tx-row-del {
   width: 24px;
   height: 24px;

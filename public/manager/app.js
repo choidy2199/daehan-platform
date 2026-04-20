@@ -2355,7 +2355,7 @@ var _tabIdMap = {
   'mw-set':           { contentId: 'tab-setbun',           render: 'setbun' },
   'gen-price':        { contentId: 'tab-general',          render: 'general' },
   'gen-trade':        { contentId: 'tab-gen-trade',        placeholder: true },
-  'transactions':     { contentId: 'tab-transactions',     placeholder: true },
+  'transactions':     { contentId: 'tab-transactions',     render: 'tx' },
   'sales-online':     { contentId: 'tab-sales',            render: 'sales' },
   'sales-marketing':  { contentId: 'tab-sales-marketing',  placeholder: true },
   'import-product':   { contentId: 'tab-import-product',   render: 'importProduct' },
@@ -2436,6 +2436,7 @@ function switchTab(tab) {
       if (renderKey === 'importProductsV2') _renderImportProductsV2();
       if (renderKey === 'importInvoiceV2') _ipinv2Render();
       if (renderKey === 'importBatchV2') _ipbat2Render();
+      if (renderKey === 'tx') _tx.init();
       _renderedTabs[renderKey] = true;
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
@@ -23867,3 +23868,330 @@ function _ipbat2CopyErpPreview() {
 function _ipbat2SendErp() {
   alert('경영박사 전송은 Phase 2에서 구현 예정입니다.');
 }
+
+// =================================================================
+// 거래명세서 (Transactions) — Phase 3A: 탭 전환 + 상품 라인
+// =================================================================
+const _tx = {
+  // ---- 상태 ----
+  state: {
+    docType: 'sales',           // 'sales' | 'purchase' | 'quote'
+    customerCode: 'TEST_001',
+    customerName: '태경공구',
+    transactionDate: null,
+    manager: '',
+    items: [],                  // { code, name, qty, unitPrice, supplyAmount, vatAmount, isAuto, productRef }
+  },
+
+  _initialized: false,
+
+  // ---- 초기화 (_tabIdMap의 render: 'tx'로 호출됨) ----
+  init() {
+    if (this._initialized) return;
+    this._initialized = true;
+
+    // 초기 상태 세팅
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    this.state.transactionDate = y + '-' + m + '-' + d;
+
+    const cu = (typeof window !== 'undefined' && window.currentUser) ? window.currentUser : null;
+    this.state.manager = (cu && (cu.name || cu.loginId)) || 'admin';
+
+    // DOM 폼 초기값 반영
+    const dateEl = document.querySelector('#tab-transactions .tx-input[type="date"]');
+    if (dateEl) dateEl.value = this.state.transactionDate;
+
+    const mgrInputs = document.querySelectorAll('#tab-transactions .tx-input-field');
+    mgrInputs.forEach(function(field) {
+      const lbl = field.querySelector('.tx-label');
+      if (lbl && lbl.textContent.trim() === '담당자') {
+        const input = field.querySelector('.tx-input');
+        if (input) input.value = _tx.state.manager;
+      }
+    });
+
+    // 이벤트 바인딩
+    this._bindTabs();
+    this._bindSearchAdd();
+    this._bindItemsTable();
+    this._bindFooterButtons();
+
+    // 초기 상태: 상품 라인 빈 안내 행
+    this.renderItemsTable();
+    this.renderSummary();
+  },
+
+  // ---- 이벤트 바인딩 ----
+  _bindTabs() {
+    const root = document.getElementById('tab-transactions');
+    if (!root) return;
+    const tabs = root.querySelectorAll('.tx-tab[data-doctype]');
+    tabs.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _tx.switchDocType(btn.getAttribute('data-doctype'));
+      });
+    });
+  },
+
+  _bindSearchAdd() {
+    const body = document.getElementById('tx-search-body');
+    if (!body) return;
+    body.addEventListener('click', function(e) {
+      const btn = e.target.closest('.tx-add-btn');
+      if (!btn) return;
+      const tr = btn.closest('tr');
+      if (!tr) return;
+      const cells = tr.children;
+      const code = (cells[1] && cells[1].textContent || '').trim();
+      const name = (cells[2] && cells[2].textContent || '').trim();
+      const priceTxt = (cells[4] && cells[4].textContent || '').trim();
+      const fallbackPrice = parseInt(priceTxt.replace(/,/g, ''), 10) || 0;
+      if (!code) return;
+      _tx.addItem(code, { fallbackName: name, fallbackRetail: fallbackPrice });
+    });
+  },
+
+  _bindItemsTable() {
+    const body = document.getElementById('tx-items-body');
+    if (!body) return;
+
+    // 삭제 버튼
+    body.addEventListener('click', function(e) {
+      const delBtn = e.target.closest('.tx-row-del');
+      if (!delBtn) return;
+      const tr = delBtn.closest('tr[data-idx]');
+      if (!tr) return;
+      const idx = parseInt(tr.getAttribute('data-idx'), 10);
+      _tx.removeItem(idx);
+    });
+
+    // 수량 / 단가 편집 (blur 저장)
+    body.addEventListener('blur', function(e) {
+      const input = e.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      const tr = input.closest('tr[data-idx]');
+      if (!tr) return;
+      const idx = parseInt(tr.getAttribute('data-idx'), 10);
+      const field = input.getAttribute('data-field');
+      const raw = String(input.value || '').replace(/,/g, '').trim();
+      const num = parseInt(raw, 10);
+      const val = isNaN(num) ? 0 : num;
+      if (field === 'qty') _tx.updateItemQty(idx, val);
+      else if (field === 'price') _tx.updateItemPrice(idx, val);
+    }, true);
+
+    // Enter → blur
+    body.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+        e.preventDefault();
+        e.target.blur();
+      }
+    });
+  },
+
+  _bindFooterButtons() {
+    const resetBtn = document.getElementById('tx-btn-reset');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function() {
+        if (_tx.state.items.length > 0 && !confirm('작성 중인 라인을 모두 비우시겠습니까?')) return;
+        _tx.state.items = [];
+        _tx.renderItemsTable();
+        _tx.renderSummary();
+      });
+    }
+    const saveBtn = document.getElementById('tx-btn-save');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function() {
+        console.log('[TX] 저장 버튼 클릭 — Phase 5에서 구현 예정', JSON.parse(JSON.stringify(_tx.state)));
+      });
+    }
+  },
+
+  // ---- 제품 lookup + 기본 단가 ----
+  _findProduct(code) {
+    const dbProducts = (typeof DB !== 'undefined' && DB.products) ? DB.products : [];
+    let p = dbProducts.find(function(it) { return String(it.code) === String(code); });
+    if (p) return { source: 'milwaukee', data: p };
+
+    const gen = (typeof genProducts !== 'undefined') ? genProducts : [];
+    p = gen.find(function(it) { return String(it.code) === String(code); });
+    if (p) return { source: 'general', data: p };
+
+    return null;
+  },
+
+  _defaultUnitPrice(hit, docType, fallback) {
+    fallback = fallback || { fallbackRetail: 0 };
+    if (!hit) {
+      // DB에 없는 경우 — 더미: 매입은 0, 매출/견적은 fallback retail
+      if (docType === 'purchase') return 0;
+      return fallback.fallbackRetail || 0;
+    }
+    const p = hit.data;
+    if (hit.source === 'milwaukee') {
+      if (docType === 'purchase') {
+        return Number(p.cost) || Number(p.supplyPrice) || 0;
+      }
+      return Number(p.priceA) || Number(p.supplyPrice) || 0;
+    }
+    // general
+    if (docType === 'purchase') {
+      return Number(p.inPrice) || 0;
+    }
+    return Number(p.outPrice) || Number(p.palletPrice) || 0;
+  },
+
+  _productName(hit, fallbackName) {
+    if (hit && hit.data) {
+      const p = hit.data;
+      return p.description || p.model || p.manageCode || fallbackName || p.code || '';
+    }
+    return fallbackName || '';
+  },
+
+  // ---- 상품 라인 관리 ----
+  addItem(code, opt) {
+    opt = opt || {};
+    const hit = this._findProduct(code);
+    const name = this._productName(hit, opt.fallbackName);
+    const unitPrice = this._defaultUnitPrice(hit, this.state.docType, opt);
+
+    const item = {
+      code: code,
+      name: name,
+      qty: 1,
+      unitPrice: unitPrice,
+      supplyAmount: 0,
+      vatAmount: 0,
+      isAuto: true,           // 자동 채움 상태 (노란 배경)
+      productRef: hit,
+    };
+    this.state.items.push(item);
+    this.recalcItem(this.state.items.length - 1);
+    this.renderItemsTable();
+    this.renderSummary();
+  },
+
+  removeItem(idx) {
+    if (idx < 0 || idx >= this.state.items.length) return;
+    this.state.items.splice(idx, 1);
+    this.renderItemsTable();
+    this.renderSummary();
+  },
+
+  updateItemQty(idx, qty) {
+    if (idx < 0 || idx >= this.state.items.length) return;
+    this.state.items[idx].qty = Math.max(0, qty);
+    this.recalcItem(idx);
+    this.renderItemsTable();
+    this.renderSummary();
+  },
+
+  updateItemPrice(idx, price) {
+    if (idx < 0 || idx >= this.state.items.length) return;
+    const it = this.state.items[idx];
+    if (it.unitPrice !== price) it.isAuto = false;   // 사용자 수정 → 자동 해제
+    it.unitPrice = Math.max(0, price);
+    this.recalcItem(idx);
+    this.renderItemsTable();
+    this.renderSummary();
+  },
+
+  // ---- 탭 전환 ----
+  switchDocType(docType) {
+    if (docType !== 'sales' && docType !== 'purchase' && docType !== 'quote') return;
+    this.state.docType = docType;
+
+    // 탭 active 클래스 토글
+    const root = document.getElementById('tab-transactions');
+    if (root) {
+      root.querySelectorAll('.tx-tab[data-doctype]').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-doctype') === docType);
+      });
+    }
+
+    // 모든 라인 단가 재설정 (사용자 수정 여부 무관하게 덮어씀 — Phase 3A 설계 결정)
+    for (let i = 0; i < this.state.items.length; i++) {
+      const it = this.state.items[i];
+      it.unitPrice = this._defaultUnitPrice(it.productRef, docType, { fallbackRetail: it.unitPrice });
+      it.isAuto = true;
+      this.recalcItem(i);
+    }
+    this.renderItemsTable();
+    this.renderSummary();
+  },
+
+  // ---- 계산 ----
+  recalcItem(idx) {
+    const it = this.state.items[idx];
+    if (!it) return;
+    it.supplyAmount = Math.round((Number(it.qty) || 0) * (Number(it.unitPrice) || 0));
+    it.vatAmount = Math.round(it.supplyAmount * 0.1);
+  },
+
+  recalcTotals() {
+    let supply = 0, vat = 0;
+    for (let i = 0; i < this.state.items.length; i++) {
+      supply += Number(this.state.items[i].supplyAmount) || 0;
+      vat += Number(this.state.items[i].vatAmount) || 0;
+    }
+    return { supply: supply, vat: vat, total: supply + vat };
+  },
+
+  // ---- 렌더링 ----
+  renderItemsTable() {
+    const body = document.getElementById('tx-items-body');
+    if (!body) return;
+
+    const items = this.state.items;
+    if (items.length === 0) {
+      body.innerHTML = '<tr class="tx-empty-row"><td colspan="8" style="text-align:center;padding:28px 8px;color:#9BA3B2;font-size:12px">상품을 검색하여 추가해주세요</td></tr>';
+      return;
+    }
+
+    const fmt = function(n) { return (Number(n) || 0).toLocaleString(); };
+    const escape = function(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+
+    let html = '';
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const priceClass = (Number(it.unitPrice) || 0) <= 0
+        ? 'tx-input-warn'
+        : (it.isAuto ? 'tx-input-auto' : '');
+      html +=
+        '<tr data-idx="' + i + '">' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td>' + escape(it.code) + '</td>' +
+          '<td style="text-align:left">' + escape(it.name) + '</td>' +
+          '<td><input class="tx-cell-input" data-field="qty" type="text" inputmode="numeric" value="' + fmt(it.qty) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;font-family:inherit;text-align:center;outline:none"></td>' +
+          '<td class="' + priceClass + '" style="padding:2px 6px"><input class="tx-cell-input" data-field="price" type="text" inputmode="numeric" value="' + fmt(it.unitPrice) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid transparent;background:transparent;border-radius:4px;font-size:13px;font-family:inherit;font-weight:inherit;color:inherit;text-align:right;outline:none"></td>' +
+          '<td style="text-align:right">' + fmt(it.supplyAmount) + '</td>' +
+          '<td style="text-align:right">' + fmt(it.vatAmount) + '</td>' +
+          '<td><button type="button" class="tx-row-del">✕</button></td>' +
+        '</tr>';
+    }
+    body.innerHTML = html;
+  },
+
+  renderSummary() {
+    const totals = this.recalcTotals();
+    const root = document.getElementById('tab-transactions');
+    if (!root) return;
+    const supplyEl = root.querySelector('[data-sum="supply"]');
+    const vatEl = root.querySelector('[data-sum="vat"]');
+    const totalEl = root.querySelector('[data-sum="total"]');
+    if (supplyEl) supplyEl.textContent = totals.supply.toLocaleString();
+    if (vatEl) vatEl.textContent = totals.vat.toLocaleString();
+    if (totalEl) totalEl.textContent = totals.total.toLocaleString();
+  },
+};
+
+// 전역 노출 (_tabIdMap 및 디버깅)
+window._tx = _tx;

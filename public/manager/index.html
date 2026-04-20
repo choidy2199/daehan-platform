@@ -707,7 +707,7 @@ document.head.appendChild(s);
             <th>소매가</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="tx-search-body">
           <tr>
             <td><button type="button" class="tx-add-btn">+ 추가</button></td>
             <td>DC998</td>
@@ -737,9 +737,9 @@ document.head.appendChild(s);
   <!-- 메인 다크 탭바 -->
   <div class="tx-toolbar">
     <div class="tx-tab-group">
-      <button type="button" class="tx-tab active">매출</button>
-      <button type="button" class="tx-tab">매입</button>
-      <button type="button" class="tx-tab">견적서</button>
+      <button type="button" class="tx-tab active" data-doctype="sales">매출</button>
+      <button type="button" class="tx-tab" data-doctype="purchase">매입</button>
+      <button type="button" class="tx-tab" data-doctype="quote">견적서</button>
     </div>
     <div class="tx-toolbar-actions">
       <button type="button" class="tx-btn">📄 PDF 출력</button>
@@ -796,38 +796,7 @@ document.head.appendChild(s);
               <th></th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td>1</td>
-              <td>DC998</td>
-              <td style="text-align:left">M18 FID3 충격 드라이버 세트</td>
-              <td>2</td>
-              <td class="tx-input-auto">510,000</td>
-              <td style="text-align:right">1,020,000</td>
-              <td style="text-align:right">102,000</td>
-              <td><button type="button" class="tx-row-del">✕</button></td>
-            </tr>
-            <tr>
-              <td>2</td>
-              <td>DC997</td>
-              <td style="text-align:left">M18 FID2 충격 드라이버 세트</td>
-              <td>1</td>
-              <td style="text-align:right">480,000</td>
-              <td style="text-align:right">480,000</td>
-              <td style="text-align:right">48,000</td>
-              <td><button type="button" class="tx-row-del">✕</button></td>
-            </tr>
-            <tr>
-              <td>3</td>
-              <td>DC886</td>
-              <td style="text-align:left">M18 FDD2 드릴드라이버 세트</td>
-              <td>3</td>
-              <td class="tx-input-auto">305,000</td>
-              <td style="text-align:right">915,000</td>
-              <td style="text-align:right">91,500</td>
-              <td><button type="button" class="tx-row-del">✕</button></td>
-            </tr>
-          </tbody>
+          <tbody id="tx-items-body"></tbody>
         </table>
       </div>
 
@@ -835,15 +804,15 @@ document.head.appendChild(s);
       <div class="tx-summary">
         <div class="tx-summary-item">
           <span class="tx-summary-label">공급가액</span>
-          <span class="tx-summary-value">2,415,000</span>
+          <span class="tx-summary-value" data-sum="supply">0</span>
         </div>
         <div class="tx-summary-item">
           <span class="tx-summary-label">VAT</span>
-          <span class="tx-summary-value">241,500</span>
+          <span class="tx-summary-value" data-sum="vat">0</span>
         </div>
         <div class="tx-summary-item">
           <span class="tx-summary-label">합계</span>
-          <span class="tx-summary-value tx-total">2,656,500</span>
+          <span class="tx-summary-value tx-total" data-sum="total">0</span>
         </div>
       </div>
 
@@ -851,8 +820,8 @@ document.head.appendChild(s);
       <div class="tx-actions-row">
         <div class="tx-autosave">💾 자동 임시저장 · 2분 전</div>
         <div class="tx-actions">
-          <button type="button" class="tx-btn tx-btn-ghost">초기화</button>
-          <button type="button" class="tx-btn tx-btn-primary">저장</button>
+          <button type="button" id="tx-btn-reset" class="tx-btn tx-btn-ghost">초기화</button>
+          <button type="button" id="tx-btn-save" class="tx-btn tx-btn-primary">저장</button>
         </div>
       </div>
     </div>
