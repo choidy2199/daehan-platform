@@ -276,32 +276,161 @@ export async function importProductsV2FromExcel(file: File): Promise<ExcelImport
 
 // ========== Batch (수입 건) ==========
 
+export type BatchV2 = Batch;
+export type CustomsCostV2 = CustomsCost;
+
+export type CostCalculationItem = {
+  model: string;
+  invoice_no: string;
+  factory_name: string;
+  factory_code: string | null;
+  qty: number;
+  fob_usd: number;
+  fob_krw: number | null;
+  ratio: number | null;
+  cost_alloc: number | null;
+  vat_alloc: number | null;
+  supply_price: number | null;
+  unit_cost: number | null;
+  is_overflow_absorber: boolean;
+};
+
+export interface CostCalculationResult {
+  items: CostCalculationItem[];
+  totals: {
+    fob_usd: number;
+    fob_krw: number | null;
+    cost_alloc: number;
+    vat_alloc: number;
+    supply_price: number | null;
+    total_paid: number | null;
+  };
+  can_calculate: boolean;
+  warnings: string[];
+}
+
+export interface ErpPreviewInvoice {
+  factory_code: string | null;
+  factory_name: string;
+  items: string;
+  memo: string;
+  total_supply: number;
+  total_vat: number;
+}
+
+export interface ErpPreviewResult {
+  invoices_erp: ErpPreviewInvoice[];
+  can_send: boolean;
+  warnings: string[];
+}
+
 export async function createBatch(data: Partial<Batch>): Promise<string> {
-  // TODO Step 4: insert into import_batches, return new id
-  void supabase; void data;
-  throw new Error('createBatch: not implemented (Phase 1 Step 4)');
+  if (!data.batch_no) throw new Error('batch_no는 필수입니다');
+  const { data: row, error } = await supabase
+    .from('import_batches')
+    .insert({
+      batch_no: data.batch_no,
+      batch_name: data.batch_name ?? null,
+      container_no: data.container_no ?? null,
+      customs_date: data.customs_date ?? null,
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return (row as { id: string }).id;
 }
 
 export async function listBatches(): Promise<Batch[]> {
-  // TODO Step 4: select * from import_batches order by created_at desc
-  void supabase;
-  return [];
+  const { data, error } = await supabase
+    .from('import_batches')
+    .select('*')
+    .order('customs_date', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as Batch[];
 }
 
 export async function getBatch(id: string): Promise<Batch> {
-  // TODO Step 4: select * from import_batches where id = ...
-  void supabase; void id;
-  throw new Error('getBatch: not implemented (Phase 1 Step 4)');
+  const { data, error } = await supabase.from('import_batches').select('*').eq('id', id).single();
+  if (error) throw error;
+  return data as Batch;
 }
 
 export async function updateBatch(id: string, data: Partial<Batch>): Promise<void> {
-  // TODO Step 4: update import_batches set ... where id = ...
-  void supabase; void id; void data;
+  const allowed: (keyof Batch)[] = ['batch_no', 'batch_name', 'container_no', 'customs_date', 'status', 'erp_sent_at'];
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const k of allowed) {
+    if (k in data) payload[k] = (data as Record<string, unknown>)[k];
+  }
+  const { error } = await supabase.from('import_batches').update(payload).eq('id', id);
+  if (error) throw error;
 }
 
 export async function deleteBatch(id: string): Promise<void> {
-  // TODO Step 4: delete from import_batches where id = ...
-  void supabase; void id;
+  const { error } = await supabase.from('import_batches').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function listBatchInvoices(batchId: string): Promise<Invoice[]> {
+  const { data, error } = await supabase
+    .from('import_invoices')
+    .select('*')
+    .eq('batch_id', batchId)
+    .order('invoice_date', { ascending: true });
+  if (error) throw error;
+  return (data || []) as Invoice[];
+}
+
+export async function connectInvoice(batchId: string, invoiceId: string): Promise<void> {
+  const { error } = await supabase
+    .from('import_invoices')
+    .update({ batch_id: batchId, updated_at: new Date().toISOString() })
+    .eq('id', invoiceId);
+  if (error) throw error;
+}
+
+export async function disconnectInvoice(_batchId: string, invoiceId: string): Promise<void> {
+  const { error } = await supabase
+    .from('import_invoices')
+    .update({ batch_id: null, updated_at: new Date().toISOString() })
+    .eq('id', invoiceId);
+  if (error) throw error;
+}
+
+export async function createCustomsCost(data: Partial<CustomsCost>): Promise<string> {
+  if (!data.batch_id || !data.item_name) throw new Error('batch_id, item_name은 필수입니다');
+  const { data: row, error } = await supabase
+    .from('import_customs_costs')
+    .insert({
+      batch_id: data.batch_id,
+      item_order: data.item_order ?? 1,
+      item_name: data.item_name,
+      amount_krw: data.amount_krw ?? 0,
+      classification: data.classification ?? 'cost',
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return (row as { id: string }).id;
+}
+
+export async function deleteCustomsCost(id: string): Promise<void> {
+  const { error } = await supabase.from('import_customs_costs').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getCostCalculation(batchId: string): Promise<CostCalculationResult> {
+  const res = await fetch(`/api/import-batches/${batchId}/cost-calculation`, { cache: 'no-store' });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || '원가 계산 실패');
+  return json.data as CostCalculationResult;
+}
+
+export async function getErpPreview(batchId: string): Promise<ErpPreviewResult> {
+  const res = await fetch(`/api/import-batches/${batchId}/erp-preview`, { cache: 'no-store' });
+  const json = await res.json();
+  if (!json.success) throw new Error(json.error || 'ERP 미리보기 실패');
+  return json.data as ErpPreviewResult;
 }
 
 // ========== Invoice (인보이스) ==========
@@ -641,12 +770,19 @@ export async function recalcInvoiceStatus(invoiceId: string): Promise<void> {
 // ========== CustomsCost (통관 비용) ==========
 
 export async function listCustomsCosts(batchId: string): Promise<CustomsCost[]> {
-  // TODO Step 4: select * from import_customs_costs where batch_id = ... order by item_order
-  void supabase; void batchId;
-  return [];
+  const { data, error } = await supabase
+    .from('import_customs_costs')
+    .select('*')
+    .eq('batch_id', batchId)
+    .order('item_order', { ascending: true });
+  if (error) throw error;
+  return (data || []) as CustomsCost[];
 }
 
 export async function updateCustomsCost(id: string, data: Partial<CustomsCost>): Promise<void> {
-  // TODO Step 4: update import_customs_costs set ... where id = ...
-  void supabase; void id; void data;
+  const allowed: (keyof CustomsCost)[] = ['item_order', 'item_name', 'amount_krw', 'classification'];
+  const payload: Record<string, unknown> = {};
+  for (const k of allowed) if (k in data) payload[k] = (data as Record<string, unknown>)[k];
+  const { error } = await supabase.from('import_customs_costs').update(payload).eq('id', id);
+  if (error) throw error;
 }
