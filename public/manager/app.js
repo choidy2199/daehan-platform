@@ -21587,6 +21587,9 @@ function _poBackToList() {
   // 목록 캐시/데이터 최신 상태 재렌더
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
+  // 상세에서 설정한 탭 자체 스크롤 스타일 복원 (목록은 기본 레이아웃 사용)
+  container.style.overflowY = '';
+  container.style.height = '';
   _poRenderLayout(container);
   _poBindEvents();
   _poRenderList();
@@ -21631,18 +21634,17 @@ function _poLoadDetail(poId) {
 function _poRenderDetail() {
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
-  // 상세 화면은 .content(overflow:hidden) 자식이므로 자체 스크롤 컨테이너가 필요
-  // → 외곽에 height:100% + overflow-y:auto 래퍼
-  // 내부 카드 div는 overflow:visible (자식 테이블의 자연 높이 반영 → scrollHeight 정확)
+  // 발주서V2 상세: 탭 컨테이너 자체를 스크롤 영역으로 (스크롤바는 탭 오른쪽 = 페이지 스크롤 느낌)
+  // 내부는 전부 자연 흐름 → 테이블이 24건이든 100건이든 전부 펼쳐서 렌더, 페이지 스크롤로 접근
+  container.style.overflowY = 'auto';
+  container.style.height = '100%';
   var h = '';
-  h += '<div style="height:100%;overflow-y:auto;">';
   h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;margin-bottom:24px;">';
   h += _poRenderDetailHeader();
   h += _poRenderDetailInfo();
   h += _poRenderDetailProductsSection();
   h += _poRenderDetailTable();
   h += _poRenderDetailSummary();
-  h += '</div>';
   h += '</div>';
   // 모달 자리
   h += '<div id="po-modal-root"></div>';
