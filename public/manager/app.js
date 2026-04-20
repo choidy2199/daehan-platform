@@ -21969,15 +21969,22 @@ function _ipv2CalcMatchScore(product, mwProduct) {
   return 0;
 }
 
-// 단일 제품의 매칭 후보 탐색 (점수 >= 50 반환)
+// 단일 제품의 매칭 후보 탐색 (mw_products + mw_gen_products 둘 다 검색, 점수 >= 50 반환)
 function _ipv2FindMatchCandidates(product) {
-  if (typeof DB === 'undefined' || !DB.products || DB.products.length === 0) return [];
+  var pool = [];
+  if (typeof DB !== 'undefined' && DB.products && DB.products.length > 0) {
+    pool = pool.concat(DB.products.map(function(p){ return Object.assign({_source:'mw'}, p); }));
+  }
+  if (typeof genProducts !== 'undefined' && genProducts && genProducts.length > 0) {
+    pool = pool.concat(genProducts.map(function(p){ return Object.assign({_source:'gen'}, p); }));
+  }
+  if (pool.length === 0) return [];
   var candidates = [];
-  DB.products.forEach(function(mw) {
+  pool.forEach(function(mw) {
     if (!mw.code) return;
     var score = _ipv2CalcMatchScore(product, mw);
     if (score >= 50) {
-      candidates.push({ code: mw.code, model: mw.model || '', description: mw.description || '', score: score });
+      candidates.push({ code: mw.code, model: mw.model || '', description: mw.description || '', source: mw._source, score: score });
     }
   });
   candidates.sort(function(a, b) { return b.score - a.score; });
@@ -21991,8 +21998,10 @@ function _ipv2AutoMatchErpCode() {
     alert('경박코드가 비어있는 제품이 없습니다.');
     return;
   }
-  if (typeof DB === 'undefined' || !DB.products || DB.products.length === 0) {
-    alert('mw_products 데이터가 로드되지 않았습니다. 밀워키 단가표 탭을 먼저 방문해주세요.');
+  var hasMw = typeof DB !== 'undefined' && DB.products && DB.products.length > 0;
+  var hasGen = typeof genProducts !== 'undefined' && genProducts && genProducts.length > 0;
+  if (!hasMw && !hasGen) {
+    alert('mw_products / mw_gen_products 데이터가 로드되지 않았습니다. 밀워키 단가표 또는 일반제품 탭을 먼저 방문해주세요.');
     return;
   }
   if (!confirm('erp_code 비어있는 제품 ' + empty.length + '건을 mw_products에서 자동 매칭하시겠습니까?')) return;
@@ -22125,9 +22134,13 @@ function _ipv2ShowMatchCandidatesModal(product, candidates, onDone) {
   h += '</div>';
   h += '<div style="padding:12px 20px;overflow-y:auto;flex:1;">';
   candidates.forEach(function(c, i) {
+    var srcBadgeBg = c.source === 'gen' ? '#FAEEDA' : '#FCEBEB';
+    var srcBadgeColor = c.source === 'gen' ? '#633806' : '#791F1F';
+    var srcLabel = c.source === 'gen' ? '일반' : '밀워키';
     h += '<label style="display:block;padding:10px 12px;border:1px solid #DDE1EB;border-radius:6px;margin-bottom:8px;cursor:pointer;">';
     h += '<input type="radio" name="ipv2-match-cand" value="' + i + '" style="margin-right:8px;vertical-align:middle;"' + (i === 0 ? ' checked' : '') + '>';
     h += '<span style="font-family:monospace;font-size:12px;color:#854F0B;font-weight:600;">' + _ipv2Esc(c.code) + '</span>';
+    h += '<span style="margin-left:6px;font-size:10px;padding:1px 6px;border-radius:8px;background:' + srcBadgeBg + ';color:' + srcBadgeColor + ';font-weight:500;">' + srcLabel + '</span>';
     h += '<span style="margin-left:8px;font-size:12px;color:#1A1D23;">' + _ipv2Esc(c.model) + '</span>';
     h += '<span style="margin-left:auto;float:right;font-size:11px;padding:2px 6px;border-radius:8px;background:#E6F1FB;color:#0C447C;">점수 ' + c.score + '</span>';
     h += '<div style="font-size:11px;color:#5A6070;margin-top:3px;">' + _ipv2Esc(c.description) + '</div>';
