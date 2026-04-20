@@ -21305,6 +21305,8 @@ var _poFilter = 'all';       // 'all' | 'draft' | 'confirmed' | 'linked' | 'comp
 var _poSearch = '';
 var _poSearchTimer = null;
 var _poLoading = false;
+// Phase B2-A 상세 상태
+var _poState = { mode: 'list', currentPoId: null, currentPo: null, currentItems: [] };
 
 function _poEsc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -21575,8 +21577,360 @@ function _poOnCreateClick() {
 }
 
 function _poOnRowClick(poId) {
-  // Phase B2 placeholder
-  _poToast('상세 화면은 Phase B2에서 구현됩니다', 'info');
+  _poState.mode = 'detail';
+  _poState.currentPoId = poId;
+  _poLoadDetail(poId);
+}
+
+function _poBackToList() {
+  _poState = { mode: 'list', currentPoId: null, currentPo: null, currentItems: [] };
+  // 목록 캐시/데이터 최신 상태 재렌더
+  var container = document.getElementById('tab-import-po-v2');
+  if (!container) return;
+  _poRenderLayout(container);
+  _poBindEvents();
+  _poRenderList();
+}
+
+function _poLoadDetail(poId) {
+  var container = document.getElementById('tab-import-po-v2');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">상세 정보를 불러오는 중...</div>';
+  Promise.all([
+    fetch('/api/import-po/' + poId, { cache: 'no-store' }).then(function(r){return r.json();}),
+    fetch('/api/import-po/' + poId + '/items', { cache: 'no-store' }).then(function(r){return r.json();}),
+  ]).then(function(results) {
+    var headerRes = results[0];
+    var itemsRes = results[1];
+    if (!headerRes.success || !headerRes.data || !headerRes.data.header) {
+      _poToast('발주서를 찾을 수 없습니다', 'error');
+      _poBackToList();
+      return;
+    }
+    _poState.currentPo = headerRes.data.header;
+    _poState.currentItems = (itemsRes && itemsRes.success) ? (itemsRes.data || []) : [];
+    _poRenderDetail();
+    // 제품V2 데이터 비었으면 백그라운드 로드 (브랜드 드롭다운 옵션용)
+    if (typeof _ipv2Data === 'undefined' || !_ipv2Data || _ipv2Data.length === 0) {
+      if (typeof _ipv2FetchList === 'function') {
+        _ipv2FetchList(function(){
+          // 상세 모드 유지 중이면 재렌더 (브랜드 드롭다운 갱신)
+          if (_poState.mode === 'detail' && _poState.currentPoId === poId) {
+            _poRenderDetail();
+          }
+        });
+      }
+    }
+  }).catch(function(err) {
+    console.error('[po] loadDetail error', err);
+    _poToast('상세 로드 실패: ' + (err.message || err), 'error');
+    _poBackToList();
+  });
+}
+
+function _poRenderDetail() {
+  var container = document.getElementById('tab-import-po-v2');
+  if (!container) return;
+  var h = '';
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;">';
+  h += _poRenderDetailHeader();
+  h += _poRenderDetailInfo();
+  h += _poRenderDetailProductsSection();
+  h += _poRenderDetailTable();
+  h += _poRenderDetailSummary();
+  h += '</div>';
+  // 모달 자리
+  h += '<div id="po-modal-root"></div>';
+  container.innerHTML = h;
+  _poBindDetailEvents();
+}
+
+function _poRenderDetailHeader() {
+  var po = _poState.currentPo;
+  if (!po) return '';
+  var h = '';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#1A1D23;color:#fff;">';
+  h += '<div style="display:flex;align-items:center;gap:10px;">';
+  h += '<button onclick="_poBackToList()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
+  h += '<span style="font-size:14px;font-weight:500;color:#fff;font-family:monospace;">' + _poEsc(po.po_number) + '</span>';
+  h += '<span style="font-size:12px;color:rgba(255,255,255,0.7);">' + _poEsc(po.factory_code || po.brand || '-') + '</span>';
+  h += _poFormatStatusBadge(po.status);
+  h += '</div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;">';
+  h += '<button disabled title="B3 구현 예정" style="font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.15);cursor:not-allowed;font-family:Pretendard,sans-serif;">↻ 재고 조회</button>';
+  h += '<button disabled title="B4 구현 예정" style="font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.15);cursor:not-allowed;font-family:Pretendard,sans-serif;">PDF</button>';
+  h += '<button disabled title="B4 구현 예정" style="font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.15);cursor:not-allowed;font-family:Pretendard,sans-serif;">발주 확정</button>';
+  h += '<button onclick="_poToast(\'헤더는 자동 저장됩니다\',\'info\')" style="font-size:12px;padding:6px 14px;border-radius:6px;background:#E24B4A;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">저장</button>';
+  h += '<button onclick="_poDeletePo(\'' + po.id + '\')" style="font-size:12px;padding:6px 12px;border-radius:6px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
+  h += '</div></div>';
+  return h;
+}
+
+function _poRenderDetailInfo() {
+  var po = _poState.currentPo;
+  if (!po) return '';
+  var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:3px;font-weight:500;';
+  var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
+  var roS = inpS + 'background:#F4F6FA;color:#5A6070;';
+
+  // 브랜드 드롭다운 옵션
+  var brands = {};
+  if (typeof _ipv2Data !== 'undefined' && _ipv2Data) {
+    _ipv2Data.forEach(function(p){ if (p.brand) brands[p.brand] = (brands[p.brand] || 0) + 1; });
+  }
+  var brandOpts = '<option value="">— 선택 —</option>';
+  Object.keys(brands).sort().forEach(function(b){
+    var sel = po.brand === b ? ' selected' : '';
+    brandOpts += '<option value="' + _poEsc(b) + '"' + sel + '>' + _poEsc(b) + ' (' + brands[b] + '개 제품)</option>';
+  });
+  // 제품V2에 없지만 현재 PO에 저장된 brand가 있으면 유지
+  if (po.brand && !brands[po.brand]) {
+    brandOpts += '<option value="' + _poEsc(po.brand) + '" selected>' + _poEsc(po.brand) + ' (기존)</option>';
+  }
+  // 직접 입력 옵션
+  brandOpts += '<option value="__custom__">[직접 입력]</option>';
+
+  var h = '';
+  h += '<div style="padding:12px 20px;background:#fff;border-bottom:0.5px solid #eee;">';
+  h += '<div style="display:flex;gap:10px;align-items:flex-end;">';
+  h += '<div style="flex:1;"><label style="' + lblS + '">발주번호</label><input type="text" value="' + _poEsc(po.po_number) + '" readonly style="' + roS + 'font-family:monospace;"></div>';
+  h += '<div style="flex:1;"><label style="' + lblS + '">발주일</label><input type="date" value="' + _poEsc((po.po_date || '').substring(0,10)) + '" style="' + inpS + '" onchange="_poOnHeaderFieldBlur(\'po_date\',this.value)"></div>';
+  h += '<div style="flex:1.5;"><label style="' + lblS + '">공장/브랜드</label><select data-field="brand" onchange="_poOnBrandChange(this.value, this)" style="' + inpS + '">' + brandOpts + '</select></div>';
+  h += '<div style="flex:1;"><label style="' + lblS + '">납기 요청일</label><input type="date" data-field="delivery_date" value="" style="' + inpS + '" disabled title="스키마 미지원"></div>';
+  h += '<div style="flex:2;"><label style="' + lblS + '">비고</label><input type="text" value="' + _poEsc(po.memo || '') + '" placeholder="비고 입력..." style="' + inpS + '" onblur="_poOnHeaderFieldBlur(\'memo\',this.value)"></div>';
+  h += '</div></div>';
+  return h;
+}
+
+function _poRenderDetailProductsSection() {
+  var total = _poState.currentItems.length;
+  var ordered = _poState.currentItems.filter(function(it){return Number(it.quantity || 0) > 0;}).length;
+  var h = '';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:0.5px solid #eee;background:#fff;">';
+  h += '<div style="display:flex;align-items:center;gap:10px;">';
+  h += '<span style="font-size:14px;font-weight:500;color:#1A1D23;">제품 목록</span>';
+  h += '<span style="font-size:12px;color:#5A6070;">전 ' + total + '개 · 발주 ' + ordered + '개</span>';
+  h += '</div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;">';
+  h += '<input type="text" id="po-detail-search" placeholder="모델/품명 검색" style="height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:12px;font-family:Pretendard,sans-serif;min-width:200px;">';
+  h += '<button disabled title="B2-B 구현 예정" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#F4F6FA;color:#9BA3B2;border:1px solid #DDE1EB;cursor:not-allowed;font-family:Pretendard,sans-serif;">발주만</button>';
+  h += '</div></div>';
+  return h;
+}
+
+function _poRenderDetailTable() {
+  var items = _poState.currentItems;
+  var po = _poState.currentPo;
+  var thS = 'padding:9px 8px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
+  var tdS = 'padding:9px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
+  var hiBg = '#BA7517';
+
+  var h = '<div style="overflow:auto;max-height:calc(100vh - 420px);min-height:200px;">';
+
+  if (!po || !po.brand) {
+    h += '<div style="padding:80px 20px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">공장/브랜드를 선택하면 제품이 자동으로 로드됩니다</div></div>';
+    return h;
+  }
+  if (items.length === 0) {
+    h += '<div style="padding:80px 20px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">해당 브랜드에 등록된 제품이 없습니다</div></div>';
+    return h;
+  }
+
+  h += '<table id="po-detail-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  h += '<colgroup>';
+  // No / 모델 / 품명 / 팔렛당 / 팔렛수 / 수량 / 경박재고 / 합계 / 수입가 / 총합계
+  h += '<col style="width:40px"><col style="width:110px"><col style=""><col style="width:55px"><col style="width:60px"><col style="width:70px"><col style="width:75px"><col style="width:75px"><col style="width:85px"><col style="width:95px">';
+  h += '</colgroup>';
+  h += '<thead><tr>';
+  h += '<th style="' + thS + '">No.</th>';
+  h += '<th style="' + thS + '">모델</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:10px;">품명</th>';
+  h += '<th style="' + thS + '">팔렛당</th>';
+  h += '<th style="' + thS + '">팔렛수</th>';
+  h += '<th style="' + thS + '">수량</th>';
+  h += '<th style="' + thS + '">경박재고</th>';
+  h += '<th style="' + thS + 'background:' + hiBg + ';">합계</th>';
+  h += '<th style="' + thS + '">수입가</th>';
+  h += '<th style="' + thS + 'background:' + hiBg + ';">총합계</th>';
+  h += '</tr></thead><tbody>';
+
+  items.forEach(function(it, i) {
+    var fobS = Number(it.fob_usd || 0) > 0 ? '$' + Number(it.fob_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '<span style="color:#9BA3B2">—</span>';
+    h += '<tr>';
+    h += '<td style="' + tdS + 'color:#9BA3B2;">' + (i + 1) + '</td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + _poEsc(it.model || '') + '</td>';
+    h += '<td style="' + tdS + 'text-align:left;padding-left:10px;color:#5A6070;">' + _poEsc(it.product_name || '') + '</td>';
+    h += '<td style="' + tdS + '">' + (Number(it.pallet_qty || 0) > 0 ? Number(it.pallet_qty) : '<span style="color:#9BA3B2">—</span>') + '</td>';
+    // 팔렛수 (B2-B 입력 대기 — 지금 readonly 0)
+    h += '<td style="' + tdS + 'color:#9BA3B2;">0</td>';
+    // 수량 (B2-B 자동 계산 대기)
+    h += '<td style="' + tdS + 'color:#9BA3B2;">0</td>';
+    // 경박재고 (B3 대기)
+    h += '<td style="' + tdS + 'color:#9BA3B2;">—</td>';
+    // 합계 (B2-B 대기, 주황 배경 유지)
+    h += '<td style="' + tdS + 'color:#9BA3B2;">—</td>';
+    // 수입가
+    h += '<td style="' + tdS + 'text-align:right;padding-right:10px;">' + fobS + '</td>';
+    // 총합계 (B2-B 대기, 주황 배경 유지)
+    h += '<td style="' + tdS + 'color:#9BA3B2;">—</td>';
+    h += '</tr>';
+  });
+
+  h += '</tbody></table></div>';
+  return h;
+}
+
+function _poRenderDetailSummary() {
+  var po = _poState.currentPo || {};
+  var items = _poState.currentItems;
+  var totalQty = items.reduce(function(s,it){return s + Number(it.quantity || 0);}, 0);
+  var kinds = items.length;
+  var linked = po.linked_invoice_id ? '연결됨' : '미연결';
+  var linkedColor = po.linked_invoice_id ? '#9FE1CB' : 'rgba(255,255,255,0.4)';
+  var totalPallets = 0; // B2-B
+  var totalFob = 0;     // B2-B
+
+  var h = '';
+  h += '<div style="padding:12px 20px;background:#1A1D23;color:#fff;font-family:Pretendard,sans-serif;display:flex;align-items:center;">';
+  var colStyle = 'flex:1;padding:0 14px;';
+  var lblS = 'font-size:11px;color:#aaa;margin-bottom:3px;';
+  var valS = 'font-size:15px;font-weight:500;color:#fff;';
+  var orgS = 'font-size:15px;font-weight:600;color:#EF9F27;';
+  var sepS = 'width:1px;height:24px;background:rgba(255,255,255,0.15);flex-shrink:0;';
+  h += '<div style="' + colStyle + '"><div style="' + lblS + '">총 수량</div><div style="' + valS + '">' + totalQty.toLocaleString('en-US') + ' EA <span style="font-size:11px;color:#aaa;margin-left:4px;">(' + kinds + '종)</span></div></div>';
+  h += '<div style="' + sepS + '"></div>';
+  h += '<div style="' + colStyle + '"><div style="' + lblS + '">총 팔렛</div><div style="' + valS + '">' + totalPallets + ' PLT</div></div>';
+  h += '<div style="' + sepS + '"></div>';
+  h += '<div style="' + colStyle + '"><div style="' + lblS + '">총 금액 (FOB)</div><div style="' + orgS + '">$' + totalFob.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</div></div>';
+  h += '<div style="' + sepS + '"></div>';
+  h += '<div style="' + colStyle + '"><div style="' + lblS + '">연결 인보이스</div><div style="font-size:13px;color:' + linkedColor + ';">' + linked + '</div></div>';
+  h += '</div>';
+  return h;
+}
+
+function _poBindDetailEvents() {
+  // 검색/필터는 B2-B 대기 — placeholder
+}
+
+// 헤더 필드 blur 자동 저장 (PUT /api/import-po)
+function _poOnHeaderFieldBlur(field, value) {
+  var po = _poState.currentPo;
+  if (!po) return;
+  var payload = { id: po.id };
+  payload[field] = value;
+  fetch('/api/import-po', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r){return r.json();})
+    .then(function(json){
+      if (json.success && json.data) {
+        _poState.currentPo = json.data;
+        _poToast('저장되었습니다', 'success');
+      } else {
+        _poToast(json.error || '저장 실패', 'error');
+      }
+    })
+    .catch(function(err){ _poToast('네트워크 오류: ' + err.message, 'error'); });
+}
+
+// 브랜드 변경 — 확인 모달 → 기존 아이템 삭제 → 새 브랜드 제품 INSERT
+function _poOnBrandChange(newBrand, selectEl) {
+  var po = _poState.currentPo;
+  if (!po) return;
+  var oldBrand = po.brand;
+  if (newBrand === '__custom__') {
+    var custom = prompt('브랜드를 직접 입력하세요:', oldBrand || '');
+    if (!custom || !custom.trim()) { selectEl.value = oldBrand || ''; return; }
+    newBrand = custom.trim();
+  }
+  if (newBrand === oldBrand) return;
+
+  var hasItems = _poState.currentItems.length > 0;
+  if (hasItems) {
+    var msg = '현재 "' + (oldBrand || '미설정') + '" 브랜드 제품 ' + _poState.currentItems.length + '건이 삭제되고 "' + newBrand + '" 브랜드 제품으로 교체됩니다. 계속하시겠습니까?';
+    if (!confirm(msg)) {
+      selectEl.value = oldBrand || '';
+      return;
+    }
+  }
+
+  // 1) 헤더 brand 업데이트
+  _poOnHeaderFieldBlur('brand', newBrand);
+  // 2) 기존 아이템 삭제 → 새 브랜드 제품 INSERT
+  _poClearItems(po.id).then(function(){
+    return _poLoadProductsByBrand(newBrand);
+  }).then(function(products){
+    if (products.length === 0) {
+      _poState.currentItems = [];
+      _poRenderDetail();
+      _poToast('해당 브랜드에 등록된 제품이 없습니다', 'info');
+      return;
+    }
+    return _poInsertItemsFromProducts(po.id, products).then(function(inserted){
+      _poState.currentItems = inserted;
+      _poRenderDetail();
+      _poToast(inserted.length + '건 제품이 로드되었습니다', 'success');
+    });
+  }).catch(function(err){
+    _poToast('제품 로드 실패: ' + (err.message || err), 'error');
+  });
+}
+
+function _poLoadProductsByBrand(brand) {
+  // 제품V2 데이터에서 필터 (이미 캐시된 _ipv2Data 사용, 없으면 fetch)
+  var filterLocal = function() {
+    if (typeof _ipv2Data === 'undefined' || !_ipv2Data) return [];
+    return _ipv2Data.filter(function(p){ return p.brand === brand; });
+  };
+  var local = filterLocal();
+  if (local.length > 0) return Promise.resolve(local);
+  // fallback: API 호출
+  return fetch('/api/import-products-v2', { cache: 'no-store' })
+    .then(function(r){return r.json();})
+    .then(function(json){
+      if (json.success && Array.isArray(json.data)) {
+        if (typeof window !== 'undefined') _ipv2Data = json.data;
+        return json.data.filter(function(p){ return p.brand === brand; });
+      }
+      return [];
+    });
+}
+
+function _poInsertItemsFromProducts(poId, products) {
+  if (!products || products.length === 0) return Promise.resolve([]);
+  return fetch('/api/import-po/' + poId + '/items', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ products: products }),
+  }).then(function(r){return r.json();}).then(function(json){
+    if (json.success && Array.isArray(json.data)) return json.data;
+    throw new Error(json.error || 'INSERT 실패');
+  });
+}
+
+function _poClearItems(poId) {
+  return fetch('/api/import-po/' + poId + '/items', { method: 'DELETE' })
+    .then(function(r){return r.json();})
+    .then(function(json){
+      if (!json.success) throw new Error(json.error || '기존 아이템 삭제 실패');
+      _poState.currentItems = [];
+      return true;
+    });
+}
+
+function _poDeletePo(poId) {
+  var po = _poState.currentPo;
+  if (!po) return;
+  if (!confirm('발주서 ' + po.po_number + ' 을(를) 삭제하시겠습니까?\n연결된 제품 라인도 함께 삭제됩니다.')) return;
+  fetch('/api/import-po?id=' + encodeURIComponent(poId), { method: 'DELETE' })
+    .then(function(r){return r.json();})
+    .then(function(json){
+      if (json.success) {
+        _poToast('삭제되었습니다', 'success');
+        _poBackToList();
+      } else {
+        _poToast(json.error || '삭제 실패', 'error');
+      }
+    })
+    .catch(function(err){ _poToast('네트워크 오류: ' + err.message, 'error'); });
 }
 
 // ========================================
