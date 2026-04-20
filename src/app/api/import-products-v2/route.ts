@@ -9,7 +9,7 @@ const supabase = createClient(
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const q = (searchParams.get('q') || '').trim();
+    const q = (searchParams.get('q') || searchParams.get('search') || '').trim();
     if (q) {
       const { data, error } = await supabase
         .from('import_products_v2')

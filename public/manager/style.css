@@ -877,6 +877,10 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #tab-import-products-v2.tab-content.active { display:block !important; overflow-y:auto; }
 #tab-import-products-v2.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
 
+/* 인보이스V2 — tab-content flex 무효화 */
+#tab-import-invoice-v2.tab-content.active { display:block !important; overflow-y:auto; }
+#tab-import-invoice-v2.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
+
 /* 공지 NEW 깜빡임 */
 /* 공지 확인 뱃지 */
 .notice-confirm-badge { background:#D1FAE5; color:#065F46; padding:2px 8px; border-radius:10px; font-size:11px; display:inline-block; margin-right:4px; font-family:'Pretendard',sans-serif; }

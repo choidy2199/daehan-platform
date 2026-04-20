@@ -306,56 +306,206 @@ export async function deleteBatch(id: string): Promise<void> {
 
 // ========== Invoice (인보이스) ==========
 
+export type InvoiceV2 = Invoice;
+export type InvoiceItemV2 = InvoiceItem;
+
 export async function createInvoice(data: Partial<Invoice>): Promise<string> {
-  // TODO Step 3: insert into import_invoices, return new id
-  void supabase; void data;
-  throw new Error('createInvoice: not implemented (Phase 1 Step 3)');
+  if (!data.invoice_no || !data.factory_name || !data.invoice_date) {
+    throw new Error('invoice_no, factory_name, invoice_date는 필수입니다');
+  }
+  const { data: row, error } = await supabase
+    .from('import_invoices')
+    .insert({
+      invoice_no: data.invoice_no,
+      batch_id: data.batch_id ?? null,
+      factory_name: data.factory_name,
+      factory_code: data.factory_code ?? null,
+      invoice_date: data.invoice_date,
+      payment_terms: data.payment_terms ?? null,
+      memo: data.memo ?? null,
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return (row as { id: string }).id;
 }
 
-export async function listInvoices(batchId?: string): Promise<Invoice[]> {
-  // TODO Step 3: select * from import_invoices [where batch_id = ...] order by invoice_date desc
-  void supabase; void batchId;
-  return [];
+export async function listInvoices(statusFilter?: string): Promise<Invoice[]> {
+  let query = supabase
+    .from('import_invoices')
+    .select('*')
+    .order('invoice_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (statusFilter && statusFilter !== 'all') query = query.eq('status', statusFilter);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []) as Invoice[];
 }
 
 export async function getInvoice(id: string): Promise<Invoice> {
-  // TODO Step 3: select * from import_invoices where id = ...
-  void supabase; void id;
-  throw new Error('getInvoice: not implemented (Phase 1 Step 3)');
+  const { data, error } = await supabase
+    .from('import_invoices')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  return data as Invoice;
 }
 
 export async function updateInvoice(id: string, data: Partial<Invoice>): Promise<void> {
-  // TODO Step 3: update import_invoices set ... where id = ...
-  void supabase; void id; void data;
+  const allowed: (keyof Invoice)[] = ['invoice_no', 'batch_id', 'factory_name', 'factory_code', 'invoice_date', 'payment_terms', 'memo', 'subtotal_usd', 'discount_usd', 'pallets_usd', 'final_amount_usd', 'weighted_avg_rate', 'status'];
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  for (const k of allowed) {
+    if (k in data) payload[k] = (data as Record<string, unknown>)[k];
+  }
+  const { error } = await supabase.from('import_invoices').update(payload).eq('id', id);
+  if (error) throw error;
 }
 
 export async function deleteInvoice(id: string): Promise<void> {
-  // TODO Step 3: delete from import_invoices where id = ...
-  void supabase; void id;
+  const { error } = await supabase.from('import_invoices').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ========== InvoiceItem (인보이스 제품 라인) ==========
 
 export async function createInvoiceItem(data: Partial<InvoiceItem>): Promise<string> {
-  // TODO Step 3: insert into import_invoice_items, return new id
-  void supabase; void data;
-  throw new Error('createInvoiceItem: not implemented (Phase 1 Step 3)');
+  if (!data.invoice_id || !data.model) throw new Error('invoice_id, model은 필수입니다');
+  const qty = Number(data.qty ?? 0);
+  const fob = Number(data.fob_usd ?? 0);
+  const { data: row, error } = await supabase
+    .from('import_invoice_items')
+    .insert({
+      invoice_id: data.invoice_id,
+      line_no: data.line_no ?? 1,
+      model: data.model,
+      name: data.name ?? null,
+      qty,
+      fob_usd: fob,
+      amount_usd: Number((qty * fob).toFixed(2)),
+      pallets: data.pallets ?? 0,
+      is_pallet_line: data.is_pallet_line ?? false,
+      memo: data.memo ?? null,
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  await recalcInvoiceTotals(data.invoice_id);
+  return (row as { id: string }).id;
 }
 
 export async function listInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
-  // TODO Step 3: select * from import_invoice_items where invoice_id = ... order by line_no
-  void supabase; void invoiceId;
-  return [];
+  const { data, error } = await supabase
+    .from('import_invoice_items')
+    .select('*')
+    .eq('invoice_id', invoiceId)
+    .order('line_no', { ascending: true });
+  if (error) throw error;
+  return (data || []) as InvoiceItem[];
 }
 
 export async function updateInvoiceItem(id: string, data: Partial<InvoiceItem>): Promise<void> {
-  // TODO Step 3: update import_invoice_items set ... where id = ...
-  void supabase; void id; void data;
+  const allowed: (keyof InvoiceItem)[] = ['line_no', 'model', 'name', 'qty', 'fob_usd', 'pallets', 'is_pallet_line', 'memo'];
+  const payload: Record<string, unknown> = {};
+  for (const k of allowed) {
+    if (k in data) payload[k] = (data as Record<string, unknown>)[k];
+  }
+  if ('qty' in payload || 'fob_usd' in payload) {
+    const { data: cur } = await supabase.from('import_invoice_items').select('qty, fob_usd, invoice_id').eq('id', id).single();
+    const q = 'qty' in payload ? Number(payload.qty) : Number((cur as { qty: number } | null)?.qty || 0);
+    const f = 'fob_usd' in payload ? Number(payload.fob_usd) : Number((cur as { fob_usd: number } | null)?.fob_usd || 0);
+    payload.amount_usd = Number((q * f).toFixed(2));
+  }
+  const { data: updated, error } = await supabase
+    .from('import_invoice_items')
+    .update(payload)
+    .eq('id', id)
+    .select('invoice_id')
+    .single();
+  if (error) throw error;
+  const invoiceId = (updated as { invoice_id: string } | null)?.invoice_id;
+  if (invoiceId) await recalcInvoiceTotals(invoiceId);
 }
 
 export async function deleteInvoiceItem(id: string): Promise<void> {
-  // TODO Step 3: delete from import_invoice_items where id = ...
-  void supabase; void id;
+  const { data: existing } = await supabase
+    .from('import_invoice_items')
+    .select('invoice_id')
+    .eq('id', id)
+    .single();
+  const invoiceId = (existing as { invoice_id: string } | null)?.invoice_id || null;
+  const { error } = await supabase.from('import_invoice_items').delete().eq('id', id);
+  if (error) throw error;
+  if (invoiceId) await recalcInvoiceTotals(invoiceId);
+}
+
+export async function bulkCreateInvoiceItems(
+  invoiceId: string,
+  items: Array<Partial<InvoiceItem>>
+): Promise<{ created: number; items: InvoiceItem[] }> {
+  if (!items || items.length === 0) return { created: 0, items: [] };
+  const { data: existing } = await supabase
+    .from('import_invoice_items')
+    .select('line_no')
+    .eq('invoice_id', invoiceId)
+    .order('line_no', { ascending: false })
+    .limit(1);
+  const nextStart = existing && existing.length > 0 ? Number((existing[0] as { line_no: number }).line_no) + 1 : 1;
+  const payload = items
+    .filter(it => !!it.model)
+    .map((it, idx) => {
+      const qty = Number(it.qty ?? 0);
+      const fob = Number(it.fob_usd ?? 0);
+      return {
+        invoice_id: invoiceId,
+        line_no: it.line_no ?? nextStart + idx,
+        model: it.model as string,
+        name: it.name ?? null,
+        qty,
+        fob_usd: fob,
+        amount_usd: Number((qty * fob).toFixed(2)),
+        pallets: it.pallets ?? 0,
+        is_pallet_line: it.is_pallet_line ?? false,
+        memo: it.memo ?? null,
+      };
+    });
+  if (payload.length === 0) return { created: 0, items: [] };
+  const { data, error } = await supabase.from('import_invoice_items').insert(payload).select('*');
+  if (error) throw error;
+  await recalcInvoiceTotals(invoiceId);
+  return { created: (data || []).length, items: (data || []) as InvoiceItem[] };
+}
+
+export async function recalcInvoiceTotals(invoiceId: string): Promise<void> {
+  const { data: items, error: qErr } = await supabase
+    .from('import_invoice_items')
+    .select('qty, fob_usd, is_pallet_line')
+    .eq('invoice_id', invoiceId);
+  if (qErr) throw qErr;
+  let subtotal = 0;
+  let pallets = 0;
+  (items || []).forEach((it: { qty: number; fob_usd: number; is_pallet_line: boolean }) => {
+    const amt = Number(it.qty || 0) * Number(it.fob_usd || 0);
+    if (it.is_pallet_line) pallets += amt;
+    else subtotal += amt;
+  });
+  const { data: inv, error: iErr } = await supabase
+    .from('import_invoices')
+    .select('discount_usd')
+    .eq('id', invoiceId)
+    .single();
+  if (iErr) throw iErr;
+  const discount = Number((inv as { discount_usd: number }).discount_usd || 0);
+  const final = Number((subtotal - discount + pallets).toFixed(2));
+  await supabase
+    .from('import_invoices')
+    .update({
+      subtotal_usd: Number(subtotal.toFixed(2)),
+      pallets_usd: Number(pallets.toFixed(2)),
+      final_amount_usd: final,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', invoiceId);
 }
 
 // ========== Payment (송금 스케줄) ==========
