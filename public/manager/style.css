@@ -1860,3 +1860,147 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   text-align: center;
   line-height: 1.6;
 }
+
+/* =================================================================
+   거래명세서 Phase 3B-1 — 검색 드롭다운 14컬럼 + 리사이즈 + 설정 팝업
+   ================================================================= */
+
+/* 검색 입력 좌측 padding (톱니바퀴 공간 확보) */
+#tab-transactions .tx-search-wrap { position: relative; }
+#tab-transactions .tx-search-input { padding-right: 36px; }
+
+/* 톱니바퀴 버튼 */
+.tx-search-settings-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #5A6070;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.tx-search-settings-btn:hover {
+  background: #EAECF2;
+  color: #1A1D23;
+}
+
+/* 드롭다운 가로 스크롤 (14컬럼 전부 표시 시) */
+#tab-transactions #tx-search-results {
+  overflow-x: auto;
+}
+
+/* 리사이즈 가능 헤더 */
+.tx-search-table th.tx-col-resizable {
+  position: relative;
+  user-select: none;
+}
+.tx-search-table th.tx-col-add {
+  width: 60px;
+  background: #EAECF2;
+}
+.tx-col-resize-handle {
+  position: absolute;
+  right: -1px;
+  top: 0;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+  background: transparent;
+}
+.tx-col-resize-handle:hover,
+.tx-col-resize-handle.active {
+  background: #185FA5;
+  opacity: 0.6;
+}
+
+/* 컬럼 설정 팝업 */
+.tx-search-settings-popup {
+  position: fixed;
+  z-index: 9999;
+  width: 240px;
+  max-height: 420px;
+  background: #FFFFFF;
+  border: 1px solid #DDE1EB;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(26, 29, 35, 0.12);
+  padding: 8px;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tx-search-settings-actions {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #EAECF2;
+}
+.tx-search-settings-actions button {
+  flex: 1;
+  height: 26px;
+  background: #FAFAF7;
+  color: #1A1D23;
+  border: 1px solid #DDE1EB;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tx-search-settings-actions button:hover {
+  background: #EAECF2;
+}
+.tx-search-settings-list {
+  overflow-y: auto;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tx-search-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: 13px;
+  color: #1A1D23;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+}
+.tx-search-settings-item:hover {
+  background: #F4F6FA;
+}
+.tx-search-settings-item input[type="checkbox"] {
+  cursor: pointer;
+}
+.tx-search-settings-footer {
+  padding-top: 6px;
+  border-top: 1px solid #EAECF2;
+}
+.tx-search-settings-footer button {
+  width: 100%;
+  height: 28px;
+  background: #185FA5;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tx-search-settings-footer button:hover {
+  background: #0C447C;
+}

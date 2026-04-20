@@ -24274,6 +24274,10 @@ const _tx = {
     this._bindSearchInput();
     this._bindCustomerSelect();
 
+    // Phase 3B-1: 검색 컬럼 설정 로드 + 톱니바퀴 버튼 생성
+    this.search.loadConfig();
+    this.search._ensureSettingsBtn();
+
     // 초기: 검색 드롭다운 접힘
     const searchResults = document.getElementById('tx-search-results');
     if (searchResults) searchResults.classList.add('tx-hidden');
@@ -24567,6 +24571,83 @@ const _tx = {
   search: {
     _debounceTimer: null,
     _cache: null,
+    _config: null,
+    _lastResults: null,
+    _settingsBtn: null,
+    _settingsPopup: null,
+
+    // 14개 컬럼 정의 (Phase 3B-1)
+    COLUMNS: [
+      { id: 'code',        label: '코드',     defaultWidth: 80,  defaultVisible: true  },
+      { id: 'manageCode',  label: '관리코드', defaultWidth: 100, defaultVisible: false },
+      { id: 'category',    label: '대분류',   defaultWidth: 100, defaultVisible: false },
+      { id: 'model',       label: '모델',     defaultWidth: 140, defaultVisible: true  },
+      { id: 'spec',        label: '규격',     defaultWidth: 180, defaultVisible: false },
+      { id: 'description', label: '품명',     defaultWidth: 220, defaultVisible: false },
+      { id: 'stock',       label: '재고',     defaultWidth: 60,  defaultVisible: true  },
+      { id: 'cost',        label: '원가',     defaultWidth: 90,  defaultVisible: true  },
+      { id: 'priceA',      label: '도매A',    defaultWidth: 90,  defaultVisible: false },
+      { id: 'retail',      label: '소매가',   defaultWidth: 90,  defaultVisible: true  },
+      { id: 'naver',       label: '스토어팜', defaultWidth: 90,  defaultVisible: false },
+      { id: 'open',        label: '오픈마켓', defaultWidth: 90,  defaultVisible: false },
+      { id: 'ssg',         label: 'SSG',      defaultWidth: 90,  defaultVisible: false },
+      { id: 'memo',        label: '비고',     defaultWidth: 200, defaultVisible: false },
+    ],
+
+    _configKey() {
+      const u = (window.currentUser && window.currentUser.loginId) || 'default';
+      return 'tx_search_columns_' + u;
+    },
+
+    _defaultConfig() {
+      const vis = {};
+      const widths = {};
+      for (let i = 0; i < this.COLUMNS.length; i++) {
+        const c = this.COLUMNS[i];
+        vis[c.id] = c.defaultVisible;
+        widths[c.id] = c.defaultWidth;
+      }
+      return { visibility: vis, widths: widths };
+    },
+
+    loadConfig() {
+      const key = this._configKey();
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const obj = JSON.parse(raw);
+          if (obj && obj.visibility && obj.widths) {
+            // 새 컬럼 추가된 경우 기본값 보충
+            for (let i = 0; i < this.COLUMNS.length; i++) {
+              const c = this.COLUMNS[i];
+              if (obj.visibility[c.id] === undefined) obj.visibility[c.id] = c.defaultVisible;
+              if (obj.widths[c.id] === undefined) obj.widths[c.id] = c.defaultWidth;
+            }
+            this._config = obj;
+            return;
+          }
+        }
+      } catch (e) { console.warn('[TX] loadConfig failed', e); }
+      this._config = this._defaultConfig();
+      this.saveConfig();
+    },
+
+    saveConfig() {
+      if (!this._config) return;
+      try {
+        localStorage.setItem(this._configKey(), JSON.stringify(this._config));
+      } catch (e) { console.warn('[TX] saveConfig failed', e); }
+    },
+
+    _visibleColumns() {
+      if (!this._config) this.loadConfig();
+      const out = [];
+      for (let i = 0; i < this.COLUMNS.length; i++) {
+        const c = this.COLUMNS[i];
+        if (this._config.visibility[c.id] !== false) out.push(c);
+      }
+      return out;
+    },
 
     _buildIndex() {
       if (this._cache) return this._cache;
@@ -24630,6 +24711,7 @@ const _tx = {
       if (!container) return;
       if (query.length < 2) {
         container.classList.add('tx-hidden');
+        this._lastResults = null;
         return;
       }
       const index = this._buildIndex();
@@ -24645,43 +24727,312 @@ const _tx = {
         if (sa !== sb) return sa - sb;
         return String(a.entry.data.code || '').localeCompare(String(b.entry.data.code || ''));
       });
-      this.render(scored.slice(0, 10));
+      const top = scored.slice(0, 10);
+      this._lastResults = top;
+      this.render(top);
     },
 
-    render(results) {
-      const container = document.getElementById('tx-search-results');
-      const body = document.getElementById('tx-search-body');
-      if (!container || !body) return;
-      container.classList.remove('tx-hidden');
-      if (!results || results.length === 0) {
-        body.innerHTML = '<tr><td colspan="5" class="tx-dropdown-empty">검색 결과가 없습니다</td></tr>';
-        return;
-      }
-      const fmt = function(n) { return (Number(n) || 0).toLocaleString(); };
+    // source 기반 분기 셀 렌더링
+    _renderCell(col, p, source) {
+      const fmt = function(n) {
+        const v = Number(n);
+        return (v || v === 0) ? v.toLocaleString() : '-';
+      };
       const esc = function(s) {
         return String(s == null ? '' : s)
           .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       };
-      let html = '';
-      for (let i = 0; i < results.length; i++) {
-        const p = results[i].entry.data;
-        const src = results[i].entry.source;
-        const retailPrice = src === 'milwaukee'
-          ? (Number(p.priceA) || Number(p.supplyPrice) || 0)
-          : (Number(p.outPrice) || Number(p.palletPrice) || 0);
-        const stock = Number(p.stock) || Number(p.qty) || 0;
-        const name = p.description || p.model || p.manageCode || p.code || '';
-        html +=
-          '<tr>' +
-            '<td><button type="button" class="tx-add-btn">+ 추가</button></td>' +
-            '<td>' + esc(p.code || '') + '</td>' +
-            '<td style="text-align:left">' + esc(name) + '</td>' +
-            '<td>' + fmt(stock) + '</td>' +
-            '<td style="text-align:right">' + fmt(retailPrice) + '</td>' +
-          '</tr>';
+      switch (col.id) {
+        case 'code':        return esc(p.code || '-');
+        case 'manageCode':  return esc(p.manageCode || '-');
+        case 'category':    return esc(p.category || '-');
+        case 'model':       return esc(p.model || '-');
+        case 'spec':        return esc(p.detail || '-');
+        case 'description': return esc(p.description || '-');
+        case 'stock': {
+          let s;
+          if (source === 'milwaukee' && typeof findStock === 'function') {
+            s = findStock(p.code);
+          } else {
+            s = (p.stock != null && p.stock !== '') ? p.stock : null;
+          }
+          return s == null ? '-' : fmt(s);
+        }
+        case 'cost': {
+          if (source === 'milwaukee') return p.cost ? fmt(p.cost) : '-';
+          return p.inPrice ? fmt(p.inPrice) : '-';
+        }
+        case 'priceA':  return (source === 'milwaukee' && p.priceA)      ? fmt(p.priceA)      : '-';
+        case 'retail': {
+          if (source === 'milwaukee') return p.priceRetail ? fmt(p.priceRetail) : '-';
+          return p.outPrice ? fmt(p.outPrice) : '-';
+        }
+        case 'naver':   return (source === 'milwaukee' && p.priceNaver)  ? fmt(p.priceNaver)  : '-';
+        case 'open':    return (source === 'milwaukee' && p.priceOpen)   ? fmt(p.priceOpen)   : '-';
+        case 'ssg':     return (source === 'milwaukee' && p.priceSsg)    ? fmt(p.priceSsg)    : '-';
+        case 'memo':    return esc(p.memo || '-');
       }
-      body.innerHTML = html;
+      return '-';
+    },
+
+    render(results) {
+      if (!this._config) this.loadConfig();
+      const container = document.getElementById('tx-search-results');
+      const table = container ? container.querySelector('.tx-search-table') : null;
+      const body = document.getElementById('tx-search-body');
+      if (!container || !table || !body) return;
+      container.classList.remove('tx-hidden');
+
+      const visible = this._visibleColumns();
+      const widths = this._config.widths;
+      const ADD_COL_W = 60;
+      const totalW = ADD_COL_W + visible.reduce(function(sum, c) { return sum + (widths[c.id] || c.defaultWidth); }, 0);
+
+      // 기존 colgroup 제거 후 재생성
+      const oldCgs = table.querySelectorAll('colgroup');
+      for (let i = 0; i < oldCgs.length; i++) oldCgs[i].remove();
+      const cg = document.createElement('colgroup');
+      cg.className = 'tx-cg';
+      let cgHtml = '<col style="width:' + ADD_COL_W + 'px">';
+      for (let i = 0; i < visible.length; i++) {
+        const c = visible[i];
+        cgHtml += '<col style="width:' + (widths[c.id] || c.defaultWidth) + 'px">';
+      }
+      cg.innerHTML = cgHtml;
+      table.insertBefore(cg, table.firstChild);
+      table.style.tableLayout = 'fixed';
+      table.style.width = totalW + 'px';
+
+      // thead 재구성
+      const thead = table.querySelector('thead');
+      if (thead) {
+        let theadHtml = '<tr>';
+        theadHtml += '<th class="tx-col-add">&nbsp;</th>';
+        for (let i = 0; i < visible.length; i++) {
+          const c = visible[i];
+          theadHtml += '<th class="tx-col-resizable" data-col-id="' + c.id + '">' +
+                       c.label +
+                       '<div class="tx-col-resize-handle"></div>' +
+                       '</th>';
+        }
+        theadHtml += '</tr>';
+        thead.innerHTML = theadHtml;
+      }
+
+      // tbody
+      if (!results || results.length === 0) {
+        body.innerHTML = '<tr><td colspan="' + (visible.length + 1) + '" class="tx-dropdown-empty">검색 결과가 없습니다</td></tr>';
+      } else {
+        let html = '';
+        for (let i = 0; i < results.length; i++) {
+          const p = results[i].entry.data;
+          const src = results[i].entry.source;
+          html += '<tr>';
+          html += '<td><button type="button" class="tx-add-btn">+ 추가</button></td>';
+          for (let j = 0; j < visible.length; j++) {
+            const c = visible[j];
+            html += '<td data-col-id="' + c.id + '">' + this._renderCell(c, p, src) + '</td>';
+          }
+          html += '</tr>';
+        }
+        body.innerHTML = html;
+      }
+
+      // 리사이즈 핸들 바인딩
+      this._bindResizeHandles(table);
+    },
+
+    _bindResizeHandles(table) {
+      const self = this;
+      const ths = table.querySelectorAll('thead th.tx-col-resizable');
+      ths.forEach(function(th) {
+        const handle = th.querySelector('.tx-col-resize-handle');
+        if (!handle || handle._txBound) return;
+        handle._txBound = true;
+        handle.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const colId = th.getAttribute('data-col-id');
+          const startX = e.pageX;
+          const startW = self._config.widths[colId] || 80;
+          handle.classList.add('active');
+          document.body.style.cursor = 'col-resize';
+          document.body.style.userSelect = 'none';
+
+          const tableRect = table.getBoundingClientRect();
+          const guide = document.createElement('div');
+          guide.style.cssText = 'position:fixed;top:' + tableRect.top + 'px;width:1px;height:' + tableRect.height + 'px;background:#185FA5;z-index:9999;pointer-events:none;';
+          guide.style.left = th.getBoundingClientRect().right + 'px';
+          document.body.appendChild(guide);
+
+          function onMove(ev) {
+            const dx = ev.pageX - startX;
+            const newW = Math.min(500, Math.max(40, startW + dx));
+            guide.style.left = (th.getBoundingClientRect().left + newW) + 'px';
+          }
+          function onUp(ev) {
+            guide.remove();
+            const dx = ev.pageX - startX;
+            const newW = Math.min(500, Math.max(40, startW + dx));
+            self._config.widths[colId] = newW;
+            handle.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            self.saveConfig();
+            self._applyWidths(table);
+          }
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+      });
+    },
+
+    _applyWidths(table) {
+      const visible = this._visibleColumns();
+      const widths = this._config.widths;
+      const ADD_COL_W = 60;
+      const cg = table.querySelector('colgroup.tx-cg');
+      if (cg) {
+        let cgHtml = '<col style="width:' + ADD_COL_W + 'px">';
+        for (let i = 0; i < visible.length; i++) {
+          const c = visible[i];
+          cgHtml += '<col style="width:' + (widths[c.id] || c.defaultWidth) + 'px">';
+        }
+        cg.innerHTML = cgHtml;
+      }
+      const totalW = ADD_COL_W + visible.reduce(function(sum, c) { return sum + (widths[c.id] || c.defaultWidth); }, 0);
+      table.style.width = totalW + 'px';
+    },
+
+    // 재렌더링 (설정 변경 후)
+    _rerender() {
+      if (this._lastResults && this._lastResults.length > 0) {
+        this.render(this._lastResults);
+      } else {
+        // 결과 없음 또는 검색 전 — 헤더 구조는 다음 검색 때 재구성됨
+        const container = document.getElementById('tx-search-results');
+        if (container && !container.classList.contains('tx-hidden')) {
+          this.render([]);
+        }
+      }
+    },
+
+    // 톱니바퀴 버튼 생성
+    _ensureSettingsBtn() {
+      if (this._settingsBtn && document.body.contains(this._settingsBtn)) return this._settingsBtn;
+      const wrap = document.querySelector('#tab-transactions .tx-search-wrap');
+      if (!wrap) return null;
+      let btn = wrap.querySelector('.tx-search-settings-btn');
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'tx-search-settings-btn';
+        btn.title = '컬럼 설정';
+        btn.innerHTML = '⚙';
+        wrap.appendChild(btn);
+      }
+      if (!btn._txBound) {
+        btn._txBound = true;
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          _tx.search._toggleSettingsPopup(btn);
+        });
+      }
+      this._settingsBtn = btn;
+      return btn;
+    },
+
+    _toggleSettingsPopup(anchor) {
+      const pop = this._settingsPopup;
+      if (pop && pop.style.display !== 'none') {
+        pop.style.display = 'none';
+        return;
+      }
+      this._openSettingsPopup(anchor);
+    },
+
+    _openSettingsPopup(anchor) {
+      let pop = this._settingsPopup;
+      if (!pop) {
+        pop = document.createElement('div');
+        pop.className = 'tx-search-settings-popup';
+        document.body.appendChild(pop);
+        this._settingsPopup = pop;
+        // 외부 클릭 닫기
+        document.addEventListener('mousedown', function(e) {
+          const p = _tx.search._settingsPopup;
+          if (!p || p.style.display === 'none') return;
+          if (p.contains(e.target)) return;
+          const b = _tx.search._settingsBtn;
+          if (b && b.contains(e.target)) return;
+          p.style.display = 'none';
+        });
+      }
+      this._renderSettingsPopup();
+      const rect = anchor.getBoundingClientRect();
+      pop.style.top = (rect.bottom + 4) + 'px';
+      pop.style.right = (window.innerWidth - rect.right) + 'px';
+      pop.style.left = 'auto';
+      pop.style.display = 'flex';
+    },
+
+    _renderSettingsPopup() {
+      const pop = this._settingsPopup;
+      if (!pop) return;
+      if (!this._config) this.loadConfig();
+      let html = '';
+      html += '<div class="tx-search-settings-actions">';
+      html += '<button type="button" data-act="all">전체 선택</button>';
+      html += '<button type="button" data-act="none">전체 해제</button>';
+      html += '</div>';
+      html += '<div class="tx-search-settings-list">';
+      for (let i = 0; i < this.COLUMNS.length; i++) {
+        const c = this.COLUMNS[i];
+        const checked = this._config.visibility[c.id] ? 'checked' : '';
+        html += '<label class="tx-search-settings-item">' +
+                '<input type="checkbox" data-col-id="' + c.id + '" ' + checked + '>' +
+                '<span>' + c.label + '</span>' +
+                '</label>';
+      }
+      html += '</div>';
+      html += '<div class="tx-search-settings-footer">';
+      html += '<button type="button" data-act="reset">기본값 복원</button>';
+      html += '</div>';
+      pop.innerHTML = html;
+
+      const self = this;
+      pop.querySelectorAll('[data-act]').forEach(function(b) {
+        b.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const act = b.getAttribute('data-act');
+          if (act === 'all') {
+            for (let i = 0; i < self.COLUMNS.length; i++) self._config.visibility[self.COLUMNS[i].id] = true;
+          } else if (act === 'none') {
+            for (let i = 0; i < self.COLUMNS.length; i++) self._config.visibility[self.COLUMNS[i].id] = false;
+          } else if (act === 'reset') {
+            // 기본값 복원: visibility + widths 둘 다 초기화
+            for (let i = 0; i < self.COLUMNS.length; i++) {
+              const c = self.COLUMNS[i];
+              self._config.visibility[c.id] = c.defaultVisible;
+              self._config.widths[c.id] = c.defaultWidth;
+            }
+          }
+          self.saveConfig();
+          self._renderSettingsPopup();
+          self._rerender();
+        });
+      });
+      pop.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+          const colId = cb.getAttribute('data-col-id');
+          self._config.visibility[colId] = cb.checked;
+          self.saveConfig();
+          self._rerender();
+        });
+      });
     },
 
     clear() {
@@ -24689,6 +25040,7 @@ const _tx = {
       if (input) input.value = '';
       const container = document.getElementById('tx-search-results');
       if (container) container.classList.add('tx-hidden');
+      this._lastResults = null;
     },
   },
 
