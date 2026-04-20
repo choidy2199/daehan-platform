@@ -25005,9 +25005,22 @@ const _tx = {
         case 'naver':   return (source === 'milwaukee' && p.priceNaver)  ? fmt(p.priceNaver)  : '-';
         case 'open':    return (source === 'milwaukee' && p.priceOpen)   ? fmt(p.priceOpen)   : '-';
         case 'ssg':     return (source === 'milwaukee' && p.priceSsg)    ? fmt(p.priceSsg)    : '-';
-        case 'in':      return (source === 'general' && Number(p.inPrice)     > 0) ? fmt(p.inPrice)     : '-';
-        case 'out':     return (source === 'general' && Number(p.outPrice)    > 0) ? fmt(p.outPrice)    : '-';
-        case 'pallet':  return (source === 'general' && Number(p.palletPrice) > 0) ? fmt(p.palletPrice) : '-';
+        case 'in':
+        case 'out':
+        case 'pallet': {
+          const DASH = '<span style="color:#DDE1EB">-</span>';
+          if (source !== 'general') return DASH;
+          const qtyField   = col.id === 'in' ? 'inQty'    : col.id === 'out' ? 'outQty'    : 'palletQty';
+          const priceField = col.id === 'in' ? 'inPrice'  : col.id === 'out' ? 'outPrice'  : 'palletPrice';
+          const price = Number(p[priceField]) || 0;
+          if (price <= 0) return DASH;
+          const qty = Number(p[qtyField]) || 0;
+          let h = '<div style="display:flex;flex-direction:column;align-items:center">';
+          if (qty > 0) h += '<span style="font-size:10px;color:#5A6070">' + qty + '개</span>';
+          h += '<span style="font-size:12px;font-weight:600;color:#185FA5">' + price.toLocaleString() + '</span>';
+          h += '</div>';
+          return h;
+        }
         case 'memo':    return esc(p.memo || '-');
       }
       return '-';
