@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { recalcInvoiceTotals } from '@/lib/import-invoice-calc';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -80,7 +81,7 @@ export async function PUT(request: NextRequest) {
     const { id, ...fields } = body || {};
     if (!id) return NextResponse.json({ success: false, error: 'id 필수' }, { status: 400 });
 
-    const allowed = ['invoice_no', 'batch_id', 'factory_name', 'factory_code', 'invoice_date', 'payment_terms', 'memo', 'subtotal_usd', 'discount_usd', 'pallets_usd', 'final_amount_usd', 'weighted_avg_rate', 'status'];
+    const allowed = ['invoice_no', 'batch_id', 'factory_name', 'factory_code', 'invoice_date', 'payment_terms', 'memo', 'subtotal_usd', 'discount_usd', 'pallets_usd', 'final_amount_usd', 'weighted_avg_rate', 'status', 'discount_rate', 'discount_amount_usd', 'pallet_count', 'pallet_unit_price_usd', 'pallet_total_usd', 'final_total_usd'];
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const k of allowed) {
       if (k in fields) {
@@ -101,6 +102,14 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({ success: false, error: '이미 등록된 인보이스 번호입니다', code: 'DUPLICATE' }, { status: 409 });
       }
       throw error;
+    }
+
+    // discount_rate 또는 pallet_unit_price_usd 변경 시 전체 재계산
+    const needsRecalc = 'discount_rate' in fields || 'pallet_unit_price_usd' in fields;
+    if (needsRecalc) {
+      await recalcInvoiceTotals(supabase, id);
+      const { data: refreshed } = await supabase.from('import_invoices').select('*').eq('id', id).single();
+      if (refreshed) return NextResponse.json({ success: true, data: refreshed });
     }
     return NextResponse.json({ success: true, data });
   } catch (err) {

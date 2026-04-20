@@ -60,8 +60,8 @@ export async function GET(
       raws
         .filter(it => !it.is_pallet_line)
         .forEach(it => {
-          const fobUsd = Number(it.fob_usd || 0);
-          const fobKrw = weightedAvg != null ? Math.round(fobUsd * Number(weightedAvg)) : 0;
+          const netFobUsd = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
+          const fobKrw = weightedAvg != null ? Math.round(netFobUsd * Number(weightedAvg)) : 0;
           items.push({
             model: String(it.model || ''),
             qty: Number(it.qty || 0),

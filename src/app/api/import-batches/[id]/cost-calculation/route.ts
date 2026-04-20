@@ -76,7 +76,9 @@ export async function GET(
         .filter(it => !it.is_pallet_line)
         .forEach(it => {
           const fobUsd = Number(it.fob_usd || 0);
-          const fobKrw = weightedAvg != null ? Math.round(fobUsd * Number(weightedAvg)) : null;
+          // 할인·팔렛 반영된 순 FOB (Phase 2 개편). 비어있으면(구데이터) amount_usd 사용
+          const netFobUsd = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
+          const fobKrw = weightedAvg != null ? Math.round(netFobUsd * Number(weightedAvg)) : null;
           items.push({
             id: it.id as string,
             invoice_id: inv.id as string,

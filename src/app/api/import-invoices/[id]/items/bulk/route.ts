@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { recalcInvoiceTotals as sharedRecalc } from '@/lib/import-invoice-calc';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,40 +14,13 @@ type ItemInput = {
   qty?: number;
   fob_usd?: number;
   pallets?: number;
+  pallet_qty?: number;
   is_pallet_line?: boolean;
   memo?: string | null;
 };
 
 async function recalcInvoiceTotals(invoiceId: string): Promise<void> {
-  const { data: items, error: qErr } = await supabase
-    .from('import_invoice_items')
-    .select('qty, fob_usd, is_pallet_line')
-    .eq('invoice_id', invoiceId);
-  if (qErr) throw qErr;
-  let subtotal = 0;
-  let pallets = 0;
-  (items || []).forEach((it: { qty: number; fob_usd: number; is_pallet_line: boolean }) => {
-    const amt = Number(it.qty || 0) * Number(it.fob_usd || 0);
-    if (it.is_pallet_line) pallets += amt;
-    else subtotal += amt;
-  });
-  const { data: inv, error: iErr } = await supabase
-    .from('import_invoices')
-    .select('discount_usd')
-    .eq('id', invoiceId)
-    .single();
-  if (iErr) throw iErr;
-  const discount = Number((inv as { discount_usd: number }).discount_usd || 0);
-  const final = Number((subtotal - discount + pallets).toFixed(2));
-  await supabase
-    .from('import_invoices')
-    .update({
-      subtotal_usd: Number(subtotal.toFixed(2)),
-      pallets_usd: Number(pallets.toFixed(2)),
-      final_amount_usd: final,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', invoiceId);
+  return sharedRecalc(supabase, invoiceId);
 }
 
 export async function POST(
@@ -81,6 +55,7 @@ export async function POST(
           qty,
           fob_usd: fob,
           amount_usd: Number((qty * fob).toFixed(2)),
+          pallet_qty: Number(r.pallet_qty) || 0,
           pallets: Number(r.pallets) || 0,
           is_pallet_line: !!r.is_pallet_line,
           memo: r.memo ? String(r.memo).trim() || null : null,

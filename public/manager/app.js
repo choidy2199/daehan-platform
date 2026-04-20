@@ -22108,9 +22108,14 @@ function _ipinv2DoRenderDetail(container) {
   h += '<div><label style="' + lblS + '">인보이스 일자 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-date" type="date" value="' + _ipinv2Esc((inv.invoice_date || '').substring(0, 10)) + '" style="' + inpS + '"></div>';
   h += '<div><label style="' + lblS + '">결제 조건</label><input id="ipinv2-f-terms" type="text" value="' + _ipinv2Esc(inv.payment_terms || '') + '" style="' + inpS + '" placeholder="T/T 30% + 70%"></div>';
   h += '</div>';
-  h += '<div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-top:12px;">';
-  h += '<div><label style="' + lblS + '">연결 수입 건</label><select id="ipinv2-f-batch" disabled style="' + inpS + 'background:#F9FAFB;color:#9BA3B2;"><option>연결 안됨 (Step 3-B)</option></select></div>';
-  h += '<div><label style="' + lblS + '">메모</label><textarea id="ipinv2-f-memo" rows="2" style="width:100%;border:1px solid #DDE1EB;border-radius:6px;padding:6px 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;resize:vertical;">' + _ipinv2Esc(inv.memo || '') + '</textarea></div>';
+  // 할인율 + 팔렛 단가 추가 줄
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;margin-top:12px;">';
+  h += '<div><label style="' + lblS + '">할인율 (%)</label><input id="ipinv2-f-discrate" type="number" step="0.01" value="' + (inv.discount_rate || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'discount_rate\',this.value)"></div>';
+  h += '<div><label style="' + lblS + '">팔렛 단가 ($)</label><input id="ipinv2-f-palletunit" type="number" step="0.01" value="' + (inv.pallet_unit_price_usd || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'pallet_unit_price_usd\',this.value)"></div>';
+  h += '<div><label style="' + lblS + '">연결 수입 건</label><select id="ipinv2-f-batch" disabled style="' + inpS + 'background:#F9FAFB;color:#9BA3B2;"><option>연결 안됨</option></select></div>';
+  h += '</div>';
+  h += '<div style="margin-top:12px;">';
+  h += '<label style="' + lblS + '">메모</label><textarea id="ipinv2-f-memo" rows="2" style="width:100%;border:1px solid #DDE1EB;border-radius:6px;padding:6px 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;resize:vertical;">' + _ipinv2Esc(inv.memo || '') + '</textarea>';
   h += '</div></div>';
 
   // 제품 라인 섹션
@@ -22220,34 +22225,35 @@ function _ipinv2RenderItemsTable() {
 
   var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;';
   var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
-  h += '<colgroup><col style="width:36px"><col style="width:160px"><col><col style="width:80px"><col style="width:110px"><col style="width:110px"><col style="width:70px"><col style="width:60px"><col style="width:50px"></colgroup>';
+  h += '<colgroup><col style="width:36px"><col style="width:160px"><col><col style="width:70px"><col style="width:70px"><col style="width:110px"><col style="width:110px"><col style="width:50px"></colgroup>';
   h += '<thead><tr>';
   h += '<th style="' + thS + 'text-align:center;">No.</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:10px;">모델 *</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:10px;">품명</th>';
-  h += '<th style="' + thS + 'text-align:right;padding-right:10px;">수량 *</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:10px;">팔렛수 *</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:10px;background:#F9FAFB;" title="팔렛수 × 팔렛당 수량 (자동)">수량</th>';
   h += '<th style="' + thS + 'text-align:right;padding-right:10px;">FOB 단가 ($) *</th>';
   h += '<th style="' + thS + 'text-align:right;padding-right:10px;">금액 ($)</th>';
-  h += '<th style="' + thS + 'text-align:right;padding-right:10px;">팔렛</th>';
-  h += '<th style="' + thS + 'text-align:center;">팔렛행</th>';
   h += '<th style="' + thS + 'text-align:center;">액션</th>';
   h += '</tr></thead><tbody>';
 
   if (items.length === 0) {
-    h += '<tr><td colspan="9" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다. 우측 상단 버튼으로 추가하세요.</td></tr>';
+    h += '<tr><td colspan="8" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다. 우측 상단 버튼으로 추가하세요.</td></tr>';
   } else {
     var tdS = 'padding:6px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;vertical-align:middle;';
     var inpTdS = 'width:100%;height:28px;border:1px solid transparent;border-radius:4px;padding:0 6px;font-size:13px;font-family:Pretendard,sans-serif;background:transparent;box-sizing:border-box;';
     items.forEach(function(it, i) {
+      var modelVal = _ipinv2Esc(it.model || '');
+      var isPlaceholder = !it.model || it.model === '' || it.model === '(모델명 입력)';
+      if (isPlaceholder) modelVal = '';
       h += '<tr data-item-id="' + it.id + '">';
       h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
-      h += '<td style="' + tdS + '"><input data-field="model" value="' + _ipinv2Esc(it.model) + '" style="' + inpTdS + 'font-weight:500;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnModelInput(event,\'' + it.id + '\')"></td>';
-      h += '<td style="' + tdS + '"><input data-field="name" value="' + _ipinv2Esc(it.name || '') + '" style="' + inpTdS + '" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')"></td>';
-      h += '<td style="' + tdS + 'text-align:right;"><input type="number" data-field="qty" value="' + (it.qty || 0) + '" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnAmountInput(event,\'' + it.id + '\')"></td>';
-      h += '<td style="' + tdS + 'text-align:right;"><input type="number" step="0.01" data-field="fob_usd" value="' + (it.fob_usd || 0) + '" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnAmountInput(event,\'' + it.id + '\')"></td>';
+      h += '<td style="' + tdS + '"><input data-field="model" value="' + modelVal + '" placeholder="모델명 입력" style="' + inpTdS + 'font-weight:500;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnModelInput(event,\'' + it.id + '\')"></td>';
+      h += '<td style="' + tdS + '"><input data-field="name" value="' + _ipinv2Esc(it.name || '') + '" placeholder="품명 (자동)" style="' + inpTdS + '" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')"></td>';
+      h += '<td style="' + tdS + 'text-align:right;"><input type="number" step="0.01" data-field="pallet_qty" value="' + (it.pallet_qty || 0) + '" placeholder="0" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')"></td>';
+      h += '<td style="' + tdS + 'text-align:right;padding-right:10px;color:#5A6070;background:#F9FAFB;" title="수량 = 팔렛수 × 팔렛당 수량 (자동 계산)" data-field="qty">' + _ipinv2Int(it.qty) + '</td>';
+      h += '<td style="' + tdS + 'text-align:right;"><input type="number" step="0.01" data-field="fob_usd" value="' + (it.fob_usd || 0) + '" placeholder="0.00" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnAmountInput(event,\'' + it.id + '\')"></td>';
       h += '<td style="' + tdS + 'text-align:right;padding-right:10px;font-weight:500;" data-field="amount">' + _ipinv2Money(it.amount_usd) + '</td>';
-      h += '<td style="' + tdS + 'text-align:right;"><input type="number" data-field="pallets" value="' + (it.pallets || 0) + '" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')"></td>';
-      h += '<td style="' + tdS + 'text-align:center;"><input type="checkbox" data-field="is_pallet_line"' + (it.is_pallet_line ? ' checked' : '') + ' onchange="_ipinv2OnItemCheckbox(event,\'' + it.id + '\')"></td>';
       h += '<td style="' + tdS + 'text-align:center;">';
       h += '<button onclick="_ipinv2DeleteItem(\'' + it.id + '\')" title="삭제" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #F0D2D2;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">✕</button>';
       h += '</td>';
@@ -22271,24 +22277,52 @@ function _ipinv2RenderSummaryBar() {
   if (!inv) return;
   var items = _ipinv2CurrentItems;
   var totalQty = items.reduce(function(s, it) { return s + Number(it.qty || 0); }, 0);
-  var subtotal = items.reduce(function(s, it) { return s + (it.is_pallet_line ? 0 : Number(it.amount_usd || 0)); }, 0);
-  var palletsAuto = items.reduce(function(s, it) { return s + (it.is_pallet_line ? Number(it.amount_usd || 0) : 0); }, 0);
-  var discount = Number(inv.discount_usd || 0);
-  var pallets = Number(inv.pallets_usd || 0);
-  var final = subtotal - discount + pallets;
+  var subtotal = Number(inv.subtotal_usd || 0);
+  var discountAmount = Number(inv.discount_amount_usd || inv.discount_usd || 0);
+  var discountRate = Number(inv.discount_rate || 0);
+  var palletCount = Number(inv.pallet_count || 0);
+  var palletTotal = Number(inv.pallet_total_usd || inv.pallets_usd || 0);
+  var palletUnit = Number(inv.pallet_unit_price_usd || 0);
+  var finalTotal = Number(inv.final_total_usd || inv.final_amount_usd || 0);
 
   var bar = document.getElementById('ipinv2-summary-bar');
   if (!bar) return;
   var labelS = 'font-size:11px;color:#5A6070;margin-right:4px;';
   var valS = 'font-size:13px;color:#1A1D23;font-weight:500;';
-  var inpS = 'width:110px;height:28px;border:1px solid #DDE1EB;border-radius:4px;padding:0 6px;font-size:13px;font-family:Pretendard,sans-serif;text-align:right;box-sizing:border-box;';
   var h = '';
   h += '<div><span style="' + labelS + '">총 수량</span><span style="' + valS + '">' + _ipinv2Int(totalQty) + ' EA</span></div>';
-  h += '<div><span style="' + labelS + '">Subtotal</span><span style="' + valS + '">' + _ipinv2Money(subtotal) + '</span></div>';
-  h += '<div><span style="' + labelS + '">Discount</span><input id="ipinv2-sum-discount" type="number" step="0.01" value="' + discount + '" style="' + inpS + '" onblur="_ipinv2UpdateFinancial(\'discount\',this.value)"></div>';
-  h += '<div><span style="' + labelS + '">Pallets</span><input id="ipinv2-sum-pallets" type="number" step="0.01" value="' + (palletsAuto > 0 ? palletsAuto : pallets) + '" style="' + inpS + '" onblur="_ipinv2UpdateFinancial(\'pallets\',this.value)"></div>';
-  h += '<div style="margin-left:16px;border-left:1px solid #DDE1EB;padding-left:16px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:16px;color:#1A1D23;font-weight:600;">' + _ipinv2Money(final) + '</span></div>';
+  h += '<div><span style="' + labelS + '">제품합계</span><span style="' + valS + '">' + _ipinv2Money(subtotal) + '</span></div>';
+  h += '<div><span style="' + labelS + '">할인(' + discountRate + '%)</span><span style="' + valS + 'color:#CC2222;">-' + _ipinv2Money(discountAmount) + '</span></div>';
+  h += '<div><span style="' + labelS + '">팔렛(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valS + '">+' + _ipinv2Money(palletTotal) + '</span></div>';
+  h += '<div style="margin-left:16px;border-left:1px solid #DDE1EB;padding-left:16px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:16px;color:#1A1D23;font-weight:600;">' + _ipinv2Money(finalTotal) + '</span></div>';
   bar.innerHTML = h;
+}
+
+function _ipinv2UpdateInvoiceCalcField(field, value) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var n = Number(value) || 0;
+  var payload = { id: inv.id };
+  payload[field] = n;
+  fetch('/api/import-invoices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success) {
+        _ipinv2CurrentInvoice = json.data;
+        // items도 재조회 (서버에서 배분값 갱신됨)
+        fetch('/api/import-invoices/' + inv.id + '/items', { cache: 'no-store' })
+          .then(function(r2) { return r2.json(); })
+          .then(function(j2) {
+            if (j2.success) {
+              var perMap = {};
+              _ipinv2CurrentItems.forEach(function(it) { perMap[it.id] = it._pallet_qty_per || 0; });
+              _ipinv2CurrentItems = (j2.data || []).map(function(it) { return Object.assign({ _pallet_qty_per: perMap[it.id] || 0 }, it); });
+              _ipinv2RenderItemsTable();
+              _ipinv2RenderSummaryBar();
+            }
+          });
+      } else alert(json.error || '업데이트 실패');
+    });
 }
 
 function _ipinv2UpdateFinancial(field, value) {
@@ -22362,14 +22396,39 @@ function _ipinv2OnItemBlur(ev, itemId) {
   var oldItem = _ipinv2CurrentItems.find(function(x) { return x.id === itemId; });
   if (!oldItem) return;
   var newVal;
-  if (field === 'qty' || field === 'fob_usd' || field === 'pallets') newVal = Number(inp.value) || 0;
+  if (field === 'qty' || field === 'fob_usd' || field === 'pallets' || field === 'pallet_qty') newVal = Number(inp.value) || 0;
   else newVal = (inp.value || '').trim();
   if (String(newVal) === String(oldItem[field] == null ? '' : oldItem[field])) return;
+
+  // pallet_qty 변경 시: 팔렛당 수량 × pallet_qty = qty 자동 계산 후 서버에 함께 전달
+  if (field === 'pallet_qty') {
+    var palletPer = Number(oldItem._pallet_qty_per || 0);
+    if (palletPer > 0) {
+      var newQty = Math.round(Number(newVal) * palletPer);
+      _ipinv2PatchItemMulti(itemId, { pallet_qty: newVal, qty: newQty });
+      return;
+    }
+  }
   _ipinv2PatchItem(itemId, field, newVal);
 }
 
-function _ipinv2OnItemCheckbox(ev, itemId) {
-  _ipinv2PatchItem(itemId, 'is_pallet_line', ev.target.checked);
+function _ipinv2PatchItemMulti(itemId, fields) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var payload = Object.assign({ id: itemId }, fields);
+  fetch('/api/import-invoices/' + inv.id + '/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        var idx = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
+        if (idx >= 0) {
+          var prev = _ipinv2CurrentItems[idx];
+          _ipinv2CurrentItems[idx] = Object.assign({ _pallet_qty_per: prev._pallet_qty_per }, json.data);
+        }
+        _ipinv2RenderItemsTable();
+        _ipinv2RefreshInvoiceTotals();
+      } else alert(json.error || '수정 실패');
+    });
 }
 
 function _ipinv2OnAmountInput(ev, itemId) {
@@ -22511,25 +22570,39 @@ function _ipinv2ApplyProductToItem(itemId, product) {
   if (!tr) return;
   var modelInp = tr.querySelector('input[data-field="model"]');
   var nameInp = tr.querySelector('input[data-field="name"]');
-  var palletInp = tr.querySelector('input[data-field="pallets"]');
   if (modelInp) modelInp.value = product.model || '';
   if (nameInp) nameInp.value = product.product_name || '';
-  if (palletInp && product.pallet_qty) palletInp.value = product.pallet_qty;
-  // 서버에 일괄 저장
-  var payload = { id: itemId, model: product.model || '', name: product.product_name || null };
-  if (product.pallet_qty) payload.pallets = product.pallet_qty;
+
+  // 제품V2의 pallet_qty (팔렛당 수량) 저장
+  var palletPer = Number(product.pallet_qty || 0);
+  var idx = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
+  if (idx >= 0) _ipinv2CurrentItems[idx]._pallet_qty_per = palletPer;
+
   var inv = _ipinv2CurrentInvoice;
-  fetch('/api/import-invoices/' + inv.id + '/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  var payload = { id: itemId, model: product.model || '', name: product.product_name || null };
+
+  // 최근 인보이스 FOB 단가 자동 조회
+  fetch('/api/import-invoices/recent-price?model=' + encodeURIComponent(product.model || ''), { cache: 'no-store' })
     .then(function(r) { return r.json(); })
     .then(function(json) {
-      if (json.success) {
-        var idx = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
-        if (idx >= 0) _ipinv2CurrentItems[idx] = json.data;
+      var recentPrice = (json && json.success && json.data) ? Number(json.data.unit_price_usd || 0) : 0;
+      if (recentPrice > 0) payload.fob_usd = recentPrice;
+      return fetch('/api/import-invoices/' + inv.id + '/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        var idx2 = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
+        if (idx2 >= 0) _ipinv2CurrentItems[idx2] = Object.assign({ _pallet_qty_per: palletPer }, json.data);
+        _ipinv2RenderItemsTable();
+        _ipinv2RefreshInvoiceTotals();
+        // 팔렛수 input에 포커스
+        setTimeout(function() {
+          var t = document.querySelector('tr[data-item-id="' + itemId + '"]');
+          if (t) { var pq = t.querySelector('input[data-field="pallet_qty"]'); if (pq) { pq.focus(); pq.select(); } }
+        }, 50);
       }
     });
-  // 다음 필드(수량)로 포커스 이동
-  var qtyInp = tr.querySelector('input[data-field="qty"]');
-  if (qtyInp) { qtyInp.focus(); qtyInp.select(); }
 }
 
 function _ipinv2CreateNewProduct(model, itemId) {
@@ -22762,9 +22835,8 @@ function _ipinv2RenderPaymentCard(p) {
   var lblS = 'display:block;font-size:10px;color:#5A6070;margin-bottom:3px;';
   var inpS = 'width:100%;height:30px;border:1px solid #DDE1EB;border-radius:4px;padding:0 8px;font-size:12px;font-family:Pretendard,sans-serif;box-sizing:border-box;background:#fff;';
   var planBorder = 'border:1px solid #185FA5;';
-  h += '<div><label style="' + lblS + '">송금 예정일</label><input type="date" value="' + _ipinv2Esc((p.planned_date || '').substring(0, 10)) + '" style="' + inpS + '" onblur="_ipinv2UpdatePaymentPlanned(\'' + p.id + '\',\'planned_date\',this.value)"></div>';
-  h += '<div><label style="' + lblS + '">예정 금액 ($)</label><input type="number" step="0.01" data-pay-field="planned_usd" value="' + (p.planned_usd || 0) + '" style="' + inpS + planBorder + 'text-align:right;" oninput="_ipinv2OnPlannedInput(event,\'' + p.id + '\',\'planned_usd\')" onblur="_ipinv2UpdatePaymentPlanned(\'' + p.id + '\',\'planned_usd\',this.value)"></div>';
-  h += '<div><label style="' + lblS + '">비율 (%)</label><input type="number" step="0.01" data-pay-field="planned_ratio" value="' + (p.planned_ratio || 0) + '" style="' + inpS + planBorder + 'text-align:right;" oninput="_ipinv2OnPlannedInput(event,\'' + p.id + '\',\'planned_ratio\')" onblur="_ipinv2UpdatePaymentPlanned(\'' + p.id + '\',\'planned_ratio\',this.value)"></div>';
+  h += '<div style="grid-column:span 2;"><label style="' + lblS + '">예정 금액 ($)</label><div style="position:relative;"><span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:#5A6070;font-size:12px;">$</span><input type="text" inputmode="decimal" data-pay-field="planned_usd" value="' + (p.planned_usd > 0 ? Number(p.planned_usd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "") + '" placeholder="0" style="' + inpS + planBorder + 'text-align:right;padding-left:18px;" oninput="_ipinv2OnPlannedInput(event,\'' + p.id + '\',\'planned_usd\')" onblur="_ipinv2OnPlannedBlur(event,\'' + p.id + '\',\'planned_usd\')"></div></div>';
+  h += '<div><label style="' + lblS + '">비율 (%)</label><input type="text" inputmode="decimal" data-pay-field="planned_ratio" value="' + (p.planned_ratio > 0 ? p.planned_ratio : "") + '" placeholder="0" style="' + inpS + planBorder + 'text-align:right;" oninput="_ipinv2OnPlannedInput(event,\'' + p.id + '\',\'planned_ratio\')" onblur="_ipinv2OnPlannedBlur(event,\'' + p.id + '\',\'planned_ratio\')"></div>';
   h += '</div></div>';
 
   // 송금 실행 섹션
@@ -22829,6 +22901,20 @@ function _ipinv2PaymentEffectiveDesc(p) {
   var usd = Number(p.actual_usd || 0);
   if (usd <= 0) return '-';
   return _ipinv2Krw(total) + ' ÷ $' + Number(usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' · 수수료 포함';
+}
+
+// 콤마/통화 기호 제거하고 숫자 반환
+function _ipinv2StripNumber(s) {
+  return Number(String(s || '').replace(/[^\d.-]/g, '')) || 0;
+}
+
+function _ipinv2OnPlannedBlur(ev, paymentId, field) {
+  var val = _ipinv2StripNumber(ev.target.value);
+  _ipinv2UpdatePaymentPlanned(paymentId, field, val);
+  // 저장 후 포맷팅
+  if (field === 'planned_usd' && val > 0) {
+    ev.target.value = val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 }
 
 // ── 계획 금액/비율 양방향 바인딩 (로컬 실시간) ──
