@@ -1728,6 +1728,7 @@ var _windowConfig = {
   '거래명세서': { tabId: 'transactions',   color: 'blue' },
   '온라인':     { tabId: 'sales-online',   color: 'green' },
   '마케팅':     { tabId: 'sales-marketing',color: 'green' },
+  '발주서V2':   { tabId: 'import-po-v2',   color: 'purple' },
   '제품':       { tabId: 'import-product', color: 'purple' },
   '수입계산기': { tabId: 'import-calc',    color: 'purple' },
   '인보이스':   { tabId: 'import-invoice', color: 'purple' },
