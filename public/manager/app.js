@@ -21284,7 +21284,6 @@ function _ipv2RenderLayout(container) {
   h += '<span id="ipv2-count" style="font-size:12px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);color:#fff;font-weight:500;">0건</span>';
   h += '</div>';
   h += '<div style="display:flex !important;flex-direction:row !important;gap:6px;">';
-  h += '<button onclick="_ipv2AutoMatchErpCode()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#854F0B;color:#fff;border:1px solid #854F0B;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">🔍 경박코드 자동 매칭</button>';
   h += '<button onclick="_ipv2Template()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #fff;cursor:pointer;font-family:Pretendard,sans-serif;">↓ 템플릿</button>';
   h += '<button onclick="_ipv2Backup()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #fff;cursor:pointer;font-family:Pretendard,sans-serif;">↓ 백업</button>';
   h += '<label style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #fff;cursor:pointer;font-family:Pretendard,sans-serif;display:inline-flex;align-items:center;">↑ 복원<input type="file" accept=".xlsx,.xls" style="display:none" onchange="_ipv2Upload(this)"/></label>';
@@ -21402,38 +21401,53 @@ function _ipv2RenderTable() {
 
   var h = '<table id="ipv2-products-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  h += '<col style="width:50px"><col style="width:100px"><col style="width:140px"><col style=""><col style="width:100px"><col style="width:90px"><col style="width:110px"><col style="width:120px"><col style="width:120px">';
+  // No / 관리코드 / 코드 / 브랜드 / 모델 / 품명 / 규격 / 팔레트 / 수입가 / 액션
+  h += '<col style="width:40px"><col style="width:120px"><col style="width:100px"><col style="width:80px"><col style="width:100px"><col style=""><col style="width:150px"><col style="width:70px"><col style="width:90px"><col style="width:70px">';
   h += '</colgroup>';
   h += '<thead><tr>';
   h += '<th style="' + thS + '">No.</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">브랜드</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">모델</th>';
+  h += '<th style="' + thS + '">관리코드</th>';
+  // 코드 헤더 강조 #854F0B (매칭 키)
+  h += '<th style="' + thS.replace('#1A1D23', '#854F0B') + '">코드</th>';
+  h += '<th style="' + thS + '">브랜드</th>';
+  h += '<th style="' + thS + '">모델</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:12px;">품명</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:12px;">규격</th>';
-  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">팔렛당</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">팔레트</th>';
   h += '<th style="' + thS + 'text-align:right;padding-right:12px;">수입가 ($)</th>';
-  // 경박코드 헤더 강조 #854F0B
-  h += '<th style="' + thS.replace('#1A1D23', '#854F0B') + '">경박코드</th>';
   h += '<th style="' + thS + '">액션</th>';
   h += '</tr></thead><tbody>';
 
   if (rows.length === 0) {
-    h += '<tr><td colspan="9" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 제품이 없습니다.</td></tr>';
+    h += '<tr><td colspan="10" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 제품이 없습니다.</td></tr>';
   } else {
     rows.forEach(function(r, i) {
+      var mgmtCode = (r.management_code || '').toString();
+      var intCode = (r.internal_code || '').toString();
+      // 매칭 상태 체크: 코드 있고 genProducts에 존재하면 ✓, 있는데 없으면 ⚠️
+      var intMarker = '';
+      if (intCode) {
+        var hit = (typeof genProducts !== 'undefined' && genProducts) ? genProducts.find(function(g){return String(g.code) === intCode;}) : null;
+        intMarker = hit ? '<span style="color:#1D9E75;margin-right:4px;font-weight:700;" title="일반제품단가표 매칭 확인됨">✓</span>' : '<span style="color:#CC2222;margin-right:4px;font-weight:700;" title="일반제품단가표에 없는 코드">⚠️</span>';
+      }
+      var intBg = intCode ? '#fff' : '#FAEEDA';
+      var intDisplay = intCode ? (intMarker + _ipv2Esc(intCode)) : '<span style="color:#BA7517;font-style:italic;">코드 입력</span>';
+      var mgmtDisplay = mgmtCode ? _ipv2Esc(mgmtCode) : '<span style="color:#9BA3B2;">-</span>';
+
       h += '<tr data-id="' + r.id + '" onmouseover="this.style.background=\'#FAFAF7\'" onmouseout="this.style.background=\'\'">';
       h += '<td style="' + tdS + 'color:#9BA3B2;">' + (i + 1) + '</td>';
-      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;" data-field="brand" ondblclick="_ipv2InlineEdit(this,\'brand\',\'' + r.id + '\')">' + _ipv2Esc(r.brand) + '</td>';
-      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;font-weight:500;" data-field="model" ondblclick="_ipv2InlineEdit(this,\'model\',\'' + r.id + '\')">' + _ipv2Esc(r.model) + '</td>';
+      // 관리코드 (수동 + 자동)
+      h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;cursor:pointer;" data-field="management_code" ondblclick="_ipv2InlineEdit(this,\'management_code\',\'' + r.id + '\')">' + mgmtDisplay + '</td>';
+      // 코드 (매칭 트리거 + 자동 채움 아이콘)
+      h += '<td style="' + tdS + 'background:' + intBg + ';font-family:monospace;cursor:pointer;position:relative;" data-field="internal_code" data-int-cell="1" ondblclick="_ipv2InlineEdit(this,\'internal_code\',\'' + r.id + '\')" title="더블클릭 편집, 값 입력 후 🔍 클릭 시 자동 채우기">' + intDisplay;
+      if (intCode) h += '<span onclick="event.stopPropagation();_ipv2FetchByInternalCode(\'' + intCode + '\',\'' + r.id + '\',false)" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:11px;opacity:0.6;" title="일반제품단가표에서 정보 불러오기">🔍</span>';
+      h += '</td>';
+      h += '<td style="' + tdS + '" data-field="brand" ondblclick="_ipv2InlineEdit(this,\'brand\',\'' + r.id + '\')">' + _ipv2Esc(r.brand) + '</td>';
+      h += '<td style="' + tdS + 'font-weight:500;" data-field="model" ondblclick="_ipv2InlineEdit(this,\'model\',\'' + r.id + '\')">' + _ipv2Esc(r.model) + '</td>';
       h += '<td style="' + tdS + 'text-align:left;padding-left:12px;color:#5A6070;" data-field="product_name" ondblclick="_ipv2InlineEdit(this,\'product_name\',\'' + r.id + '\')">' + _ipv2Esc(r.product_name || '') + '</td>';
       h += '<td style="' + tdS + 'text-align:left;padding-left:12px;color:#5A6070;" data-field="spec" ondblclick="_ipv2InlineEdit(this,\'spec\',\'' + r.id + '\')">' + _ipv2Esc(r.spec || '') + '</td>';
       h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;" data-field="pallet_qty" ondblclick="_ipv2InlineEdit(this,\'pallet_qty\',\'' + r.id + '\')">' + (r.pallet_qty ? r.pallet_qty + ' EA' : '<span style="color:#9BA3B2">-</span>') + '</td>';
       h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;" data-field="base_fob_usd" ondblclick="_ipv2InlineEdit(this,\'base_fob_usd\',\'' + r.id + '\')">' + _ipv2FormatBaseFobDisplay(r.base_fob_usd) + '</td>';
-      // 경박코드 셀 — 빈 값: 연주황 #FAEEDA + placeholder, 값 있음: 흰 배경
-      var erpCode = (r.erp_code || '').toString();
-      var erpCellBg = erpCode ? '#fff' : '#FAEEDA';
-      var erpDisplay = erpCode ? _ipv2Esc(erpCode) : '<span style="color:#BA7517;font-style:italic;">코드 입력</span>';
-      h += '<td style="' + tdS + 'background:' + erpCellBg + ';font-family:monospace;cursor:pointer;" data-field="erp_code" data-erp-cell="1" ondblclick="_ipv2InlineEdit(this,\'erp_code\',\'' + r.id + '\')">' + erpDisplay + '</td>';
       h += '<td style="' + tdS + '">';
       h += '<div style="display:inline-flex;gap:4px;">';
       h += '<button onclick="_ipv2OpenModal(\'edit\',\'' + r.id + '\')" style="font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid #DDE1EB;background:#fff;color:#5A6070;cursor:pointer;font-family:Pretendard,sans-serif;">수정</button>';
@@ -21489,6 +21503,10 @@ function _ipv2InlineEdit(td, field, id) {
           var idx = _ipv2Data.findIndex(function(x) { return x.id === id; });
           if (idx >= 0) _ipv2Data[idx] = json.data;
           _ipv2RenderTable();
+          // internal_code 저장 시 자동 채우기 트리거 (일반제품단가표에서 정보 불러오기)
+          if (field === 'internal_code' && typeof newVal === 'string' && newVal.trim()) {
+            _ipv2FetchByInternalCode(newVal.trim(), id, true);
+          }
         } else {
           alert(json.error || '수정 실패');
           td.innerHTML = orig;
@@ -21647,8 +21665,8 @@ function _ipv2SaveModal(id) {
 function _ipv2Template() {
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); return; }
   var data = [
-    ['브랜드', '모델', '품명', '규격', '팔렛당 수량', '수입가($)', '경박코드', '비고'],
-    ['Tichop', 'DC9925', 'Air Compressor', '25L', 13, 500.00, 'DC9925-TC', '비고 예시 — 이 행은 업로드 시 자동으로 건너뜁니다'],
+    ['관리코드', '코드', '브랜드', '모델', '품명', '규격', '팔레트', '수입가($)', '비고'],
+    ['2019000001374', '14210', '콜라보', 'DC660', 'DC660 2HP-통없는모델', '콜라보-콤프레샤(900W)', 48, 500.00, '비고 예시 — 이 행은 업로드 시 자동으로 건너뜁니다'],
   ];
   var ws = XLSX.utils.aoa_to_sheet(data);
   var wb = XLSX.utils.book_new();
@@ -21687,22 +21705,21 @@ function _ipv2IsExampleRow(r) {
   var brand = (r.brand || '').toString().trim();
   var model = (r.model || '').toString().trim();
   var memo = (r.memo || '').toString();
-  return brand === 'Tichop' && model === 'DC9925' && memo.indexOf('비고 예시') !== -1;
+  // 신 템플릿 예시: 콜라보/DC660, 구 템플릿 예시: Tichop/DC9925 모두 건너뜀
+  return ((brand === '콜라보' && model === 'DC660') || (brand === 'Tichop' && model === 'DC9925')) && memo.indexOf('비고 예시') !== -1;
 }
 
 function _ipv2ValidateUploadStructure(raw) {
   if (!raw || raw.length === 0) return '빈 파일입니다. 내용을 확인해주세요';
   var header = raw[0] || [];
-  var expected = ['브랜드', '모델', '품명', '규격', '팔렛당 수량', '비고'];
   if (header.length < 2) return '헤더 행이 비어있습니다';
-  if ((header[0] || '').toString().trim() !== '브랜드') return '1번 컬럼 헤더가 "브랜드"여야 합니다 (현재: "' + (header[0] || '') + '")';
-  if ((header[1] || '').toString().trim() !== '모델') return '2번 컬럼 헤더가 "모델"여야 합니다 (현재: "' + (header[1] || '') + '")';
+  // 헤더 기반 매핑이라 정확한 컬럼 순서는 요구하지 않음 — 브랜드/모델만 필수
+  var hdrs = header.map(function(c){ return String(c || '').trim().toLowerCase(); });
+  var hasBrand = hdrs.some(function(h){ return h === '브랜드' || h === 'brand'; });
+  var hasModel = hdrs.some(function(h){ return h === '모델' || h === 'model'; });
+  if (!hasBrand) return '헤더에 "브랜드" 또는 "brand" 컬럼이 필요합니다';
+  if (!hasModel) return '헤더에 "모델" 또는 "model" 컬럼이 필요합니다';
   if (raw.length < 2) return '데이터 행이 없습니다. 제품을 입력한 뒤 다시 업로드해주세요';
-  var allEmpty = raw.slice(1).every(function(r) {
-    if (!r || r.length === 0) return true;
-    return (!r[0] || String(r[0]).trim() === '') && (!r[1] || String(r[1]).trim() === '');
-  });
-  if (allEmpty) return '모든 행의 브랜드·모델이 비어있습니다';
   return null;
 }
 
@@ -21713,9 +21730,9 @@ function _ipv2Backup() {
     var c = (a.brand || '').localeCompare(b.brand || '');
     return c !== 0 ? c : (a.model || '').localeCompare(b.model || '');
   });
-  var data = [['브랜드', '모델', '품명', '규격', '팔렛당 수량', '수입가($)', '경박코드', '비고']];
+  var data = [['관리코드', '코드', '브랜드', '모델', '품명', '규격', '팔레트', '수입가($)', '비고']];
   rows.forEach(function(r) {
-    data.push([r.brand || '', r.model || '', r.product_name || '', r.spec || '', r.pallet_qty || 0, Number(r.base_fob_usd || 0), r.erp_code || '', r.memo || '']);
+    data.push([r.management_code || '', r.internal_code || '', r.brand || '', r.model || '', r.product_name || '', r.spec || '', r.pallet_qty || 0, Number(r.base_fob_usd || 0), r.memo || '']);
   });
   var ws = XLSX.utils.aoa_to_sheet(data);
   var wb = XLSX.utils.book_new();
@@ -21773,9 +21790,12 @@ function _ipv2Upload(input) {
     var idxModel = findHdr(['모델', 'model']);
     var idxName = findHdr(['품명', 'product_name', 'name']);
     var idxSpec = findHdr(['규격', 'spec']);
-    var idxPallet = findHdr(['팔렛당 수량', 'pallet_qty', '팔렛당']);
+    var idxPallet = findHdr(['팔레트', '팔렛당 수량', 'pallet_qty', '팔렛당']);
     var idxFob = findHdr(['수입가($)', '수입가 ($)', 'base_fob_usd', '수입가']);
-    var idxErp = findHdr(['경박코드', 'erp_code', 'erpcode']);
+    // 관리코드: 구/신 헤더 호환 (경박코드/erp_code도 관리코드로 매핑)
+    var idxMgmt = findHdr(['관리코드', 'management_code', 'managecode', '경박코드', 'erp_code', 'erpcode']);
+    // 코드: 신규 internal_code 매핑 키
+    var idxIntCode = findHdr(['코드', 'code', 'internal_code', 'internalcode']);
     var idxMemo = findHdr(['비고', 'memo']);
     if (idxBrand < 0) idxBrand = 0;
     if (idxModel < 0) idxModel = 1;
@@ -21793,7 +21813,8 @@ function _ipv2Upload(input) {
         spec: idxSpec >= 0 ? (r[idxSpec] || null) : null,
         pallet_qty: idxPallet >= 0 ? r[idxPallet] : 0,
         base_fob_usd: idxFob >= 0 ? r[idxFob] : 0,
-        erp_code: idxErp >= 0 && r[idxErp] != null && String(r[idxErp]).trim() !== '' ? String(r[idxErp]).trim() : null,
+        management_code: idxMgmt >= 0 && r[idxMgmt] != null && String(r[idxMgmt]).trim() !== '' ? String(r[idxMgmt]).trim() : null,
+        internal_code: idxIntCode >= 0 && r[idxIntCode] != null && String(r[idxIntCode]).trim() !== '' ? String(r[idxIntCode]).trim() : null,
         memo: idxMemo >= 0 ? (r[idxMemo] || null) : null,
       };
       if (_ipv2IsExampleRow(row)) { skipped++; continue; }
@@ -21922,271 +21943,150 @@ function _ipv2ShowUploadResult(res) {
   root.innerHTML = h;
 }
 
-// ── 경박코드 자동 매칭 (mw_products에서 검색) ──
+// ── 코드 기준 자동 채우기 (mw_gen_products에서 조회) ──
 
-function _ipv2LevenshteinDistance(a, b) {
-  a = String(a || '');
-  b = String(b || '');
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  var prev = new Array(b.length + 1);
-  var curr = new Array(b.length + 1);
-  for (var j = 0; j <= b.length; j++) prev[j] = j;
-  for (var i = 1; i <= a.length; i++) {
-    curr[0] = i;
-    for (var k = 1; k <= b.length; k++) {
-      var cost = a[i - 1] === b[k - 1] ? 0 : 1;
-      curr[k] = Math.min(prev[k] + 1, curr[k - 1] + 1, prev[k - 1] + cost);
-    }
-    var tmp = prev; prev = curr; curr = tmp;
-  }
-  return prev[b.length];
+function _ipv2Toast(msg, type, ms) {
+  var bg = type === 'error' ? '#CC2222' : (type === 'success' ? '#1D9E75' : '#185FA5');
+  var el = document.createElement('div');
+  el.style.cssText = 'position:fixed;top:16px;right:16px;padding:10px 16px;background:' + bg + ';color:#fff;border-radius:6px;font-size:13px;font-weight:500;font-family:Pretendard,sans-serif;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function(){ if (el && el.parentNode) el.parentNode.removeChild(el); }, ms || 3000);
 }
 
-function _ipv2CalcMatchScore(product, mwProduct) {
-  var pModel = (product.model || '').toString().toUpperCase().replace(/\s+/g, '');
-  var mModel = (mwProduct.model || '').toString().toUpperCase().replace(/\s+/g, '');
-  var pName = (product.product_name || '').toString().toLowerCase().trim();
-  var mName = (mwProduct.description || '').toString().toLowerCase().trim();
-
-  // 모델 정확 일치
-  if (pModel && mModel && pModel === mModel) return 100;
-
-  // 모델 포함 관계
-  if (pModel && mModel) {
-    if (pModel.indexOf(mModel) !== -1 || mModel.indexOf(pModel) !== -1) {
-      return Math.max(50, 70 + Math.min(20, Math.abs(pModel.length - mModel.length) * -2));
-    }
-  }
-
-  // 품명 유사도
-  if (pName && mName) {
-    var dist = _ipv2LevenshteinDistance(pName, mName);
-    if (dist < 3) return 50 + (3 - dist) * 10;
-  }
-
-  return 0;
+function _ipv2FlashRow(productId) {
+  var row = document.querySelector('tr[data-id="' + productId + '"]');
+  if (!row) return;
+  row.style.transition = 'background-color 0.3s';
+  row.style.background = '#E6F1FB';
+  setTimeout(function(){ row.style.background = ''; }, 5000);
 }
 
-// 단일 제품의 매칭 후보 탐색 (mw_products + mw_gen_products 둘 다 검색, 점수 >= 50 반환)
-function _ipv2FindMatchCandidates(product) {
-  var pool = [];
-  if (typeof DB !== 'undefined' && DB.products && DB.products.length > 0) {
-    pool = pool.concat(DB.products.map(function(p){ return Object.assign({_source:'mw'}, p); }));
-  }
-  if (typeof genProducts !== 'undefined' && genProducts && genProducts.length > 0) {
-    pool = pool.concat(genProducts.map(function(p){ return Object.assign({_source:'gen'}, p); }));
-  }
-  if (pool.length === 0) return [];
-  var candidates = [];
-  pool.forEach(function(mw) {
-    if (!mw.code) return;
-    var score = _ipv2CalcMatchScore(product, mw);
-    if (score >= 50) {
-      candidates.push({ code: mw.code, model: mw.model || '', description: mw.description || '', source: mw._source, score: score });
-    }
-  });
-  candidates.sort(function(a, b) { return b.score - a.score; });
-  return candidates.slice(0, 5);
+function _ipv2FlashInternalCodeCell(productId, color) {
+  var row = document.querySelector('tr[data-id="' + productId + '"]');
+  if (!row) return;
+  var cell = row.querySelector('[data-int-cell="1"]');
+  if (!cell) return;
+  cell.style.transition = 'border-color 0.3s';
+  cell.style.border = '2px solid ' + color;
+  setTimeout(function(){ cell.style.border = ''; }, 2000);
 }
 
-// 자동 매칭 진입점
-function _ipv2AutoMatchErpCode() {
-  var empty = _ipv2Data.filter(function(p) { return !p.erp_code; });
-  if (empty.length === 0) {
-    alert('경박코드가 비어있는 제품이 없습니다.');
+// internal_code(예:"14210") 로 mw_gen_products에서 조회 → 자동 채움
+// silent=true: 기존 값 있어도 확인 모달 없이 덮어쓰지 않고 유지 (인라인 편집 직후 호출 용도)
+function _ipv2FetchByInternalCode(code, productId, silent) {
+  code = String(code || '').trim();
+  if (!code) return;
+  var gen = (typeof genProducts !== 'undefined' && genProducts) ? genProducts : [];
+  var hit = gen.find(function(g){ return String(g.code) === code; });
+  if (!hit) {
+    _ipv2Toast('일반제품단가표에 등록되지 않은 코드입니다 (' + code + ')', 'error');
+    _ipv2FlashInternalCodeCell(productId, '#CC2222');
     return;
   }
-  var hasMw = typeof DB !== 'undefined' && DB.products && DB.products.length > 0;
-  var hasGen = typeof genProducts !== 'undefined' && genProducts && genProducts.length > 0;
-  if (!hasMw && !hasGen) {
-    alert('mw_products / mw_gen_products 데이터가 로드되지 않았습니다. 밀워키 단가표 또는 일반제품 탭을 먼저 방문해주세요.');
-    return;
-  }
-  if (!confirm('erp_code 비어있는 제품 ' + empty.length + '건을 mw_products에서 자동 매칭하시겠습니까?')) return;
+  var product = _ipv2Data.find(function(p){ return p.id === productId; });
+  if (!product) return;
 
-  _ipv2ShowMatchProgress(0, empty.length);
+  // 매핑: mw_gen_products → import_products_v2
+  var mapping = {
+    management_code: hit.manageCode || null,
+    brand: hit.model || null,              // gen.model = 브랜드
+    product_name: hit.description || null, // 전체 품명
+    spec: hit.category || null,            // 전체 대분류
+    pallet_qty: hit.palletQty || null,
+  };
+  // model / base_fob_usd는 채우지 않음 (사용자 직접 입력 영역)
 
-  // 매칭 실행 (각 제품에 대해 후보 탐색)
-  var pending = []; // 사용자 선택 필요
-  var autoMatched = []; // 자동 적용
-  var failed = []; // 실패
-  var idx = 0;
-
-  function processNext() {
-    if (idx >= empty.length) {
-      _ipv2FinishAutoMatch(autoMatched, pending, failed);
-      return;
-    }
-    var p = empty[idx];
-    var cands = _ipv2FindMatchCandidates(p);
-    var high = cands.filter(function(c) { return c.score >= 70; });
-    if (high.length === 1) {
-      autoMatched.push({ product: p, candidate: high[0] });
-    } else if (high.length >= 2) {
-      pending.push({ product: p, candidates: high });
-    } else {
-      failed.push(p);
-    }
-    idx++;
-    _ipv2ShowMatchProgress(idx, empty.length);
-    setTimeout(processNext, 5);
-  }
-  processNext();
-}
-
-function _ipv2ShowMatchProgress(done, total) {
-  var root = document.getElementById('ipv2-modal-root');
-  if (!root) return;
-  var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  var h = '<div id="ipv2-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;">';
-  h += '<div style="background:#fff;border-radius:10px;width:420px;padding:24px;">';
-  h += '<h3 style="font-size:15px;font-weight:600;margin:0 0 12px 0;color:#1A1D23;">경박코드 자동 매칭 중...</h3>';
-  h += '<div style="height:10px;background:#F4F6FA;border-radius:6px;overflow:hidden;margin-bottom:10px;"><div style="width:' + pct + '%;height:100%;background:#854F0B;transition:width 0.15s;"></div></div>';
-  h += '<div style="font-size:12px;color:#5A6070;text-align:center;">' + done + ' / ' + total + ' (' + pct + '%)</div>';
-  h += '</div></div>';
-  root.innerHTML = h;
-}
-
-// 자동 매칭 완료 → DB 업데이트 → 사용자 선택 모달 순차 표시 → 결과 모달
-function _ipv2FinishAutoMatch(autoMatched, pending, failed) {
-  // 자동 매칭 DB 저장
-  var savePromises = autoMatched.map(function(m) {
-    return fetch('/api/import-products-v2', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: m.product.id, erp_code: m.candidate.code }),
-    }).then(function(r) { return r.json(); }).then(function(j) {
-      if (j.success && j.data) {
-        var i = _ipv2Data.findIndex(function(x) { return x.id === m.product.id; });
-        if (i >= 0) _ipv2Data[i] = j.data;
-      }
-      return j;
-    });
+  // 기존 값 있는 필드 검사
+  var changes = [];
+  var conflicts = [];
+  var fieldLabels = { management_code: '관리코드', brand: '브랜드', product_name: '품명', spec: '규격', pallet_qty: '팔레트' };
+  Object.keys(mapping).forEach(function(k){
+    var newVal = mapping[k];
+    var oldVal = product[k];
+    if (newVal == null || newVal === '') return;
+    var oldStr = oldVal == null ? '' : String(oldVal);
+    var newStr = String(newVal);
+    if (oldStr === newStr) return;
+    if (oldStr) conflicts.push({ field: k, label: fieldLabels[k], oldVal: oldStr, newVal: newStr });
+    else changes.push({ field: k, label: fieldLabels[k], newVal: newStr });
   });
 
-  Promise.all(savePromises).then(function() {
-    _ipv2RenderTable();
-    // 자동 매칭된 행 5초간 연파랑 하이라이트
-    autoMatched.forEach(function(m) {
-      var tr = document.querySelector('tr[data-id="' + m.product.id + '"]');
-      if (tr) {
-        var cell = tr.querySelector('[data-erp-cell="1"]');
-        if (cell) {
-          cell.style.background = '#E6F1FB';
-          cell.style.transition = 'background-color 0.5s';
-          setTimeout(function() { cell.style.background = '#fff'; }, 5000);
-        }
-      }
-    });
-    // 후보 여러 개 → 순차 모달
-    var userSelected = [];
-    var skippedByUser = [];
-    var pIdx = 0;
-    function nextCandidate() {
-      if (pIdx >= pending.length) {
-        _ipv2ShowMatchResult({ auto: autoMatched.length, manual: userSelected.length, skipped: skippedByUser.length, failed: failed.length });
-        return;
-      }
-      var item = pending[pIdx];
-      _ipv2ShowMatchCandidatesModal(item.product, item.candidates, function(chosen) {
-        if (chosen) {
-          userSelected.push({ product: item.product, candidate: chosen });
-          fetch('/api/import-products-v2', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: item.product.id, erp_code: chosen.code }),
-          }).then(function(r) { return r.json(); }).then(function(j) {
-            if (j.success && j.data) {
-              var i = _ipv2Data.findIndex(function(x) { return x.id === item.product.id; });
-              if (i >= 0) _ipv2Data[i] = j.data;
-              _ipv2RenderTable();
-            }
-            pIdx++;
-            nextCandidate();
-          });
+  if (changes.length === 0 && conflicts.length === 0) {
+    _ipv2Toast('변경할 내용이 없습니다', 'info');
+    return;
+  }
+
+  function applyAll(overwrite) {
+    var payload = { id: productId };
+    changes.forEach(function(c){ payload[c.field] = c.newVal; });
+    if (overwrite) conflicts.forEach(function(c){ payload[c.field] = c.newVal; });
+    fetch('/api/import-products-v2', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(function(r){ return r.json(); })
+      .then(function(json){
+        if (json.success && json.data) {
+          var idx = _ipv2Data.findIndex(function(x){ return x.id === productId; });
+          if (idx >= 0) _ipv2Data[idx] = json.data;
+          _ipv2RenderTable();
+          _ipv2FlashRow(productId);
+          _ipv2Toast('자동 채우기 완료', 'success');
         } else {
-          skippedByUser.push(item.product);
-          pIdx++;
-          nextCandidate();
+          _ipv2Toast(json.error || '저장 실패', 'error');
         }
-      });
+      })
+      .catch(function(err){ _ipv2Toast('네트워크 오류: ' + err.message, 'error'); });
+  }
+
+  if (conflicts.length === 0) {
+    applyAll(false);
+    return;
+  }
+  if (silent) {
+    // 편집 중 자동 트리거 → 충돌 시 빈 필드만 채움 (기존 값 보존)
+    applyAll(false);
+    if (conflicts.length > 0) {
+      _ipv2Toast('기존 값이 있는 ' + conflicts.length + '개 필드는 유지됨. [🔍] 클릭으로 덮어쓰기 가능', 'info');
     }
-    if (pending.length > 0) nextCandidate();
-    else _ipv2ShowMatchResult({ auto: autoMatched.length, manual: 0, skipped: 0, failed: failed.length });
-  });
+    return;
+  }
+  // 사용자 수동 [🔍] 클릭 → 덮어쓰기 확인 모달
+  _ipv2ShowOverwriteModal(changes, conflicts, applyAll);
 }
 
-function _ipv2ShowMatchCandidatesModal(product, candidates, onDone) {
+function _ipv2ShowOverwriteModal(changes, conflicts, onDone) {
   var root = document.getElementById('ipv2-modal-root');
   if (!root) return;
-  window._ipv2MatchSelected = null;
-  window._ipv2MatchDone = onDone;
-  var h = '<div id="ipv2-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;">';
-  h += '<div style="background:#fff;border-radius:10px;width:520px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;">';
+  window._ipv2OverwriteDone = onDone;
+  var h = '<div id="ipv2-overlay" onclick="if(event.target===this){_ipv2CloseModal();window._ipv2OverwriteDone=null;}" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;">';
+  h += '<div style="background:#fff;border-radius:10px;width:520px;max-width:95vw;">';
   h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #DDE1EB;">';
-  h += '<h3 style="font-size:15px;font-weight:600;margin:0;color:#1A1D23;">경박코드 선택 — 후보 ' + candidates.length + '건</h3>';
+  h += '<h3 style="font-size:15px;font-weight:600;margin:0;color:#1A1D23;">자동 채우기 — 덮어쓰기 확인</h3>';
+  h += '<button onclick="_ipv2CloseModal();window._ipv2OverwriteDone=null;" style="background:none;border:none;cursor:pointer;font-size:18px;color:#5A6070;padding:4px;">✕</button>';
   h += '</div>';
-  h += '<div style="padding:14px 20px;background:#FAEEDA;border-bottom:1px solid #EEE;">';
-  h += '<div style="font-size:13px;font-weight:500;color:#1A1D23;">' + _ipv2Esc(product.model || '') + '</div>';
-  h += '<div style="font-size:12px;color:#5A6070;margin-top:2px;">' + _ipv2Esc(product.product_name || '(품명 없음)') + '</div>';
+  h += '<div style="padding:16px 20px;max-height:60vh;overflow-y:auto;">';
+  if (changes.length > 0) {
+    h += '<div style="font-size:12px;font-weight:600;color:#085041;margin-bottom:6px;">자동 채워질 빈 필드 (' + changes.length + ')</div>';
+    changes.forEach(function(c){
+      h += '<div style="padding:6px 10px;background:#E1F5EE;border-radius:4px;margin-bottom:4px;font-size:12px;"><span style="color:#085041;font-weight:500;">' + c.label + ':</span> ' + _ipv2Esc(c.newVal) + '</div>';
+    });
+  }
+  if (conflicts.length > 0) {
+    h += '<div style="font-size:12px;font-weight:600;color:#791F1F;margin:12px 0 6px 0;">기존 값과 충돌하는 필드 (' + conflicts.length + ')</div>';
+    conflicts.forEach(function(c){
+      h += '<div style="padding:6px 10px;background:#FCEBEB;border-radius:4px;margin-bottom:4px;font-size:12px;">';
+      h += '<div style="color:#791F1F;font-weight:500;margin-bottom:2px;">' + c.label + '</div>';
+      h += '<div style="color:#5A6070;"><span style="text-decoration:line-through;">' + _ipv2Esc(c.oldVal) + '</span> → <b style="color:#1A1D23;">' + _ipv2Esc(c.newVal) + '</b></div>';
+      h += '</div>';
+    });
+  }
   h += '</div>';
-  h += '<div style="padding:12px 20px;overflow-y:auto;flex:1;">';
-  candidates.forEach(function(c, i) {
-    var srcBadgeBg = c.source === 'gen' ? '#FAEEDA' : '#FCEBEB';
-    var srcBadgeColor = c.source === 'gen' ? '#633806' : '#791F1F';
-    var srcLabel = c.source === 'gen' ? '일반' : '밀워키';
-    h += '<label style="display:block;padding:10px 12px;border:1px solid #DDE1EB;border-radius:6px;margin-bottom:8px;cursor:pointer;">';
-    h += '<input type="radio" name="ipv2-match-cand" value="' + i + '" style="margin-right:8px;vertical-align:middle;"' + (i === 0 ? ' checked' : '') + '>';
-    h += '<span style="font-family:monospace;font-size:12px;color:#854F0B;font-weight:600;">' + _ipv2Esc(c.code) + '</span>';
-    h += '<span style="margin-left:6px;font-size:10px;padding:1px 6px;border-radius:8px;background:' + srcBadgeBg + ';color:' + srcBadgeColor + ';font-weight:500;">' + srcLabel + '</span>';
-    h += '<span style="margin-left:8px;font-size:12px;color:#1A1D23;">' + _ipv2Esc(c.model) + '</span>';
-    h += '<span style="margin-left:auto;float:right;font-size:11px;padding:2px 6px;border-radius:8px;background:#E6F1FB;color:#0C447C;">점수 ' + c.score + '</span>';
-    h += '<div style="font-size:11px;color:#5A6070;margin-top:3px;">' + _ipv2Esc(c.description) + '</div>';
-    h += '</label>';
-  });
-  h += '</div>';
-  h += '<div style="display:flex;justify-content:space-between;padding:14px 20px;border-top:1px solid #DDE1EB;">';
-  h += '<button onclick="(function(){var d=window._ipv2MatchDone;window._ipv2MatchDone=null;if(d)d(null);})()" style="background:#fff;color:#5A6070;border:1px solid #DDE1EB;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:Pretendard,sans-serif;">건너뛰기</button>';
-  h += '<button onclick="(function(){var sel=document.querySelector(\'input[name=ipv2-match-cand]:checked\');var arr=' + JSON.stringify(candidates) + ';var c=sel?arr[Number(sel.value)]:null;var d=window._ipv2MatchDone;window._ipv2MatchDone=null;if(d)d(c);})()" style="background:#854F0B;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">선택 적용</button>';
+  h += '<div style="display:flex;justify-content:flex-end;gap:6px;padding:14px 20px;border-top:1px solid #DDE1EB;">';
+  h += '<button onclick="(function(){var d=window._ipv2OverwriteDone;window._ipv2OverwriteDone=null;_ipv2CloseModal();if(d)d(false);})()" style="background:#fff;color:#5A6070;border:1px solid #DDE1EB;border-radius:6px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:Pretendard,sans-serif;">유지 (빈 필드만)</button>';
+  h += '<button onclick="(function(){var d=window._ipv2OverwriteDone;window._ipv2OverwriteDone=null;_ipv2CloseModal();if(d)d(true);})()" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">덮어쓰기</button>';
   h += '</div></div></div>';
   root.innerHTML = h;
 }
 
-function _ipv2ShowMatchResult(stats) {
-  var root = document.getElementById('ipv2-modal-root');
-  if (!root) return;
-  var h = '<div id="ipv2-overlay" onclick="if(event.target===this)_ipv2CloseModal()" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;">';
-  h += '<div style="background:#fff;border-radius:10px;width:480px;">';
-  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #DDE1EB;">';
-  h += '<h3 style="font-size:16px;font-weight:600;margin:0;color:#1A1D23;">자동 매칭 완료</h3>';
-  h += '<button onclick="_ipv2CloseModal()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#5A6070;padding:4px;">✕</button>';
-  h += '</div>';
-  h += '<div style="padding:20px;">';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">';
-  h += '<div style="padding:10px 12px;background:#E6F1FB;border-radius:6px;text-align:center;">';
-  h += '<div style="font-size:11px;color:#0C447C;margin-bottom:2px;">자동 매칭</div>';
-  h += '<div style="font-size:18px;font-weight:600;color:#0C447C;">' + stats.auto + '</div>';
-  h += '</div>';
-  h += '<div style="padding:10px 12px;background:#FAEEDA;border-radius:6px;text-align:center;">';
-  h += '<div style="font-size:11px;color:#633806;margin-bottom:2px;">수동 선택</div>';
-  h += '<div style="font-size:18px;font-weight:600;color:#633806;">' + stats.manual + '</div>';
-  h += '</div>';
-  h += '<div style="padding:10px 12px;background:#F1EFE8;border-radius:6px;text-align:center;">';
-  h += '<div style="font-size:11px;color:#5F5E5A;margin-bottom:2px;">건너뜀</div>';
-  h += '<div style="font-size:18px;font-weight:600;color:#5F5E5A;">' + stats.skipped + '</div>';
-  h += '</div>';
-  h += '<div style="padding:10px 12px;background:#FCEBEB;border-radius:6px;text-align:center;">';
-  h += '<div style="font-size:11px;color:#791F1F;margin-bottom:2px;">실패</div>';
-  h += '<div style="font-size:18px;font-weight:600;color:#791F1F;">' + stats.failed + '</div>';
-  h += '</div>';
-  h += '</div></div>';
-  h += '<div style="display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid #DDE1EB;">';
-  h += '<button onclick="_ipv2CloseModal()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif;">확인</button>';
-  h += '</div></div></div>';
-  root.innerHTML = h;
-}
 
 // ========================================
 // 인보이스V2 (import_invoices) — Phase 1 Step 3-A

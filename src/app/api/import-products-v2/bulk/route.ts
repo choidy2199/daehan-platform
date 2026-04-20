@@ -13,7 +13,9 @@ type UpsertRow = {
   spec?: string | null;
   pallet_qty?: unknown;
   base_fob_usd?: unknown;
-  erp_code?: string | null;
+  management_code?: string | null;
+  internal_code?: string | null;
+  erp_code?: string | null; // legacy
   memo?: string | null;
 };
 
@@ -24,7 +26,8 @@ type NormalizedRow = {
   spec: string | null;
   pallet_qty: number;
   base_fob_usd: number;
-  erp_code: string | null;
+  management_code: string | null;
+  internal_code: string | null;
   memo: string | null;
 };
 
@@ -86,6 +89,8 @@ export async function POST(request: NextRequest) {
           baseFob = Number.isFinite(parsed) ? parsed : 0;
         }
         if (baseFob < 0) baseFob = 0;
+        // 관리코드: management_code 우선, 없으면 legacy erp_code 폴백
+        const mgmt = r?.management_code ?? r?.erp_code;
         valid.push({
           brand,
           model,
@@ -93,7 +98,8 @@ export async function POST(request: NextRequest) {
           spec: r?.spec ? String(r.spec).trim() || null : null,
           pallet_qty: pallet,
           base_fob_usd: baseFob,
-          erp_code: r?.erp_code ? String(r.erp_code).trim() || null : null,
+          management_code: mgmt ? String(mgmt).trim() || null : null,
+          internal_code: r?.internal_code ? String(r.internal_code).trim() || null : null,
           memo: r?.memo ? String(r.memo).trim() || null : null,
         });
       } catch (rowErr) {
