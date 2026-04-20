@@ -22126,33 +22126,32 @@ function _ipinv2DoRenderDetail(container) {
   h += '<span id="ipinv2-hdr-invno" style="font-size:14px;font-weight:500;color:#fff;">' + _ipinv2Esc(inv.invoice_no) + '</span>';
   h += '<span id="ipinv2-hdr-factory" style="font-size:13px;color:rgba(255,255,255,0.7);">' + _ipinv2Esc(inv.factory_name) + '</span>';
   h += '<span id="ipinv2-hdr-status">' + _ipinv2StatusBadge(inv.status) + '</span>';
+  // 수입건 배지 (batch 연결 시만 표시, 클릭 시 수입건V2로 이동)
+  if (inv.batch_no || inv.batch_id) {
+    var batchLabel = inv.batch_no || '연결됨';
+    h += '<span id="ipinv2-hdr-batch" onclick="_ipinv2GotoBatch(\'' + (inv.batch_id || '') + '\')" title="수입건V2로 이동" style="font-size:11px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.12);color:#E6F1FB;font-weight:500;cursor:pointer;">수입건 ' + _ipinv2Esc(batchLabel) + '</span>';
+  }
   h += '</div>';
   h += '<div style="display:flex;gap:6px;">';
   h += '<button id="ipinv2-btn-save" onclick="_ipinv2SaveBasicInfo()" style="font-size:12px;padding:6px 14px;border-radius:6px;background:#E24B4A;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">저장</button>';
   h += '<button onclick="_ipinv2DeleteInvoice()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
   h += '</div></div>';
 
-  // 기본 정보 섹션
-  h += '<div style="padding:16px 20px;background:#fff;border-bottom:0.5px solid #eee;">';
-  h += '<div style="font-size:11px;color:#5A6070;letter-spacing:0.04em;font-weight:600;text-transform:uppercase;margin-bottom:10px;">기본 정보</div>';
-  var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:4px;font-weight:500;';
+  // 기본 정보 섹션 (1줄 6필드)
+  h += '<div style="padding:12px 20px;background:#fff;border-bottom:0.5px solid #eee;">';
+  var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:3px;font-weight:500;';
   var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;">';
+  h += '<div style="display:grid;grid-template-columns:repeat(6, minmax(120px, 1fr));gap:10px;">';
   h += '<div><label style="' + lblS + '">인보이스 번호 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-invno" type="text" value="' + _ipinv2Esc(inv.invoice_no) + '" style="' + inpS + '" placeholder="INV-2026-001"></div>';
   h += '<div><label style="' + lblS + '">공장명 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-factory" type="text" value="' + _ipinv2Esc(inv.factory_name) + '" style="' + inpS + '"></div>';
-  h += '<div><label style="' + lblS + '">공장 코드 (경영박사 CODE2)</label><input id="ipinv2-f-code" type="text" value="' + _ipinv2Esc(inv.factory_code || '') + '" style="' + inpS + '"></div>';
+  h += '<div><label style="' + lblS + '">공장 코드</label><input id="ipinv2-f-code" type="text" value="' + _ipinv2Esc(inv.factory_code || '') + '" style="' + inpS + '" placeholder="CODE2"></div>';
   h += '<div><label style="' + lblS + '">인보이스 일자 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-date" type="date" value="' + _ipinv2Esc((inv.invoice_date || '').substring(0, 10)) + '" style="' + inpS + '"></div>';
-  h += '<div><label style="' + lblS + '">결제 조건</label><input id="ipinv2-f-terms" type="text" value="' + _ipinv2Esc(inv.payment_terms || '') + '" style="' + inpS + '" placeholder="T/T 30% + 70%"></div>';
-  h += '</div>';
-  // 할인율 + 팔렛 단가 추가 줄
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:12px;margin-top:12px;">';
   h += '<div><label style="' + lblS + '">할인율 (%)</label><input id="ipinv2-f-discrate" type="number" step="0.01" value="' + (inv.discount_rate || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'discount_rate\',this.value)"></div>';
   h += '<div><label style="' + lblS + '">팔렛 단가 ($)</label><input id="ipinv2-f-palletunit" type="number" step="0.01" value="' + (inv.pallet_unit_price_usd || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'pallet_unit_price_usd\',this.value)"></div>';
-  h += '<div><label style="' + lblS + '">연결 수입 건</label><select id="ipinv2-f-batch" disabled style="' + inpS + 'background:#F9FAFB;color:#9BA3B2;"><option>연결 안됨</option></select></div>';
-  h += '</div>';
-  h += '<div style="margin-top:12px;">';
-  h += '<label style="' + lblS + '">메모</label><textarea id="ipinv2-f-memo" rows="2" style="width:100%;border:1px solid #DDE1EB;border-radius:6px;padding:6px 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;resize:vertical;">' + _ipinv2Esc(inv.memo || '') + '</textarea>';
   h += '</div></div>';
+
+  // 금액 요약 바 (기본 정보 바로 아래, 다크)
+  h += '<div id="ipinv2-summary-bar" style="padding:10px 20px;background:#1A1D23;color:#fff;display:flex;align-items:center;gap:14px;font-family:Pretendard,sans-serif;flex-wrap:wrap;"></div>';
 
   // 제품 라인 섹션
   h += '<div id="ipinv2-items-section" style="padding:0;">';
@@ -22166,7 +22165,7 @@ function _ipinv2DoRenderDetail(container) {
   h += '<button onclick="_ipinv2OpenPasteModal()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">📋 엑셀 붙여넣기</button>';
   h += '<button onclick="_ipinv2AddItem()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">+ 제품 추가</button>';
   h += '</div></div>';
-  h += '<div id="ipinv2-items-wrap" style="overflow:auto;max-height:calc(100vh - 640px);min-height:120px;"></div>';
+  h += '<div id="ipinv2-items-wrap" style="overflow:auto;max-height:calc(100vh - 560px);min-height:160px;"></div>';
   h += '</div>';
 
   // 송금 스케줄 섹션
@@ -22181,9 +22180,6 @@ function _ipinv2DoRenderDetail(container) {
   h += '<div id="ipinv2-payments-cards" style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;"></div>';
   h += '<div id="ipinv2-payments-summary" style="padding:14px 20px;background:#1A1D23;color:#fff;font-family:Pretendard,sans-serif;"></div>';
   h += '</div>';
-
-  // Sticky summary bar
-  h += '<div id="ipinv2-summary-bar" style="position:sticky;bottom:0;background:#F9FAFB;border-top:1px solid #eee;padding:12px 20px;display:flex;gap:24px;align-items:center;justify-content:flex-end;font-family:Pretendard,sans-serif;"></div>';
 
   h += '</div>';
 
@@ -22211,8 +22207,7 @@ function _ipinv2SaveBasicInfo() {
     factory_name: (document.getElementById('ipinv2-f-factory').value || '').trim(),
     factory_code: (document.getElementById('ipinv2-f-code').value || '').trim(),
     invoice_date: document.getElementById('ipinv2-f-date').value,
-    payment_terms: (document.getElementById('ipinv2-f-terms').value || '').trim(),
-    memo: (document.getElementById('ipinv2-f-memo').value || '').trim(),
+    // payment_terms / memo UI 제거 (서버 컬럼은 유지, 기존 값 건드리지 않음)
   };
   if (!payload.invoice_no) return alert('인보이스 번호를 입력하세요.');
   if (!payload.factory_name) return alert('공장명을 입력하세요.');
@@ -22276,24 +22271,8 @@ function _ipinv2RenderItemsTable() {
   if (items.length === 0) {
     h += '<tr><td colspan="8" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다. 우측 상단 버튼으로 추가하세요.</td></tr>';
   } else {
-    var tdS = 'padding:6px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;vertical-align:middle;';
-    var inpTdS = 'width:100%;height:28px;border:1px solid transparent;border-radius:4px;padding:0 6px;font-size:13px;font-family:Pretendard,sans-serif;background:transparent;box-sizing:border-box;';
     items.forEach(function(it, i) {
-      var modelVal = _ipinv2Esc(it.model || '');
-      var isPlaceholder = !it.model || it.model === '' || it.model === '(모델명 입력)';
-      if (isPlaceholder) modelVal = '';
-      h += '<tr data-item-id="' + it.id + '">';
-      h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
-      h += '<td style="' + tdS + '"><input data-field="model" value="' + modelVal + '" placeholder="모델명 입력" style="' + inpTdS + 'font-weight:500;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnModelInput(event,\'' + it.id + '\')"></td>';
-      h += '<td style="' + tdS + '"><input data-field="name" value="' + _ipinv2Esc(it.name || '') + '" placeholder="품명 (자동)" style="' + inpTdS + '" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')"></td>';
-      h += '<td style="' + tdS + 'text-align:right;"><input type="number" step="0.01" data-field="pallet_qty" value="' + (it.pallet_qty || 0) + '" placeholder="0" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')"></td>';
-      h += '<td style="' + tdS + 'text-align:right;padding-right:10px;color:#5A6070;background:#F9FAFB;" title="수량 = 팔렛수 × 팔렛당 수량 (자동 계산)" data-field="qty">' + _ipinv2Int(it.qty) + '</td>';
-      h += '<td style="' + tdS + 'text-align:right;"><input type="number" step="0.01" data-field="fob_usd" value="' + (it.fob_usd || 0) + '" placeholder="0.00" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnAmountInput(event,\'' + it.id + '\')"></td>';
-      h += '<td style="' + tdS + 'text-align:right;padding-right:10px;font-weight:500;" data-field="amount">' + _ipinv2Money(it.amount_usd) + '</td>';
-      h += '<td style="' + tdS + 'text-align:center;">';
-      h += '<button onclick="_ipinv2DeleteItem(\'' + it.id + '\')" title="삭제" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #F0D2D2;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">✕</button>';
-      h += '</td>';
-      h += '</tr>';
+      h += _ipinv2RenderItemRowHtml(it, i);
     });
   }
   h += '</tbody></table>';
@@ -22324,15 +22303,29 @@ function _ipinv2RenderSummaryBar() {
 
   var bar = document.getElementById('ipinv2-summary-bar');
   if (!bar) return;
-  var labelS = 'font-size:11px;color:#5A6070;margin-right:4px;';
-  var valS = 'font-size:13px;color:#1A1D23;font-weight:500;';
+  var labelS = 'font-size:10px;color:rgba(255,255,255,0.5);margin-right:5px;';
+  var valS = 'font-size:13px;color:#fff;font-weight:500;';
+  var sepS = 'width:1px;height:18px;background:rgba(255,255,255,0.18);';
   var h = '';
-  h += '<div><span style="' + labelS + '">총 수량</span><span style="' + valS + '">' + _ipinv2Int(totalQty) + ' EA</span></div>';
-  h += '<div><span style="' + labelS + '">제품합계</span><span style="' + valS + '">' + _ipinv2Money(subtotal) + '</span></div>';
-  h += '<div><span style="' + labelS + '">할인(' + discountRate + '%)</span><span style="' + valS + 'color:#CC2222;">-' + _ipinv2Money(discountAmount) + '</span></div>';
-  h += '<div><span style="' + labelS + '">팔렛(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valS + '">+' + _ipinv2Money(palletTotal) + '</span></div>';
-  h += '<div style="margin-left:16px;border-left:1px solid #DDE1EB;padding-left:16px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:16px;color:#1A1D23;font-weight:600;">' + _ipinv2Money(finalTotal) + '</span></div>';
+  h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">총 수량</span><span style="' + valS + '">' + _ipinv2Int(totalQty) + ' EA</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">제품합계</span><span style="' + valS + '">' + _ipinv2Money(subtotal) + '</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">할인(' + discountRate + '%)</span><span style="' + valS + 'color:#FCA5A5;">-' + _ipinv2Money(discountAmount) + '</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">팔렛(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valS + 'color:#BAE6FD;">+' + _ipinv2Money(palletTotal) + '</span></div>';
+  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:4px 12px;background:rgba(255,255,255,0.08);border-radius:6px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:17px;color:#fff;font-weight:700;">' + _ipinv2Money(finalTotal) + '</span></div>';
   bar.innerHTML = h;
+}
+
+// 수입건V2로 이동
+function _ipinv2GotoBatch(batchId) {
+  if (!batchId) return;
+  try {
+    if (typeof _sidebarOpenWindow === 'function') _sidebarOpenWindow('수입건V2');
+    else if (typeof switchTab === 'function') switchTab('import-batch-v2');
+    setTimeout(function() { if (typeof _ipbat2OpenDetail === 'function') _ipbat2OpenDetail(batchId); }, 200);
+  } catch (e) {}
 }
 
 function _ipinv2UpdateInvoiceCalcField(field, value) {
@@ -22390,25 +22383,81 @@ function _ipinv2UpdateFinancial(field, value) {
 }
 
 // ── 제품 라인 추가/수정/삭제 ──
+// 단일 행 HTML 생성 (재렌더 회피용)
+function _ipinv2RenderItemRowHtml(it, i) {
+  var tdS = 'padding:6px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;vertical-align:middle;';
+  var inpTdS = 'width:100%;height:28px;border:1px solid transparent;border-radius:4px;padding:0 6px;font-size:13px;font-family:Pretendard,sans-serif;background:transparent;box-sizing:border-box;';
+  var modelVal = _ipinv2Esc(it.model || '');
+  var isPlaceholder = !it.model || it.model === '' || it.model === '(모델명 입력)';
+  if (isPlaceholder) modelVal = '';
+  var h = '';
+  h += '<tr data-item-id="' + it.id + '">';
+  h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
+  h += '<td style="' + tdS + '"><input data-field="model" value="' + modelVal + '" placeholder="모델명 입력" style="' + inpTdS + 'font-weight:500;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnModelInput(event,\'' + it.id + '\')"></td>';
+  h += '<td style="' + tdS + '"><input data-field="name" value="' + _ipinv2Esc(it.name || '') + '" placeholder="품명 (자동)" style="' + inpTdS + '" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')"></td>';
+  h += '<td style="' + tdS + 'text-align:right;"><input type="number" step="0.01" data-field="pallet_qty" value="' + (it.pallet_qty || 0) + '" placeholder="0" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')"></td>';
+  h += '<td style="' + tdS + 'text-align:right;padding-right:10px;color:#5A6070;background:#F9FAFB;" title="수량 = 팔렛수 × 팔렛당 수량 (자동 계산)" data-field="qty">' + _ipinv2Int(it.qty) + '</td>';
+  h += '<td style="' + tdS + 'text-align:right;"><input type="number" step="0.01" data-field="fob_usd" value="' + (it.fob_usd || 0) + '" placeholder="0.00" style="' + inpTdS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2OnItemBlur(event,\'' + it.id + '\')" oninput="_ipinv2OnAmountInput(event,\'' + it.id + '\')"></td>';
+  h += '<td style="' + tdS + 'text-align:right;padding-right:10px;font-weight:500;" data-field="amount">' + _ipinv2Money(it.amount_usd) + '</td>';
+  h += '<td style="' + tdS + 'text-align:center;">';
+  h += '<button onclick="_ipinv2DeleteItem(\'' + it.id + '\')" title="삭제" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #F0D2D2;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">✕</button>';
+  h += '</td>';
+  h += '</tr>';
+  return h;
+}
+
+// 안전 에러 포맷터 (Error/object/string/null 모두 문자열화)
+function _ipinv2FormatError(err) {
+  if (err == null) return '알 수 없는 오류가 발생했습니다';
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message || err.toString();
+  if (typeof err === 'object') {
+    if (typeof err.message === 'string' && err.message) return err.message;
+    if (typeof err.error === 'string' && err.error) return err.error;
+    if (err.code) return String(err.code);
+    try { return JSON.stringify(err); } catch (e) { return '알 수 없는 오류가 발생했습니다'; }
+  }
+  return String(err);
+}
+
+// 제품 추가 버튼 동시 클릭 방지 + 낙관적 UI
+var _ipinv2AddInProgress = false;
+
 function _ipinv2AddItem() {
+  if (_ipinv2AddInProgress) return;
   var inv = _ipinv2CurrentInvoice;
   if (!inv) return;
+  _ipinv2AddInProgress = true;
+  var addBtn = document.querySelector('button[onclick="_ipinv2AddItem()"]');
+  if (addBtn) { addBtn.disabled = true; addBtn.style.opacity = '0.6'; addBtn.style.cursor = 'wait'; }
+
   var nextLine = _ipinv2CurrentItems.length > 0 ? Math.max.apply(null, _ipinv2CurrentItems.map(function(i) { return i.line_no; })) + 1 : 1;
-  var payload = { invoice_id: inv.id, line_no: nextLine, model: '(모델명 입력)', qty: 0, fob_usd: 0, pallets: 0 };
+  var payload = { invoice_id: inv.id, line_no: nextLine, model: '', qty: 0, fob_usd: 0, pallets: 0, pallet_qty: 0 };
+
+  function cleanup() {
+    _ipinv2AddInProgress = false;
+    if (addBtn) { addBtn.disabled = false; addBtn.style.opacity = ''; addBtn.style.cursor = ''; }
+  }
+
   fetch('/api/import-invoices/' + inv.id + '/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    .then(function(r) { return r.json(); })
-    .then(function(json) {
-      if (json.success && json.data) {
-        _ipinv2CurrentItems.push(json.data);
-        _ipinv2RenderItemsTable();
-        _ipinv2RefreshInvoiceTotals();
-        // 새 행의 모델 input으로 포커스
-        setTimeout(function() {
-          var tr = document.querySelector('tr[data-item-id="' + json.data.id + '"]');
-          if (tr) { var inp = tr.querySelector('input[data-field="model"]'); if (inp) { inp.focus(); inp.select(); } }
-        }, 50);
-      } else alert(json.error || '제품 라인 추가 실패');
-    });
+    .then(function(r) { return r.text().then(function(t) { return { ok: r.ok, status: r.status, text: t }; }); })
+    .then(function(res) {
+      var json = null; try { if (res.text) json = JSON.parse(res.text); } catch (e) {}
+      if (!res.ok || !json || !json.success) {
+        var msg = json ? _ipinv2FormatError(json.error || json) : ('서버 오류 (HTTP ' + res.status + ')');
+        alert('제품 라인 추가 실패\n\n' + msg);
+        return;
+      }
+      _ipinv2CurrentItems.push(json.data);
+      _ipinv2AppendItemRow(json.data);   // 단일 행만 추가
+      _ipinv2RecalcSummaryLocal();       // 서버 재조회 없이 로컬 요약만 갱신
+      setTimeout(function() {
+        var tr = document.querySelector('tr[data-item-id="' + json.data.id + '"]');
+        if (tr) { var inpEl = tr.querySelector('input[data-field="model"]'); if (inpEl) { inpEl.focus(); inpEl.select(); } }
+      }, 30);
+    })
+    .catch(function(err) { alert('제품 라인 추가 실패\n\n' + _ipinv2FormatError(err)); })
+    .finally(function() { cleanup(); });
 }
 
 function _ipinv2DeleteItem(itemId) {
@@ -22416,14 +22465,96 @@ function _ipinv2DeleteItem(itemId) {
   if (!inv) return;
   if (!confirm('이 제품 라인을 삭제하시겠습니까?')) return;
   fetch('/api/import-invoices/' + inv.id + '/items?id=' + encodeURIComponent(itemId), { method: 'DELETE' })
+    .then(function(r) { return r.text().then(function(t) { return { ok: r.ok, status: r.status, text: t }; }); })
+    .then(function(res) {
+      var json = null; try { if (res.text) json = JSON.parse(res.text); } catch (e) {}
+      if (!res.ok || !json || !json.success) {
+        alert('삭제 실패\n\n' + (json ? _ipinv2FormatError(json.error || json) : 'HTTP ' + res.status));
+        return;
+      }
+      _ipinv2CurrentItems = _ipinv2CurrentItems.filter(function(x) { return x.id !== itemId; });
+      var tr = document.querySelector('tr[data-item-id="' + itemId + '"]');
+      if (tr) tr.remove();
+      _ipinv2RenumberRows();
+      _ipinv2FetchInvoiceOnly();
+    })
+    .catch(function(err) { alert('삭제 실패\n\n' + _ipinv2FormatError(err)); });
+}
+
+// 단일 인보이스만 재조회 (전체 목록 GET 피함)
+function _ipinv2FetchInvoiceOnly() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  fetch('/api/import-invoices/' + inv.id + '/items', { cache: 'no-store' })
     .then(function(r) { return r.json(); })
     .then(function(json) {
-      if (json.success) {
-        _ipinv2CurrentItems = _ipinv2CurrentItems.filter(function(x) { return x.id !== itemId; });
-        _ipinv2RenderItemsTable();
-        _ipinv2RefreshInvoiceTotals();
-      } else alert(json.error || '삭제 실패');
+      if (!json.success) return;
+      // 서버 응답으로 각 행의 배분값만 갱신 (amount/net_fob 등)
+      (json.data || []).forEach(function(srv) {
+        var idx = _ipinv2CurrentItems.findIndex(function(x) { return x.id === srv.id; });
+        if (idx >= 0) _ipinv2CurrentItems[idx] = Object.assign({ _pallet_qty_per: _ipinv2CurrentItems[idx]._pallet_qty_per || 0 }, srv);
+      });
+    })
+    .then(function() {
+      // invoice totals 한번만 갱신 (목록 GET 대신 per-invoice endpoint 없으므로 final_total_usd만 로컬 재산출)
+      _ipinv2RecalcSummaryLocal();
     });
+}
+
+// 낙관적 로컬 요약 재계산 (서버 호출 없이)
+function _ipinv2RecalcSummaryLocal() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var items = _ipinv2CurrentItems;
+  var gross = items.reduce(function(s, it) { return s + Number(it.amount_usd || 0); }, 0);
+  var discountRate = Number(inv.discount_rate || 0);
+  var discount = Number((gross * (discountRate / 100)).toFixed(2));
+  var palletCount = items.reduce(function(s, it) { return s + Number(it.pallet_qty || 0); }, 0);
+  var palletUnit = Number(inv.pallet_unit_price_usd || 0);
+  var palletTotal = Number((palletCount * palletUnit).toFixed(2));
+  var finalTotal = Number((gross - discount + palletTotal).toFixed(2));
+  inv.subtotal_usd = gross;
+  inv.discount_amount_usd = discount;
+  inv.discount_usd = discount;
+  inv.pallet_count = palletCount;
+  inv.pallet_total_usd = palletTotal;
+  inv.pallets_usd = palletTotal;
+  inv.final_total_usd = finalTotal;
+  inv.final_amount_usd = finalTotal;
+  _ipinv2RenderSummaryBar();
+}
+
+// 단일 행 추가 (전체 재렌더 회피)
+function _ipinv2AppendItemRow(it) {
+  var wrap = document.getElementById('ipinv2-items-wrap');
+  if (!wrap) return;
+  var tbody = wrap.querySelector('tbody');
+  if (!tbody) { _ipinv2RenderItemsTable(); return; }
+  // "제품 라인이 없습니다" 행 제거
+  var empty = tbody.querySelector('tr td[colspan]');
+  if (empty) tbody.innerHTML = '';
+  var i = _ipinv2CurrentItems.length - 1;
+  tbody.insertAdjacentHTML('beforeend', _ipinv2RenderItemRowHtml(it, i));
+  _ipinv2UpdateCountHeader();
+}
+
+function _ipinv2UpdateCountHeader() {
+  var items = _ipinv2CurrentItems;
+  var totalQty = items.reduce(function(s, x) { return s + Number(x.qty || 0); }, 0);
+  var totalAmt = items.reduce(function(s, x) { return s + Number(x.amount_usd || 0); }, 0);
+  var sumEl = document.getElementById('ipinv2-items-summary');
+  if (sumEl) sumEl.textContent = items.length > 0 ? '· ' + _ipinv2Int(totalQty) + ' EA · ' + _ipinv2Money(totalAmt) : '';
+  var cntEl = document.getElementById('ipinv2-items-count');
+  if (cntEl) cntEl.textContent = '(' + items.length + '건)';
+}
+
+function _ipinv2RenumberRows() {
+  var trs = document.querySelectorAll('#ipinv2-items-wrap tbody tr[data-item-id]');
+  trs.forEach(function(tr, i) {
+    var noCell = tr.querySelector('td:first-child');
+    if (noCell) noCell.textContent = i + 1;
+  });
+  _ipinv2UpdateCountHeader();
 }
 
 function _ipinv2OnItemBlur(ev, itemId) {
@@ -22452,20 +22583,42 @@ function _ipinv2OnItemBlur(ev, itemId) {
 function _ipinv2PatchItemMulti(itemId, fields) {
   var inv = _ipinv2CurrentInvoice;
   if (!inv) return;
+  // 낙관적 로컬 업데이트
+  var idx = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
+  if (idx >= 0) Object.assign(_ipinv2CurrentItems[idx], fields);
+  _ipinv2UpdateItemRowInPlace(itemId);
+  _ipinv2RecalcSummaryLocal();
+
   var payload = Object.assign({ id: itemId }, fields);
   fetch('/api/import-invoices/' + inv.id + '/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    .then(function(r) { return r.json(); })
-    .then(function(json) {
-      if (json.success && json.data) {
-        var idx = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
-        if (idx >= 0) {
-          var prev = _ipinv2CurrentItems[idx];
-          _ipinv2CurrentItems[idx] = Object.assign({ _pallet_qty_per: prev._pallet_qty_per }, json.data);
-        }
-        _ipinv2RenderItemsTable();
-        _ipinv2RefreshInvoiceTotals();
-      } else alert(json.error || '수정 실패');
-    });
+    .then(function(r) { return r.text().then(function(t) { return { ok: r.ok, status: r.status, text: t }; }); })
+    .then(function(res) {
+      var json = null; try { if (res.text) json = JSON.parse(res.text); } catch (e) {}
+      if (!res.ok || !json || !json.success) {
+        alert('수정 실패\n\n' + (json ? _ipinv2FormatError(json.error || json) : 'HTTP ' + res.status));
+        return;
+      }
+      var idx2 = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
+      if (idx2 >= 0) {
+        var prev = _ipinv2CurrentItems[idx2];
+        _ipinv2CurrentItems[idx2] = Object.assign({ _pallet_qty_per: prev._pallet_qty_per }, json.data);
+      }
+      // 서버 재계산 반영 (배분 변경 → summary 정확치)
+      _ipinv2FetchInvoiceOnly();
+    })
+    .catch(function(err) { alert('수정 실패\n\n' + _ipinv2FormatError(err)); });
+}
+
+// 단일 행의 표시 셀만 in-place 갱신 (input value는 유지, 표시 td만)
+function _ipinv2UpdateItemRowInPlace(itemId) {
+  var it = _ipinv2CurrentItems.find(function(x) { return x.id === itemId; });
+  if (!it) return;
+  var tr = document.querySelector('tr[data-item-id="' + itemId + '"]');
+  if (!tr) return;
+  var qtyTd = tr.querySelector('td[data-field="qty"]');
+  if (qtyTd) qtyTd.textContent = _ipinv2Int(it.qty);
+  var amtTd = tr.querySelector('td[data-field="amount"]');
+  if (amtTd) amtTd.textContent = _ipinv2Money(it.amount_usd);
 }
 
 function _ipinv2OnAmountInput(ev, itemId) {
@@ -22500,23 +22653,37 @@ function _ipinv2UpdateLocalAmount(itemId, q, f) {
 function _ipinv2PatchItem(itemId, field, value) {
   var inv = _ipinv2CurrentInvoice;
   if (!inv) return;
+  // 낙관적 로컬 업데이트
+  var idx = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
+  if (idx >= 0) {
+    _ipinv2CurrentItems[idx][field] = value;
+    if (field === 'qty' || field === 'fob_usd') {
+      var q = Number(_ipinv2CurrentItems[idx].qty || 0);
+      var f = Number(_ipinv2CurrentItems[idx].fob_usd || 0);
+      _ipinv2CurrentItems[idx].amount_usd = Number((q * f).toFixed(2));
+    }
+  }
+  _ipinv2UpdateItemRowInPlace(itemId);
+  _ipinv2RecalcSummaryLocal();
+
   var payload = { id: itemId };
   payload[field] = value;
   fetch('/api/import-invoices/' + inv.id + '/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    .then(function(r) { return r.json(); })
-    .then(function(json) {
-      if (json.success) {
-        var idx = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
-        if (idx >= 0) _ipinv2CurrentItems[idx] = json.data;
-        // 금액/합계 재반영
-        var tr = document.querySelector('tr[data-item-id="' + itemId + '"]');
-        if (tr) {
-          var amtTd = tr.querySelector('td[data-field="amount"]');
-          if (amtTd) amtTd.textContent = _ipinv2Money(json.data.amount_usd);
-        }
-        _ipinv2RefreshInvoiceTotals();
-      } else alert(json.error || '수정 실패');
-    });
+    .then(function(r) { return r.text().then(function(t) { return { ok: r.ok, status: r.status, text: t }; }); })
+    .then(function(res) {
+      var json = null; try { if (res.text) json = JSON.parse(res.text); } catch (e) {}
+      if (!res.ok || !json || !json.success) {
+        alert('수정 실패\n\n' + (json ? _ipinv2FormatError(json.error || json) : 'HTTP ' + res.status));
+        return;
+      }
+      var idx2 = _ipinv2CurrentItems.findIndex(function(x) { return x.id === itemId; });
+      if (idx2 >= 0) {
+        var prev = _ipinv2CurrentItems[idx2];
+        _ipinv2CurrentItems[idx2] = Object.assign({ _pallet_qty_per: prev._pallet_qty_per }, json.data);
+      }
+      _ipinv2FetchInvoiceOnly();
+    })
+    .catch(function(err) { alert('수정 실패\n\n' + _ipinv2FormatError(err)); });
 }
 
 function _ipinv2RefreshInvoiceTotals() {
@@ -24001,11 +24168,11 @@ const _tx = {
   // ---- 상태 ----
   state: {
     docType: 'sales',           // 'sales' | 'purchase' | 'quote'
-    customerCode: 'TEST_001',
-    customerName: '태경공구',
+    customerCode: '',
+    customerName: '',
     transactionDate: null,
     manager: '',
-    items: [],                  // { code, name, qty, unitPrice, supplyAmount, vatAmount, isAuto, productRef }
+    items: [],                  // { code, name, qty, unitPrice, spec, supplyAmount, vatAmount, isAuto, productRef }
   },
 
   _initialized: false,
@@ -24038,15 +24205,28 @@ const _tx = {
       }
     });
 
+    // 거래처 입력 초기값 비움
+    const custInput = document.getElementById('tx-customer-input');
+    if (custInput) custInput.value = '';
+
     // 이벤트 바인딩
     this._bindTabs();
     this._bindSearchAdd();
     this._bindItemsTable();
     this._bindFooterButtons();
+    this._bindSearchInput();
+    this._bindCustomerSelect();
+
+    // 초기: 검색 드롭다운 접힘
+    const searchResults = document.getElementById('tx-search-results');
+    if (searchResults) searchResults.classList.add('tx-hidden');
 
     // 초기 상태: 상품 라인 빈 안내 행
     this.renderItemsTable();
     this.renderSummary();
+
+    // 초기: 과거 거래 패널 "거래처를 선택해주세요" 상태
+    this.renderHistoryPanel(null, null);
   },
 
   // ---- 이벤트 바인딩 ----
@@ -24183,21 +24363,28 @@ const _tx = {
     const hit = this._findProduct(code);
     const name = this._productName(hit, opt.fallbackName);
     const unitPrice = this._defaultUnitPrice(hit, this.state.docType, opt);
+    const spec = (hit && hit.data && hit.data.detail) ? String(hit.data.detail) : null;
 
     const item = {
       code: code,
       name: name,
       qty: 1,
       unitPrice: unitPrice,
+      spec: spec,
       supplyAmount: 0,
       vatAmount: 0,
       isAuto: true,           // 자동 채움 상태 (노란 배경)
       productRef: hit,
     };
-    this.state.items.push(item);
-    this.recalcItem(this.state.items.length - 1);
+    const idx = this.state.items.push(item) - 1;
+    this.recalcItem(idx);
     this.renderItemsTable();
     this.renderSummary();
+
+    // 거래처가 선택된 상태면 해당 제품의 최근 거래가로 덮어쓰기 (비동기)
+    if (this.state.customerCode) {
+      this._fetchLastPriceForItem(idx);
+    }
   },
 
   removeItem(idx) {
@@ -24315,6 +24502,424 @@ const _tx = {
     if (supplyEl) supplyEl.textContent = totals.supply.toLocaleString();
     if (vatEl) vatEl.textContent = totals.vat.toLocaleString();
     if (totalEl) totalEl.textContent = totals.total.toLocaleString();
+  },
+
+  // ================================================================
+  // Phase 3B — 검색
+  // ================================================================
+  search: {
+    _debounceTimer: null,
+    _cache: null,
+
+    _buildIndex() {
+      if (this._cache) return this._cache;
+      const out = [];
+      const mw = (typeof DB !== 'undefined' && DB.products) ? DB.products : [];
+      for (let i = 0; i < mw.length; i++) out.push({ source: 'milwaukee', data: mw[i] });
+      const gen = (typeof genProducts !== 'undefined') ? genProducts : [];
+      for (let i = 0; i < gen.length; i++) out.push({ source: 'general', data: gen[i] });
+      this._cache = out;
+      return out;
+    },
+
+    _levenshtein(a, b, maxDist) {
+      a = String(a || '').toLowerCase();
+      b = String(b || '').toLowerCase();
+      if (Math.abs(a.length - b.length) > maxDist) return maxDist + 1;
+      const m = a.length, n = b.length;
+      if (m === 0) return n;
+      if (n === 0) return m;
+      let prev = new Array(n + 1);
+      let cur = new Array(n + 1);
+      for (let j = 0; j <= n; j++) prev[j] = j;
+      for (let i = 1; i <= m; i++) {
+        cur[0] = i;
+        let rowMin = cur[0];
+        for (let j = 1; j <= n; j++) {
+          const cost = (a.charCodeAt(i - 1) === b.charCodeAt(j - 1)) ? 0 : 1;
+          cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+          if (cur[j] < rowMin) rowMin = cur[j];
+        }
+        if (rowMin > maxDist) return maxDist + 1;
+        const tmp = prev; prev = cur; cur = tmp;
+      }
+      return prev[n];
+    },
+
+    _score(query, entry) {
+      const p = entry.data;
+      const q = query.toLowerCase();
+      const code = String(p.code || '').toLowerCase();
+      const mgr = String(p.manageCode || '').toLowerCase();
+      const model = String(p.model || '').toLowerCase();
+      const desc = String(p.description || '').toLowerCase();
+      const detail = String(p.detail || '').toLowerCase();
+      if (code === q || model === q) return 0;
+      if (code.startsWith(q) || model.startsWith(q)) return 1;
+      if (code.includes(q) || mgr.includes(q) || model.includes(q) || desc.includes(q) || detail.includes(q)) return 2;
+      if (_tx.search._levenshtein(code, q, 2) <= 2) return 3;
+      if (_tx.search._levenshtein(model, q, 2) <= 2) return 3;
+      return 999;
+    },
+
+    onInput(queryText) {
+      if (this._debounceTimer) clearTimeout(this._debounceTimer);
+      const q = String(queryText || '').trim();
+      this._debounceTimer = setTimeout(function() { _tx.search._run(q); }, 150);
+    },
+
+    _run(query) {
+      const container = document.getElementById('tx-search-results');
+      if (!container) return;
+      if (query.length < 2) {
+        container.classList.add('tx-hidden');
+        return;
+      }
+      const index = this._buildIndex();
+      const scored = [];
+      for (let i = 0; i < index.length; i++) {
+        const s = this._score(query, index[i]);
+        if (s <= 3) scored.push({ score: s, entry: index[i] });
+      }
+      scored.sort(function(a, b) {
+        if (a.score !== b.score) return a.score - b.score;
+        const sa = a.entry.source === 'milwaukee' ? 0 : 1;
+        const sb = b.entry.source === 'milwaukee' ? 0 : 1;
+        if (sa !== sb) return sa - sb;
+        return String(a.entry.data.code || '').localeCompare(String(b.entry.data.code || ''));
+      });
+      this.render(scored.slice(0, 10));
+    },
+
+    render(results) {
+      const container = document.getElementById('tx-search-results');
+      const body = document.getElementById('tx-search-body');
+      if (!container || !body) return;
+      container.classList.remove('tx-hidden');
+      if (!results || results.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" class="tx-dropdown-empty">검색 결과가 없습니다</td></tr>';
+        return;
+      }
+      const fmt = function(n) { return (Number(n) || 0).toLocaleString(); };
+      const esc = function(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      };
+      let html = '';
+      for (let i = 0; i < results.length; i++) {
+        const p = results[i].entry.data;
+        const src = results[i].entry.source;
+        const retailPrice = src === 'milwaukee'
+          ? (Number(p.priceA) || Number(p.supplyPrice) || 0)
+          : (Number(p.outPrice) || Number(p.palletPrice) || 0);
+        const stock = Number(p.stock) || Number(p.qty) || 0;
+        const name = p.description || p.model || p.manageCode || p.code || '';
+        html +=
+          '<tr>' +
+            '<td><button type="button" class="tx-add-btn">+ 추가</button></td>' +
+            '<td>' + esc(p.code || '') + '</td>' +
+            '<td style="text-align:left">' + esc(name) + '</td>' +
+            '<td>' + fmt(stock) + '</td>' +
+            '<td style="text-align:right">' + fmt(retailPrice) + '</td>' +
+          '</tr>';
+      }
+      body.innerHTML = html;
+    },
+
+    clear() {
+      const input = document.getElementById('tx-search-input');
+      if (input) input.value = '';
+      const container = document.getElementById('tx-search-results');
+      if (container) container.classList.add('tx-hidden');
+    },
+  },
+
+  _bindSearchInput() {
+    const input = document.getElementById('tx-search-input');
+    if (!input) return;
+    let isComposing = false;
+    input.addEventListener('compositionstart', function() { isComposing = true; });
+    input.addEventListener('compositionend', function(e) {
+      isComposing = false;
+      _tx.search.onInput(e.target.value);
+    });
+    input.addEventListener('input', function(e) {
+      if (isComposing) return;
+      _tx.search.onInput(e.target.value);
+    });
+  },
+
+  // ================================================================
+  // Phase 3B — 거래처 선택
+  // ================================================================
+  customer: {
+    _cache: null,
+    _dropdown: null,
+
+    _load() {
+      if (this._cache) return this._cache;
+      this._cache = (typeof clientData !== 'undefined') ? clientData.slice() : [];
+      return this._cache;
+    },
+
+    _match(query, c) {
+      const q = String(query || '').toLowerCase();
+      if (!q) return true;
+      return String(c.name || '').toLowerCase().includes(q)
+          || String(c.code || '').toLowerCase().includes(q)
+          || String(c.bizNo || '').includes(q)
+          || String(c.manager || '').toLowerCase().includes(q);
+    },
+
+    _ensureDropdown() {
+      if (this._dropdown) return this._dropdown;
+      const dd = document.createElement('div');
+      dd.className = 'tx-customer-dropdown';
+      dd.style.display = 'none';
+      dd.innerHTML =
+        '<div class="tx-customer-search-wrap">' +
+          '<input type="text" class="tx-customer-search-input" placeholder="거래처명·코드·사업자번호 검색" autocomplete="off">' +
+        '</div>' +
+        '<div class="tx-customer-list"></div>';
+      document.body.appendChild(dd);
+      this._dropdown = dd;
+
+      const searchInput = dd.querySelector('.tx-customer-search-input');
+      searchInput.addEventListener('input', function(e) { _tx.customer.onSearch(e.target.value); });
+      searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') _tx.customer.closeDropdown();
+      });
+
+      dd.querySelector('.tx-customer-list').addEventListener('click', function(e) {
+        const item = e.target.closest('.tx-customer-item');
+        if (!item) return;
+        const idx = parseInt(item.getAttribute('data-idx'), 10);
+        const list = _tx.customer._load();
+        if (!isNaN(idx) && list[idx]) _tx.customer.select(list[idx]);
+      });
+
+      document.addEventListener('mousedown', function(e) {
+        if (!_tx.customer._dropdown || _tx.customer._dropdown.style.display === 'none') return;
+        if (_tx.customer._dropdown.contains(e.target)) return;
+        const btn = document.getElementById('tx-customer-select-btn');
+        const inp = document.getElementById('tx-customer-input');
+        if ((btn && btn.contains(e.target)) || (inp && inp.contains(e.target))) return;
+        _tx.customer.closeDropdown();
+      });
+
+      return dd;
+    },
+
+    openDropdown() {
+      const dd = this._ensureDropdown();
+      const btn = document.getElementById('tx-customer-select-btn');
+      const combo = btn ? btn.closest('.tx-input-combo') : null;
+      const anchor = combo || btn;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      dd.style.left = rect.left + 'px';
+      dd.style.top = (rect.bottom + 4) + 'px';
+      dd.style.width = Math.max(320, rect.width) + 'px';
+      dd.style.display = 'flex';
+      this.onSearch('');
+      const si = dd.querySelector('.tx-customer-search-input');
+      if (si) { si.value = ''; si.focus(); }
+    },
+
+    closeDropdown() {
+      if (this._dropdown) this._dropdown.style.display = 'none';
+    },
+
+    onSearch(queryText) {
+      const list = this._load();
+      const filtered = list.filter(function(c) { return _tx.customer._match(queryText, c); });
+      this.renderList(filtered.slice(0, 20));
+    },
+
+    renderList(customers) {
+      if (!this._dropdown) return;
+      const body = this._dropdown.querySelector('.tx-customer-list');
+      if (!customers || customers.length === 0) {
+        body.innerHTML = '<div class="tx-dropdown-empty">거래처가 없습니다</div>';
+        return;
+      }
+      const all = this._load();
+      const esc = function(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      };
+      let html = '';
+      for (let i = 0; i < customers.length; i++) {
+        const c = customers[i];
+        const origIdx = all.indexOf(c);
+        const meta = c.bizNo || c.phone || c.mobile || c.manager || '';
+        html +=
+          '<div class="tx-customer-item" data-idx="' + origIdx + '">' +
+            '<span class="tx-customer-item-name">' + esc(c.name || '(이름 없음)') + '</span>' +
+            '<span class="tx-customer-item-meta">' + esc(meta) + '</span>' +
+          '</div>';
+      }
+      body.innerHTML = html;
+    },
+
+    select(c) {
+      _tx.state.customerCode = c.code || c.manageCode || c.bizNo || '';
+      _tx.state.customerName = c.name || '';
+      const input = document.getElementById('tx-customer-input');
+      if (input) input.value = _tx.state.customerName;
+      this.closeDropdown();
+      _tx.loadCustomerData();
+    },
+  },
+
+  _bindCustomerSelect() {
+    const btn = document.getElementById('tx-customer-select-btn');
+    const input = document.getElementById('tx-customer-input');
+    if (btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        _tx.customer.openDropdown();
+      });
+    }
+    if (input) {
+      input.addEventListener('click', function(e) {
+        e.stopPropagation();
+        _tx.customer.openDropdown();
+      });
+    }
+  },
+
+  // ================================================================
+  // Phase 3B — 단가 자동 채움 + 과거 거래 로딩
+  // ================================================================
+  async _fetchLastPriceForItem(idx) {
+    const it = this.state.items[idx];
+    if (!it || !this.state.customerCode) return;
+    try {
+      let url = '/api/transactions/last-price'
+        + '?customerCode=' + encodeURIComponent(this.state.customerCode)
+        + '&productCode=' + encodeURIComponent(it.code);
+      if (it.spec) url += '&spec=' + encodeURIComponent(it.spec);
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.success && data.data && data.data.unit_price != null) {
+        const price = Number(data.data.unit_price);
+        if (price > 0 && this.state.items[idx] === it) {
+          it.unitPrice = price;
+          it.isAuto = true;
+          this.recalcItem(idx);
+          this.renderItemsTable();
+          this.renderSummary();
+        }
+      }
+    } catch (err) {
+      console.warn('[TX] 단가 자동채움 실패', it.code, err);
+    }
+  },
+
+  async loadCustomerData() {
+    const code = this.state.customerCode;
+    if (!code) return;
+    for (let i = 0; i < this.state.items.length; i++) {
+      await this._fetchLastPriceForItem(i);
+    }
+    await this.loadHistoryPanel();
+  },
+
+  async loadHistoryPanel() {
+    const code = this.state.customerCode;
+    if (!code) { this.renderHistoryPanel(null, null); return; }
+    let recents = [];
+    let stats = null;
+    try {
+      const rRes = await fetch('/api/transactions/recent?customerCode=' + encodeURIComponent(code) + '&limit=5');
+      const rJson = await rRes.json();
+      if (rJson && rJson.success) recents = rJson.data || [];
+    } catch (e) { console.warn('[TX] 최근 거래 조회 실패', e); }
+    try {
+      const sRes = await fetch('/api/transactions/stats?customerCode=' + encodeURIComponent(code) + '&months=6');
+      const sJson = await sRes.json();
+      if (sJson && sJson.success) stats = sJson.data;
+    } catch (e) { console.warn('[TX] 통계 조회 실패', e); }
+    this.renderHistoryPanel(recents, stats);
+  },
+
+  renderHistoryPanel(recents, stats) {
+    const panel = document.querySelector('#tab-transactions .tx-history-panel');
+    if (!panel) return;
+    const titleEl = panel.querySelector('.tx-history-title');
+    const metaEl = panel.querySelector('.tx-history-meta');
+    const listEl = panel.querySelector('.tx-history-list');
+    const name = this.state.customerName;
+
+    if (!name) {
+      if (titleEl) titleEl.textContent = '📜 과거 거래';
+      if (metaEl) metaEl.textContent = '거래처를 먼저 선택해주세요';
+      if (listEl) listEl.innerHTML = '<div class="tx-history-empty">좌측 거래처 옆<br/>▼ 선택 버튼을 눌러<br/>거래처를 선택하세요</div>';
+      return;
+    }
+
+    if (titleEl) titleEl.textContent = '📜 ' + name + ' 과거 거래';
+    if (metaEl) {
+      const cnt = (stats && stats.totalCount) ? stats.totalCount : 0;
+      const amt = (stats && stats.totalAmount) ? stats.totalAmount : 0;
+      metaEl.textContent = '최근 6개월 · ' + cnt + '건 · ' + amt.toLocaleString() + '원';
+    }
+
+    if (!listEl) return;
+    if (!recents || recents.length === 0) {
+      listEl.innerHTML = '<div class="tx-history-empty">거래 내역이 없습니다</div>';
+      return;
+    }
+
+    const esc = function(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    };
+    const badgeClass = function(dt) {
+      if (dt === 'purchase') return 'tx-badge-purchase';
+      if (dt === 'quote') return 'tx-badge-quote';
+      return 'tx-badge-sales';
+    };
+    const badgeLabel = function(dt) {
+      if (dt === 'purchase') return '매입';
+      if (dt === 'quote') return '견적';
+      return '매출';
+    };
+    const fmtDate = function(d) {
+      if (!d) return '';
+      const s = String(d);
+      return s.length >= 10 ? s.slice(5, 10) : s;
+    };
+    const fmt = function(n) { return (Number(n) || 0).toLocaleString(); };
+
+    let html = '';
+    for (let i = 0; i < recents.length; i++) {
+      const tx = recents[i];
+      const items = tx.items || [];
+      const first = items[0] || {};
+      const firstLabel = first.product_code
+        ? (first.product_code + ' × ' + (first.quantity || 0))
+        : (items.length + '개 상품');
+      const more = items.length > 1 ? ' 외 ' + (items.length - 1) + '건' : '';
+      const unit = first.unit_price != null ? ('@' + fmt(first.unit_price)) : '';
+      html +=
+        '<div class="tx-history-card">' +
+          '<div class="tx-history-row1">' +
+            '<span class="tx-history-date">' + esc(fmtDate(tx.transaction_date)) + '</span>' +
+            '<span class="tx-badge ' + badgeClass(tx.doc_type) + '">' + badgeLabel(tx.doc_type) + '</span>' +
+          '</div>' +
+          '<div class="tx-history-product">' + esc(firstLabel + more) + '</div>' +
+          '<div class="tx-history-row2">' +
+            '<span class="tx-history-unit">' + esc(unit) + '</span>' +
+            '<span class="tx-history-total">' + fmt(tx.total_amount) + '</span>' +
+          '</div>' +
+        '</div>';
+    }
+    listEl.innerHTML = html;
   },
 };
 

@@ -691,9 +691,9 @@ document.head.appendChild(s);
   <!-- 최상단 제품 검색 블록 -->
   <div class="tx-search-panel">
     <div class="tx-search-wrap">
-      <input class="tx-search-input" type="search" placeholder="🔍 제품 검색 (모델명, 코드, 품명...)" autocomplete="off" />
+      <input id="tx-search-input" class="tx-search-input" type="search" placeholder="🔍 제품 검색 (모델명, 코드, 품명...)" autocomplete="off" />
     </div>
-    <div class="tx-search-results">
+    <div id="tx-search-results" class="tx-search-results">
       <table class="tx-search-table">
         <colgroup>
           <col style="width:70px"><col style="width:120px"><col><col style="width:60px"><col style="width:110px">
@@ -757,8 +757,8 @@ document.head.appendChild(s);
         <div class="tx-input-field">
           <label class="tx-label">거래처</label>
           <div class="tx-input-combo">
-            <input class="tx-input" type="text" value="태경공구" readonly />
-            <button type="button" class="tx-input-btn">▼ 선택</button>
+            <input id="tx-customer-input" class="tx-input" type="text" placeholder="거래처를 선택하세요" readonly />
+            <button id="tx-customer-select-btn" type="button" class="tx-input-btn">▼ 선택</button>
           </div>
         </div>
         <div class="tx-input-field">

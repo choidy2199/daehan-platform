@@ -315,6 +315,7 @@ export async function getRecentTransactionsByCustomer(
 export async function getLastUnitPrice(
   customerCode: string,
   productCode: string,
+  spec?: string | null,
   client?: Client
 ): Promise<number | null> {
   const sb = getClient(client);
@@ -332,11 +333,17 @@ export async function getLastUnitPrice(
 
     const ids = headers.map((h: any) => h.id as string);
 
-    const { data: items, error: iErr } = await sb
+    let itemsQuery = sb
       .from('dh_transaction_items')
       .select('unit_price, transaction_id')
       .eq('product_code', productCode)
       .in('transaction_id', ids);
+
+    if (spec !== undefined && spec !== null && String(spec).length > 0) {
+      itemsQuery = itemsQuery.eq('spec', spec);
+    }
+
+    const { data: items, error: iErr } = await itemsQuery;
 
     if (iErr) throw iErr;
     if (!items || items.length === 0) return null;

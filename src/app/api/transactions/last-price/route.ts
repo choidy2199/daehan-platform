@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const customerCode = searchParams.get('customerCode');
     const productCode = searchParams.get('productCode');
+    const specParam = searchParams.get('spec');
+    const spec = specParam && specParam.length > 0 ? specParam : undefined;
 
     if (!customerCode || !productCode) {
       return NextResponse.json(
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const price = await getLastUnitPrice(customerCode, productCode, supabase);
+    const price = await getLastUnitPrice(customerCode, productCode, spec, supabase);
 
     return NextResponse.json({ success: true, data: { unit_price: price } });
   } catch (err: any) {

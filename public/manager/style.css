@@ -1767,3 +1767,96 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   .tx-input-row { grid-template-columns: 1fr; }
   .tx-toolbar { flex-wrap: wrap; }
 }
+
+/* =================================================================
+   거래명세서 Phase 3B — 검색 드롭다운 / 거래처 / 빈 상태
+   ================================================================= */
+
+/* 검색 드롭다운: .tx-search-results 컨테이너를 접힘/펼침 제어 */
+#tab-transactions #tx-search-results.tx-hidden {
+  display: none;
+}
+#tab-transactions .tx-dropdown-empty {
+  padding: 16px 12px;
+  font-size: 12px;
+  color: #9BA3B2;
+  text-align: center;
+}
+
+/* 거래처 선택 드롭다운 — position: fixed 기반 (좌표는 JS가 세팅) */
+.tx-customer-dropdown {
+  position: fixed;
+  z-index: 9999;
+  background: #FFFFFF;
+  border: 1px solid #DDE1EB;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(26, 29, 35, 0.12);
+  width: 320px;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  overflow: hidden;
+}
+.tx-customer-search-wrap {
+  padding: 8px;
+  border-bottom: 1px solid #EAECF2;
+  background: #FAFAF7;
+}
+.tx-customer-search-input {
+  width: 100%;
+  height: 32px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid #DDE1EB;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1A1D23;
+  background: #FFFFFF;
+  outline: none;
+}
+.tx-customer-search-input:focus {
+  border-color: #185FA5;
+  box-shadow: 0 0 0 2px #E6F1FB;
+}
+.tx-customer-list {
+  overflow-y: auto;
+  flex: 1;
+  max-height: 280px;
+}
+.tx-customer-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #1A1D23;
+  border-bottom: 1px solid #F0F2F7;
+  cursor: pointer;
+  gap: 8px;
+}
+.tx-customer-item:last-child { border-bottom: none; }
+.tx-customer-item:hover { background: #F4F6FA; }
+.tx-customer-item-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.tx-customer-item-meta {
+  font-size: 11px;
+  color: #9BA3B2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 과거 거래 패널 — 빈 상태 안내 */
+.tx-history-empty {
+  padding: 24px 12px;
+  font-size: 12px;
+  color: #9BA3B2;
+  text-align: center;
+  line-height: 1.6;
+}
