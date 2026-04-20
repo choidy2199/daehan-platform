@@ -23103,6 +23103,14 @@ function _ipinv2CalcRemainingBalance(currentSeq) {
   return Math.max(0, finalTotal - sumPrevConfirmed);
 }
 
+// 환율 역산 — $ + ₩ → 환율 (소수점 2자리)
+function _ipinv2CalcExchangeRate(actualUsd, remittanceKrw) {
+  var usd = Number(actualUsd);
+  var krw = Number(remittanceKrw);
+  if (!usd || usd <= 0 || !krw || krw <= 0) return null;
+  return Math.round((krw / usd) * 100) / 100;
+}
+
 // 저장 버튼 enabled/disabled 상태 실시간 갱신
 function _ipinv2UpdateSaveButtonState(paymentId) {
   var card = document.querySelector('[data-pay-id="' + paymentId + '"]');
@@ -23173,8 +23181,21 @@ function _ipinv2RenderPaymentCard(p, pendingPlaceholder) {
   var badgeLabel = showAsConfirmed ? '확정' : '대기';
   var canDelete = _ipinv2Payments.length > 1;
 
+  // autoCalcRate 초기값 판정: 저장된 rate가 rev(₩/$)와 일치하거나 0이면 '1' (역산 허용), 아니면 '0' (사용자 커스텀)
+  var _usdInit = Number(p.actual_usd || 0);
+  var _krwInit = Number(p.remittance_krw || 0);
+  var _rateInit = Number(p.exchange_rate || 0);
+  var _autoCalcInit = '1';
+  if (_rateInit > 0 && _usdInit > 0 && _krwInit > 0) {
+    var _expRate = Math.round((_krwInit / _usdInit) * 100) / 100;
+    _autoCalcInit = Math.abs(_rateInit - _expRate) < 0.02 ? '1' : '0';
+  } else if (_rateInit > 0) {
+    // usd 또는 krw가 없는데 rate만 있으면 사용자가 rate를 먼저 입력한 케이스 → '0'
+    _autoCalcInit = '0';
+  }
+
   var h = '';
-  h += '<div data-pay-id="' + p.id + '" onkeydown="_ipinv2OnPayKeydown(event,\'' + p.id + '\')" style="border:' + border + ';background:' + bg + ';border-radius:8px;padding:14px 16px;font-family:Pretendard,sans-serif;">';
+  h += '<div data-pay-id="' + p.id + '" data-auto-calc-rate="' + _autoCalcInit + '" onkeydown="_ipinv2OnPayKeydown(event,\'' + p.id + '\')" style="border:' + border + ';background:' + bg + ';border-radius:8px;padding:14px 16px;font-family:Pretendard,sans-serif;">';
 
   // 카드 헤더 — 좌: 차수 + 배지 / 우: [저장 또는 수정] [삭제]
   h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">';
@@ -23279,6 +23300,31 @@ function _ipinv2OnActualBlur(ev, paymentId, field, decimals) {
   if (decimals === 0 && val > 0) ev.target.value = Math.round(val).toLocaleString('en-US');
   else if (decimals === 2 && val > 0) ev.target.value = val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   else if (decimals === 4 && val > 0) ev.target.value = val.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+
+  // remittance_krw 또는 actual_usd blur 시 환율 자동 역산 (환율이 비어있거나 autoCalcRate 플래그일 때만)
+  if (field === 'remittance_krw' || field === 'actual_usd') {
+    var card = document.querySelector('[data-pay-id="' + paymentId + '"]');
+    if (card) {
+      var usdEl = card.querySelector('[data-pay-field="actual_usd"]');
+      var remitEl = card.querySelector('[data-pay-field="remittance_krw"]');
+      var rateEl = card.querySelector('[data-pay-field="exchange_rate"]');
+      if (usdEl && remitEl && rateEl) {
+        var usd = Number(String(usdEl.value || '').replace(/,/g, '')) || 0;
+        var krw = Number(String(remitEl.value || '').replace(/,/g, '')) || 0;
+        var curRate = Number(String(rateEl.value || '').replace(/,/g, '')) || 0;
+        // 환율 비어있거나 이전에 역산으로 채워진 경우만 다시 역산
+        var canAutoCalc = (curRate === 0) || (card.dataset.autoCalcRate === '1');
+        if (canAutoCalc && usd > 0 && krw > 0) {
+          var newRate = _ipinv2CalcExchangeRate(usd, krw);
+          if (newRate) {
+            rateEl.value = newRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            card.dataset.autoCalcRate = '1';
+          }
+        }
+      }
+    }
+  }
+
   // 저장 버튼 상태 갱신 (6필드 충족 여부)
   _ipinv2UpdateSaveButtonState(paymentId);
 }
@@ -23407,8 +23453,14 @@ function _ipinv2OnActualInput(ev, paymentId) {
   var rateRaw = String(rateEl.value || '').replace(/,/g, '');
   var usd = Number(usdRaw) || 0;
   var rate = Number(rateRaw) || 0;
-  // 송금액(₩) 자동 계산 — 실송금액 또는 환율 변경 시, 사용자 수동 편집 안 했으면만
   var field = ev.target.getAttribute('data-pay-field');
+
+  // 사용자가 환율 필드 직접 입력 시 autoCalcRate='0' (역산 무시, 수동 우선)
+  if (field === 'exchange_rate') {
+    card.dataset.autoCalcRate = '0';
+  }
+
+  // 송금액(₩) 자동 계산 — 실송금액 또는 환율 변경 시, 사용자 수동 편집 안 했으면만
   if (field === 'actual_usd' || field === 'exchange_rate') {
     var manual = remitEl.dataset.manualEdit === '1';
     if (!manual) {
