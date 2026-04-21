@@ -21713,7 +21713,7 @@ function _poRenderDetail() {
   var listPlaceholderAlert = "alert('발주서 리스트 모달은 P7에서 구현 예정')";
 
   var h = '';
-  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;margin-bottom:0;overflow:hidden;">';
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;margin-bottom:24px;overflow:hidden;">';
 
   // 상단 다크 헤더 (← 목록 버튼 제거, 메타 정보만. 에러 시 오류 배지)
   h += '<div class="pc-main-header">';
