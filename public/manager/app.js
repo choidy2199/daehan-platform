@@ -350,6 +350,11 @@ async function forceUploadAll() {
   updateSyncStatus('동기화 중...');
 
   var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
+  // 동적 키: mw_import_po_cart_{poId} — PO별 장바구니 (커밋 5)
+  for (var _si = 0; _si < localStorage.length; _si++) {
+    var _sk = localStorage.key(_si);
+    if (_sk && _sk.indexOf('mw_import_po_cart_') === 0 && keys.indexOf(_sk) < 0) keys.push(_sk);
+  }
 
   try {
     var uploadData = [];
@@ -397,6 +402,11 @@ async function uploadAllToSupabase() {
   btn.style.color = '#fff';
 
   var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
+  // 동적 키: mw_import_po_cart_{poId} — PO별 장바구니 (커밋 5)
+  for (var _si = 0; _si < localStorage.length; _si++) {
+    var _sk = localStorage.key(_si);
+    if (_sk && _sk.indexOf('mw_import_po_cart_') === 0 && keys.indexOf(_sk) < 0) keys.push(_sk);
+  }
 
   try {
     var uploadData = [];
@@ -20770,7 +20780,8 @@ function _poRenderDetail() {
     : _poFormatStatusBadge(po.status || 'draft');
   var poDate = hasError ? '-' : _poFormatDate(po.po_date);
   var brand = hasError ? '-' : _poEsc(po.brand || '-');
-  var itemCount = (_poState && _poState.currentItems) ? _poState.currentItems.length : 0;
+  var productCount = (loadObj('mw_import_po_products', []) || []).length;
+  var cartCount = (hasError || !po.id) ? 0 : _poLoadCart(po.id).length;
   var disabledAttr = hasError ? ' disabled' : '';
   var placeholderAlert = "alert('P2~P9에서 구현 예정')";
   var listPlaceholderAlert = "alert('발주서 리스트 모달은 P7에서 구현 예정')";
@@ -20783,7 +20794,7 @@ function _poRenderDetail() {
   h += '<div class="pc-mh-left">';
   h += '<span class="pc-mh-title">' + poNumber + '</span>';
   h += statusBadge;
-  h += '<span class="pc-mh-meta">· ' + poDate + ' · ' + brand + ' (' + itemCount + '개 제품)</span>';
+  h += '<span class="pc-mh-meta" id="po-mh-meta">· ' + poDate + ' · ' + brand + ' (' + productCount + '개 제품 · ' + cartCount + '개 장바구니)</span>';
   h += '</div>';
   h += '</div>';
 
@@ -20821,18 +20832,22 @@ function _poRenderDetail() {
   }
   h += '</div>';
 
-  // 우측 패널 (35% — 제품발주, P4에서 구현)
+  // 우측 패널 (35% — 제품발주 장바구니)
   h += '<div class="pc-panel pc-panel-right">';
   h += '<div class="pc-panel-header">';
-  h += '<div class="pc-panel-title">제품발주 <span class="pc-panel-count">0건</span></div>';
+  h += '<div class="pc-panel-title">제품발주 <span class="pc-panel-count" id="po-cart-count">' + cartCount + '건</span></div>';
   h += '<div class="pc-panel-actions">';
   h += '<button class="btn-mini" onclick="' + listPlaceholderAlert + '"' + disabledAttr + '>발주서 리스트</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>비우기</button>';
   h += '<button class="btn-mini btn-mini-confirm" onclick="' + placeholderAlert + '"' + disabledAttr + '>✓ 발주확정</button>';
   h += '</div></div>';
   h += '<div class="pc-info-strip">발주번호: <strong>' + poNumber + '</strong> · 자동부여</div>';
-  h += '<div class="pc-tbl-placeholder">' + (hasError ? '로드 실패' : '발주목록 준비중 (P4에서 구현)') + '</div>';
-  h += '<div class="pc-right-summary-skeleton">' + (hasError ? '-' : '요약 준비중 (P4)') + '</div>';
+  if (hasError) {
+    h += '<div class="pc-tbl-placeholder">로드 실패</div>';
+  } else {
+    h += '<div id="po-cart-body" class="po-cart-body"></div>';
+    h += '<div id="po-cart-summary" class="po-cart-summary"></div>';
+  }
   h += '</div>';
 
   h += '</div>'; // .pc-split
@@ -20841,7 +20856,10 @@ function _poRenderDetail() {
   // 모달 자리
   h += '<div id="po-modal-root"></div>';
   container.innerHTML = h;
-  if (!hasError) _poRenderProductList();
+  if (!hasError) {
+    _poRenderProductList();
+    _poRenderCart(po.id);
+  }
   _poBindDetailEvents();
 }
 
@@ -20850,7 +20868,8 @@ function _poBindDetailEvents() {
   // 검색/필터는 인라인 onclick/oninput으로 연결됨
 }
 
-// 좌측 제품 목록 — mw_import_po_products 원본 실시간 참조 렌더링
+// 좌측 제품 목록 — mw_import_po_products 원본 실시간 참조 렌더링 (12컬럼)
+// 컬럼: ☐ / 코드 / 브랜드 / 품명 / 모델명 / 1P / 가격$ / 재고 / 발주P / 낱개 / 합계 / 🛒
 function _poRenderProductList() {
   var body = document.getElementById('po-product-list-body');
   if (!body) return;
@@ -20859,12 +20878,18 @@ function _poRenderProductList() {
   var gpByCode = {};
   gp.forEach(function(p) { if (p && p.code != null) gpByCode[String(p.code)] = p; });
 
+  var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+  var cartMap = _poCartMap(po ? po.id : null);
+
   var q = (_poState && _poState._productListQuery ? _poState._productListQuery : '').trim().toLowerCase();
   var filtered = list.filter(function(item) {
     if (!q) return true;
     var p = gpByCode[String(item.productCode)];
     var hay = String(item.productCode || '');
-    if (p) hay += ' ' + (p.manageCode || '') + ' ' + (p.model || '') + ' ' + (p.description || '');
+    if (p) {
+      var br = getGenBrand(p) || '';
+      hay += ' ' + (p.manageCode || '') + ' ' + (p.model || '') + ' ' + (p.description || '') + ' ' + br;
+    }
     return hay.toLowerCase().indexOf(q) >= 0;
   });
 
@@ -20884,22 +20909,38 @@ function _poRenderProductList() {
     return;
   }
 
-  var thS = 'padding:9px 8px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
-  var tdS = 'padding:8px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
+  var thS = 'padding:9px 6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
+  var tdS = 'padding:6px 6px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
 
   var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  h += '<col style="width:36px"><col style="width:72px"><col style="width:118px"><col style=""><col style="width:58px"><col style="width:78px"><col style="width:58px"><col style="width:40px">';
+  // ☐ / 코드 / 브랜드 / 품명(가변) / 모델명 / 1P / 가격$ / 재고 / 발주P / 낱개 / 합계 / 🛒
+  h += '<col style="width:32px">';
+  h += '<col style="width:70px">';
+  h += '<col style="width:54px">';
+  h += '<col style="">';
+  h += '<col style="width:90px">';
+  h += '<col style="width:38px">';
+  h += '<col style="width:62px">';
+  h += '<col style="width:44px">';
+  h += '<col style="width:54px">';
+  h += '<col style="width:44px">';
+  h += '<col style="width:44px">';
+  h += '<col style="width:36px">';
   h += '</colgroup>';
   h += '<thead><tr>';
   h += '<th style="' + thS + '"><input type="checkbox" disabled></th>';
   h += '<th style="' + thS + '">코드</th>';
-  h += '<th style="' + thS + '">관리코드</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:10px;">모델·품명</th>';
-  h += '<th style="' + thS + '">파레트</th>';
-  h += '<th style="' + thS + '">수입가</th>';
+  h += '<th style="' + thS + '">브랜드</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">품명</th>';
+  h += '<th style="' + thS + '">모델명</th>';
+  h += '<th style="' + thS + '">1P</th>';
+  h += '<th style="' + thS + '">가격$</th>';
   h += '<th style="' + thS + '">재고</th>';
-  h += '<th style="' + thS + '">×</th>';
+  h += '<th style="' + thS + '">발주 P</th>';
+  h += '<th style="' + thS + '">낱개</th>';
+  h += '<th style="' + thS + '">합계</th>';
+  h += '<th style="' + thS + '">🛒</th>';
   h += '</tr></thead><tbody>';
 
   filtered.forEach(function(item) {
@@ -20911,36 +20952,114 @@ function _poRenderProductList() {
       h += '<td style="' + tdS + '"></td>';
       h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;color:#9BA3B2;">' + codeEsc + '</td>';
       h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
-      h += '<td style="' + tdS + 'text-align:left;padding-left:10px;color:#9BA3B2;font-style:italic;">원본 삭제됨</td>';
-      h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
-      h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
-      h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
-      h += '<td style="' + tdS + '"><button onclick="_poRemoveProductFromList(\'' + codeEsc + '\')" style="border:none;background:transparent;color:#CC2222;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="제거">×</button></td>';
+      h += '<td style="' + tdS + 'text-align:left;padding-left:8px;color:#9BA3B2;font-style:italic;" colspan="8">원본 삭제됨 — × 로 제거하세요</td>';
+      h += '<td style="' + tdS + '"><button class="po-cart-remove-btn" onclick="_poRemoveProductFromList(\'' + codeEsc + '\')" title="제거">×</button></td>';
       h += '</tr>';
       return;
     }
+    var inCart = !!cartMap[code];
+    var rowClass = inCart ? ' class="po-row-in-cart"' : '';
     var stock = (p.stock != null && p.stock !== '') ? Number(p.stock) : null;
     var stockHtml;
     if (stock == null || isNaN(stock)) stockHtml = '<span style="color:#DDE1EB">-</span>';
-    else if (stock > 0) stockHtml = '<span style="background:#E1F5EE;color:#085041;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">' + stock + '</span>';
+    else if (stock > 0) stockHtml = '<span style="background:#E1F5EE;color:#085041;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">' + stock.toLocaleString() + '</span>';
     else if (stock === 0) stockHtml = '<span style="background:#FAEEDA;color:#854F0B;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">0</span>';
-    else stockHtml = '<span style="background:#FCEBEB;color:#791F1F;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">' + stock + '</span>';
-    var importP = (p.importPrice != null) ? '$' + Number(p.importPrice).toFixed(2) : '<span style="color:#DDE1EB">—</span>';
-    var palletP = (p.palletQty != null && p.palletQty !== '' && Number(p.palletQty) > 0) ? Number(p.palletQty).toLocaleString() : '<span style="color:#DDE1EB">-</span>';
-    h += '<tr>';
-    h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '"></td>';
+    else stockHtml = '<span style="background:#FCEBEB;color:#791F1F;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">' + stock.toLocaleString() + '</span>';
+    var importP = (p.importPrice != null) ? '$' + Number(p.importPrice).toFixed(2) : '<span style="color:#DDE1EB">-</span>';
+    var palletQtyNum = (p.palletQty != null && p.palletQty !== '' && Number(p.palletQty) > 0) ? Number(p.palletQty) : 0;
+    var palletCell = palletQtyNum > 0 ? palletQtyNum.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
+    var brandTxt = _poEsc(getGenBrand(p) || '-');
+    var modelTxt = _poEsc(p.model || '-');
+    var descTxt = _poEsc(p.description || '-');
+    var cbAttr = inCart ? ' disabled' : '';
+    var inputAttr = inCart ? ' disabled' : '';
+    var lastCell = inCart
+      ? '<span class="po-cart-check" title="이미 장바구니에 있습니다">✓</span>'
+      : '<button class="po-cart-btn" title="장바구니에 추가" onclick="_poOnCartBtnClick(\'' + codeEsc + '\')">🛒</button>';
+    h += '<tr' + rowClass + ' data-code="' + codeEsc + '">';
+    h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '"' + cbAttr + '></td>';
     h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + _poEsc(p.code || '') + '</td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:11px;">' + _poEsc(p.manageCode || '-') + '</td>';
-    h += '<td style="' + tdS + 'text-align:left;padding-left:10px;overflow:hidden;"><div style="font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _poEsc(p.model || '-') + '</div><div style="color:#5A6070;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _poEsc(p.description || '') + '</div></td>';
-    h += '<td style="' + tdS + '">' + palletP + '</td>';
-    h += '<td style="' + tdS + '">' + importP + '</td>';
+    h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
+    h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + descTxt + '</td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + importP + '</td>';
     h += '<td style="' + tdS + '">' + stockHtml + '</td>';
-    h += '<td style="' + tdS + '"><button onclick="_poRemoveProductFromList(\'' + codeEsc + '\')" style="border:none;background:transparent;color:#CC2222;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="제거">×</button></td>';
+    h += '<td style="' + tdS + '"><input type="text" class="po-pallet-input" data-code="' + codeEsc + '" data-pallet="' + palletQtyNum + '" oninput="_poOnPalletInput(this)" onkeydown="_poOnPalletKeyDown(event,this)"' + inputAttr + ' autocomplete="off"></td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;color:#5A6070;" data-unit-cell><span style="color:#DDE1EB">-</span></td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;color:#5A6070;" data-total-cell><span style="color:#DDE1EB">-</span></td>';
+    h += '<td style="' + tdS + '">' + lastCell + '</td>';
     h += '</tr>';
   });
 
   h += '</tbody></table>';
   body.innerHTML = h;
+}
+
+// 발주 P input → 낱개/합계 실시간 갱신
+function _poOnPalletInput(inputEl) {
+  var tr = inputEl.closest('tr');
+  if (!tr) return;
+  var palletQty = Number(inputEl.getAttribute('data-pallet')) || 0;
+  var raw = String(inputEl.value || '').replace(/[^\d]/g, '');
+  inputEl.value = raw;
+  var pCount = raw === '' ? 0 : Number(raw);
+  var unit = palletQty > 0 ? pCount * palletQty : 0;
+  var code = inputEl.getAttribute('data-code');
+  var gp = loadObj('mw_gen_products', []);
+  var stock = 0;
+  for (var i = 0; i < gp.length; i++) {
+    if (gp[i] && String(gp[i].code) === String(code)) {
+      var s = gp[i].stock;
+      stock = (s != null && s !== '' && !isNaN(Number(s))) ? Number(s) : 0;
+      break;
+    }
+  }
+  var unitCell = tr.querySelector('[data-unit-cell]');
+  var totalCell = tr.querySelector('[data-total-cell]');
+  if (unitCell) {
+    unitCell.innerHTML = unit > 0 ? unit.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
+  }
+  if (totalCell) {
+    var total = stock + unit;
+    totalCell.innerHTML = unit > 0 ? total.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
+  }
+}
+
+// 발주 P input 엔터 키 → 장바구니 전송
+function _poOnPalletKeyDown(ev, inputEl) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  var code = inputEl.getAttribute('data-code');
+  if (!code) return;
+  _poOnCartBtnClick(code);
+}
+
+// 🛒 버튼 또는 엔터 키 공통 핸들러
+function _poOnCartBtnClick(code) {
+  var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+  if (!po || !po.id) { alert('PO가 로드되지 않았습니다.'); return; }
+  var row = document.querySelector('#po-product-list-body tr[data-code="' + code + '"]');
+  if (!row) return;
+  var input = row.querySelector('.po-pallet-input');
+  if (!input) return;
+  var raw = String(input.value || '').trim();
+  var pCount = raw === '' ? 0 : Number(raw);
+  if (!pCount || pCount <= 0 || isNaN(pCount)) { alert('수량을 입력하세요'); input.focus(); return; }
+  var cart = _poLoadCart(po.id);
+  var existIdx = -1;
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i] && String(cart[i].productCode) === String(code)) { existIdx = i; break; }
+  }
+  if (existIdx >= 0) {
+    if (!confirm('이미 장바구니에 있습니다. 덮어쓸까요?')) return;
+  }
+  _poAddToCart(code, pCount);
+  input.value = '';
+  var uc = row.querySelector('[data-unit-cell]');
+  var tc = row.querySelector('[data-total-cell]');
+  if (uc) uc.innerHTML = '<span style="color:#DDE1EB">-</span>';
+  if (tc) tc.innerHTML = '<span style="color:#DDE1EB">-</span>';
 }
 
 function _poFilterProductList(q) {
@@ -20949,14 +21068,419 @@ function _poFilterProductList(q) {
   _poRenderProductList();
 }
 
-// 제품 가져오기 팝업 스텁 — 커밋 5(P2-b)에서 실제 모달 구현
-function _poOpenProductPicker() {
-  if (!_poState || !_poState.currentPo) {
-    alert('PO가 로드되지 않았습니다.');
+// ===== 커밋 5 — 장바구니 (mw_import_po_cart_{poId}) 헬퍼 =====
+
+function _poCartKey(poId) {
+  return 'mw_import_po_cart_' + String(poId || '');
+}
+
+function _poLoadCart(poId) {
+  if (!poId) return [];
+  var arr = loadObj(_poCartKey(poId), []);
+  return Array.isArray(arr) ? arr : [];
+}
+
+function _poSaveCart(poId, cart) {
+  if (!poId) return;
+  save(_poCartKey(poId), Array.isArray(cart) ? cart : []);
+}
+
+function _poCartMap(poId) {
+  var m = {};
+  if (!poId) return m;
+  var cart = _poLoadCart(poId);
+  cart.forEach(function(c) { if (c && c.productCode != null) m[String(c.productCode)] = c; });
+  return m;
+}
+
+// 상단 다크바 메타 갱신
+function _poRefreshMetaCounts() {
+  var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+  if (!po || !po.id) return;
+  var productCount = (loadObj('mw_import_po_products', []) || []).length;
+  var cartCount = _poLoadCart(po.id).length;
+  var metaEl = document.getElementById('po-mh-meta');
+  if (metaEl) {
+    var poDate = _poFormatDate(po.po_date);
+    var brand = _poEsc(po.brand || '-');
+    metaEl.innerHTML = '· ' + poDate + ' · ' + brand + ' (' + productCount + '개 제품 · ' + cartCount + '개 장바구니)';
+  }
+  var countEl = document.getElementById('po-cart-count');
+  if (countEl) countEl.textContent = cartCount + '건';
+}
+
+// 장바구니 추가
+function _poAddToCart(code, palletCount) {
+  var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+  if (!po || !po.id) return;
+  var cart = _poLoadCart(po.id);
+  var gp = loadObj('mw_gen_products', []);
+  var product = null;
+  for (var i = 0; i < gp.length; i++) {
+    if (gp[i] && String(gp[i].code) === String(code)) { product = gp[i]; break; }
+  }
+  var palletQty = (product && product.palletQty != null && Number(product.palletQty) > 0) ? Number(product.palletQty) : 0;
+  var pc = Number(palletCount) || 0;
+  var unitCount = palletQty > 0 ? pc * palletQty : 0;
+  var nowISO = new Date().toISOString();
+  var entry = {
+    productCode: String(code),
+    palletCount: pc,
+    unitCount: unitCount,
+    addedAt: nowISO
+  };
+  var existIdx = -1;
+  for (var j = 0; j < cart.length; j++) {
+    if (cart[j] && String(cart[j].productCode) === String(code)) { existIdx = j; break; }
+  }
+  if (existIdx >= 0) cart[existIdx] = entry;
+  else cart.push(entry);
+  _poSaveCart(po.id, cart);
+  _poRenderCart(po.id);
+  _poRenderProductList();
+  _poRefreshMetaCounts();
+  _poToast((existIdx >= 0 ? '덮어썼습니다' : '장바구니에 추가됨'), 'success');
+}
+
+// 장바구니 제거
+function _poRemoveFromCart(code) {
+  var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+  if (!po || !po.id) return;
+  var cart = _poLoadCart(po.id);
+  var idx = -1;
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i] && String(cart[i].productCode) === String(code)) { idx = i; break; }
+  }
+  if (idx < 0) return;
+  cart.splice(idx, 1);
+  _poSaveCart(po.id, cart);
+  _poRenderCart(po.id);
+  _poRenderProductList();
+  _poRefreshMetaCounts();
+}
+
+// 우측 장바구니 렌더 (7컬럼: 브랜드/품명/모델명/1P/낱개/금액$/총금액$ + ×)
+function _poRenderCart(poId) {
+  var body = document.getElementById('po-cart-body');
+  var summary = document.getElementById('po-cart-summary');
+  if (!body || !summary) return;
+  var cart = _poLoadCart(poId);
+  var gp = loadObj('mw_gen_products', []);
+  var gpByCode = {};
+  gp.forEach(function(p) { if (p && p.code != null) gpByCode[String(p.code)] = p; });
+
+  if (cart.length === 0) {
+    body.innerHTML = '<div class="po-cart-empty">' +
+      '<div class="po-cart-empty-icon">🛒</div>' +
+      '<div style="margin-bottom:6px;font-size:14px;color:#5A6070;">장바구니가 비어있습니다</div>' +
+      '<div style="font-size:12px;">좌측에서 발주 P 입력 후 🛒 클릭</div>' +
+      '</div>';
+    summary.innerHTML = '';
+    summary.style.display = 'none';
     return;
   }
-  var brand = _poState.currentPo.brand || '';
-  alert('제품 가져오기 팝업 (커밋 5에서 구현 예정)\n현재 PO 브랜드: ' + (brand || '(미지정)'));
+  summary.style.display = 'flex';
+
+  var thS = 'padding:9px 6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
+  var tdS = 'padding:6px 6px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
+
+  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  h += '<colgroup>';
+  // 브랜드 / 품명(가변) / 모델명 / 1P / 낱개 / 금액$ / 총금액$ / ×
+  h += '<col style="width:54px">';
+  h += '<col style="">';
+  h += '<col style="width:80px">';
+  h += '<col style="width:38px">';
+  h += '<col style="width:50px">';
+  h += '<col style="width:62px">';
+  h += '<col style="width:74px">';
+  h += '<col style="width:30px">';
+  h += '</colgroup>';
+  h += '<thead><tr>';
+  h += '<th style="' + thS + '">브랜드</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">품명</th>';
+  h += '<th style="' + thS + '">모델명</th>';
+  h += '<th style="' + thS + '">1P</th>';
+  h += '<th style="' + thS + '">낱개</th>';
+  h += '<th style="' + thS + '">금액$</th>';
+  h += '<th style="' + thS + '">총금액$</th>';
+  h += '<th style="' + thS + '">×</th>';
+  h += '</tr></thead><tbody>';
+
+  var totalUnit = 0, totalPallet = 0, totalAmount = 0;
+  cart.forEach(function(c) {
+    var code = String(c.productCode);
+    var codeEsc = _poEsc(code);
+    var p = gpByCode[code];
+    var brandTxt = p ? _poEsc(getGenBrand(p) || '-') : '-';
+    var descTxt = p ? _poEsc(p.description || '-') : '<span style="color:#9BA3B2;font-style:italic;">원본 삭제됨</span>';
+    var modelTxt = p ? _poEsc(p.model || '-') : '-';
+    var palletQtyNum = (p && p.palletQty != null && Number(p.palletQty) > 0) ? Number(p.palletQty) : 0;
+    var palletCell = palletQtyNum > 0 ? palletQtyNum.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
+    var priceNum = (p && p.importPrice != null) ? Number(p.importPrice) : 0;
+    var priceCell = priceNum > 0 ? '$' + priceNum.toFixed(2) : '<span style="color:#DDE1EB">-</span>';
+    var unitCount = Number(c.unitCount) || 0;
+    var pCount = Number(c.palletCount) || 0;
+    var amount = priceNum * unitCount;
+    totalUnit += unitCount;
+    totalPallet += pCount;
+    totalAmount += amount;
+    h += '<tr>';
+    h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
+    h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + descTxt + '</td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;font-weight:600;">' + unitCount.toLocaleString() + '</td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + priceCell + '</td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;font-weight:600;color:#185FA5;">' + (amount > 0 ? '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '<span style="color:#DDE1EB">-</span>') + '</td>';
+    h += '<td style="' + tdS + '"><button class="po-cart-remove-btn" onclick="_poRemoveFromCart(\'' + codeEsc + '\')" title="제거">×</button></td>';
+    h += '</tr>';
+  });
+
+  h += '</tbody></table>';
+  body.innerHTML = h;
+
+  var sHtml = '<div class="po-cart-summary-group">';
+  sHtml += '<span>총 수량<b class="po-num">' + totalUnit.toLocaleString() + '</b></span>';
+  sHtml += '<span>총 파렛<b class="po-num">' + totalPallet.toLocaleString() + '</b></span>';
+  sHtml += '</div>';
+  sHtml += '<div class="po-cart-total">$' + totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</div>';
+  summary.innerHTML = sHtml;
+}
+
+// ===== 커밋 5 — 제품 가져오기 팝업 (_poOpenProductPicker) =====
+
+var _poPickerState = { brandFilter: 'all', search: '', stockOnly: false, selectedCodes: {}, brands: [] };
+
+function _poOpenProductPicker() {
+  if (!_poState || !_poState.currentPo) { alert('PO가 로드되지 않았습니다.'); return; }
+  // 이미 열려있으면 무시
+  if (document.getElementById('po-picker-overlay')) return;
+
+  var gp = loadObj('mw_gen_products', []);
+  // 브랜드 목록 수집
+  var brandSet = {};
+  gp.forEach(function(p) { var b = getGenBrand(p); if (b) brandSet[b] = (brandSet[b] || 0) + 1; });
+  var brands = Object.keys(brandSet).sort();
+  _poPickerState.brands = brands;
+  _poPickerState.brandCounts = brandSet;
+  _poPickerState.totalCount = gp.length;
+  _poPickerState.selectedCodes = {};
+  _poPickerState.search = '';
+  _poPickerState.stockOnly = false;
+  // PO의 brand가 있으면 자동 선택
+  var poBrand = (_poState.currentPo.brand || '').trim();
+  _poPickerState.brandFilter = (poBrand && brandSet[poBrand]) ? poBrand : 'all';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'po-picker-overlay';
+  overlay.className = 'po-picker-overlay';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) _poClosePicker(); });
+  overlay.addEventListener('keydown', function(e) { if (e.key === 'Escape') _poClosePicker(); });
+
+  var modal = document.createElement('div');
+  modal.className = 'po-picker-modal';
+  modal.id = 'po-picker-modal';
+
+  var h = '';
+  h += '<div class="po-picker-header" id="po-picker-header">';
+  h += '<span class="po-picker-title">제품 가져오기</span>';
+  h += '<button class="po-picker-close" onclick="_poClosePicker()" aria-label="닫기">✕</button>';
+  h += '</div>';
+  h += '<div class="po-picker-brandbar" id="po-picker-brandbar"></div>';
+  h += '<div class="po-picker-filter">';
+  h += '<input type="text" id="po-picker-search" placeholder="관리코드, 코드, 모델명, 품명 검색" oninput="_poPickerOnSearch(this.value)" autocomplete="off">';
+  h += '<label><input type="checkbox" id="po-picker-stockonly" onchange="_poPickerToggleStockOnly(this.checked)"> 재고 있음만</label>';
+  h += '</div>';
+  h += '<div class="po-picker-body" id="po-picker-body"></div>';
+  h += '<div class="po-picker-footer">';
+  h += '<div class="po-picker-footer-left" id="po-picker-footer-left">선택 0건</div>';
+  h += '<div class="po-picker-footer-right">';
+  h += '<button class="po-picker-btn po-picker-btn-cancel" onclick="_poClosePicker()">취소</button>';
+  h += '<button class="po-picker-btn po-picker-btn-apply" id="po-picker-btn-apply" onclick="_poPickerApply()" disabled>선택 항목 추가 (0)</button>';
+  h += '</div>';
+  h += '</div>';
+  modal.innerHTML = h;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  _poPickerRenderBrandBar();
+  _poPickerRenderList();
+
+  // 드래그 이동
+  if (typeof _makeDraggable === 'function') {
+    _makeDraggable(modal, document.getElementById('po-picker-header'));
+  }
+
+  // ESC 처리
+  document.addEventListener('keydown', _poPickerEscHandler);
+  // 첫 input 포커스
+  setTimeout(function() { var s = document.getElementById('po-picker-search'); if (s) s.focus(); }, 0);
+}
+
+function _poPickerEscHandler(e) {
+  if (e.key === 'Escape') _poClosePicker();
+}
+
+function _poClosePicker() {
+  var o = document.getElementById('po-picker-overlay');
+  if (o && o.parentNode) o.parentNode.removeChild(o);
+  document.removeEventListener('keydown', _poPickerEscHandler);
+}
+
+function _poPickerRenderBrandBar() {
+  var bar = document.getElementById('po-picker-brandbar');
+  if (!bar) return;
+  var brands = _poPickerState.brands || [];
+  var counts = _poPickerState.brandCounts || {};
+  var total = _poPickerState.totalCount || 0;
+  var h = '';
+  var activeAll = _poPickerState.brandFilter === 'all' ? ' active' : '';
+  h += '<button class="po-brand-tab' + activeAll + '" onclick="_poPickerSetBrand(\'all\')">전체<span class="po-brand-count">(' + total + ')</span></button>';
+  brands.forEach(function(b) {
+    var bEsc = _poEsc(b);
+    var active = _poPickerState.brandFilter === b ? ' active' : '';
+    h += '<button class="po-brand-tab' + active + '" onclick="_poPickerSetBrand(\'' + bEsc + '\')">' + bEsc + '<span class="po-brand-count">(' + (counts[b] || 0) + ')</span></button>';
+  });
+  bar.innerHTML = h;
+}
+
+function _poPickerSetBrand(b) {
+  _poPickerState.brandFilter = b;
+  _poPickerRenderBrandBar();
+  _poPickerRenderList();
+}
+
+function _poPickerOnSearch(q) {
+  _poPickerState.search = (q || '').trim().toLowerCase();
+  _poPickerRenderList();
+}
+
+function _poPickerToggleStockOnly(on) {
+  _poPickerState.stockOnly = !!on;
+  _poPickerRenderList();
+}
+
+function _poPickerRenderList() {
+  var bodyEl = document.getElementById('po-picker-body');
+  if (!bodyEl) return;
+  var gp = loadObj('mw_gen_products', []);
+  var registered = {};
+  (loadObj('mw_import_po_products', []) || []).forEach(function(x) { if (x && x.productCode != null) registered[String(x.productCode)] = true; });
+
+  var filtered = gp.filter(function(p) {
+    if (!p || p.code == null) return false;
+    if (_poPickerState.brandFilter !== 'all') {
+      var b = getGenBrand(p) || '';
+      if (b !== _poPickerState.brandFilter) return false;
+    }
+    if (_poPickerState.stockOnly) {
+      var s = Number(p.stock);
+      if (!s || isNaN(s) || s <= 0) return false;
+    }
+    if (_poPickerState.search) {
+      var hay = String(p.code || '') + ' ' + (p.manageCode || '') + ' ' + (p.model || '') + ' ' + (p.description || '');
+      if (hay.toLowerCase().indexOf(_poPickerState.search) < 0) return false;
+    }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    bodyEl.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">검색 결과가 없습니다</div>';
+    _poPickerUpdateFooter();
+    return;
+  }
+
+  var thS = 'padding:9px 6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
+  var tdS = 'padding:6px 6px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
+
+  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  h += '<colgroup>';
+  h += '<col style="width:36px"><col style="width:70px"><col style="width:118px"><col style=""><col style="width:86px"><col style="width:42px"><col style="width:62px"><col style="width:46px"><col style="width:86px">';
+  h += '</colgroup>';
+  h += '<thead><tr>';
+  h += '<th style="' + thS + '"><input type="checkbox" id="po-picker-check-all" onchange="_poPickerToggleAll(this.checked)"></th>';
+  h += '<th style="' + thS + '">코드</th>';
+  h += '<th style="' + thS + '">관리코드</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">품명</th>';
+  h += '<th style="' + thS + '">모델명</th>';
+  h += '<th style="' + thS + '">1P</th>';
+  h += '<th style="' + thS + '">수입가$</th>';
+  h += '<th style="' + thS + '">재고</th>';
+  h += '<th style="' + thS + '">상태</th>';
+  h += '</tr></thead><tbody>';
+
+  filtered.forEach(function(p) {
+    var code = String(p.code);
+    var codeEsc = _poEsc(code);
+    var isReg = !!registered[code];
+    var checked = !isReg && _poPickerState.selectedCodes[code] ? ' checked' : '';
+    var rowStyle = isReg ? ' style="background:#F4F6FA;opacity:0.55;"' : '';
+    var cbAttr = isReg ? ' disabled' : '';
+    var stockNum = (p.stock != null && p.stock !== '' && !isNaN(Number(p.stock))) ? Number(p.stock) : null;
+    var stockHtml;
+    if (stockNum == null) stockHtml = '<span style="color:#DDE1EB">-</span>';
+    else if (stockNum > 0) stockHtml = '<span style="background:#E1F5EE;color:#085041;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">' + stockNum.toLocaleString() + '</span>';
+    else if (stockNum === 0) stockHtml = '<span style="background:#FAEEDA;color:#854F0B;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">0</span>';
+    else stockHtml = '<span style="background:#FCEBEB;color:#791F1F;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">' + stockNum.toLocaleString() + '</span>';
+    var palletQty = (p.palletQty != null && p.palletQty !== '' && Number(p.palletQty) > 0) ? Number(p.palletQty) : null;
+    var palletCell = palletQty != null ? palletQty.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
+    var priceCell = (p.importPrice != null) ? '$' + Number(p.importPrice).toFixed(2) : '<span style="color:#DDE1EB">-</span>';
+    var statusCell = isReg ? '<span class="po-registered-badge">이미 등록됨</span>' : '';
+    h += '<tr' + rowStyle + '>';
+    h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '" onchange="_poPickerToggleOne(\'' + codeEsc + '\', this.checked)"' + cbAttr + checked + '></td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + codeEsc + '</td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:11px;">' + _poEsc(p.manageCode || '-') + '</td>';
+    h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + _poEsc(p.description || '-') + '</td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + _poEsc(p.model || '-') + '</td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
+    h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + priceCell + '</td>';
+    h += '<td style="' + tdS + '">' + stockHtml + '</td>';
+    h += '<td style="' + tdS + '">' + statusCell + '</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  bodyEl.innerHTML = h;
+  _poPickerUpdateFooter();
+}
+
+function _poPickerToggleOne(code, checked) {
+  if (checked) _poPickerState.selectedCodes[code] = true;
+  else delete _poPickerState.selectedCodes[code];
+  _poPickerUpdateFooter();
+}
+
+function _poPickerToggleAll(checked) {
+  var boxes = document.querySelectorAll('#po-picker-body input[type="checkbox"][data-code]:not(:disabled)');
+  boxes.forEach(function(cb) {
+    cb.checked = !!checked;
+    var code = cb.getAttribute('data-code');
+    if (code) {
+      if (checked) _poPickerState.selectedCodes[code] = true;
+      else delete _poPickerState.selectedCodes[code];
+    }
+  });
+  _poPickerUpdateFooter();
+}
+
+function _poPickerUpdateFooter() {
+  var n = Object.keys(_poPickerState.selectedCodes).length;
+  var leftEl = document.getElementById('po-picker-footer-left');
+  var btn = document.getElementById('po-picker-btn-apply');
+  if (leftEl) leftEl.textContent = '선택 ' + n + '건';
+  if (btn) {
+    btn.textContent = '선택 항목 추가 (' + n + ')';
+    btn.disabled = n === 0;
+  }
+}
+
+function _poPickerApply() {
+  var codes = Object.keys(_poPickerState.selectedCodes);
+  if (codes.length === 0) return;
+  _poClosePicker();
+  _poAddProductsToList(codes);
+  // 다크바 제품 수 갱신
+  _poRefreshMetaCounts();
 }
 
 // 등록 제품 목록에 추가 — 커밋 5 팝업에서 codes 배열 전달
@@ -20980,6 +21504,7 @@ function _poAddProductsToList(codes) {
   });
   save('mw_import_po_products', list);
   _poRenderProductList();
+  if (typeof _poRefreshMetaCounts === 'function') _poRefreshMetaCounts();
   var msg = added + '건 추가됨';
   if (skipped > 0) msg += ' (중복 ' + skipped + '건 skip)';
   _poToast(msg, 'success');
@@ -20996,7 +21521,16 @@ function _poRemoveProductFromList(code) {
   if (!confirm('등록 목록에서 제거하시겠습니까?')) return;
   list.splice(idx, 1);
   save('mw_import_po_products', list);
+  // 장바구니에도 있으면 같이 제거
+  var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+  if (po && po.id) {
+    var cart = _poLoadCart(po.id);
+    var newCart = cart.filter(function(c) { return c && String(c.productCode) !== String(code); });
+    if (newCart.length !== cart.length) _poSaveCart(po.id, newCart);
+    _poRenderCart(po.id);
+  }
   _poRenderProductList();
+  if (typeof _poRefreshMetaCounts === 'function') _poRefreshMetaCounts();
   _poToast('제거됨', 'success');
 }
 
