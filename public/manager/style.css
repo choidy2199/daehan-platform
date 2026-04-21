@@ -1292,7 +1292,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #1A1D23;
 }
-#tab-transactions.tab-content.active > div {
+#tab-transactions.tab-content.active > div:not(.tx-save-popup-backdrop) {
   display: block !important;
   flex: none !important;
   overflow: visible !important;
