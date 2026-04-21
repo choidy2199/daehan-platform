@@ -2203,7 +2203,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .pc-badge-state { background:#EF9F27; color:#1A1D23; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
 .pc-mh-meta { font-size:12px; color:#aaa; font-family:Pretendard,sans-serif; }
 
-.pc-split { display:grid; grid-template-columns:65fr 35fr; background:#fff; min-height:640px; flex:1; }
+.pc-split { display:grid; grid-template-columns:65fr 35fr; background:#fff; min-height:calc(100vh - 180px); flex:1; }
 .pc-panel { display:flex; flex-direction:column; min-width:0; border-right:1px solid #DDE1EB; }
 .pc-panel:last-child { border-right:none; }
 
