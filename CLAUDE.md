@@ -421,6 +421,21 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - 입고 감지: 재고>0 + 대기/부분 → 초록배경 + "입고" 뱃지
   - 등록 팝업: 거래처/제품 자동완성, 출고 처리 (prompt 수량)
 
+- [2026-04-21] 일반 단가표 수입가(USD) 컬럼 + 브랜드 추출 헬퍼
+  - 커밋 98acf90: 일반 단가표에 수입가(USD) 컬럼 추가 (파레트 우측, 비고 좌측) + prompt 편집 + 엑셀 템플릿/업로드/내보내기 연동 (맨 끝 컬럼, 17컬럼 역호환)
+  - 커밋 ebdde31: `getGenBrand(product)` 헬퍼 추가 — `mw_gen_products.category`의 "-" 앞부분 추출 (예: "HPT", "티롤릿", "콜라보", "비트맨", "다스트"). 별도 `brand` 필드 두지 않음. 미사용 `GEN_PRODUCT_BRANDS` 상수 제거
+
+- [2026-04-21] 수입 제품 창고 UI + 수입계산기 dead code 정리 (인보이스V2/수입건V2 보존)
+  - 커밋 4effa34: app.js 순감 1,887줄 (1,895 삭제 / 8 추가)
+  - `_ipv2*` 블록 882줄 제거 (제품V2 전역변수 6개 + `_ipv2FetchList` + 주석 블록 2개)
+  - `_po*` 정리: `_poLoadDetail`/`_poRenderDetailInfo`의 `_ipv2*` 참조 제거, `_poLoadProductsByBrand` 함수 제거. 브랜드 드롭다운은 `po.brand` 한 값만 보여주는 임시 상태 (P2-b에서 교체)
+  - 수입계산기 DELETED 주석 블록 966줄 물리 제거 (3d0b6f9에서 `/* DELETED */`로 처리됐던 `_import*` / `mw_import_calcs` / `mw_import_items` 전체)
+  - `_DEPRECATED_KEYS`에 `mw_cache_import_products_v2` 추가
+  - `src/app/api/import-po/[id]/items/route.ts` payload에서 `product_v2_id` 필드 제거 (DB 컬럼은 유지)
+  - DB 정리 (Supabase MCP 직접 실행, git 커밋 없음): `import_products_v2` 27건 + `import_po_headers` 2건 + `import_po_items` 48건 + `app_data['mw_import_calcs']` 1건 = **총 78건 삭제**. DROP/ALTER 일절 없음. 테이블 구조/FK/컬럼 전부 유지
+  - **보존**: 인보이스V2 (`_ipinv2*`, ~1,810줄) + 수입건V2 (`_ipbat2*`, ~2,370줄) + `src/app/api/import-invoices/` + `src/app/api/import-batches/` + `src/app/api/import-products-v2/` (인보이스V2가 제품 검색/자동 등록에 호출 중) + `src/lib/import-v2.ts` + `src/lib/import-invoice-calc.ts`
+  - 다음 단계 (P2-b): 제품·발주 탭 좌측 "제품 목록"을 `mw_gen_products` 기반으로 재설계. 브랜드 탭 필터는 `getGenBrand()` 기반
+
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
 2. git remote -v 로 원격 저장소 연결 상태 확인

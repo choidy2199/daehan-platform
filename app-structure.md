@@ -556,13 +556,13 @@ public/manager/index.html:1783:        <input class="input" id="picker-search" t
 - 블록 1: `_ipv2Esc`, `_renderImportProductsV2`
 - 블록 2: `_ipv2RenderLayout`, `_ipv2BindEvents`, `_ipv2ScheduleSearch`, `_ipv2Filtered`, `_ipv2PopulateBrandFilter`, `_ipv2RenderTable`, `_ipv2InlineEdit`, `_ipv2Delete`, `_ipv2OpenModal`, `_ipv2CloseModal`, `_ipv2FormatBaseFob`, `_ipv2FormatBaseFobDisplay`, `_ipv2SaveModal`, `_ipv2Template`, `_ipv2FormatError`, `_ipv2IsExampleRow`, `_ipv2ValidateUploadStructure`, `_ipv2Backup`, `_ipv2Upload`, `_ipv2ShowUploadResult`, `_ipv2Toast`, `_ipv2FlashRow`, `_ipv2FlashInternalCodeCell`, `_ipv2FetchByInternalCode`, `_ipv2ShowOverwriteModal`
 
-### 유지된 제품V2 자원 (발주서V2가 의존하거나 P2 재연결 대상)
-- Supabase 테이블 `import_products_v2` (데이터 보존)
-- API 라우트 `/api/import-products-v2`, `/api/import-products-v2/bulk`
-- JS 상태변수 `_ipv2Data`, `_ipv2Loading`, `_ipv2Filter`, `_ipv2Search`, `_ipv2Sort`, `_ipv2SearchTimer`
-- JS 함수 `_ipv2FetchList()` (발주서V2 상세 화면이 브랜드 드롭다운/제품 로드에 의존)
-- localStorage 캐시 키 `mw_cache_import_products_v2`
-- 엑셀 유틸 `src/lib/import-v2.ts` — `importProductsV2FromExcel`
+### 유지된 제품V2 자원 (인보이스V2 제품 검색/자동 등록에 사용 중)
+> **2026-04-21 갱신 (커밋 4effa34):** 제품·발주 탭에서 `_ipv2*` 직접 참조는 전부 제거됨. 아래는 **인보이스V2 (`_ipinv2*`)**가 계속 사용하는 자원.
+
+- Supabase 테이블 `import_products_v2` (**테이블 구조 유지 / 데이터 0건** — 27건 삭제 완료)
+- API 라우트 `/api/import-products-v2`, `/api/import-products-v2/bulk` (인보이스V2가 제품 검색·자동 등록에 호출)
+- 엑셀 유틸 `src/lib/import-v2.ts` — ProductV2 섹션 **유지** (Batch/Invoice/Payment/CustomsCost 섹션과 독립 공존)
+- **제거된 것**: `_ipv2Data/_ipv2Filter/_ipv2Search/_ipv2Sort/_ipv2SearchTimer/_ipv2Loading` 전역변수, `_ipv2FetchList()` 함수, `mw_cache_import_products_v2` 캐시 사용 경로. `localStorage` 키는 `_DEPRECATED_KEYS`에 등록되어 로드 시 필터링됨.
 
 ### 65/35 레이아웃 뼈대
 - `_poRenderDetail()` 전면 재작성 — 기존 `_poRenderDetailHeader/Info/ProductsSection/Table/Summary` 미호출 (함수 자체는 보존, P7에서 재활용 가능)
@@ -650,8 +650,8 @@ P1 배포 후 사용자 확인에서 발견된 3건 보완.
 | i | `.imc-*` CSS 약 170줄 주석 처리 | style.css:952~1123 | 내부 주석 10개 제거 후 전체 래핑 |
 
 ### Supabase 정책
-- 테이블 **DROP 절대 금지** ✅ 준수
-- `app_data['mw_import_calcs']` row **유지**(1.28 KB, 2026-04-12 마지막 수정)
+- 테이블 **DROP 절대 금지** ✅ 준수 (현재까지 DROP 없음)
+- `app_data['mw_import_calcs']` row **삭제 완료** (2026-04-21 커밋 4effa34 정리 단계)
 - 복원 필요 시 git history + 이 섹션 참조
 
 ### 삭제된 CSS 내부 주석 (style.css 952~1123 `.imc-*` 블록)
@@ -675,4 +675,67 @@ P1 배포 후 사용자 확인에서 발견된 3건 보완.
 ### 커밋
 - P1 base: `c846097`
 - P1 후속: `55bdf6d`
-- 수입 모듈 정리: (이번 커밋)
+- 수입 모듈 정리: `3d0b6f9`
+
+## 12. [2026-04-21] 수입 제품 창고 UI 제거 + 수입계산기 dead code 물리 삭제 + DB 테스트 데이터 전부 정리
+
+제품·발주 탭을 **일반 제품 창고(`mw_gen_products`) 원본 참조** 구조로 재설계하기 위한 선행 정리.
+
+### 배경
+- 사용자 확정: 제품·발주 탭의 "제품 목록"은 `mw_gen_products`를 원본으로 참조하도록 재설계 예정 (P2-b 단계)
+- 인보이스V2 / 수입건V2 메뉴는 **그대로 사용 중** → 관련 코드/API/테이블 전부 보존
+- 수입계산기/제품V2 UI는 이미 3d0b6f9에서 UI만 제거됐으나 app.js 내부에 주석 블록 형태로 대량 잔존
+
+### 커밋 체인
+- `ebdde31 refactor(gen): 브랜드 추출 헬퍼 getGenBrand 추가` — `mw_gen_products.category`의 "-" 앞부분 추출 (예: "HPT", "티롤릿", "콜라보", "비트맨", "다스트")
+- `4effa34 refactor(import): 수입 제품 창고 UI 제거 + 수입계산기 dead code 제거 (API/테이블 보존)` — 순감 1,887줄
+
+### 4effa34 변경 범위
+
+**app.js 1,895줄 삭제 / 8줄 추가:**
+- `_ipv2*` 블록 882줄 제거 (구 L22071~22952): 제품V2 전역 변수 6개 + `_ipv2FetchList` + 주석 블록 2개
+- `_po*` 정리:
+  - `_poLoadDetail`: `_ipv2FetchList` 호출 블록 + 잔재 `}` 제거
+  - `_poRenderDetailInfo`: `_ipv2Data.forEach` 참조 제거 — 브랜드 드롭다운은 `po.brand` 한 값만 보여주는 **임시 상태** (P2-b에서 `mw_gen_products` 기반으로 교체 예정)
+  - `_poLoadProductsByBrand`: 전체 함수 제거
+  - `_poInsertItemsFromProducts` / `_poClearItems`: 보존
+- 수입계산기 DELETED 주석 블록 966줄 물리 제거 (구 L20043~21008): `/* DELETED 2026-04-21 */` 로 3d0b6f9에서 주석 처리됐던 `_import*` / `mw_import_calcs` / `mw_import_items` 블록 전체
+- `_DEPRECATED_KEYS`에 `mw_cache_import_products_v2` 추가, 상단 주석 현행화
+
+**src/app/api/import-po/[id]/items/route.ts:**
+- payload에서 `product_v2_id` 필드 제거 (테이블 컬럼은 DB에 유지)
+
+### DB 정리 (커밋 없음, Supabase MCP 직접 실행)
+**DELETE만 수행, DROP/ALTER 일절 없음 — 테이블 구조 + FK 제약 + `import_po_items.product_v2_id` 컬럼 전부 유지.**
+
+| 테이블 | Before | After |
+|---|---|---|
+| `import_products_v2` | 27 | 0 |
+| `import_po_headers` | 2 (PO-2026-002/003 draft) | 0 |
+| `import_po_items` | 48 | 0 |
+| `import_invoices` | 0 | 0 |
+| `import_invoice_items` | 0 | 0 |
+| `import_payments` | 0 | 0 |
+| `import_customs_costs` | 0 | 0 |
+| `import_batches` | 0 | 0 |
+| `app_data['mw_import_calcs']` | 1 (1.28 KB) | 삭제 |
+| `app_data['mw_import_items']` | 0 | — |
+
+총 78건 삭제 / 0건 실패.
+
+### 보존 (중요)
+- 인보이스V2 섹션 (`_ipinv2*`, 약 1,810줄) / 수입건V2 섹션 (`_ipbat2*`, 약 2,370줄) — 전체 보존
+- `src/app/api/import-invoices/` / `src/app/api/import-batches/` / `src/app/api/import-products-v2/` — 보존 (인보이스V2가 제품 검색/자동 등록에 `import-products-v2` API 호출 중)
+- `src/lib/import-v2.ts` (788줄) / `src/lib/import-invoice-calc.ts` (124줄) — 보존
+- 일반/밀워키 단가표 — 완전 미변경
+
+### 브랜드 처리 방식 확정
+- `mw_gen_products`에 별도 `brand` 필드 두지 않음
+- `category` 값의 "-" 앞부분이 곧 브랜드 (234건 전체가 `HPT-*`, `티롤릿`, `콜라보-*`, `비트맨-*`, `다스트-*` 형식)
+- `getGenBrand(product)` 헬퍼로 추출 — P2-b 팝업/필터에서 사용 예정
+
+### 다음 단계 (P2-b)
+- 제품·발주 탭 좌측 "제품 목록"을 `mw_gen_products` 기반으로 재설계
+- 브랜드 탭 필터는 `getGenBrand()` 기반 (하드코딩 X)
+- `_poLoadProductsByBrand` 후속 함수는 `mw_gen_products.filter(p => getGenBrand(p) === brand)` 방식으로 재작성
+- `/api/import-po/[id]/items` payload는 현재 형태 유지하되 client는 `mw_gen_products[idx]`에서 필드 채움
