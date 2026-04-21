@@ -10850,12 +10850,12 @@ function exportGenProducts() {
   try { gp = JSON.parse(localStorage.getItem('mw_gen_products') || '[]') || []; } catch(e) { gp = []; }
   if (!gp.length) { toast('내보낼 일반제품 데이터가 없습니다'); return; }
   var wb = XLSX.utils.book_new();
-  var data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜']];
+  var data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜', '수입가(USD)']];
   gp.forEach(function(p) {
-    data.push([p.code, p.manageCode || '', p.category || '', p.model || '', p.description || '', p.cost || 0, p.priceA || 0, p.priceNaver || 0, p.priceOpen || 0, p.inQty || 0, p.inPrice || 0, p.outQty || 0, p.outPrice || 0, p.palletQty || 0, p.palletPrice || 0, p.memo || '', p.inDate || '']);
+    data.push([p.code, p.manageCode || '', p.category || '', p.model || '', p.description || '', p.cost || 0, p.priceA || 0, p.priceNaver || 0, p.priceOpen || 0, p.inQty || 0, p.inPrice || 0, p.outQty || 0, p.outPrice || 0, p.palletQty || 0, p.palletPrice || 0, p.memo || '', p.inDate || '', p.importPrice != null ? p.importPrice : '']);
   });
   var ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 25 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 20 }, { wch: 12 }];
+  ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 25 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, ws, '일반제품');
   XLSX.writeFile(wb, '일반제품_' + new Date().toISOString().slice(0, 10) + '.xlsx');
   toast('일반제품 엑셀 다운로드 완료 (' + gp.length + '건)');
@@ -11601,13 +11601,14 @@ function renderGenProducts() {
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'in')">${(p.inQty || p.inPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.inQty ? '<span style="font-size:10px;color:#5A6070">' + p.inQty + '개</span>' : '') + (p.inPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.inPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'out')">${(p.outQty || p.outPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.outQty ? '<span style="font-size:10px;color:#5A6070">' + p.outQty + '개</span>' : '') + (p.outPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.outPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'pallet')">${(p.palletQty || p.palletPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.palletQty ? '<span style="font-size:10px;color:#5A6070">' + p.palletQty + '개</span>' : '') + (p.palletPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.palletPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
+      <td class="num" style="cursor:pointer" onclick="editGenImportPrice(${idx})">${p.importPrice != null ? '$' + Number(p.importPrice).toFixed(2) : '<span style="color:#DDE1EB">—</span>'}</td>
       <td><input value="${(p.memo || '').replace(/"/g,'&quot;')}" onchange="updateGenMemo(${idx},this.value)" placeholder="" style="width:100%;font-size:12px;border:1px solid #DDE1EB;border-radius:4px;padding:2px 6px;background:#fff;color:#1A1D23;text-align:left"></td>
       <td style="text-align:left;font-size:12px;cursor:pointer;white-space:nowrap;padding-left:8px" onclick="editGenInDate(${idx})">${p.inDate ? '<span style="color:#CC2222;margin-right:4px">●</span>' + p.inDate : '-'}</td>
       <td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="editGenProduct(${idx})" style="padding:2px 8px;font-size:11px">수정</button> <button class="btn-danger btn-sm" onclick="removeGenProduct(${idx})" style="padding:2px 6px;font-size:11px">삭제</button></td>
     </tr>`;
   }).join('');
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="17"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="18"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
   }
   document.getElementById('gen-count').textContent = `${genProducts.length}건`;
   initColumnResize('gen-table');
@@ -11721,12 +11722,33 @@ function editGenInDate(idx) {
   toast(val.trim() ? '입고날짜 메모 저장' : '입고날짜 메모 삭제');
 }
 
+function editGenImportPrice(idx) {
+  var p = genProducts[idx];
+  var cur = p.importPrice != null ? p.importPrice : '';
+  var val = prompt('수입가 (USD, 예: 19.50)\n- 빈칸 저장 시 null', cur);
+  if (val === null) return;
+  var s = String(val).trim();
+  if (s === '') {
+    genProducts[idx].importPrice = null;
+  } else {
+    var parsed = parseFloat(s.replace(/[$,\s]/g, ''));
+    if (isNaN(parsed) || parsed < 0) {
+      alert('올바른 숫자를 입력해주세요. (예: 19.50)');
+      return;
+    }
+    genProducts[idx].importPrice = Math.round(parsed * 100) / 100;
+  }
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+  autoSyncToSupabase('mw_gen_products');
+  renderGenProducts();
+}
+
 function downloadGenTemplate() {
   if (!window.XLSX) { toast('SheetJS 로딩 중...'); return; }
-  const data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜']];
-  data.push(['SAMPLE-001', '8801234567890', '전동공구', '샘플 제품', '샘플 설명', 90000, 95000, 97000, 105000, 10, 800, 120, 750, 1200, 700, '', '']);
+  const data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜', '수입가(USD)']];
+  data.push(['SAMPLE-001', '8801234567890', '전동공구', '샘플 제품', '샘플 설명', 90000, 95000, 97000, 105000, 10, 800, 120, 750, 1200, 700, '', '', '']);
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:12},{wch:16},{wch:12},{wch:25},{wch:40},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10},{wch:10},{wch:10},{wch:20},{wch:15}];
+  ws['!cols'] = [{wch:12},{wch:16},{wch:12},{wch:25},{wch:40},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10},{wch:10},{wch:10},{wch:20},{wch:15},{wch:12}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '일반제품');
   XLSX.writeFile(wb, '일반제품_양식.xlsx');
@@ -11746,6 +11768,12 @@ function uploadGenProducts(input) {
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         if (!r || !r[0]) continue;
+        var ipRaw = r[17];
+        var ip = null;
+        if (ipRaw != null && String(ipRaw).trim() !== '') {
+          var ipNum = parseFloat(String(ipRaw).replace(/[$,\s]/g, ''));
+          if (!isNaN(ipNum) && ipNum >= 0) ip = Math.round(ipNum * 100) / 100;
+        }
         genProducts.push({
           code: String(r[0] || ''),
           manageCode: String(r[1] || ''),
@@ -11765,6 +11793,7 @@ function uploadGenProducts(input) {
           palletPrice: parseInt(r[14]) || 0,
           memo: String(r[15] || ''),
           inDate: String(r[16] || ''),
+          importPrice: ip,
           source: 'general'
         });
         count++;
@@ -11818,6 +11847,12 @@ function importGenExcel() {
       for (var i = 1; i < rows.length; i++) {
         var r = rows[i];
         if (!r || !r[0]) continue;
+        var ipRaw2 = r[17];
+        var ip2 = null;
+        if (ipRaw2 != null && String(ipRaw2).trim() !== '') {
+          var ipNum2 = parseFloat(String(ipRaw2).replace(/[$,\s]/g, ''));
+          if (!isNaN(ipNum2) && ipNum2 >= 0) ip2 = Math.round(ipNum2 * 100) / 100;
+        }
         imported.push({
           code: String(r[0] || ''),
           manageCode: String(r[1] || ''),
@@ -11837,6 +11872,7 @@ function importGenExcel() {
           palletPrice: parseInt(r[14]) || 0,
           memo: String(r[15] || ''),
           inDate: String(r[16] || ''),
+          importPrice: ip2,
           source: 'general'
         });
       }
