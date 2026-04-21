@@ -2135,6 +2135,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   justify-content: center;
 }
 .tx-save-popup-backdrop.tx-hidden { display: none; }
+.tx-save-popup-backdrop.tx-hidden .tx-save-popup {
+  display: none !important;
+}
 
 .tx-save-popup {
   width: 360px;
