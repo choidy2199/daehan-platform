@@ -615,4 +615,64 @@ P1 배포 후 사용자 확인에서 발견된 3건 보완.
 
 ### 커밋
 - P1 base: `c846097`
-- P1 후속: (이번 커밋)
+- P1 후속: `55bdf6d`
+
+## 11. [2026-04-21] 수입 모듈 정리 — "제품/수입계산기/인보이스" 3개 메뉴 삭제
+
+구버전 수입 메뉴 3종을 UI에서 제거. 각 메뉴의 기능은 이미 신규 모듈로 이관됨.
+
+### 대체 매핑
+| 삭제 메뉴 | 대체처 | 상태 |
+|---|---|---|
+| "제품" | 제품·발주 탭 좌측 (mw_gen_products 참조) | P2에서 구현 예정 |
+| "수입계산기" | 수입건V2 원가계산 (통합 완료) | 기능 중복 제거 |
+| "인보이스" | 인보이스V2 (구버전) | 대체 완료 |
+
+### 최종 수입 워크플로우
+제품·발주(PO) → 인보이스V2(선적) → 수입건V2(수입묶음 + 원가확정) → 경영박사(매입전표)
+
+### 남은 수입 탭 (3개)
+- **제품·발주** (`tab-import-po-v2`) — displayName '제품·발주', 내부 키 '발주서V2' 유지
+- **인보이스V2** (`tab-import-invoice-v2`)
+- **수입건V2** (`tab-import-batch-v2`)
+
+### 변경 요약
+| # | 항목 | 위치 | 비고 |
+|---|---|---|---|
+| a | `_DEPRECATED_KEYS` 전역 상수 추가 | app.js 상단 | `['mw_import_calcs', 'mw_import_items']` |
+| b | `cleanupDeprecatedKeys` IIFE 추가 | `_windowConfig` 직후 | 페이지 로드 시 잔존 localStorage 정리 |
+| c | sync 다운로드 3경로에 deprecated key 필터 추가 | `loadFromSupabase`, 배경 sync, Realtime | app_data 다운받아도 localStorage에 재생성 안 됨 |
+| d | 사이드바/탑바 드롭다운/빈 div 9줄 삭제 | index.html | |
+| e | 아이콘 오버라이드 3줄 삭제 | app.js `_windowIconOverrides` | '제품'/'수입계산기'/'인보이스' |
+| f | `_windowConfig` 3개 엔트리 삭제 + `_removedWindowNames` 3개 추가 | app.js | |
+| g | `_tabIdMap` 3개 엔트리 + `switchTab` 3개 분기 삭제 | app.js | |
+| h | `_import*` 섹션 약 961줄 주석 처리 (`/* DELETED 2026-04-21 */`) | app.js:19976~20936 | 전체 self-contained, 외부 호출 0건 |
+| i | `.imc-*` CSS 약 170줄 주석 처리 | style.css:952~1123 | 내부 주석 10개 제거 후 전체 래핑 |
+
+### Supabase 정책
+- 테이블 **DROP 절대 금지** ✅ 준수
+- `app_data['mw_import_calcs']` row **유지**(1.28 KB, 2026-04-12 마지막 수정)
+- 복원 필요 시 git history + 이 섹션 참조
+
+### 삭제된 CSS 내부 주석 (style.css 952~1123 `.imc-*` 블록)
+복원 시 참고 (원본 주석 그대로):
+- 라인 952: `/* ======================== 수입계산기 (Import Calculator) ======================== */`
+- 라인 965: `/* wildcard rule(line 221)이 flex:1 + overflow:hidden 부여 → 그대로 수용, 스크롤은 .imc-scroll에서 처리 */`
+- 라인 1054: `/* 계산서 선택 바 */`
+- 라인 1076: `/* 토글 */`
+- 라인 1088: `/* 송금 아이템 */`
+- 라인 1097: `/* 할인율 strip 4열 */`
+- 라인 1104: `/* 스크롤바 */`
+- 라인 1109: `/* 인보이스 목록 행 */`
+- 라인 1114: `/* 통계 바 (상세 패널) */`
+- 라인 1122: `/* 제품 카드 (상세 패널) */`
+
+### 의존성 검증 요약 (조사 결과)
+- `_import*` 함수 풀은 완전 self-contained — 19976~20936 범위 밖 호출 0건
+- 수입계산기 `_importCompute` 등 계산 로직은 수입건V2(`_ipbat2*`)에서 호출되지 않음 — 별도 구현
+- src/ (Next.js) 내 참조 0건
+
+### 커밋
+- P1 base: `c846097`
+- P1 후속: `55bdf6d`
+- 수입 모듈 정리: (이번 커밋)

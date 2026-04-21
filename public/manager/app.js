@@ -1,3 +1,9 @@
+// ======================== DEPRECATED KEYS (2026-04-21) ========================
+// 삭제된 수입 모듈 메뉴('제품'/'수입계산기'/'인보이스')의 localStorage 키 목록.
+// Supabase app_data row는 보존하되 클라이언트에는 동기화하지 않음 (로드 시 필터).
+// 향후 다른 메뉴 삭제 시 이 배열에 추가.
+var _DEPRECATED_KEYS = ['mw_import_calcs', 'mw_import_items'];
+
 // ======================== SIDEBAR + CHROME TABS + DARK MODE ========================
 
 function toggleSidebar() {
@@ -443,6 +449,10 @@ async function loadFromSupabase() {
     for (var i = 0; i < data.length; i++) {
       var item = data[i];
       if (item.key && item.value) {
+        if (_DEPRECATED_KEYS.indexOf(item.key) >= 0) {
+          console.log('[SYNC] deprecated key 스킵:', item.key);
+          continue;
+        }
         localStorage.setItem(item.key, typeof item.value === 'string' ? item.value : JSON.stringify(item.value));
         loaded++;
       }
@@ -479,6 +489,10 @@ function _bgSyncFromSupabase(activeTab) {
     for (var i = 0; i < data.length; i++) {
       var item = data[i];
       if (!item.key || !item.value) continue;
+      if (_DEPRECATED_KEYS.indexOf(item.key) >= 0) {
+        console.log('[SYNC] deprecated key 스킵:', item.key);
+        continue;
+      }
       // pending sync가 있는 키는 스킵 (로컬 변경 보호)
       if (_syncTimers[item.key]) continue;
       var newVal = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
@@ -604,6 +618,11 @@ async function realtimeDownloadAndRefresh() {
       if (item.key && item.value) {
         // API 키는 localStorage에 저장 안 함 (서버에서만 관리)
         if (item.key === 'api_keys') continue;
+        // deprecated 메뉴 키 스킵 (2026-04-21 정리)
+        if (_DEPRECATED_KEYS.indexOf(item.key) >= 0) {
+          console.log('[SYNC] deprecated key 스킵:', item.key);
+          continue;
+        }
         // 로컬에 아직 업로드 안 된 변경이 있으면 서버 데이터로 덮어쓰지 않음
         if (_syncTimers[item.key]) {
           console.log('[Realtime] 로컬 변경 대기 중, 스킵:', item.key);
@@ -1704,9 +1723,6 @@ var _svgIcons = {
   '견적': '<svg viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="#fff" stroke-width="1.5"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#fff" stroke-width="1.5"/></svg>',
   '온라인': '<svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="21" r="1" stroke="#fff" stroke-width="1.5"/><circle cx="20" cy="21" r="1" stroke="#fff" stroke-width="1.5"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" stroke="#fff" stroke-width="1.5"/></svg>',
   '마케팅': '<svg viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="#fff" stroke-width="1.5"/></svg>',
-  '제품': '<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="#fff" stroke-width="1.5"/><path d="M16 7V5a4 4 0 00-8 0v2" stroke="#fff" stroke-width="1.5"/></svg>',
-  '수입계산기': '<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="2" width="16" height="20" rx="2" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="6" x2="16" y2="6" stroke="#fff" stroke-width="1.5"/><rect x="7" y="10" width="3" height="2" rx="0.5" stroke="#fff" stroke-width="1"/><rect x="14" y="10" width="3" height="2" rx="0.5" stroke="#fff" stroke-width="1"/><rect x="7" y="14" width="3" height="2" rx="0.5" stroke="#fff" stroke-width="1"/><rect x="14" y="14" width="3" height="2" rx="0.5" stroke="#fff" stroke-width="1"/></svg>',
-  '인보이스': '<svg viewBox="0 0 24 24" fill="none"><path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2-3-2z" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="8" x2="16" y2="8" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="12" x2="16" y2="12" stroke="#fff" stroke-width="1.5"/></svg>',
   '거래명세서': '<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="2" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="8" x2="16" y2="8" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="12" x2="16" y2="12" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="16" x2="13" y2="16" stroke="#fff" stroke-width="1.5"/></svg>',
   '택배': '<svg viewBox="0 0 24 24" fill="none"><rect x="1" y="6" width="15" height="13" rx="1" stroke="#fff" stroke-width="1.5"/><path d="M16 10h4l3 4v5h-7V10z" stroke="#fff" stroke-width="1.5"/><circle cx="7" cy="19" r="2" stroke="#fff" stroke-width="1.5"/><circle cx="19" cy="19" r="2" stroke="#fff" stroke-width="1.5"/></svg>',
   '검색': '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="#fff" stroke-width="1.5"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="#fff" stroke-width="1.5"/></svg>',
@@ -1730,9 +1746,6 @@ var _windowConfig = {
   '온라인':     { tabId: 'sales-online',   color: 'green' },
   '마케팅':     { tabId: 'sales-marketing',color: 'green' },
   '발주서V2':   { tabId: 'import-po-v2',   color: 'purple', displayName: '제품·발주' },
-  '제품':       { tabId: 'import-product', color: 'purple' },
-  '수입계산기': { tabId: 'import-calc',    color: 'purple' },
-  '인보이스':   { tabId: 'import-invoice', color: 'purple' },
   '인보이스V2': { tabId: 'import-invoice-v2', color: 'purple' },
   '수입건V2':   { tabId: 'import-batch-v2',   color: 'purple' },
   '택배':       { tabId: 'delivery',       color: 'gray' },
@@ -1743,8 +1756,19 @@ var _windowConfig = {
   '설정':       { tabId: 'setting',        color: 'darkgray' }
 };
 
+// [2026-04-21] 삭제된 수입 모듈 메뉴의 localStorage 정리
+// _DEPRECATED_KEYS 기반 (DRY) — 페이지 로드 시 1회 실행
+(function cleanupDeprecatedKeys() {
+  _DEPRECATED_KEYS.forEach(function(key) {
+    if (localStorage.getItem(key) !== null) {
+      console.log('[CLEANUP] 삭제된 메뉴 키 제거:', key);
+      localStorage.removeItem(key);
+    }
+  });
+})();
+
 // 삭제된 탭 ID (즐겨찾기/열린창 자동 정리용)
-var _removedWindowNames = ['매출', '매입', '견적', '제품V2'];
+var _removedWindowNames = ['매출', '매입', '견적', '제품V2', '제품', '수입계산기', '인보이스'];
 
 var _openWindows = [];    // 열린 창 이름 목록 (순서 유지)
 var _activeWindow = null; // 현재 활성 창 이름
@@ -2360,9 +2384,6 @@ var _tabIdMap = {
   'transactions':     { contentId: 'tab-transactions',     render: 'tx' },
   'sales-online':     { contentId: 'tab-sales',            render: 'sales' },
   'sales-marketing':  { contentId: 'tab-sales-marketing',  placeholder: true },
-  'import-product':   { contentId: 'tab-import-product',   render: 'importProduct' },
-  'import-calc':      { contentId: 'tab-import-calc',      render: 'importCalc' },
-  'import-invoice':   { contentId: 'tab-import-invoice',   render: 'importInvoice' },
   'import-po-v2':     { contentId: 'tab-import-po-v2',       render: 'importPoV2' },
   'import-invoice-v2':{ contentId: 'tab-import-invoice-v2',  render: 'importInvoiceV2' },
   'import-batch-v2':  { contentId: 'tab-import-batch-v2',    render: 'importBatchV2' },
@@ -2432,9 +2453,6 @@ function switchTab(tab) {
       if (renderKey === 'kakao') renderKakaoTab();
       if (renderKey === 'notice') renderNoticeTab();
       if (renderKey === 'backorder') renderBackorderTab();
-      if (renderKey === 'importCalc') renderImportCalcTab();
-      if (renderKey === 'importProduct') renderImportProductTab();
-      if (renderKey === 'importInvoice') renderImportInvoiceTab();
       if (renderKey === 'importPoV2') _poInit();
       if (renderKey === 'importInvoiceV2') _ipinv2Render();
       if (renderKey === 'importBatchV2') _ipbat2Render();
@@ -19973,6 +19991,11 @@ function _checkUnreadNoticePopup() {
   }
 }
 
+/* ========== DELETED 2026-04-21 ==========
+   수입 모듈 정리 — "제품/수입계산기/인보이스" 3개 메뉴 UI 삭제
+   함수 풀: _import* prefix (self-contained, 외부 호출 0건)
+   복원 필요 시 이 블록의 주석 마커만 제거
+============================================
 // ======================== 수입계산기 (Import Calculator) ========================
 
 // ─── 헬퍼 함수 ───
@@ -20933,6 +20956,7 @@ function _importDoRenderProduct() {
 }
 
 function renderImportProductTab() { _importLoadData(); _importDoRenderProduct(); }
+============================================ END DELETED 2026-04-21 */
 
 // ========================================
 // 백오더 관리
