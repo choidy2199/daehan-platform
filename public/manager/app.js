@@ -21697,7 +21697,6 @@ function _poRenderDetail() {
   if (!container) return;
   // 제품·발주 상세: 탭 컨테이너 자체를 스크롤 영역으로 (P3-B2-A 스크롤 설정 유지)
   container.style.overflowY = 'auto';
-  container.style.height = '100%';
 
   var hasError = !!(_poState && _poState.loadError);
   var po = (_poState && _poState.currentPo) ? _poState.currentPo : {};
