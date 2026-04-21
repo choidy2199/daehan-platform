@@ -41,7 +41,6 @@ export async function POST(
     }
     const payload = products.map((p: Record<string, unknown>, idx: number) => ({
       po_id: poId,
-      product_v2_id: (p?.id as string) || null,
       brand: p?.brand ? String(p.brand).trim() || null : null,
       model: p?.model ? String(p.model).trim() || null : null,
       product_name: p?.product_name ? String(p.product_name).trim() || null : null,
