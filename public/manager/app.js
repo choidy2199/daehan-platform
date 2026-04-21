@@ -349,7 +349,7 @@ async function forceUploadAll() {
   if (btn) btn.disabled = true;
   updateSyncStatus('동기화 중...');
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
 
   try {
     var uploadData = [];
@@ -396,7 +396,7 @@ async function uploadAllToSupabase() {
   btn.style.background = '#888';
   btn.style.color = '#fff';
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
 
   try {
     var uploadData = [];
@@ -20799,22 +20799,26 @@ function _poRenderDetail() {
   // 본문 2분할 (65/35)
   h += '<div class="pc-split">';
 
-  // 좌측 패널 (65% — 제품목록, P2에서 구현)
+  // 좌측 패널 (65% — 제품목록, mw_import_po_products 원본 참조)
+  var registeredCount = (loadObj('mw_import_po_products', []) || []).length;
   h += '<div class="pc-panel pc-panel-left">';
   h += '<div class="pc-panel-header">';
-  h += '<div class="pc-panel-title">제품목록 <span class="pc-panel-count">' + itemCount + '건</span></div>';
+  h += '<div class="pc-panel-title">제품목록 <span class="pc-panel-count" id="po-product-list-count">' + registeredCount + '건</span></div>';
   h += '<div class="pc-panel-actions">';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>템플릿</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>백업</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>복원</button>';
-  h += '<button class="btn-mini btn-mini-p" onclick="' + placeholderAlert + '"' + disabledAttr + '>+ 제품등록</button>';
+  h += '<button class="btn-mini btn-mini-p" onclick="_poOpenProductPicker()"' + disabledAttr + '>+ 제품등록</button>';
   h += '<button class="btn-mini btn-mini-erp" onclick="' + placeholderAlert + '"' + disabledAttr + '>↻ 경영박사 재고</button>';
   h += '</div></div>';
   h += '<div class="pc-search-bar">';
-  h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" disabled>';
-  h += '<select class="pc-search-sel" disabled><option>전체 브랜드</option></select>';
+  h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" oninput="_poFilterProductList(this.value)" autocomplete="off"' + (hasError ? ' disabled' : '') + '>';
   h += '</div>';
-  h += '<div class="pc-tbl-placeholder">' + (hasError ? '로드 실패 — 우측 상단 [↻ 다시 시도] 버튼을 눌러 주세요' : '제품목록 준비중 (P2에서 구현)') + '</div>';
+  if (hasError) {
+    h += '<div class="pc-tbl-placeholder">로드 실패 — 우측 상단 [↻ 다시 시도] 버튼을 눌러 주세요</div>';
+  } else {
+    h += '<div id="po-product-list-body" style="flex:1;overflow-y:auto;"></div>';
+  }
   h += '</div>';
 
   // 우측 패널 (35% — 제품발주, P4에서 구현)
@@ -20837,168 +20841,163 @@ function _poRenderDetail() {
   // 모달 자리
   h += '<div id="po-modal-root"></div>';
   container.innerHTML = h;
+  if (!hasError) _poRenderProductList();
   _poBindDetailEvents();
 }
 
-function _poRenderDetailHeader() {
-  var po = _poState.currentPo;
-  if (!po) return '';
-  var h = '';
-  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#1A1D23;color:#fff;">';
-  h += '<div style="display:flex;align-items:center;gap:10px;">';
-  h += '<button onclick="_poBackToList()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
-  h += '<span style="font-size:14px;font-weight:500;color:#fff;font-family:monospace;">' + _poEsc(po.po_number) + '</span>';
-  h += '<span style="font-size:12px;color:rgba(255,255,255,0.7);">' + _poEsc(po.factory_code || po.brand || '-') + '</span>';
-  h += _poFormatStatusBadge(po.status);
-  h += '</div>';
-  h += '<div style="display:flex;align-items:center;gap:6px;">';
-  h += '<button disabled title="B3 구현 예정" style="font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.15);cursor:not-allowed;font-family:Pretendard,sans-serif;">↻ 재고 조회</button>';
-  h += '<button disabled title="B4 구현 예정" style="font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.15);cursor:not-allowed;font-family:Pretendard,sans-serif;">PDF</button>';
-  h += '<button disabled title="B4 구현 예정" style="font-size:12px;padding:6px 10px;border-radius:6px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);border:1px solid rgba(255,255,255,0.15);cursor:not-allowed;font-family:Pretendard,sans-serif;">발주 확정</button>';
-  h += '<button onclick="_poToast(\'헤더는 자동 저장됩니다\',\'info\')" style="font-size:12px;padding:6px 14px;border-radius:6px;background:#E24B4A;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">저장</button>';
-  h += '<button onclick="_poDeletePo(\'' + po.id + '\')" style="font-size:12px;padding:6px 12px;border-radius:6px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
-  h += '</div></div>';
-  return h;
+
+function _poBindDetailEvents() {
+  // 검색/필터는 인라인 onclick/oninput으로 연결됨
 }
 
-function _poRenderDetailInfo() {
-  var po = _poState.currentPo;
-  if (!po) return '';
-  var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:3px;font-weight:500;';
-  var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
-  var roS = inpS + 'background:#F4F6FA;color:#5A6070;';
+// 좌측 제품 목록 — mw_import_po_products 원본 실시간 참조 렌더링
+function _poRenderProductList() {
+  var body = document.getElementById('po-product-list-body');
+  if (!body) return;
+  var list = loadObj('mw_import_po_products', []);
+  var gp = loadObj('mw_gen_products', []);
+  var gpByCode = {};
+  gp.forEach(function(p) { if (p && p.code != null) gpByCode[String(p.code)] = p; });
 
-  // 브랜드 드롭다운 옵션 — P2-b 재설계 대기 (mw_gen_products 기반으로 전환 예정)
-  var brands = {};
-  var brandOpts = '<option value="">— 선택 —</option>';
-  // 현재 PO에 저장된 brand가 있으면 유지
-  if (po.brand && !brands[po.brand]) {
-    brandOpts += '<option value="' + _poEsc(po.brand) + '" selected>' + _poEsc(po.brand) + ' (기존)</option>';
+  var q = (_poState && _poState._productListQuery ? _poState._productListQuery : '').trim().toLowerCase();
+  var filtered = list.filter(function(item) {
+    if (!q) return true;
+    var p = gpByCode[String(item.productCode)];
+    var hay = String(item.productCode || '');
+    if (p) hay += ' ' + (p.manageCode || '') + ' ' + (p.model || '') + ' ' + (p.description || '');
+    return hay.toLowerCase().indexOf(q) >= 0;
+  });
+
+  var countEl = document.getElementById('po-product-list-count');
+  if (countEl) countEl.textContent = list.length + '건';
+
+  if (filtered.length === 0) {
+    if (list.length === 0) {
+      body.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">' +
+        '<div style="font-size:32px;color:#DDE1EB;margin-bottom:10px;">📋</div>' +
+        '<div style="margin-bottom:6px;font-size:14px;color:#5A6070;">등록된 제품이 없습니다</div>' +
+        '<div style="font-size:12px;">위 \'+ 제품등록\' 버튼으로 추가하세요</div>' +
+        '</div>';
+    } else {
+      body.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">검색 결과가 없습니다</div>';
+    }
+    return;
   }
-  // 직접 입력 옵션
-  brandOpts += '<option value="__custom__">[직접 입력]</option>';
 
-  var h = '';
-  h += '<div style="padding:12px 20px;background:#fff;border-bottom:0.5px solid #eee;">';
-  h += '<div style="display:flex;gap:10px;align-items:flex-end;">';
-  h += '<div style="flex:1;"><label style="' + lblS + '">발주번호</label><input type="text" value="' + _poEsc(po.po_number) + '" readonly style="' + roS + 'font-family:monospace;"></div>';
-  h += '<div style="flex:1;"><label style="' + lblS + '">발주일</label><input type="date" value="' + _poEsc((po.po_date || '').substring(0,10)) + '" style="' + inpS + '" onchange="_poOnHeaderFieldBlur(\'po_date\',this.value)"></div>';
-  h += '<div style="flex:1.5;"><label style="' + lblS + '">공장/브랜드</label><select data-field="brand" style="' + inpS + '">' + brandOpts + '</select></div>';
-  h += '<div style="flex:1;"><label style="' + lblS + '">납기 요청일</label><input type="date" data-field="delivery_date" value="" style="' + inpS + '" disabled title="스키마 미지원"></div>';
-  h += '<div style="flex:2;"><label style="' + lblS + '">비고</label><input type="text" value="' + _poEsc(po.memo || '') + '" placeholder="비고 입력..." style="' + inpS + '" onblur="_poOnHeaderFieldBlur(\'memo\',this.value)"></div>';
-  h += '</div></div>';
-  return h;
-}
-
-function _poRenderDetailProductsSection() {
-  var total = _poState.currentItems.length;
-  var ordered = _poState.currentItems.filter(function(it){return Number(it.quantity || 0) > 0;}).length;
-  var h = '';
-  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:0.5px solid #eee;background:#fff;">';
-  h += '<div style="display:flex;align-items:center;gap:10px;">';
-  h += '<span style="font-size:14px;font-weight:500;color:#1A1D23;">제품 목록</span>';
-  h += '<span style="font-size:12px;color:#5A6070;">전 ' + total + '개 · 발주 ' + ordered + '개</span>';
-  h += '</div>';
-  h += '<div style="display:flex;align-items:center;gap:8px;">';
-  h += '<input type="text" id="po-detail-search" placeholder="모델/품명 검색" style="height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:12px;font-family:Pretendard,sans-serif;min-width:200px;">';
-  h += '<button disabled title="B2-B 구현 예정" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#F4F6FA;color:#9BA3B2;border:1px solid #DDE1EB;cursor:not-allowed;font-family:Pretendard,sans-serif;">발주만</button>';
-  h += '</div></div>';
-  return h;
-}
-
-function _poRenderDetailTable() {
-  var items = _poState.currentItems;
-  var po = _poState.currentPo;
   var thS = 'padding:9px 8px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
-  var tdS = 'padding:9px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
-  var hiBg = '#BA7517';
+  var tdS = 'padding:8px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
 
-  // 테이블은 자연 높이 — 많은 건수는 페이지 자체 스크롤로 해결 (내부 스크롤 X)
-  var h = '<div style="overflow:visible;">';
-
-  if (!po || !po.brand) {
-    h += '<div style="padding:80px 20px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">공장/브랜드를 선택하면 제품이 자동으로 로드됩니다</div></div>';
-    return h;
-  }
-  if (items.length === 0) {
-    h += '<div style="padding:80px 20px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">해당 브랜드에 등록된 제품이 없습니다</div></div>';
-    return h;
-  }
-
-  h += '<table id="po-detail-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  // No / 모델 / 품명 / 팔렛당 / 팔렛수 / 수량 / 경박재고 / 합계 / 수입가 / 총합계
-  h += '<col style="width:40px"><col style="width:110px"><col style=""><col style="width:55px"><col style="width:60px"><col style="width:70px"><col style="width:75px"><col style="width:75px"><col style="width:85px"><col style="width:95px">';
+  h += '<col style="width:36px"><col style="width:72px"><col style="width:118px"><col style=""><col style="width:58px"><col style="width:78px"><col style="width:58px"><col style="width:40px">';
   h += '</colgroup>';
   h += '<thead><tr>';
-  h += '<th style="' + thS + '">No.</th>';
-  h += '<th style="' + thS + '">모델</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:10px;">품명</th>';
-  h += '<th style="' + thS + '">팔렛당</th>';
-  h += '<th style="' + thS + '">팔렛수</th>';
-  h += '<th style="' + thS + '">수량</th>';
-  h += '<th style="' + thS + '">경박재고</th>';
-  h += '<th style="' + thS + 'background:' + hiBg + ';">합계</th>';
+  h += '<th style="' + thS + '"><input type="checkbox" disabled></th>';
+  h += '<th style="' + thS + '">코드</th>';
+  h += '<th style="' + thS + '">관리코드</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:10px;">모델·품명</th>';
+  h += '<th style="' + thS + '">파레트</th>';
   h += '<th style="' + thS + '">수입가</th>';
-  h += '<th style="' + thS + 'background:' + hiBg + ';">총합계</th>';
+  h += '<th style="' + thS + '">재고</th>';
+  h += '<th style="' + thS + '">×</th>';
   h += '</tr></thead><tbody>';
 
-  items.forEach(function(it, i) {
-    var fobS = Number(it.fob_usd || 0) > 0 ? '$' + Number(it.fob_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '<span style="color:#9BA3B2">—</span>';
+  filtered.forEach(function(item) {
+    var code = String(item.productCode);
+    var codeEsc = _poEsc(code);
+    var p = gpByCode[code];
+    if (!p) {
+      h += '<tr style="background:#FAFBFC;">';
+      h += '<td style="' + tdS + '"></td>';
+      h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;color:#9BA3B2;">' + codeEsc + '</td>';
+      h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
+      h += '<td style="' + tdS + 'text-align:left;padding-left:10px;color:#9BA3B2;font-style:italic;">원본 삭제됨</td>';
+      h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
+      h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
+      h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
+      h += '<td style="' + tdS + '"><button onclick="_poRemoveProductFromList(\'' + codeEsc + '\')" style="border:none;background:transparent;color:#CC2222;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="제거">×</button></td>';
+      h += '</tr>';
+      return;
+    }
+    var stock = (p.stock != null && p.stock !== '') ? Number(p.stock) : null;
+    var stockHtml;
+    if (stock == null || isNaN(stock)) stockHtml = '<span style="color:#DDE1EB">-</span>';
+    else if (stock > 0) stockHtml = '<span style="background:#E1F5EE;color:#085041;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">' + stock + '</span>';
+    else if (stock === 0) stockHtml = '<span style="background:#FAEEDA;color:#854F0B;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">0</span>';
+    else stockHtml = '<span style="background:#FCEBEB;color:#791F1F;padding:2px 6px;border-radius:3px;font-size:11px;font-weight:600;">' + stock + '</span>';
+    var importP = (p.importPrice != null) ? '$' + Number(p.importPrice).toFixed(2) : '<span style="color:#DDE1EB">—</span>';
+    var palletP = (p.palletQty != null && p.palletQty !== '' && Number(p.palletQty) > 0) ? Number(p.palletQty).toLocaleString() : '<span style="color:#DDE1EB">-</span>';
     h += '<tr>';
-    h += '<td style="' + tdS + 'color:#9BA3B2;">' + (i + 1) + '</td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + _poEsc(it.model || '') + '</td>';
-    h += '<td style="' + tdS + 'text-align:left;padding-left:10px;color:#5A6070;">' + _poEsc(it.product_name || '') + '</td>';
-    h += '<td style="' + tdS + '">' + (Number(it.pallet_qty || 0) > 0 ? Number(it.pallet_qty) : '<span style="color:#9BA3B2">—</span>') + '</td>';
-    // 팔렛수 (B2-B 입력 대기 — 지금 readonly 0)
-    h += '<td style="' + tdS + 'color:#9BA3B2;">0</td>';
-    // 수량 (B2-B 자동 계산 대기)
-    h += '<td style="' + tdS + 'color:#9BA3B2;">0</td>';
-    // 경박재고 (B3 대기)
-    h += '<td style="' + tdS + 'color:#9BA3B2;">—</td>';
-    // 합계 (B2-B 대기, 주황 배경 유지)
-    h += '<td style="' + tdS + 'color:#9BA3B2;">—</td>';
-    // 수입가
-    h += '<td style="' + tdS + 'text-align:right;padding-right:10px;">' + fobS + '</td>';
-    // 총합계 (B2-B 대기, 주황 배경 유지)
-    h += '<td style="' + tdS + 'color:#9BA3B2;">—</td>';
+    h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '"></td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + _poEsc(p.code || '') + '</td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:11px;">' + _poEsc(p.manageCode || '-') + '</td>';
+    h += '<td style="' + tdS + 'text-align:left;padding-left:10px;overflow:hidden;"><div style="font-weight:500;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _poEsc(p.model || '-') + '</div><div style="color:#5A6070;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _poEsc(p.description || '') + '</div></td>';
+    h += '<td style="' + tdS + '">' + palletP + '</td>';
+    h += '<td style="' + tdS + '">' + importP + '</td>';
+    h += '<td style="' + tdS + '">' + stockHtml + '</td>';
+    h += '<td style="' + tdS + '"><button onclick="_poRemoveProductFromList(\'' + codeEsc + '\')" style="border:none;background:transparent;color:#CC2222;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="제거">×</button></td>';
     h += '</tr>';
   });
 
-  h += '</tbody></table></div>';
-  return h;
+  h += '</tbody></table>';
+  body.innerHTML = h;
 }
 
-function _poRenderDetailSummary() {
-  var po = _poState.currentPo || {};
-  var items = _poState.currentItems;
-  var totalQty = items.reduce(function(s,it){return s + Number(it.quantity || 0);}, 0);
-  var kinds = items.length;
-  var linked = po.linked_invoice_id ? '연결됨' : '미연결';
-  var linkedColor = po.linked_invoice_id ? '#9FE1CB' : 'rgba(255,255,255,0.4)';
-  var totalPallets = 0; // B2-B
-  var totalFob = 0;     // B2-B
-
-  var h = '';
-  h += '<div style="padding:14px 20px;background:#1A1D23;color:#fff;font-family:Pretendard,sans-serif;display:flex;align-items:center;min-height:56px;box-sizing:border-box;">';
-  var colStyle = 'flex:1;padding:0 14px;';
-  var lblS = 'font-size:11px;color:#aaa;margin-bottom:3px;line-height:1.3;';
-  var valS = 'font-size:15px;font-weight:500;color:#fff;line-height:1.3;';
-  var orgS = 'font-size:15px;font-weight:600;color:#EF9F27;line-height:1.3;';
-  var sepS = 'width:1px;height:24px;background:rgba(255,255,255,0.15);flex-shrink:0;';
-  h += '<div style="' + colStyle + '"><div style="' + lblS + '">총 수량</div><div style="' + valS + '">' + totalQty.toLocaleString('en-US') + ' EA <span style="font-size:11px;color:#aaa;margin-left:4px;">(' + kinds + '종)</span></div></div>';
-  h += '<div style="' + sepS + '"></div>';
-  h += '<div style="' + colStyle + '"><div style="' + lblS + '">총 팔렛</div><div style="' + valS + '">' + totalPallets + ' PLT</div></div>';
-  h += '<div style="' + sepS + '"></div>';
-  h += '<div style="' + colStyle + '"><div style="' + lblS + '">총 금액 (FOB)</div><div style="' + orgS + '">$' + totalFob.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</div></div>';
-  h += '<div style="' + sepS + '"></div>';
-  h += '<div style="' + colStyle + '"><div style="' + lblS + '">연결 인보이스</div><div style="font-size:13px;color:' + linkedColor + ';">' + linked + '</div></div>';
-  h += '</div>';
-  return h;
+function _poFilterProductList(q) {
+  if (!_poState) return;
+  _poState._productListQuery = q || '';
+  _poRenderProductList();
 }
 
-function _poBindDetailEvents() {
-  // 검색/필터는 B2-B 대기 — placeholder
+// 제품 가져오기 팝업 스텁 — 커밋 5(P2-b)에서 실제 모달 구현
+function _poOpenProductPicker() {
+  if (!_poState || !_poState.currentPo) {
+    alert('PO가 로드되지 않았습니다.');
+    return;
+  }
+  var brand = _poState.currentPo.brand || '';
+  alert('제품 가져오기 팝업 (커밋 5에서 구현 예정)\n현재 PO 브랜드: ' + (brand || '(미지정)'));
+}
+
+// 등록 제품 목록에 추가 — 커밋 5 팝업에서 codes 배열 전달
+function _poAddProductsToList(codes) {
+  if (!codes || codes.length === 0) return;
+  var list = loadObj('mw_import_po_products', []);
+  var existing = {};
+  list.forEach(function(x) { if (x && x.productCode != null) existing[String(x.productCode)] = true; });
+  var nowISO = new Date().toISOString();
+  var user = (typeof window !== 'undefined' && window.currentUser && window.currentUser.loginId) ? window.currentUser.loginId : 'admin';
+  var added = 0, skipped = 0;
+  codes.forEach(function(code) {
+    var c = String(code);
+    if (!existing[c]) {
+      list.push({ productCode: c, addedAt: nowISO, addedBy: user });
+      existing[c] = true;
+      added++;
+    } else {
+      skipped++;
+    }
+  });
+  save('mw_import_po_products', list);
+  _poRenderProductList();
+  var msg = added + '건 추가됨';
+  if (skipped > 0) msg += ' (중복 ' + skipped + '건 skip)';
+  _poToast(msg, 'success');
+}
+
+// 등록 제품 목록에서 제거 — × 버튼 onclick
+function _poRemoveProductFromList(code) {
+  var list = loadObj('mw_import_po_products', []);
+  var idx = -1;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] && String(list[i].productCode) === String(code)) { idx = i; break; }
+  }
+  if (idx < 0) return;
+  if (!confirm('등록 목록에서 제거하시겠습니까?')) return;
+  list.splice(idx, 1);
+  save('mw_import_po_products', list);
+  _poRenderProductList();
+  _poToast('제거됨', 'success');
 }
 
 // 헤더 필드 blur 자동 저장 (PUT /api/import-po)
