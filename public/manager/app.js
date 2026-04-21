@@ -4,13 +4,10 @@
 // 향후 다른 메뉴 삭제 시 이 배열에 추가.
 var _DEPRECATED_KEYS = ['mw_import_calcs', 'mw_import_items'];
 
-// ======================== 일반제품 스키마 (P2-a 2026-04-21) ========================
-// mw_gen_products 제품 객체 스키마 확장 — 기존 20개 필드 + 아래 2개 신규:
-//   - importPrice: number | null   // USD, 소수점 2자리 (예: 19.50). 기존 234건은 null
-//   - brand:       string | null   // GEN_PRODUCT_BRANDS 중 하나. 기존 234건은 null
-// 읽을 때는 product.importPrice ?? null, product.brand ?? null 로 사용 (P2-b에서 적용)
-// 신규 저장 경로는 P2-b에서 좌측 팝업 체크 방식으로 추가될 예정.
-var GEN_PRODUCT_BRANDS = ['TC.BL', '콜라보', '비트맨'];
+// ======================== 일반제품 스키마 ========================
+// mw_gen_products 제품 객체 스키마 — 기존 20개 필드 + importPrice (number | null, USD).
+// 브랜드는 별도 필드로 저장하지 않음. category("HPT-전동공구(디월트)" 등)의 "-" 앞부분을
+// getGenBrand(product) 헬퍼로 추출하여 사용 (예: "HPT", "티롤릿", "콜라보", "비트맨", "다스트").
 
 // ======================== SIDEBAR + CHROME TABS + DARK MODE ========================
 
@@ -11741,6 +11738,14 @@ function editGenImportPrice(idx) {
   localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
   autoSyncToSupabase('mw_gen_products');
   renderGenProducts();
+}
+
+function getGenBrand(product) {
+  if (!product || !product.category) return null;
+  var category = String(product.category).trim();
+  if (!category) return null;
+  var brand = category.split('-')[0].trim();
+  return brand || null;
 }
 
 function downloadGenTemplate() {
