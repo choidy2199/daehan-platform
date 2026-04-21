@@ -4,6 +4,14 @@
 // 향후 다른 메뉴 삭제 시 이 배열에 추가.
 var _DEPRECATED_KEYS = ['mw_import_calcs', 'mw_import_items'];
 
+// ======================== 일반제품 스키마 (P2-a 2026-04-21) ========================
+// mw_gen_products 제품 객체 스키마 확장 — 기존 20개 필드 + 아래 2개 신규:
+//   - importPrice: number | null   // USD, 소수점 2자리 (예: 19.50). 기존 234건은 null
+//   - brand:       string | null   // GEN_PRODUCT_BRANDS 중 하나. 기존 234건은 null
+// 읽을 때는 product.importPrice ?? null, product.brand ?? null 로 사용 (P2-b에서 적용)
+// 신규 저장 경로는 P2-b에서 좌측 팝업 체크 방식으로 추가될 예정.
+var GEN_PRODUCT_BRANDS = ['TC.BL', '콜라보', '비트맨'];
+
 // ======================== SIDEBAR + CHROME TABS + DARK MODE ========================
 
 function toggleSidebar() {
@@ -21819,7 +21827,7 @@ function _poRenderDetailInfo() {
   h += '<div style="display:flex;gap:10px;align-items:flex-end;">';
   h += '<div style="flex:1;"><label style="' + lblS + '">발주번호</label><input type="text" value="' + _poEsc(po.po_number) + '" readonly style="' + roS + 'font-family:monospace;"></div>';
   h += '<div style="flex:1;"><label style="' + lblS + '">발주일</label><input type="date" value="' + _poEsc((po.po_date || '').substring(0,10)) + '" style="' + inpS + '" onchange="_poOnHeaderFieldBlur(\'po_date\',this.value)"></div>';
-  h += '<div style="flex:1.5;"><label style="' + lblS + '">공장/브랜드</label><select data-field="brand" onchange="_poOnBrandChange(this.value, this)" style="' + inpS + '">' + brandOpts + '</select></div>';
+  h += '<div style="flex:1.5;"><label style="' + lblS + '">공장/브랜드</label><select data-field="brand" style="' + inpS + '">' + brandOpts + '</select></div>';
   h += '<div style="flex:1;"><label style="' + lblS + '">납기 요청일</label><input type="date" data-field="delivery_date" value="" style="' + inpS + '" disabled title="스키마 미지원"></div>';
   h += '<div style="flex:2;"><label style="' + lblS + '">비고</label><input type="text" value="' + _poEsc(po.memo || '') + '" placeholder="비고 입력..." style="' + inpS + '" onblur="_poOnHeaderFieldBlur(\'memo\',this.value)"></div>';
   h += '</div></div>';
@@ -21956,48 +21964,10 @@ function _poOnHeaderFieldBlur(field, value) {
     .catch(function(err){ _poToast('네트워크 오류: ' + err.message, 'error'); });
 }
 
-// 브랜드 변경 — 확인 모달 → 기존 아이템 삭제 → 새 브랜드 제품 INSERT
-function _poOnBrandChange(newBrand, selectEl) {
-  var po = _poState.currentPo;
-  if (!po) return;
-  var oldBrand = po.brand;
-  if (newBrand === '__custom__') {
-    var custom = prompt('브랜드를 직접 입력하세요:', oldBrand || '');
-    if (!custom || !custom.trim()) { selectEl.value = oldBrand || ''; return; }
-    newBrand = custom.trim();
-  }
-  if (newBrand === oldBrand) return;
-
-  var hasItems = _poState.currentItems.length > 0;
-  if (hasItems) {
-    var msg = '현재 "' + (oldBrand || '미설정') + '" 브랜드 제품 ' + _poState.currentItems.length + '건이 삭제되고 "' + newBrand + '" 브랜드 제품으로 교체됩니다. 계속하시겠습니까?';
-    if (!confirm(msg)) {
-      selectEl.value = oldBrand || '';
-      return;
-    }
-  }
-
-  // 1) 헤더 brand 업데이트
-  _poOnHeaderFieldBlur('brand', newBrand);
-  // 2) 기존 아이템 삭제 → 새 브랜드 제품 INSERT
-  _poClearItems(po.id).then(function(){
-    return _poLoadProductsByBrand(newBrand);
-  }).then(function(products){
-    if (products.length === 0) {
-      _poState.currentItems = [];
-      _poRenderDetail();
-      _poToast('해당 브랜드에 등록된 제품이 없습니다', 'info');
-      return;
-    }
-    return _poInsertItemsFromProducts(po.id, products).then(function(inserted){
-      _poState.currentItems = inserted;
-      _poRenderDetail();
-      _poToast(inserted.length + '건 제품이 로드되었습니다', 'success');
-    });
-  }).catch(function(err){
-    _poToast('제품 로드 실패: ' + (err.message || err), 'error');
-  });
-}
+// [P2-a 2026-04-21] _poOnBrandChange 함수 제거
+// - 자동 insert 방식(브랜드 선택 → 해당 브랜드 제품 일괄 INSERT) 폐기
+// - P2-b에서 좌측 팝업 체크 방식으로 재설계 예정
+// - 헬퍼 _poLoadProductsByBrand / _poInsertItemsFromProducts / _poClearItems 는 아래에 유지 (재활용 가능)
 
 function _poLoadProductsByBrand(brand) {
   // 제품V2 데이터에서 필터 (이미 캐시된 _ipv2Data 사용, 없으면 fetch)
