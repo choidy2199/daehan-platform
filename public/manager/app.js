@@ -20783,8 +20783,6 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-actions">';
   h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPoListModal()"' + (hasError ? ' disabled' : '') + '>발주서 리스트</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>비우기</button>';
-  var canExportPdf = !hasError && !noPo && po.status && po.status !== 'draft';
-  h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPdfPreview()"' + (canExportPdf ? '' : ' disabled') + '>📄 발주서 PDF</button>';
   if (isReadOnly) {
     h += '<button class="btn-mini" id="po-btn-confirm" disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;">✓ 확정됨</button>';
   } else {
@@ -21652,11 +21650,11 @@ function _poConfirmOrder() {
     }); })
     .then(function(updatedPo) {
       alert('발주가 확정되었습니다.');
-      _poState.currentPo = updatedPo || Object.assign({}, po, {
-        status: 'confirmed',
-        total_fob_usd: totals.totalFobUsd,
-        total_quantity: totals.totalUnit
-      });
+      // 확정 후 빈 작업화면으로 리셋 — 사용자는 [+ 새 발주서] 또는 [발주서 리스트]에서 다음 작업
+      try { localStorage.removeItem('mw_import_po_cart_' + po.id); } catch (e) {}
+      _poState.currentPo = null;
+      _poState.currentPoId = null;
+      _poState.currentItems = [];
       _poRenderDetail();
     })
     .catch(function(err) {
@@ -21669,34 +21667,48 @@ function _poConfirmOrder() {
 // ===== 커밋 7 — 발주서 PDF 미리보기/다운로드 =====
 
 var _DAEHAN_COMPANY_INFO = {
-  name: '대한종합상사',
+  name: '(주)대한종합상사',
   ceo: '최병우',
-  bizNumber: '000-00-00000',
-  address: '서울특별시 ○○구 ○○로 ○○',
-  phone: '02-0000-0000',
-  fax: '02-0000-0000',
-  email: 'toollab.studio@gmail.com',
+  bizNumber: '616-87-01106',
+  corpNumber: '280211-0187308',
+  address: '경기도 양주시 백석읍 부흥로 1110, 1동',
+  phone: '031-871-0945',
+  fax: '031-871-0944',
+  email: '0945daehan@naver.com',
+  deliveryPoint: '대신화물 : 양주 광적지점',
   logoUrl: '/manager/daehanrogo.png'
 };
 
-function _poOpenPdfPreview() {
-  var po = _poState && _poState.currentPo;
-  if (!po) return;
-  if (!po.status || po.status === 'draft') {
-    alert('확정된 발주서만 PDF 생성이 가능합니다.');
+function _poOpenPdfPreview(poId) {
+  var targetId = poId || (_poState && _poState.currentPo ? _poState.currentPo.id : null);
+  if (!targetId) {
+    alert('PDF를 생성할 발주서가 없습니다.');
     return;
   }
   // 최신 데이터 (headers + items) 재조회
-  fetch('/api/import-po/' + po.id, { cache: 'no-store' })
+  fetch('/api/import-po/' + targetId, { cache: 'no-store' })
     .then(function(r) { return r.json(); })
     .then(function(json) {
       if (!json || !json.success) throw new Error((json && json.error) || '데이터 로드 실패');
       var data = json.data || {};
-      var header = data.header || po;
-      var items = data.items || (_poState.currentItems || []);
+      var header = data.header || null;
+      var items = data.items || [];
+      if (!header || !header.status || header.status === 'draft') {
+        alert('확정된 발주서만 PDF 생성이 가능합니다.');
+        return;
+      }
       _poRenderPdfPreview(header, items);
     })
     .catch(function(err) { alert('데이터 로드 실패: ' + (err && err.message || err)); });
+}
+
+// 인보이스 연결 모달 스텁 (커밋 9에서 구현)
+function _poOpenInvoiceLink(poId) {
+  alert('인보이스 연결 기능은 인보이스V2 메뉴 구축 후 사용 가능합니다.');
+  // TODO 커밋 9:
+  // - 인보이스 리스트 모달
+  // - 선택 시 PUT /api/import-po { id: poId, linked_invoice_id, status: 'linked' }
+  // - 성공 시 행 [🔗 인보이스 연결] → [✓ 연결됨] 회색으로 전환
 }
 
 function _poClosePdfPreview() {
@@ -21800,8 +21812,11 @@ function _poBuildPdfHtml(po, items) {
   h += '<tr><th>회사명</th><td>' + _poEsc(info.name) + '</td></tr>';
   h += '<tr><th>대표자</th><td>' + _poEsc(info.ceo) + '</td></tr>';
   h += '<tr><th>사업자번호</th><td>' + _poEsc(info.bizNumber) + '</td></tr>';
+  if (info.corpNumber) h += '<tr><th>법인등록번호</th><td>' + _poEsc(info.corpNumber) + '</td></tr>';
   h += '<tr><th>주소</th><td>' + _poEsc(info.address) + '</td></tr>';
-  h += '<tr><th>연락처</th><td>' + _poEsc(info.phone) + '</td></tr>';
+  h += '<tr><th>연락처</th><td>TEL ' + _poEsc(info.phone) + ' / FAX ' + _poEsc(info.fax || '-') + '</td></tr>';
+  h += '<tr><th>이메일</th><td>' + _poEsc(info.email) + '</td></tr>';
+  if (info.deliveryPoint) h += '<tr><th>택배거점</th><td>' + _poEsc(info.deliveryPoint) + '</td></tr>';
   h += '</table>';
   h += '</div>';
 
@@ -21926,7 +21941,8 @@ function _poRenderPoListModal(list) {
   var modal = document.createElement('div');
   modal.className = 'po-picker-modal';
   modal.id = 'po-list-modal';
-  modal.style.maxWidth = '720px';
+  modal.style.width = '1200px';
+  modal.style.maxWidth = '95vw';
 
   var h = '';
   h += '<div class="po-picker-header" id="po-list-modal-header">';
@@ -21980,6 +21996,20 @@ function _poRenderPoListTable(list, currentId) {
     var totalTxt = (p.total_fob_usd != null && !isNaN(Number(p.total_fob_usd)))
       ? '$' + Number(p.total_fob_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : '-';
+    var canPdf = p.status === 'confirmed' || p.status === 'linked' || p.status === 'completed';
+    var isLinked = p.status === 'linked' || !!p.linked_invoice_id;
+    var actionsHtml;
+    if (isCurrent) {
+      actionsHtml = '<span class="po-list-current-label">— 현재 보는 중 —</span>';
+    } else if (!canPdf) {
+      actionsHtml = '<span class="po-list-draft-label">작성 중</span>';
+    } else {
+      var pdfBtn = '<button class="po-row-btn po-row-btn-pdf" onclick="event.stopPropagation(); _poOpenPdfPreview(\'' + idEsc + '\');">📄 PDF</button>';
+      var invoiceBtn = isLinked
+        ? '<button class="po-row-btn po-row-btn-invoice-linked" disabled>✓ 연결됨</button>'
+        : '<button class="po-row-btn po-row-btn-invoice-pending" onclick="event.stopPropagation(); _poOpenInvoiceLink(\'' + idEsc + '\');">🔗 인보이스 연결</button>';
+      actionsHtml = '<div class="po-list-row-actions">' + pdfBtn + invoiceBtn + '</div>';
+    }
     return '<tr class="' + cls + '">' +
       '<td class="po-list-td-check" onclick="event.stopPropagation();"><input type="checkbox" class="po-list-check" data-po-id="' + idEsc + '" onchange="_poListOnCheckChange()"></td>' +
       '<td style="font-family:monospace;font-size:12px;"' + selAttr + '>' + _poEsc(p.po_number || '-') + '</td>' +
@@ -21987,13 +22017,14 @@ function _poRenderPoListTable(list, currentId) {
       '<td' + selAttr + '>' + brandTxt + '</td>' +
       '<td style="text-align:right;font-variant-numeric:tabular-nums;"' + selAttr + '>' + totalTxt + '</td>' +
       '<td' + selAttr + '>' + _poFormatStatusBadge(p.status) + '</td>' +
+      '<td class="po-list-td-actions">' + actionsHtml + '</td>' +
       '</tr>';
   }).join('');
   return '<table class="po-list-table">' +
-    '<colgroup><col style="width:36px"><col style="width:24%"><col style="width:16%"><col style="width:16%"><col style="width:20%"><col style="width:16%"></colgroup>' +
+    '<colgroup><col style="width:36px"><col style="width:140px"><col style="width:100px"><col style="width:110px"><col style="width:140px"><col style="width:90px"><col style=""></colgroup>' +
     '<thead><tr>' +
     '<th class="po-list-th-check"><input type="checkbox" id="po-list-check-all" onchange="_poListToggleAllChecks(this.checked)"></th>' +
-    '<th>발주번호</th><th>날짜</th><th>브랜드</th><th style="text-align:right;">총금액</th><th>상태</th>' +
+    '<th>발주번호</th><th>날짜</th><th>브랜드</th><th style="text-align:right;">총금액</th><th>상태</th><th>작업</th>' +
     '</tr></thead>' +
     '<tbody>' + rows + '</tbody>' +
     '</table>';

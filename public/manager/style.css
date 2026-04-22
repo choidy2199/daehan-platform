@@ -2377,6 +2377,20 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-list-check, #po-list-check-all { width:14px; height:14px; cursor:pointer; }
 .po-list-table th.po-list-th-check, .po-list-table td.po-list-td-check { text-align:center !important; padding-left:10px; cursor:default; }
 
+/* 발주서 리스트 — 행별 작업 컬럼 (PDF / 인보이스 연결) */
+.po-list-table td.po-list-td-actions { text-align:center; padding:4px 6px; white-space:nowrap; }
+.po-list-row-actions { display:inline-flex; gap:6px; justify-content:center; }
+.po-row-btn { width:140px; height:30px; display:inline-flex; align-items:center; justify-content:center; gap:4px; background:#fff; border:1px solid #DDE1EB; border-radius:4px; padding:0 10px; font-size:12px; font-weight:500; cursor:pointer; font-family:Pretendard,sans-serif; color:#1A1D23; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; }
+.po-row-btn:hover:not(:disabled) { background:#F4F6FA; border-color:#B0B8CC; }
+.po-row-btn-pdf { color:#185FA5; border-color:#185FA5; }
+.po-row-btn-pdf:hover { background:#E6F1FB; }
+.po-row-btn-invoice-pending { background:#CC2222; color:#fff; border-color:#CC2222; }
+.po-row-btn-invoice-pending:hover { background:#A81A1A; border-color:#A81A1A; }
+.po-row-btn-invoice-linked { background:#DDE1EB; color:#5A6070; border-color:#DDE1EB; cursor:default; }
+.po-row-btn-invoice-linked:hover { background:#DDE1EB; }
+.po-list-current-label { color:#9BA3B2; font-size:12px; font-style:italic; }
+.po-list-draft-label { color:#9BA3B2; font-size:12px; }
+
 /* ===== 커밋 7 — PDF 미리보기 모달 + A4 문서 ===== */
 .po-pdf-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:10001; display:flex; align-items:center; justify-content:center; padding:20px; font-family:Pretendard,sans-serif; }
 .po-pdf-modal { background:#F4F6FA; border-radius:6px; width:880px; max-width:95vw; max-height:95vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 48px rgba(26,29,35,0.18); }
