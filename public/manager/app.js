@@ -20900,7 +20900,6 @@ function _poConfirmOrder() {
       total_quantity: totals.totalUnit
     }); })
     .then(function(updatedPo) {
-      alert('발주가 확정되었습니다.');
       // 확정 후 빈 작업화면으로 리셋 — 사용자는 [+ 새 발주서] 또는 [발주서 리스트]에서 다음 작업
       try { localStorage.removeItem('mw_import_po_cart_' + po.id); } catch (e) {}
       _poState.currentPo = null;
@@ -20908,6 +20907,12 @@ function _poConfirmOrder() {
       _poState.currentItems = [];
       _poCacheCurrentPo();
       _poRenderDetail();
+      // Task 5: 발주서 리스트로 이동 제안
+      setTimeout(function() {
+        if (confirm('발주가 확정되었습니다.\n\n발주서 리스트로 이동하시겠습니까?')) {
+          if (typeof _poOpenPoListModal === 'function') _poOpenPoListModal();
+        }
+      }, 100);
     })
     .catch(function(err) {
       console.error('[_poConfirmOrder]', err);
@@ -20954,22 +20959,26 @@ function _poOpenPdfPreview(poId) {
     .catch(function(err) { alert('데이터 로드 실패: ' + (err && err.message || err)); });
 }
 
-// 커밋 9 — 인보이스 연결 본 구현
-// PO → 새 인보이스 자동 생성 + linked_invoice_id/status 업데이트 + 인보이스V2 이동
+// 커밋 9/10 — 인보이스 연결 본 구현
+// PO → 새 인보이스 자동 생성 + PO items를 인보이스 items로 복사 + linked_invoice_id/status → 인보이스V2 이동
 function _poOpenInvoiceLink(poId) {
   if (!poId) return;
-  // 1) PO 상세 조회
+  var poItemsCached = [];
+  // 1) PO 상세(header + items) 조회
   fetch('/api/import-po/' + poId, { cache: 'no-store' })
     .then(function(r) { return r.json(); })
     .then(function(json) {
       if (!json || !json.success) throw new Error((json && json.error) || 'PO 조회 실패');
-      var po = (json.data && json.data.header) ? json.data.header : (json.data || null);
+      var data = json.data || {};
+      var po = data.header || (json.data && json.data.id ? json.data : null);
+      poItemsCached = Array.isArray(data.items) ? data.items : [];
       if (!po) throw new Error('발주서를 찾을 수 없습니다');
       if (po.status === 'linked' || po.linked_invoice_id) {
         alert('이미 인보이스에 연결된 발주서입니다.');
         return null;
       }
-      if (!confirm('발주서 ' + po.po_number + '에 연결할 새 인보이스를 생성하시겠습니까?\n\n생성 후 인보이스V2 메뉴로 이동합니다.')) {
+      var itemCount = poItemsCached.length;
+      if (!confirm('발주서 ' + po.po_number + '에 연결할 새 인보이스를 생성하시겠습니까?\n\n생성 후 인보이스V2 메뉴로 이동합니다.\nPO 제품 ' + itemCount + '건이 인보이스로 자동 복사됩니다.')) {
         return null;
       }
       return po;
@@ -21016,7 +21025,40 @@ function _poOpenInvoiceLink(poId) {
     })
     .then(function(ctx) {
       if (!ctx) return null;
-      // 4) PO 업데이트: linked_invoice_id + status='linked'
+      // 4) PO items를 인보이스 items로 자동 복사 (Task 3)
+      //    DB 필드 의미:
+      //      PO.pallet_qty = 팔렛당 낱개(예:48) / PO.quantity = 총수량(예:96) / PO.fob_usd = 단가
+      //      invoice.pallet_qty = 팔렛수(예:2) / invoice.qty = 총수량
+      //    변환: invoice.pallet_qty = PO.quantity / PO.pallet_qty
+      //    amount_usd는 서버(bulk route)가 qty*fob_usd로 자동 계산
+      if (poItemsCached.length === 0) return ctx;
+      var items = poItemsCached.map(function(it) {
+        var poPalletUnit = Number(it.pallet_qty) || 0;
+        var poQty = Number(it.quantity) || 0;
+        var invPalletCount = poPalletUnit > 0 ? (poQty / poPalletUnit) : 0;
+        return {
+          model: it.model || '',
+          name: it.product_name || null,
+          qty: poQty,
+          fob_usd: Number(it.fob_usd) || 0,
+          pallet_qty: invPalletCount
+        };
+      });
+      return fetch('/api/import-invoices/' + ctx.invoice.id + '/items/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: items })
+      }).then(function(r) { return r.json(); }).then(function(ij) {
+        if (!ij || !ij.success) console.warn('[invoice items copy] 일부 실패:', ij && ij.error);
+        return ctx;
+      }).catch(function(err) {
+        console.warn('[invoice items copy] 네트워크 오류:', err);
+        return ctx;
+      });
+    })
+    .then(function(ctx) {
+      if (!ctx) return null;
+      // 5) PO 업데이트: linked_invoice_id + status='linked'
       return fetch('/api/import-po', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -21028,8 +21070,7 @@ function _poOpenInvoiceLink(poId) {
     })
     .then(function(invoice) {
       if (!invoice) return;
-      // 5) 성공 → 알림 + 리스트 닫기 + 인보이스V2 이동 + 상세 열기
-      alert('인보이스 ' + invoice.invoice_no + '가 생성되었습니다.\n인보이스V2 메뉴로 이동합니다.');
+      // 6) Task 4: alert 제거 — 바로 인보이스V2 이동 + 상세 열기
       _poClosePoListModal();
       if (typeof openWindow === 'function') openWindow('인보이스V2');
       setTimeout(function() {
@@ -21887,7 +21928,10 @@ function _ipinv2DoRenderList(container) {
   h += '<span style="font-size:14px;font-weight:500;color:#fff;">인보이스V2</span>';
   h += '<span style="font-size:12px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);color:#fff;font-weight:500;">' + total + '건</span>';
   h += '</div>';
+  h += '<div style="display:flex;align-items:center;gap:6px;">';
+  h += '<button id="ipinv2-delete-btn" onclick="_ipinv2DeleteSelected()" disabled style="font-size:12px;padding:6px 12px;border-radius:6px;background:#CC2222;color:#fff;border:none;cursor:default;font-family:Pretendard,sans-serif;font-weight:500;opacity:0.5;">선택 삭제 (0)</button>';
   h += '<button onclick="_ipinv2CreateNew()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#E24B4A;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">+ 새 인보이스</button>';
+  h += '</div>';
   h += '</div>';
 
   // 상태 필터 탭
@@ -21910,9 +21954,10 @@ function _ipinv2DoRenderList(container) {
   // 테이블
   h += '<div style="overflow:auto;max-height:calc(100vh - 200px);">';
   h += '<table id="ipinv2-list-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
-  h += '<colgroup><col style="width:40px"><col style="width:150px"><col><col style="width:110px"><col style="width:130px"><col style="width:70px"><col style="width:120px"><col style="width:100px"><col style="width:110px"></colgroup>';
+  h += '<colgroup><col style="width:34px"><col style="width:40px"><col style="width:150px"><col><col style="width:110px"><col style="width:130px"><col style="width:70px"><col style="width:120px"><col style="width:100px"><col style="width:110px"></colgroup>';
   var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;';
   h += '<thead><tr>';
+  h += '<th style="' + thS + 'text-align:center;"><input type="checkbox" id="ipinv2-chk-all" onclick="event.stopPropagation()" onchange="_ipinv2ToggleAll(this)"></th>';
   h += '<th style="' + thS + 'text-align:center;">No.</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:12px;">인보이스 번호</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:12px;">공장</th>';
@@ -21925,11 +21970,12 @@ function _ipinv2DoRenderList(container) {
   h += '</tr></thead><tbody>';
 
   if (rows.length === 0) {
-    h += '<tr><td colspan="9" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 인보이스가 없습니다.</td></tr>';
+    h += '<tr><td colspan="10" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 인보이스가 없습니다.</td></tr>';
   } else {
     var tdS = 'padding:9px 10px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;';
     rows.forEach(function(inv, i) {
       h += '<tr data-id="' + inv.id + '" onclick="_ipinv2OpenDetail(\'' + inv.id + '\')" style="cursor:pointer;" onmouseover="this.style.background=\'#FAFAF7\'" onmouseout="this.style.background=\'\'">';
+      h += '<td style="' + tdS + 'text-align:center;" onclick="event.stopPropagation()"><input type="checkbox" class="ipinv2-row-chk" data-inv-id="' + inv.id + '" onclick="event.stopPropagation()" onchange="_ipinv2UpdateDeleteBtn()"></td>';
       h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
       h += '<td style="' + tdS + 'text-align:left;padding-left:12px;font-weight:500;">' + _ipinv2Esc(inv.invoice_no) + '</td>';
       h += '<td style="' + tdS + 'text-align:left;padding-left:12px;">' + _ipinv2Esc(inv.factory_name) + '</td>';
@@ -21953,6 +21999,67 @@ function _ipinv2FilterByStatus(status) {
   _ipinv2Filter = status;
   var container = document.getElementById('tab-import-invoice-v2');
   if (container) _ipinv2DoRenderList(container);
+}
+
+// ── 선택 삭제 (Task 1) ──
+function _ipinv2ToggleAll(el) {
+  var boxes = document.querySelectorAll('.ipinv2-row-chk');
+  boxes.forEach(function(cb) { cb.checked = !!el.checked; });
+  _ipinv2UpdateDeleteBtn();
+}
+
+function _ipinv2UpdateDeleteBtn() {
+  var boxes = document.querySelectorAll('.ipinv2-row-chk');
+  var checked = document.querySelectorAll('.ipinv2-row-chk:checked');
+  var count = checked.length;
+  var total = boxes.length;
+  var btn = document.getElementById('ipinv2-delete-btn');
+  if (btn) {
+    btn.textContent = '선택 삭제 (' + count + ')';
+    btn.disabled = count === 0;
+    btn.style.opacity = count === 0 ? '0.5' : '1';
+    btn.style.cursor = count === 0 ? 'default' : 'pointer';
+  }
+  var all = document.getElementById('ipinv2-chk-all');
+  if (all) {
+    all.checked = count === total && total > 0;
+    all.indeterminate = count > 0 && count < total;
+  }
+}
+
+function _ipinv2DeleteSelected() {
+  var checks = document.querySelectorAll('.ipinv2-row-chk:checked');
+  var ids = Array.prototype.map.call(checks, function(cb) { return cb.getAttribute('data-inv-id'); });
+  if (ids.length === 0) return;
+  if (!confirm('선택한 ' + ids.length + '건의 인보이스를 삭제하시겠습니까?\n\n연결된 발주서는 \'확정\' 상태로 자동 복원됩니다.')) return;
+
+  var btn = document.getElementById('ipinv2-delete-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '삭제 중...'; }
+
+  Promise.all(ids.map(function(id) {
+    return fetch('/api/import-invoices?id=' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function(r) { return r.json().then(function(j) { return { ok: r.ok && j.success, error: j.error, restored: j.restoredPOCount || 0 }; }); });
+  })).then(function(results) {
+    var successCount = 0, failed = 0, restoredTotal = 0;
+    results.forEach(function(r) {
+      if (r && r.ok) { successCount++; restoredTotal += (r.restored || 0); }
+      else failed++;
+    });
+    if (failed > 0) {
+      alert(successCount + '건 삭제 완료 / ' + failed + '건 실패');
+    } else {
+      var msg = successCount + '건 삭제 완료';
+      if (restoredTotal > 0) msg += ' (PO ' + restoredTotal + '건 복원)';
+      _ipinv2Toast(msg, 'success');
+    }
+    _ipinv2LoadList(function() {
+      var container = document.getElementById('tab-import-invoice-v2');
+      if (container) _ipinv2DoRenderList(container);
+    });
+  }).catch(function(err) {
+    alert('삭제 실패: ' + (err && err.message || err));
+    if (btn) { btn.disabled = false; btn.textContent = '선택 삭제 (0)'; }
+  });
 }
 
 // ── 새 인보이스 / 상세 오픈 ──

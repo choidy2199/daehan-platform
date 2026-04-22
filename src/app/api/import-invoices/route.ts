@@ -123,9 +123,28 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ success: false, error: 'id 필수' }, { status: 400 });
+
+    // 1) 연결된 PO 자동 복원 (status='confirmed', linked_invoice_id=null)
+    const { data: linkedPOs, error: poQueryErr } = await supabase
+      .from('import_po_headers')
+      .select('id')
+      .eq('linked_invoice_id', id);
+    if (poQueryErr) console.error('[invoice DELETE] PO query error:', poQueryErr);
+    const restoredCount = (linkedPOs || []).length;
+    if (restoredCount > 0) {
+      const { error: restoreErr } = await supabase
+        .from('import_po_headers')
+        .update({ status: 'confirmed', linked_invoice_id: null })
+        .eq('linked_invoice_id', id);
+      if (restoreErr) {
+        return NextResponse.json({ success: false, error: 'PO 복원 실패: ' + restoreErr.message }, { status: 500 });
+      }
+    }
+
+    // 2) 인보이스 삭제 (import_invoice_items는 FK cascade 기대, 미설정이면 명시 삭제)
     const { error } = await supabase.from('import_invoices').delete().eq('id', id);
     if (error) throw error;
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, restoredPOCount: restoredCount });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
