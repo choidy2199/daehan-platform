@@ -328,6 +328,8 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .tab-content.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 #tab-catalog.active { overflow: hidden; }
 #tab-import-po-v2.tab-content.active { height: calc(100vh - 62px); }
+#po-modal-root { flex:0 0 auto; min-height:0; }
+#po-modal-root:not(:empty) { flex:1 1 0%; }
 
 /* Section — 탭 내 마지막 section이 남은 높이를 채움 */
 .section { margin-bottom: 20px; border-radius: 6px; overflow: hidden; border: 1px solid var(--tl-border); }
