@@ -11830,7 +11830,7 @@ function importGenExcel() {
         genProducts.length = 0;
         imported.forEach(function(item) { genProducts.push(item); });
         statusEl.textContent = '전체 교체: ' + imported.length + '건 등록';
-      } else {
+      } else if (mode === 'merge') {
         var updated = 0, added = 0;
         imported.forEach(function(item) {
           var idx = genProducts.findIndex(function(p) { return String(p.code) === String(item.code); });
@@ -11847,12 +11847,27 @@ function importGenExcel() {
           }
         });
         statusEl.textContent = '코드매칭: ' + updated + '건 업데이트, ' + added + '건 신규 추가';
+      } else if (mode === 'new_only') {
+        var added = 0, skipped = 0;
+        imported.forEach(function(item) {
+          var exists = genProducts.some(function(p) { return String(p.code) === String(item.code); });
+          if (exists) {
+            skipped++;
+          } else {
+            genProducts.push(item);
+            added++;
+          }
+        });
+        statusEl.textContent = '신규만 추가: ' + added + '건 추가, ' + skipped + '건 스킵 (중복)';
       }
 
       localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
       renderGenProducts();
-      var genActionName = mode === 'merge' ? '코드매칭' : '전체교체';
-      saveActionHistory(genActionName, '일반제품', imported.length, null);
+      var genActionName = mode === 'merge' ? '코드매칭'
+                        : mode === 'new_only' ? '신규추가'
+                        : '전체교체';
+      var genCount = mode === 'new_only' ? added : imported.length;
+      saveActionHistory(genActionName, '일반제품', genCount, null);
       toast('일반제품 가져오기 완료 (' + imported.length + '건)');
       setTimeout(function() { closeGenImportModal(); }, 1500);
     } catch (err) {

@@ -1239,8 +1239,11 @@ document.head.appendChild(s);
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;font-size:13px">
           <input type="radio" name="gen-import-mode" value="replace" checked style="accent-color:#185FA5"> 전체 교체 — 기존 데이터 삭제 후 새로 등록 (최초 업로드)
         </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;font-size:13px">
           <input type="radio" name="gen-import-mode" value="merge"> 코드 매칭 업데이트 — 기존 제품은 덮어쓰기, 신규는 추가 (부분 수정용)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="radio" name="gen-import-mode" value="new_only"> 신규만 추가 (중복 코드는 기존 값 유지)
         </label>
       </div>
       <div id="gen-import-status" style="font-size:13px;color:#5A6070"></div>
