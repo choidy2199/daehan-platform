@@ -51,6 +51,25 @@ export async function GET(request: NextRequest) {
       h.display_brand = (h.brand as string) || firstBrandByPo[id] || '';
     });
 
+    // linked_invoice_no 폴백: linked_invoice_id가 있으면 invoice_no 배치 조회
+    const linkedInvoiceIds = headers
+      .map(h => h.linked_invoice_id as string | null)
+      .filter((v): v is string => !!v);
+    const invoiceNoById: Record<string, string> = {};
+    if (linkedInvoiceIds.length > 0) {
+      const { data: invoices } = await supabase
+        .from('import_invoices')
+        .select('id, invoice_no')
+        .in('id', linkedInvoiceIds);
+      (invoices || []).forEach((inv: { id: string; invoice_no: string }) => {
+        if (inv.invoice_no) invoiceNoById[inv.id] = inv.invoice_no;
+      });
+    }
+    headers.forEach(h => {
+      const linkId = h.linked_invoice_id as string | null;
+      h.linked_invoice_no = linkId && invoiceNoById[linkId] ? invoiceNoById[linkId] : null;
+    });
+
     return NextResponse.json({ success: true, data: headers });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

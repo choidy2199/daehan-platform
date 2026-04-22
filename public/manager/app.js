@@ -20383,7 +20383,7 @@ function _poFormatStatusBadge(status) {
   var map = {
     draft:     { bg:'#FAEEDA', color:'#854F0B', label:'작성중' },
     confirmed: { bg:'#E1F5EE', color:'#085041', label:'확정' },
-    linked:    { bg:'#EEEDFE', color:'#3C3489', label:'인보이스연결' },
+    linked:    { bg:'#E6F1FB', color:'#0C447C', label:'연결됨' },
     completed: { bg:'#E1F5EE', color:'#085041', label:'완료' },
   };
   var m = map[status] || map.draft;
@@ -21821,13 +21821,106 @@ function _poOpenPdfPreview(poId) {
     .catch(function(err) { alert('데이터 로드 실패: ' + (err && err.message || err)); });
 }
 
-// 인보이스 연결 모달 스텁 (커밋 9에서 구현)
+// 커밋 9 — 인보이스 연결 본 구현
+// PO → 새 인보이스 자동 생성 + linked_invoice_id/status 업데이트 + 인보이스V2 이동
 function _poOpenInvoiceLink(poId) {
-  alert('인보이스 연결 기능은 인보이스V2 메뉴 구축 후 사용 가능합니다.');
-  // TODO 커밋 9:
-  // - 인보이스 리스트 모달
-  // - 선택 시 PUT /api/import-po { id: poId, linked_invoice_id, status: 'linked' }
-  // - 성공 시 행 [🔗 인보이스 연결] → [✓ 연결됨] 회색으로 전환
+  if (!poId) return;
+  // 1) PO 상세 조회
+  fetch('/api/import-po/' + poId, { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.success) throw new Error((json && json.error) || 'PO 조회 실패');
+      var po = (json.data && json.data.header) ? json.data.header : (json.data || null);
+      if (!po) throw new Error('발주서를 찾을 수 없습니다');
+      if (po.status === 'linked' || po.linked_invoice_id) {
+        alert('이미 인보이스에 연결된 발주서입니다.');
+        return null;
+      }
+      if (!confirm('발주서 ' + po.po_number + '에 연결할 새 인보이스를 생성하시겠습니까?\n\n생성 후 인보이스V2 메뉴로 이동합니다.')) {
+        return null;
+      }
+      return po;
+    })
+    .then(function(po) {
+      if (!po) return null;
+      // 2) 기존 인보이스 목록 조회 → 시퀀스 계산
+      return fetch('/api/import-invoices?v=' + Date.now(), { cache: 'no-store' })
+        .then(function(r) { return r.json(); })
+        .then(function(j) {
+          var list = (j && j.success) ? (j.data || []) : [];
+          var year = new Date().getFullYear();
+          var prefix = 'INV-' + year + '-';
+          var maxSeq = 0;
+          list.forEach(function(inv) {
+            var n = inv && inv.invoice_no ? String(inv.invoice_no) : '';
+            if (n.indexOf(prefix) !== 0) return;
+            var seq = parseInt(n.substring(prefix.length), 10);
+            if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+          });
+          var nextInvNo = prefix + String(maxSeq + 1).padStart(3, '0');
+          var today = new Date();
+          var dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+          return { po: po, invoicePayload: {
+            invoice_no: nextInvNo,
+            factory_name: po.factory_name || po.brand || '(공장명)',
+            factory_code: po.factory_code || null,
+            invoice_date: dateStr,
+            memo: '발주서 ' + (po.po_number || '') + '에서 자동 생성'
+          }};
+        });
+    })
+    .then(function(ctx) {
+      if (!ctx) return null;
+      // 3) 인보이스 생성
+      return fetch('/api/import-invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ctx.invoicePayload)
+      }).then(function(r) { return r.json(); }).then(function(cj) {
+        if (!cj || !cj.success || !cj.data) throw new Error((cj && cj.error) || '인보이스 생성 실패');
+        return { po: ctx.po, invoice: cj.data };
+      });
+    })
+    .then(function(ctx) {
+      if (!ctx) return null;
+      // 4) PO 업데이트: linked_invoice_id + status='linked'
+      return fetch('/api/import-po', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ctx.po.id, linked_invoice_id: ctx.invoice.id, status: 'linked' })
+      }).then(function(r) { return r.json(); }).then(function(uj) {
+        if (!uj || !uj.success) throw new Error((uj && uj.error) || 'PO 업데이트 실패');
+        return ctx.invoice;
+      });
+    })
+    .then(function(invoice) {
+      if (!invoice) return;
+      // 5) 성공 → 알림 + 리스트 닫기 + 인보이스V2 이동 + 상세 열기
+      alert('인보이스 ' + invoice.invoice_no + '가 생성되었습니다.\n인보이스V2 메뉴로 이동합니다.');
+      _poClosePoListModal();
+      if (typeof switchTab === 'function') {
+        switchTab('import-invoice-v2');
+        setTimeout(function() {
+          if (typeof _ipinv2OpenDetail === 'function') _ipinv2OpenDetail(invoice.id);
+        }, 250);
+      }
+    })
+    .catch(function(err) {
+      console.error('[_poOpenInvoiceLink]', err);
+      alert('인보이스 연결 실패: ' + (err && err.message || err));
+    });
+}
+
+// 연결 인보이스 번호 클릭 → 인보이스V2 상세 이동
+function _poGotoInvoice(invoiceId) {
+  if (!invoiceId) return;
+  _poClosePoListModal();
+  if (typeof switchTab === 'function') {
+    switchTab('import-invoice-v2');
+    setTimeout(function() {
+      if (typeof _ipinv2OpenDetail === 'function') _ipinv2OpenDetail(invoiceId);
+    }, 250);
+  }
 }
 
 function _poClosePdfPreview() {
@@ -22287,9 +22380,12 @@ function _poRenderPoListTable(list, currentId) {
       var pdfBtn = '<button class="po-row-btn po-row-btn-pdf" onclick="event.stopPropagation(); _poOpenPdfPreview(\'' + idEsc + '\');">📄 PDF</button>';
       var invoiceBtn = isLinked
         ? '<button class="po-row-btn po-row-btn-invoice-linked" disabled>✓ 연결됨</button>'
-        : '<button class="po-row-btn po-row-btn-invoice-pending" onclick="event.stopPropagation(); _poOpenInvoiceLink(\'' + idEsc + '\');">🔗 인보이스 연결</button>';
+        : '<button class="po-row-btn po-row-btn-invoice-pending" onclick="event.stopPropagation(); _poOpenInvoiceLink(\'' + idEsc + '\');">🔗 인보이스</button>';
       actionsHtml = '<div class="po-list-row-actions">' + pdfBtn + invoiceBtn + '</div>';
     }
+    var invoiceCell = p.linked_invoice_no
+      ? '<a class="po-list-invoice-link" onclick="event.stopPropagation(); _poGotoInvoice(\'' + _poEsc(p.linked_invoice_id) + '\');">' + _poEsc(p.linked_invoice_no) + '</a>'
+      : '<span class="po-list-invoice-empty">-</span>';
     return '<tr class="' + cls + '">' +
       '<td class="po-list-td-check" onclick="event.stopPropagation();"><input type="checkbox" class="po-list-check" data-po-id="' + idEsc + '" onchange="_poListOnCheckChange()"></td>' +
       '<td style="font-family:monospace;font-size:12px;"' + selAttr + '>' + _poEsc(p.po_number || '-') + '</td>' +
@@ -22297,6 +22393,7 @@ function _poRenderPoListTable(list, currentId) {
       '<td' + selAttr + '>' + brandTxt + '</td>' +
       '<td style="text-align:right;font-variant-numeric:tabular-nums;"' + selAttr + '>' + totalTxt + '</td>' +
       '<td' + selAttr + '>' + _poFormatStatusBadge(p.status) + '</td>' +
+      '<td class="po-list-td-invoice">' + invoiceCell + '</td>' +
       '<td class="po-list-td-actions">' + actionsHtml + '</td>' +
       '</tr>';
   }).join('');
@@ -22304,13 +22401,13 @@ function _poRenderPoListTable(list, currentId) {
   var emptyCount = Math.max(0, _PO_LIST_PAGE_SIZE - list.length);
   var emptyRows = '';
   for (var i = 0; i < emptyCount; i++) {
-    emptyRows += '<tr class="po-list-row po-list-empty-row"><td colspan="7">&nbsp;</td></tr>';
+    emptyRows += '<tr class="po-list-row po-list-empty-row"><td colspan="8">&nbsp;</td></tr>';
   }
   return '<table class="po-list-table">' +
-    '<colgroup><col style="width:32px"><col style="width:130px"><col style="width:90px"><col style="width:80px"><col style="width:100px"><col style="width:70px"><col style=""></colgroup>' +
+    '<colgroup><col style="width:32px"><col style="width:120px"><col style="width:85px"><col style="width:70px"><col style="width:90px"><col style="width:65px"><col style="width:110px"><col style=""></colgroup>' +
     '<thead><tr>' +
     '<th class="po-list-th-check"><input type="checkbox" id="po-list-check-all" onchange="_poListToggleAllChecks(this.checked)"></th>' +
-    '<th>발주번호</th><th>날짜</th><th>브랜드</th><th style="text-align:right;">총금액</th><th>상태</th><th>작업</th>' +
+    '<th>발주번호</th><th>날짜</th><th>브랜드</th><th style="text-align:right;">총금액</th><th>상태</th><th>연결 인보이스</th><th>작업</th>' +
     '</tr></thead>' +
     '<tbody>' + rows + emptyRows + '</tbody>' +
     '</table>';
