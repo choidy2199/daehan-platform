@@ -65,7 +65,6 @@ document.head.appendChild(s);
       </button>
       <div class="sidebar-sub">
         <div class="sidebar-sub-item" data-tab="tab-general" data-window="일반단가표" onclick="_sidebarOpenWindow('일반단가표')"><span>일반단가표</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('일반단가표')">★</button></div>
-        <div class="sidebar-sub-item" data-tab="tab-estimate" data-window="검색" onclick="_sidebarOpenWindow('검색')"><span>견적서</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('검색')">★</button></div>
         <div class="sidebar-sub-item" data-tab="tab-transactions" data-window="거래명세서" onclick="_sidebarOpenWindow('거래명세서')"><span>거래명세서</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('거래명세서')">★</button></div>
       </div>
     </div>
@@ -639,54 +638,6 @@ document.head.appendChild(s);
     </div>
   </div>
 </div>
-
-<!-- =============== TAB 6: 견적서 =============== -->
-<div id="tab-estimate" class="tab-content">
-  <!-- 1번째 큰 메뉴: 제품 검색 추가 -->
-  <div class="section">
-    <div class="section-header" id="est-section-header">
-      <div style="display:flex;align-items:center;gap:12px">
-        <span>제품검색</span>
-        <span id="est-edit-selection-info" style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.6);display:none"></span>
-      </div>
-      <div id="est-header-actions" style="display:flex;gap:8px;align-items:center">
-        <button id="est-edit-btn" onclick="estToggleEditMode()" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">✎ 수정</button>
-      </div>
-    </div>
-    <div class="section-body" style="padding:12px">
-      <input class="input" id="est-search" type="search" name="search_naf_est" placeholder="코드, 모델명, 제품설명 검색..." autocomplete="nope" data-form-type="other" data-lpignore="true" style="max-width:500px;margin-bottom:12px"
-        oninput="searchEstProducts(this.value)">
-      <div id="est-search-results" class="table-scroll">
-        <table class="data-table" id="est-search-table">
-          <thead><tr>
-            <th id="est-no-th" style="width:30px">No.</th>
-            <th>코드</th>
-            <th>관리코드</th>
-            <th>대분류</th>
-            <th>모델/규격</th>
-            <th>제품/품명</th>
-            <th class="center">재고</th>
-            <th>원가</th>
-            <th>도매가</th>
-            <th style="background:#1D9E75;color:#fff">스토어팜</th>
-            <th style="background:#185FA5;color:#fff">오픈마켓</th>
-            <th style="background:#B8860B;color:#fff">SSG</th>
-            <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">IN</th>
-            <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">OUT</th>
-            <th class="center" style="background:#E6F1FB;color:#0C447C;font-size:10px">파레트</th>
-            <th>매입원가</th>
-            <th>마진금액</th>
-            <th>비고</th>
-            <th style="min-width:120px">입고날짜</th>
-          </tr></thead>
-          <tbody id="est-search-body"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-</div>
-
 <!-- =============== TAB: 거래명세서 =============== -->
 <div id="tab-transactions" class="tab-content">
   <!-- 최상단 제품 검색 블록 -->
@@ -1424,7 +1375,6 @@ document.head.appendChild(s);
         <label class="dm-row"><input type="checkbox" value="orderHistory"><span class="dm-label">발주 이력 (원가P)</span><span class="dm-badge" id="dm-cnt-orderHistory"></span></label>
         <label class="dm-row"><input type="checkbox" value="general"><span class="dm-label">일반제품</span><span class="dm-badge" id="dm-cnt-general"></span></label>
         <label class="dm-row"><input type="checkbox" value="sales"><span class="dm-label">온라인판매 항목</span><span class="dm-badge" id="dm-cnt-sales"></span></label>
-        <label class="dm-row"><input type="checkbox" value="estimates"><span class="dm-label">견적서</span><span class="dm-badge" id="dm-cnt-estimates"></span></label>
         <label class="dm-row"><input type="checkbox" value="setbun"><span class="dm-label">세트분해 / 배터리 시세</span><span class="dm-badge" id="dm-cnt-setbun"></span></label>
         <label class="dm-row"><input type="checkbox" value="settings"><span class="dm-label">설정값 (리베이트·수수료·마크업)</span><span class="dm-badge" id="dm-cnt-settings"></span></label>
         <label class="dm-row"><input type="checkbox" value="ui"><span class="dm-label">UI 설정 (컬럼 너비)</span><span class="dm-badge" id="dm-cnt-ui"></span></label>
@@ -1755,38 +1705,6 @@ document.head.appendChild(s);
   </div>
 </div>
 
-<!-- Estimate List Modal -->
-<div class="modal-bg" id="est-list-modal">
-  <div class="modal" style="max-width:700px;max-height:80vh">
-    <div class="modal-header">
-      <h3>📋 견적서 목록</h3>
-      <button class="modal-close" onclick="document.getElementById('est-list-modal').classList.remove('show')">&times;</button>
-    </div>
-    <div class="modal-body" style="overflow-y:auto;max-height:calc(80vh - 100px);padding:12px">
-      <table class="data-table">
-        <thead><tr><th>견적번호</th><th>거래처</th><th>견적금액</th><th>날짜</th><th style="width:120px"></th></tr></thead>
-        <tbody id="est-list-body"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- Estimate PDF Preview Modal -->
-<div class="modal-bg" id="est-pdf-modal">
-  <div class="modal" style="max-width:850px;max-height:95vh">
-    <div class="modal-header">
-      <h3>📄 견적서 미리보기</h3>
-      <button class="modal-close" onclick="document.getElementById('est-pdf-modal').classList.remove('show')">&times;</button>
-    </div>
-    <div class="modal-body" style="overflow-y:auto;max-height:calc(95vh - 130px);padding:0">
-      <div id="est-pdf-content" style="background:white;padding:40px;font-size:13px;color:#222;font-family:Pretendard,sans-serif"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" onclick="document.getElementById('est-pdf-modal').classList.remove('show')">닫기</button>
-      <button class="btn-primary" onclick="downloadEstimatePdf()">📥 PDF 다운로드</button>
-    </div>
-  </div>
-</div>
 
 <!-- Setbun Edit Modal -->
 <div class="modal-bg" id="setbun-edit-modal">

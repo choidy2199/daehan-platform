@@ -2,7 +2,7 @@
 // 삭제된 메뉴(수입 제품 창고, 수입계산기, 구 '제품' 메뉴)의 localStorage 키 목록.
 // Supabase app_data row는 보존하되 클라이언트에는 동기화하지 않음 (로드 시 필터).
 // 향후 다른 메뉴 삭제 시 이 배열에 추가.
-var _DEPRECATED_KEYS = ['mw_import_calcs', 'mw_import_items', 'mw_cache_import_products_v2'];
+var _DEPRECATED_KEYS = ['mw_import_calcs', 'mw_import_items', 'mw_cache_import_products_v2', 'mw_estimates'];
 
 // ======================== 일반제품 스키마 ========================
 // mw_gen_products 제품 객체 스키마 — 기존 20개 필드 + importPrice (number | null, USD).
@@ -266,7 +266,7 @@ function save(key, data) {
   if (key === KEYS.inventory) { _stockMap = null; }
   // products 변경 시 탭 캐시 무효화
   if (key === KEYS.products) {
-    if (typeof _renderedTabs !== 'undefined') { _renderedTabs['catalog'] = false; _renderedTabs['estimate'] = false; }
+    if (typeof _renderedTabs !== 'undefined') { _renderedTabs['catalog'] = false; }
   }
   // 자동 Supabase 동기화
   autoSyncToSupabase(key);
@@ -349,7 +349,7 @@ async function forceUploadAll() {
   if (btn) btn.disabled = true;
   updateSyncStatus('동기화 중...');
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
   // 동적 키: mw_import_po_cart_{poId} — PO별 장바구니 (커밋 5)
   for (var _si = 0; _si < localStorage.length; _si++) {
     var _sk = localStorage.key(_si);
@@ -401,7 +401,7 @@ async function uploadAllToSupabase() {
   btn.style.background = '#888';
   btn.style.color = '#fff';
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_estimates','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
   // 동적 키: mw_import_po_cart_{poId} — PO별 장바구니 (커밋 5)
   for (var _si = 0; _si < localStorage.length; _si++) {
     var _sk = localStorage.key(_si);
@@ -530,7 +530,6 @@ function _bgSyncFromSupabase(activeTab) {
       DB.rebate = load(KEYS.rebate);
       _stockMap = null;
       if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gp = loadObj('mw_gen_products', []); for (var j = 0; j < _gp.length; j++) genProducts.push(_gp[j]); }
-      if (typeof estimates !== 'undefined') { estimates.length = 0; var _es = loadObj('mw_estimates', []); for (var j = 0; j < _es.length; j++) estimates.push(_es[j]); }
       if (typeof clientData !== 'undefined') { clientData.length = 0; var _cl = loadObj('mw_clients', []); for (var j = 0; j < _cl.length; j++) clientData.push(_cl[j]); }
 
       // 변경된 키에 해당하는 탭만 리렌더링
@@ -665,7 +664,6 @@ async function realtimeDownloadAndRefresh() {
       _stockMap = null; // 재고 캐시 초기화
 
       // 추가 글로벌 변수 재로드
-      if (typeof estimates !== 'undefined') { estimates.length = 0; var _estArr = loadObj('mw_estimates', []); for (var j = 0; j < _estArr.length; j++) estimates.push(_estArr[j]); }
       if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gpArr = loadObj('mw_gen_products', []); for (var j = 0; j < _gpArr.length; j++) genProducts.push(_gpArr[j]); }
       if (typeof clientData !== 'undefined') { clientData.length = 0; var _clArr = loadObj('mw_clients', []); for (var j = 0; j < _clArr.length; j++) clientData.push(_clArr[j]); }
 
@@ -724,7 +722,6 @@ function refreshActiveTab() {
     if (tabId === 'tab-manage') {
       if (typeof renderClients === 'function') renderClients();
     }
-    if (tabId === 'tab-estimate' && typeof renderEstimateList === 'function') renderEstimateList();
     if (tabId === 'tab-general' && typeof renderGenProducts === 'function') renderGenProducts();
     if (tabId === 'tab-kakao') {
       var activeKakaoSub = localStorage.getItem('mw_kakao_active_subtab') || 'kakao-dashboard';
@@ -1728,7 +1725,6 @@ function debounce(fn, delay) {
   var overrides = {
     'catalog-search': function() { renderCatalog(); },
     'gen-search': function() { renderGenProducts(); },
-    'est-search': function() { searchEstProducts(document.getElementById('est-search').value); },
     'client-search': function() { renderClients(); }
   };
   function applyDebounce() {
@@ -1787,7 +1783,6 @@ var _windowConfig = {
   '인보이스V2': { tabId: 'import-invoice-v2', color: 'purple' },
   '수입건V2':   { tabId: 'import-batch-v2',   color: 'purple' },
   '택배':       { tabId: 'delivery',       color: 'gray' },
-  '검색':       { tabId: 'search',         color: 'gray' },
   '카톡':       { tabId: 'kakao',          color: 'pink' },
   '공지':       { tabId: 'notice',         color: 'orange' },
   '백오더':     { tabId: 'backorder',      color: 'blue' },
@@ -1806,11 +1801,11 @@ var _windowConfig = {
 })();
 
 // 삭제된 탭 ID (즐겨찾기/열린창 자동 정리용)
-var _removedWindowNames = ['매출', '매입', '견적', '제품V2', '제품', '수입계산기', '인보이스', '매입매출'];
+var _removedWindowNames = ['매출', '매입', '견적', '제품V2', '제품', '수입계산기', '인보이스', '매입매출', '검색'];
 
 var _openWindows = [];    // 열린 창 이름 목록 (순서 유지)
 var _activeWindow = null; // 현재 활성 창 이름
-var _defaultFavorites = ['단가표','발주','일반단가표','온라인','검색'];
+var _defaultFavorites = ['단가표','발주','일반단가표','온라인'];
 
 function _getFavoritesKey() {
   var u = window.currentUser && window.currentUser.loginId || 'default';
@@ -2425,7 +2420,6 @@ var _tabIdMap = {
   'import-invoice-v2':{ contentId: 'tab-import-invoice-v2',  render: 'importInvoiceV2' },
   'import-batch-v2':  { contentId: 'tab-import-batch-v2',    render: 'importBatchV2' },
   'delivery':         { contentId: 'tab-delivery',         placeholder: true },
-  'search':           { contentId: 'tab-estimate',         render: 'estimate' },
   'kakao':            { contentId: 'tab-kakao',            render: 'kakao' },
   'notice':           { contentId: 'tab-notice',           render: 'notice' },
   'backorder':        { contentId: 'tab-backorder',        render: 'backorder' },
@@ -2439,7 +2433,6 @@ var _legacyTabIdMap = {
   'setbun':   'mw-set',
   'general':  'gen-price',
   'sales':    'sales-online',
-  'estimate': 'search',
   'manage':   'setting'
 };
 
@@ -2484,7 +2477,6 @@ function switchTab(tab) {
       if (renderKey === 'sales') { renderSales(); renderOnlineSales(); }
       if (renderKey === 'promo') { renderPromo(); renderAllPromosV2(); }
       if (renderKey === 'setbun') renderSetbun();
-      if (renderKey === 'estimate') { renderEstimateList(); if (!_estDateManuallySet) { var _edEl = document.getElementById('est-date'); if (_edEl) _edEl.value = getTodayStr(); } searchEstProducts(''); }
       if (renderKey === 'general') renderGenProducts();
       if (renderKey === 'manage') { loadFeeSettings(); switchSettingsMain('fee'); }
       if (renderKey === 'kakao') renderKakaoTab();
@@ -2498,10 +2490,6 @@ function switchTab(tab) {
       console.log('[PERF] switchTab(' + tab + ') 렌더링: ' + (performance.now() - t0).toFixed(0) + 'ms');
     });
   } else {
-    // 견적 탭 재방문 시 날짜 갱신 (사용자가 직접 변경하지 않은 경우)
-    if (renderKey === 'estimate' && !_estDateManuallySet) {
-      document.getElementById('est-date').value = getTodayStr();
-    }
     // Phase 3B-2: 거래명세서 탭 재진입 시 기본 4개 재표시 (검색창 비어있을 때만)
     if (renderKey === 'tx' && typeof _tx !== 'undefined' && _tx._onReenter) _tx._onReenter();
     console.log('[PERF] switchTab(' + tab + ') 캐시 히트: ' + (performance.now() - t0).toFixed(0) + 'ms');
@@ -10034,9 +10022,6 @@ function executeDataReset() {
     if (v === 'sales') {
       if (typeof salesItems !== 'undefined') { salesItems.length = 0; localStorage.setItem('mw_sales_items', '[]'); }
     }
-    if (v === 'estimates') {
-      if (typeof estimates !== 'undefined') { estimates.length = 0; localStorage.setItem('mw_estimates', '[]'); }
-    }
     if (v === 'setbun') {
       if (typeof setbunItems !== 'undefined') { setbunItems.length = 0; localStorage.setItem('mw_setbun_items', '[]'); }
       if (typeof partsPrices !== 'undefined') { partsPrices = {}; localStorage.setItem('mw_parts_prices', '{}'); }
@@ -11876,856 +11861,6 @@ function importGenExcel() {
   reader.readAsArrayBuffer(file);
 }
 
-// ======================== TAB 6: 견적서 ========================
-let estimates = loadObj('mw_estimates', []);
-let currentEstIdx = -1;
-let currentEstItems = [];
-
-function genEstNo() {
-  const d = new Date();
-  const prefix = 'DH-' + d.getFullYear() + String(d.getMonth()+1).padStart(2,'0');
-  const existing = estimates.filter(e => e.no && e.no.startsWith(prefix));
-  const nextNum = existing.length + 1;
-  return prefix + '-' + String(nextNum).padStart(4,'0');
-}
-
-// Helper: find product from both 밀워키 + 일반제품
-function getGenTierPrice(genProduct, qty) {
-  if (!genProduct) return { price: 0, tier: '' };
-  var q = parseInt(qty) || 0;
-  if (genProduct.palletQty && genProduct.palletPrice && q >= genProduct.palletQty) {
-    return { price: genProduct.palletPrice, tier: '파레트' };
-  }
-  if (genProduct.outQty && genProduct.outPrice && q >= genProduct.outQty) {
-    return { price: genProduct.outPrice, tier: 'OUT' };
-  }
-  if (genProduct.inQty && genProduct.inPrice && q >= genProduct.inQty) {
-    return { price: genProduct.inPrice, tier: 'IN' };
-  }
-  return { price: genProduct.priceA || genProduct.cost || 0, tier: '' };
-}
-
-function findAnyProduct(code) {
-  const mw = findProduct(code);
-  if (mw) return { ...mw, _source: 'milwaukee' };
-  const gen = genProducts.find(p => String(p.code) === String(code));
-  if (gen) return { ...gen, _source: 'general' };
-  return null;
-}
-
-function searchEstProducts(val) {
-  const body = document.getElementById('est-search-body');
-  if (!body) return;
-  const q = (val || '').toLowerCase().trim();
-
-  var combined;
-  if (!q) {
-    // 검색어 없으면 전체 목록 표시
-    combined = DB.products.map(function(p) { return Object.assign({}, p, { _source: 'milwaukee' }); })
-      .concat(genProducts.map(function(p) { return Object.assign({}, p, { _source: 'general' }); }));
-  } else {
-    // 밀워키 검색 (manageCode 포함)
-    var mwResults = DB.products.filter(function(p) {
-      return String(p.code).includes(q) || String(p.manageCode || '').toLowerCase().includes(q) || String(p.model || '').toLowerCase().includes(q) || String(p.description || '').toLowerCase().includes(q);
-    }).map(function(p) { return Object.assign({}, p, { _source: 'milwaukee' }); });
-    // 일반제품 검색
-    var genResults = genProducts.filter(function(p) {
-      return (String(p.code) + ' ' + (p.manageCode || '') + ' ' + (p.model || '') + ' ' + (p.description || '')).toLowerCase().includes(q);
-    }).map(function(p) { return Object.assign({}, p, { _source: 'general' }); });
-    combined = mwResults.concat(genResults);
-  }
-
-  // 데이터 인덱스 계산용 (소스별 원본 배열에서의 위치)
-  var _estRowNum = 0;
-  body.innerHTML = combined.map(function(p) {
-    _estRowNum++;
-    var aPrice = p.priceA || 0;
-    var cost = p.cost || 0;
-    var margin = aPrice > 0 && cost > 0 ? aPrice - cost : 0;
-    var marginRate = aPrice > 0 && cost > 0 ? ((margin / aPrice) * 100).toFixed(1) : '-';
-    var marginDisplay = margin > 0 ? fmt(margin) + ' (' + marginRate + '%)' : (margin < 0 ? '<span style="color:#CC2222">' + fmt(margin) + ' (' + marginRate + '%)</span>' : '-');
-    // 원본 배열 인덱스 찾기
-    var srcArr = p._source === 'milwaukee' ? DB.products : genProducts;
-    var origIdx = -1;
-    for (var si = 0; si < srcArr.length; si++) { if (srcArr[si].code === p.code) { origIdx = si; break; } }
-    // IN/OUT/파레트 셀
-    var inCell, outCell, palletCell;
-    if (p._source === 'general') {
-      inCell = (p.inQty && p.inPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:10px;color:#5A6070">' + p.inQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.inPrice.toLocaleString() + '</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
-      outCell = (p.outQty && p.outPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:10px;color:#5A6070">' + p.outQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.outPrice.toLocaleString() + '</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
-      palletCell = (p.palletQty && p.palletPrice) ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:10px;color:#5A6070">' + p.palletQty + '개</span><span style="font-size:10px;font-weight:600;color:#185FA5">' + p.palletPrice.toLocaleString() + '</span></div>' : p.palletQty ? '<div style="display:flex;flex-direction:column;align-items:center"><span style="font-size:10px;color:#5A6070">' + p.palletQty + '개</span><span style="font-size:10px;color:#9BA3B2">단가없음</span></div>' : '<span style="color:#DDE1EB;font-size:10px">-</span>';
-    } else {
-      inCell = '<span style="color:#DDE1EB;font-size:10px">-</span>';
-      outCell = '<span style="color:#DDE1EB;font-size:10px">-</span>';
-      palletCell = '<span style="color:#DDE1EB;font-size:10px">-</span>';
-    }
-    return '<tr>' +
-      '<td class="center est-no-col" data-source="' + p._source + '" data-idx="' + origIdx + '">' + _estRowNum + '</td>' +
-      '<td class="center">' + p.code + '</td>' +
-      '<td class="center" style="font-size:10px">' + (p.manageCode || '-') + '</td>' +
-      '<td class="center">' + (p.category || '-') + '</td>' +
-      '<td class="center" style="font-weight:500">' + (p.model || '-') + '</td>' +
-      '<td class="center" style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (p.description || '-') + '</td>' +
-      '<td class="center">' + (function(){ var s = p._source === 'milwaukee' ? findStock(p.code) : (p.stock != null ? p.stock : null); return s != null ? (s > 0 ? '<span class="badge badge-green">' + s + '</span>' : s === 0 ? '<span class="badge badge-amber">0</span>' : '<span class="badge badge-red">' + s + '</span>') : '<span class="badge badge-gray">-</span>'; })() + '</td>' +
-      '<td class="num" style="color:#1D9E75">' + (cost ? fmt(cost) : '-') + '</td>' +
-      '<td class="num" style="color:#185FA5;font-weight:700">' + fmt(aPrice) + '</td>' +
-      '<td class="num" style="padding:4px 3px">' + marketBadge(p, 'naver') + '</td>' +
-      '<td class="num" style="padding:4px 3px">' + marketBadge(p, 'gmarket') + '</td>' +
-      '<td class="num" style="padding:4px 3px">' + marketBadge(p, 'ssg') + '</td>' +
-      '<td class="center">' + inCell + '</td>' +
-      '<td class="center">' + outCell + '</td>' +
-      '<td class="center">' + palletCell + '</td>' +
-      '<td class="num" style="color:#1D9E75">' + (cost ? fmt(cost) : '-') + '</td>' +
-      '<td class="num" style="font-size:11px">' + marginDisplay + '</td>' +
-      '<td class="center">-</td>' +
-      '<td style="text-align:left;font-size:12px;white-space:nowrap;padding-left:8px">' + (p.inDate ? '<span style="color:#CC2222;margin-right:4px">●</span>' + p.inDate : '-') + '</td>' +
-    '</tr>';
-  }).join('');
-  initColumnResize('est-search-table');
-  initStickyHeader('est-search-table');
-  // 편집 모드였으면 체크박스 복원
-  if (_estEditMode) _estEnterEditMode();
-}
-
-// ========================================
-// 검색 탭 — 편집 모드 (No. ↔ 체크박스)
-// ========================================
-
-var _estEditMode = false;
-var _estBulkFields = ['code','manageCode','category','subCategory1','subCategory2','promoNo','ttiNo','model','supplyPrice'];
-var _estBulkLabels = ['코드','관리코드','대분류','중분류','소분류','프로모션No.','TTI#','모델명','공급가'];
-var _estBulkEditData = [], _estBulkOrigData = [], _estBulkKeys = [];
-var _estBulkActiveIdx = 0, _estBulkTabReady = false;
-
-function estToggleEditMode() {
-  _estEditMode = !_estEditMode;
-  var headerActions = document.getElementById('est-header-actions');
-  if (_estEditMode) {
-    headerActions.innerHTML =
-      '<span id="est-edit-selection-info" style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.7)">0개 선택됨</span>' +
-      '<button onclick="estEditAction(\'modify\')" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">선택수정</button>' +
-      '<button onclick="estEditAction(\'delete\')" style="background:#CC2222;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">선택삭제</button>' +
-      '<button onclick="estToggleEditMode()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">취소</button>';
-    _estEnterEditMode();
-  } else {
-    headerActions.innerHTML =
-      '<button id="est-edit-btn" onclick="estToggleEditMode()" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">✎ 수정</button>';
-    _estExitEditMode();
-  }
-}
-
-function _estEnterEditMode() {
-  // th → 전체선택 체크박스
-  var noTh = document.getElementById('est-no-th');
-  if (noTh) {
-    noTh._origHTML = noTh.innerHTML;
-    noTh.innerHTML = '<input type="checkbox" id="est-edit-checkall" onchange="_estToggleAll(this)" style="width:15px;height:15px;accent-color:#185FA5">';
-  }
-  // td → 체크박스
-  document.querySelectorAll('#est-search-body .est-no-col').forEach(function(td) {
-    td._origHTML = td.innerHTML;
-    var src = td.dataset.source || '';
-    var idx = td.dataset.idx || '';
-    td.innerHTML = '<input type="checkbox" class="est-edit-cb" data-source="' + src + '" data-idx="' + idx + '" onchange="_estUpdateSelection()" style="width:15px;height:15px;accent-color:#185FA5">';
-  });
-  _estUpdateSelection();
-}
-
-function _estExitEditMode() {
-  // th 복원
-  var noTh = document.getElementById('est-no-th');
-  if (noTh && noTh._origHTML) { noTh.innerHTML = noTh._origHTML; delete noTh._origHTML; }
-  else if (noTh) noTh.textContent = 'No.';
-  // td 복원
-  var num = 0;
-  document.querySelectorAll('#est-search-body .est-no-col').forEach(function(td) {
-    if (td._origHTML) { td.innerHTML = td._origHTML; delete td._origHTML; }
-    else { num++; td.textContent = num; }
-  });
-}
-
-function _estToggleAll(masterCb) {
-  document.querySelectorAll('.est-edit-cb').forEach(function(cb) { cb.checked = masterCb.checked; });
-  _estUpdateSelection();
-}
-
-function _estUpdateSelection() {
-  var checked = document.querySelectorAll('.est-edit-cb:checked').length;
-  var total = document.querySelectorAll('.est-edit-cb').length;
-  var info = document.getElementById('est-edit-selection-info');
-  if (info) info.textContent = checked + '개 선택됨';
-  var masterCb = document.getElementById('est-edit-checkall');
-  if (masterCb) masterCb.checked = (checked === total && total > 0);
-  // 행 하이라이트
-  document.querySelectorAll('.est-edit-cb').forEach(function(cb) {
-    var tr = cb.closest('tr');
-    if (tr) tr.style.background = cb.checked ? '#E6F1FB' : '';
-  });
-}
-
-function _estGetCheckedKeys() {
-  var keys = [];
-  document.querySelectorAll('.est-edit-cb:checked').forEach(function(cb) {
-    keys.push({ source: cb.dataset.source, idx: parseInt(cb.dataset.idx) });
-  });
-  return keys;
-}
-
-function estEditAction(action) {
-  var keys = _estGetCheckedKeys();
-  if (keys.length === 0) { alert('제품을 선택해주세요'); return; }
-
-  if (action === 'modify') {
-    _estShowBulkEditModal(keys);
-    return;
-  }
-
-  if (action === 'delete') {
-    if (!confirm('선택하신 ' + keys.length + '개 제품을 삭제하시겠습니까?')) return;
-    // 인덱스 역순 삭제 (앞에서 지우면 인덱스 밀림)
-    var mwDel = keys.filter(function(k) { return k.source === 'milwaukee'; }).map(function(k) { return k.idx; }).sort(function(a,b){ return b-a; });
-    var genDel = keys.filter(function(k) { return k.source === 'general'; }).map(function(k) { return k.idx; }).sort(function(a,b){ return b-a; });
-    mwDel.forEach(function(i) { if (i >= 0 && i < DB.products.length) DB.products.splice(i, 1); });
-    genDel.forEach(function(i) { if (i >= 0 && i < genProducts.length) genProducts.splice(i, 1); });
-    if (mwDel.length > 0) { recalcAll(); save(KEYS.products, DB.products); }
-    if (genDel.length > 0) save('mw_gen_products', genProducts);
-    searchEstProducts(document.getElementById('est-search') ? document.getElementById('est-search').value : '');
-    return;
-  }
-}
-
-// ── 선택수정 팝업 ──
-function _estShowBulkEditModal(keys) {
-  _estBulkEditData = []; _estBulkOrigData = []; _estBulkKeys = [];
-  keys.forEach(function(k) {
-    var arr = k.source === 'milwaukee' ? DB.products : genProducts;
-    var p = arr[k.idx];
-    if (!p) return;
-    var copy = {}, orig = {};
-    _estBulkFields.forEach(function(f) { copy[f] = p[f] !== undefined && p[f] !== null ? p[f] : ''; orig[f] = copy[f]; });
-    _estBulkEditData.push(copy);
-    _estBulkOrigData.push(orig);
-    _estBulkKeys.push(k);
-  });
-  if (_estBulkEditData.length === 0) { alert('선택된 제품을 찾을 수 없습니다'); return; }
-  _estBulkActiveIdx = 0;
-
-  // 탭 HTML
-  var tabsHtml = _estBulkEditData.map(function(d, i) {
-    var label = d.model || d.code || '제품' + (i+1);
-    if (label.length > 20) label = label.substring(0, 20) + '…';
-    return '<button class="estbe-tab" data-idx="' + i + '" onclick="_estBulkSwitchTab(' + i + ')" ' +
-      'style="background:none;border:none;padding:8px 14px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;' +
-      'font-family:Pretendard,sans-serif;color:#9BA3B2;border-bottom:2px solid transparent;margin-bottom:-2px">' + label + '</button>';
-  }).join('');
-
-  // 필드 HTML (3열 그리드 × 3행)
-  var fieldsHtml = '';
-  for (var r = 0; r < 3; r++) {
-    fieldsHtml += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">';
-    for (var c = 0; c < 3; c++) {
-      var fi = r * 3 + c;
-      if (fi >= _estBulkFields.length) { fieldsHtml += '<div></div>'; continue; }
-      var fk = _estBulkFields[fi];
-      var fl = _estBulkLabels[fi];
-      var oninput = fk === 'supplyPrice' ? ' oninput="var v=this.value.replace(/[^0-9]/g,\'\');if(v)this.value=Number(v).toLocaleString();else this.value=\'\'"' : '';
-      fieldsHtml += '<div class="form-field"><label class="label">' + fl + '</label>' +
-        '<input class="input estbe-input" data-field="' + fk + '" id="estbe-f-' + fk + '" type="text"' + oninput + '></div>';
-    }
-    fieldsHtml += '</div>';
-  }
-
-  var html = '<div id="est-bulk-edit-modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:10000;justify-content:center;align-items:flex-start;padding-top:40px">' +
-    '<div id="est-bulk-edit-inner" style="max-width:720px;width:92%;border-radius:10px;background:white;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.15)">' +
-      '<div id="est-bulk-edit-header" style="padding:14px 20px;border-bottom:1px solid #DDE1EB;display:flex;justify-content:space-between;align-items:center;cursor:move">' +
-        '<h3 style="font-size:16px;font-weight:600;margin:0">' + _estBulkEditData.length + '개 제품 수정</h3>' +
-        '<button onclick="_estCloseBulkModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9BA3B2">&times;</button>' +
-      '</div>' +
-      '<div style="background:#F4F6FA;padding:8px 20px;font-size:11px;color:#5A6070">각 제품 탭을 클릭하여 개별 수정 · 수정 후 \'전체 적용\'으로 일괄 저장</div>' +
-      '<div style="display:flex;gap:0;border-bottom:2px solid #DDE1EB;margin:0 20px;overflow-x:auto;flex-shrink:0">' + tabsHtml + '</div>' +
-      '<div style="padding:16px 20px">' + fieldsHtml + '</div>' +
-      '<div style="padding:12px 20px;border-top:1px solid #DDE1EB;display:flex;justify-content:flex-end;gap:8px">' +
-        '<button onclick="_estCloseBulkModal()" style="background:transparent;color:#185FA5;border:1px solid #185FA5;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">취소</button>' +
-        '<button onclick="_estApplyBulkEdit()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:Pretendard,sans-serif">전체 적용</button>' +
-      '</div>' +
-    '</div>' +
-  '</div>';
-
-  document.body.insertAdjacentHTML('beforeend', html);
-  var modalEl = document.getElementById('est-bulk-edit-inner');
-  var handleEl = document.getElementById('est-bulk-edit-header');
-  if (modalEl && handleEl) _makeDraggable(modalEl, handleEl);
-  _estBulkSwitchTab(0);
-}
-
-function _estBulkSaveCurrentTab() {
-  if (!_estBulkTabReady) return;
-  var d = _estBulkEditData[_estBulkActiveIdx];
-  if (!d) return;
-  _estBulkFields.forEach(function(k) {
-    var el = document.getElementById('estbe-f-' + k);
-    if (!el) return;
-    if (k === 'supplyPrice') { d[k] = parseInt(el.value.replace(/[^0-9]/g, '')) || 0; }
-    else { d[k] = el.value; }
-  });
-}
-
-function _estBulkSwitchTab(idx) {
-  _estBulkSaveCurrentTab();
-  _estBulkActiveIdx = idx;
-  document.querySelectorAll('.estbe-tab').forEach(function(btn, i) {
-    var active = i === idx;
-    btn.style.color = active ? '#185FA5' : '#9BA3B2';
-    btn.style.fontWeight = active ? '600' : '500';
-    btn.style.borderBottom = active ? '2px solid #185FA5' : '2px solid transparent';
-    btn.style.background = active ? '#E6F1FB' : 'none';
-  });
-  var d = _estBulkEditData[idx];
-  if (!d) return;
-  _estBulkFields.forEach(function(k) {
-    var el = document.getElementById('estbe-f-' + k);
-    if (!el) return;
-    if (k === 'supplyPrice') { el.value = d[k] ? Number(d[k]).toLocaleString() : ''; }
-    else { el.value = d[k] || ''; }
-  });
-  _estBulkTabReady = true;
-}
-
-function _estCloseBulkModal() {
-  var el = document.getElementById('est-bulk-edit-modal');
-  if (el) el.remove();
-  _estBulkEditData = []; _estBulkOrigData = []; _estBulkKeys = [];
-  _estBulkActiveIdx = 0; _estBulkTabReady = false;
-}
-
-function _estApplyBulkEdit() {
-  _estBulkSaveCurrentTab();
-  var updated = 0;
-  _estBulkEditData.forEach(function(d, di) {
-    var k = _estBulkKeys[di];
-    var arr = k.source === 'milwaukee' ? DB.products : genProducts;
-    var p = arr[k.idx];
-    if (!p) return;
-    var changed = false;
-    _estBulkFields.forEach(function(f) {
-      if (String(d[f]) !== String(_estBulkOrigData[di][f])) { p[f] = d[f]; changed = true; }
-    });
-    if (changed) updated++;
-  });
-  if (updated > 0) {
-    // 밀워키 제품 변경됐으면 저장
-    var hasMw = _estBulkKeys.some(function(k) { return k.source === 'milwaukee'; });
-    var hasGen = _estBulkKeys.some(function(k) { return k.source === 'general'; });
-    if (hasMw) { recalcAll(); save(KEYS.products, DB.products); }
-    if (hasGen) save('mw_gen_products', genProducts);
-  }
-  _estCloseBulkModal();
-  searchEstProducts(document.getElementById('est-search') ? document.getElementById('est-search').value : '');
-}
-
-function showEstimateList() {
-  renderEstimateList();
-  document.getElementById('est-list-modal').classList.add('show');
-}
-
-function renderEstimateList() {
-  const body = document.getElementById('est-list-body');
-  if (!body) return;
-  body.innerHTML = estimates.map((e, i) => {
-    return `<tr>
-      <td class="center" style="font-weight:600">${e.no}</td>
-      <td class="center">${e.client || '-'}</td>
-      <td class="num" style="font-weight:600">${fmt(e.total || 0)}</td>
-      <td class="center">${e.date || '-'}</td>
-      <td class="center" style="white-space:nowrap">
-        <button class="btn-edit" onclick="openEstimate(${i})">열기</button>
-        <button class="btn-danger btn-sm" onclick="deleteEstimate(${i})" style="padding:2px 8px;font-size:11px">삭제</button>
-      </td>
-    </tr>`;
-  }).join('');
-  if (!estimates.length) {
-    body.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>저장된 견적서가 없습니다</p></div></td></tr>';
-  }
-  var countEl = document.getElementById('est-list-count');
-  if (countEl) countEl.textContent = `${estimates.length}건`;
-}
-
-function getTodayStr() {
-  var d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-var _estDateManuallySet = false;
-
-function newEstimate() {
-  currentEstIdx = -1;
-  currentEstItems = [];
-  var clientEl = document.getElementById('est-client');
-  var dateEl = document.getElementById('est-date');
-  if (clientEl) clientEl.value = '';
-  if (dateEl) dateEl.value = getTodayStr();
-  _estDateManuallySet = false;
-  estSelectedClient = null;
-  var cInfo = document.getElementById('est-client-info');
-  if (cInfo) { cInfo.style.display = 'none'; cInfo.style.background = '#F4F6FA'; cInfo.innerHTML = ''; }
-  renderEstimateItems();
-}
-
-// 견적 날짜 input 변경 감지 — 사용자 직접 변경 시 플래그 설정
-(function() {
-  function attachDateListener() {
-    var dateInput = document.getElementById('est-date');
-    if (dateInput && !dateInput._dateListenerAttached) {
-      dateInput._dateListenerAttached = true;
-      dateInput.addEventListener('change', function() { _estDateManuallySet = true; });
-    }
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', attachDateListener);
-  } else {
-    setTimeout(attachDateListener, 0);
-  }
-})();
-
-// ======================== 견적서 거래처 자동완성 ========================
-var estSelectedClient = null;
-
-function searchClientAC(val) {
-  var list = document.getElementById('client-ac-list');
-  if (!list) return;
-  if (!val || val.length < 1) { list.style.display = 'none'; return; }
-  var q = String(val).toLowerCase();
-  var results = (typeof clientData !== 'undefined' ? clientData : []).filter(function(c) {
-    return String(c.name || '').toLowerCase().includes(q) ||
-           String(c.bizNo || '').replace(/-/g, '').includes(q.replace(/-/g, '')) ||
-           String(c.ceo || '').toLowerCase().includes(q) ||
-           String(c.code || '').toLowerCase().includes(q);
-  }).slice(0, 8);
-  var html = '';
-  results.forEach(function(c) {
-    var idx = clientData.indexOf(c);
-    html += '<div class="client-ac-item" data-idx="' + idx + '" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid #F0F2F7">';
-    html += '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E1F5EE;color:#085041;white-space:nowrap">등록</span>';
-    html += '<span style="font-weight:600;color:#1A1D23">' + (c.name || '') + '</span>';
-    html += '<span style="font-size:10px;color:#5A6070">' + (c.bizNo || '') + '</span>';
-    html += '<span style="font-size:10px;color:#9BA3B2">' + (c.ceo || '') + '</span>';
-    html += '<span style="font-size:10px;color:#9BA3B2">' + (c.phone || c.mobile || '') + '</span>';
-    html += '</div>';
-  });
-  html += '<div class="client-ac-new" style="padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;background:#FAFBFC;border-top:2px solid #DDE1EB">';
-  html += '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E6F1FB;color:#0C447C;white-space:nowrap">신규</span>';
-  html += '<span style="color:#185FA5;font-weight:500">"' + val + '"</span>';
-  html += '<span style="font-size:10px;color:#9BA3B2">← 미등록 거래처로 직접 입력</span>';
-  html += '</div>';
-  list.innerHTML = html;
-  list.style.display = 'block';
-  list.querySelectorAll('.client-ac-item').forEach(function(el) {
-    el.onmousedown = function(e) {
-      e.preventDefault();
-      var idx = parseInt(el.dataset.idx);
-      var c = clientData[idx];
-      if (!c) return;
-      document.getElementById('est-client').value = c.name;
-      estSelectedClient = c;
-      showEstClientInfo(c);
-      renderEstimateItems();
-      list.style.display = 'none';
-    };
-  });
-  var newBtn = list.querySelector('.client-ac-new');
-  if (newBtn) {
-    newBtn.onmousedown = function(e) {
-      e.preventDefault();
-      estSelectedClient = null;
-      showEstClientUnreg(val);
-      renderEstimateItems();
-      list.style.display = 'none';
-    };
-  }
-}
-
-function showEstClientInfo(c) {
-  var info = document.getElementById('est-client-info');
-  if (!info) return;
-  info.style.display = 'flex';
-  info.style.background = '#F4F6FA';
-  info.innerHTML =
-    '<div><span style="color:#5A6070">상호: </span><span style="font-weight:500">' + (c.name || '') + '</span>' +
-    '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:#E1F5EE;color:#085041;margin-left:4px">등록</span></div>' +
-    '<div><span style="color:#5A6070">사업자: </span><span>' + (c.bizNo || '-') + '</span></div>' +
-    '<div><span style="color:#5A6070">대표: </span><span>' + (c.ceo || '-') + '</span></div>' +
-    '<div><span style="color:#5A6070">전화: </span><span>' + (c.phone || c.mobile || '-') + '</span></div>' +
-    '<div><span style="color:#5A6070">주소: </span><span>' + (c.address || '-') + '</span></div>' +
-    '<div><span style="color:#5A6070">이메일: </span><span>' + (c.email || '-') + '</span></div>' +
-    (c.vatExempt ? '<div style="color:#CC2222;font-weight:600;margin-top:4px">⚠️ 부가세 면제 거래처</div>' : '');
-}
-
-function showEstClientUnreg(name) {
-  var info = document.getElementById('est-client-info');
-  if (!info) return;
-  info.style.display = 'flex';
-  info.style.background = '#FFF5F5';
-  info.innerHTML =
-    '<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:#FCEBEB;color:#791F1F">미등록</span>' +
-    '<span style="color:#5A6070;font-size:11px">"' + name + '" — 설정 > 거래처 등록에서 등록하면 자동 연결됩니다</span>';
-}
-
-document.addEventListener('mousedown', function(e) {
-  var wrap = document.getElementById('client-ac-wrap');
-  var list = document.getElementById('client-ac-list');
-  if (wrap && list && !wrap.contains(e.target)) {
-    list.style.display = 'none';
-  }
-});
-
-function openEstimate(idx) {
-  const e = estimates[idx];
-  if (!e) return;
-  currentEstIdx = idx;
-  currentEstItems = JSON.parse(JSON.stringify(e.items || []));
-  document.getElementById('est-client').value = e.client || '';
-  document.getElementById('est-date').value = e.date || '';
-  _estDateManuallySet = true; // 저장된 견적서의 날짜 유지
-  document.getElementById('est-current-no').textContent = e.no || '';
-  document.getElementById('est-list-modal').classList.remove('show');
-  renderEstimateItems();
-}
-
-function deleteEstimate(idx) {
-  if (!confirm('이 견적서를 삭제하시겠습니까?')) return;
-  estimates.splice(idx, 1);
-  localStorage.setItem('mw_estimates', JSON.stringify(estimates));
-  autoSyncToSupabase('mw_estimates');
-  if (currentEstIdx === idx) { currentEstIdx = -1; currentEstItems = []; renderEstimateItems(); }
-  renderEstimateList();
-  toast('견적서 삭제 완료');
-}
-
-function addEstimateProduct(code) {
-  const p = findAnyProduct(code);
-  if (!p) return;
-  if (currentEstItems.some(it => String(it.code) === String(code))) {
-    toast('이미 추가된 제품입니다');
-    return;
-  }
-  currentEstItems.push({
-    code: String(p.code),
-    manageCode: p.manageCode || '',
-    category: p.category || '',
-    model: p.model || '',
-    description: p.description || '',
-    priceA: p.priceA || 0,
-    qty: 1,
-    memo: ''
-  });
-  renderEstimateItems();
-  toast(`${p.model} 추가 완료`);
-}
-
-function removeEstimateItem(idx) {
-  currentEstItems.splice(idx, 1);
-  renderEstimateItems();
-}
-
-function onEstQtyChange(idx, val) {
-  currentEstItems[idx].qty = parseInt(val) || 0;
-  // 일반제품이면 수량별 자동 단가 적용
-  var p = findAnyProduct(currentEstItems[idx].code);
-  if (p && p._source === 'general') {
-    var tier = getGenTierPrice(p, currentEstItems[idx].qty);
-    currentEstItems[idx].customPrice = tier.price;
-    currentEstItems[idx]._tier = tier.tier;
-  }
-  renderEstimateItems();
-}
-
-function onEstMemoChange(idx, val) {
-  currentEstItems[idx].memo = val;
-}
-
-function renderEstimateItems() {
-  const body = document.getElementById('est-body');
-  if (!body) return;
-  const isVatExempt = estSelectedClient && estSelectedClient.vatExempt === true;
-  let total = 0;
-  body.innerHTML = currentEstItems.map((item, i) => {
-    const p = findAnyProduct(item.code);
-    const aPrice = item.customPrice != null ? item.customPrice : (p ? p.priceA : (item.priceA || 0));
-    const stock = findStock(item.code);
-    const qty = item.qty || 0;
-    const amount = aPrice * qty;
-    const vat = isVatExempt ? 0 : Math.round(amount * 0.1);
-    total += amount;
-    const stockTxt = stock == null ? '-' : `<span style="color:#CC2222;font-weight:700">${stock}</span>`;
-    return `<tr>
-      <td class="center"><button class="btn-danger btn-sm" onclick="removeEstimateItem(${i})" style="padding:2px 6px">✕</button></td>
-      <td class="center">${item.code}</td>
-      <td class="center" style="font-size:10px">${item.manageCode || (p ? p.manageCode : '') || '-'}</td>
-      <td class="center">${item.category || (p ? p.category : '') || '-'}</td>
-      <td class="center" style="font-weight:500">${p ? p.model : item.model}</td>
-      <td class="center" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p ? p.description : item.description}</td>
-      <td class="center"><input type="number" value="${qty || ''}" onchange="onEstQtyChange(${i},this.value)" min="0" style="width:60px;text-align:center"></td>
-      <td class="num"><input type="number" value="${aPrice || ''}" onchange="onEstPriceChange(${i},this.value)" min="0" style="width:80px;text-align:right;font-size:12px">${item._tier === '파레트' ? '<span style="font-size:10px;background:#FAEEDA;color:#633806;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">파레트</span>' : item._tier === 'IN' ? '<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">IN</span>' : (item._tier === 'OUT' ? '<span style="font-size:10px;background:#E6F1FB;color:#0C447C;padding:1px 4px;border-radius:2px;font-weight:600;margin-left:4px">OUT</span>' : '')}</td>
-      <td class="num" style="font-weight:600">${amount ? fmt(amount) : '-'}</td>
-      <td class="num" style="color:#5A6070">${amount ? fmt(vat) : '-'}</td>
-      <td class="center"><input value="${item.memo || ''}" onchange="onEstMemoChange(${i},this.value)" style="width:60px;font-size:12px;text-align:center"></td>
-      <td class="center"><input value="${item.shipCompany || ''}" onchange="currentEstItems[${i}].shipCompany=this.value" style="width:70px;font-size:12px;text-align:center" placeholder=""></td>
-      <td class="num"><input type="number" value="${item.shipCost || ''}" onchange="currentEstItems[${i}].shipCost=parseInt(this.value)||0" min="0" style="width:70px;text-align:right;font-size:12px" placeholder=""></td>
-      <td class="center">${stockTxt}</td>
-    </tr>`;
-  }).join('');
-  if (!currentEstItems.length) {
-    body.innerHTML = '<tr><td colspan="14" style="text-align:center;color:#9BA3B2;padding:20px">제품을 검색하여 추가하세요</td></tr>';
-  }
-  const totalVat = isVatExempt ? 0 : Math.round(total * 0.1);
-  const vatLabel = isVatExempt ? '부가세 면제' : '부가세 ' + fmt(totalVat);
-  var estTotalEl = document.getElementById('est-total');
-  if (estTotalEl) estTotalEl.innerHTML = `${fmt(total)} <span style="font-size:13px;color:#5A6070;font-weight:400">+</span> <span style="font-size:13px;color:${isVatExempt ? '#CC2222' : '#5A6070'}">${vatLabel}</span> <span style="font-size:13px;color:#5A6070;font-weight:400">=</span> <span style="font-size:18px;color:#CC2222">토탈 ${fmt(total + totalVat)}</span>`;
-  if (document.getElementById('est-table')) { initColumnResize('est-table'); initStickyHeader('est-table'); }
-}
-
-function onEstPriceChange(idx, val) {
-  currentEstItems[idx].customPrice = parseInt(val) || 0;
-  currentEstItems[idx]._tier = '';
-  renderEstimateItems();
-}
-
-function saveEstimate() {
-  var noEl = document.getElementById('est-current-no');
-  var no = noEl.textContent;
-  if (!no || no === '-') no = genEstNo();
-  noEl.textContent = no;
-  const client = document.getElementById('est-client').value.trim();
-  const date = document.getElementById('est-date').value;
-  if (!client) { toast('거래처를 입력해주세요'); return; }
-
-  let total = 0;
-  currentEstItems.forEach(item => {
-    const p = findAnyProduct(item.code);
-    const aPrice = p ? p.priceA : (item.priceA || 0);
-    total += aPrice * (item.qty || 0);
-  });
-
-  const estData = { no, client, date, total, items: JSON.parse(JSON.stringify(currentEstItems)) };
-
-  if (currentEstIdx >= 0) {
-    estimates[currentEstIdx] = estData;
-  } else {
-    estimates.push(estData);
-    currentEstIdx = estimates.length - 1;
-  }
-  localStorage.setItem('mw_estimates', JSON.stringify(estimates));
-  autoSyncToSupabase('mw_estimates');
-  renderEstimateList();
-  toast('견적서 저장 완료');
-}
-
-function previewEstimatePdf() {
-  const no = document.getElementById('est-current-no').textContent;
-  const client = document.getElementById('est-client').value.trim();
-  const date = document.getElementById('est-date').value;
-  if (!client) { toast('거래처를 입력해주세요'); return; }
-
-  let total = 0;
-  let hasShipping = false;
-  let shippingRows = '';
-  const rows = currentEstItems.filter(it => it.qty > 0).map((item, i) => {
-    const p = findAnyProduct(item.code);
-    const aPrice = item.customPrice != null ? item.customPrice : (p ? p.priceA : (item.priceA || 0));
-    const amount = aPrice * item.qty;
-    const vat = Math.round(amount * 0.1);
-    total += amount;
-    if (item.shipCost > 0) {
-      hasShipping = true;
-      shippingRows += `<tr>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center" colspan="4">택배비 (${item.shipCompany || '-'})</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">1</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${fmt(item.shipCost)}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;font-weight:600">${fmt(item.shipCost)}</td>
-        <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;color:#5A6070">${fmt(Math.round(item.shipCost * 0.1))}</td>
-      </tr>`;
-      total += item.shipCost;
-    }
-    return `<tr>
-      <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${i+1}</td>
-      <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${item.code}</td>
-      <td style="padding:6px 8px;border:1px solid #ccc;font-weight:500">${p ? p.model : item.model}</td>
-      <td style="padding:6px 8px;border:1px solid #ccc">${p ? p.description : item.description}</td>
-      <td style="padding:6px 8px;border:1px solid #ccc;text-align:center">${item.qty}</td>
-      <td style="padding:6px 8px;border:1px solid #ccc;text-align:right">${fmt(aPrice)}</td>
-      <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;font-weight:600">${fmt(amount)}</td>
-      <td style="padding:6px 8px;border:1px solid #ccc;text-align:right;color:#5A6070">${fmt(vat)}</td>
-    </tr>`;
-  }).join('');
-
-  const totalVat = Math.round(total * 0.1);
-  const shippingMessage = hasShipping ? '' : `<div style="background:#FFF8E8;border:1px solid #EF9F27;border-radius:4px;padding:10px 14px;margin-bottom:20px;font-size:13px;font-weight:600;color:#8B6914;text-align:center">※ 모든 제품은 택배비가 별도입니다.</div>`;
-
-  const html = `
-    <div style="text-align:center;margin-bottom:24px">
-      <h1 style="font-size:24px;margin:0 0 4px">견 적 서</h1>
-      <p style="font-size:12px;color:#888">본 견적서는 발행일로부터 10일 이내 유효합니다.</p>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:20px;font-size:13px">
-      <div>
-        <table style="border-collapse:collapse">
-          <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">견적번호</td><td style="padding:4px 12px;border:1px solid #ccc">${no}</td></tr>
-          <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">공급받는자</td><td style="padding:4px 12px;border:1px solid #ccc;font-weight:700">${client}</td></tr>
-          <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">견적일자</td><td style="padding:4px 12px;border:1px solid #ccc">${date}</td></tr>
-        </table>
-      </div>
-      <div style="text-align:right">
-        <table style="border-collapse:collapse">
-          <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">합계금액</td><td style="padding:4px 12px;border:1px solid #ccc;font-weight:700;font-size:15px;color:#185FA5">${fmt(total)}</td></tr>
-          <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">부가세(10%)</td><td style="padding:4px 12px;border:1px solid #ccc">${fmt(totalVat)}</td></tr>
-          <tr><td style="padding:4px 12px;font-weight:600;background:#f5f5f5;border:1px solid #ccc">총계(VAT포함)</td><td style="padding:4px 12px;border:1px solid #ccc;font-weight:700">${fmt(total + totalVat)}</td></tr>
-        </table>
-      </div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px">
-      <thead>
-        <tr style="background:#1A1D23;color:white">
-          <th style="padding:8px;border:1px solid #ccc">No</th>
-          <th style="padding:8px;border:1px solid #ccc">코드</th>
-          <th style="padding:8px;border:1px solid #ccc">모델 및 품명</th>
-          <th style="padding:8px;border:1px solid #ccc">제품설명 및 규격</th>
-          <th style="padding:8px;border:1px solid #ccc">수량</th>
-          <th style="padding:8px;border:1px solid #ccc">단가</th>
-          <th style="padding:8px;border:1px solid #ccc">합계금액</th>
-          <th style="padding:8px;border:1px solid #ccc">부가세</th>
-        </tr>
-      </thead>
-      <tbody>${rows}${shippingRows}</tbody>
-      <tfoot>
-        <tr style="background:#f5f5f5;font-weight:700">
-          <td colspan="6" style="padding:8px;border:1px solid #ccc;text-align:right">합 계</td>
-          <td style="padding:8px;border:1px solid #ccc;text-align:right">${fmt(total)}</td>
-          <td style="padding:8px;border:1px solid #ccc;text-align:right">${fmt(totalVat)}</td>
-        </tr>
-      </tfoot>
-    </table>
-    ${shippingMessage}
-    <div style="border-top:2px solid #1A1D23;padding-top:14px;font-size:12px;color:#555">
-      <div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#222">공급자</div>
-      <table style="border-collapse:collapse;width:100%">
-        <tr><td style="padding:3px 10px;width:100px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">업체명</td><td style="padding:3px 10px;border:1px solid #ddd;font-weight:700">(주)대한종합상사</td><td style="padding:3px 10px;width:80px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">대표</td><td style="padding:3px 10px;border:1px solid #ddd">최병우</td></tr>
-        <tr><td style="padding:3px 10px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">소재지</td><td colspan="3" style="padding:3px 10px;border:1px solid #ddd">경기도 양주시 백석읍 부흥로 1110</td></tr>
-        <tr><td style="padding:3px 10px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">업태</td><td style="padding:3px 10px;border:1px solid #ddd">도소매</td><td style="padding:3px 10px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">종목</td><td style="padding:3px 10px;border:1px solid #ddd">공구 및 철물</td></tr>
-        <tr><td style="padding:3px 10px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">TEL</td><td style="padding:3px 10px;border:1px solid #ddd">031-871-0945</td><td style="padding:3px 10px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">FAX</td><td style="padding:3px 10px;border:1px solid #ddd">031-871-0944</td></tr>
-        <tr><td style="padding:3px 10px;font-weight:600;background:#f9f9f9;border:1px solid #ddd">이메일</td><td colspan="3" style="padding:3px 10px;border:1px solid #ddd">0945Daehan@naver.com</td></tr>
-      </table>
-    </div>
-  `;
-
-  document.getElementById('est-pdf-content').innerHTML = html;
-  document.getElementById('est-pdf-modal').classList.add('show');
-}
-
-function downloadEstimatePdf() {
-  const content = document.getElementById('est-pdf-content');
-  const no = document.getElementById('est-current-no').textContent;
-  const client = document.getElementById('est-client').value.trim();
-
-  const printWin = window.open('', '_blank');
-  printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>견적서_${no}_${client}</title>
-    <style>
-      body { font-family: Pretendard, 'Malgun Gothic', sans-serif; margin: 30px; color: #222; }
-      @media print { body { margin: 15px; } }
-      table { page-break-inside: auto; }
-      tr { page-break-inside: avoid; }
-    </style></head><body>${content.innerHTML}</body></html>`);
-  printWin.document.close();
-  setTimeout(() => { printWin.print(); }, 500);
-}
-
-// ======================== 전표 등록 (NewOrderOut) ========================
-async function registerOrderOut() {
-  var btn = document.getElementById('btn-order-out');
-
-  // 거래처 확인
-  var clientName = document.getElementById('est-client').value.trim();
-  if (!clientName) { alert('거래처를 선택해주세요'); return; }
-
-  var customerCode = '';
-  if (estSelectedClient && estSelectedClient.manageCode && estSelectedClient.manageCode !== '-') {
-    customerCode = estSelectedClient.manageCode;
-  } else if (estSelectedClient) {
-    alert('이 거래처에 관리코드(CODE2)가 없습니다.\n경영박사에서 거래처 관리코드를 등록한 후 다시 시도하세요.\n\n거래처: ' + clientName);
-    return;
-  } else {
-    alert('등록된 거래처를 선택해주세요.\n(경영박사에 등록된 거래처만 전표 등록 가능)');
-    return;
-  }
-
-  // 품목 확인
-  if (!currentEstItems.length) { alert('품목을 추가해주세요'); return; }
-
-  // 날짜
-  var dateVal = document.getElementById('est-date').value || '';
-  var erpDate = '';
-  if (dateVal) {
-    var d = new Date(dateVal);
-    erpDate = String(d.getFullYear()).slice(2) + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
-  }
-
-  // 품목 데이터 구성
-  var isVatExempt = estSelectedClient && estSelectedClient.vatExempt === true;
-  var totalAmount = 0;
-  var itemsData = currentEstItems.filter(function(it) { return it.qty > 0; }).map(function(it) {
-    var p = findAnyProduct(it.code);
-    var price = it.customPrice != null ? it.customPrice : (p ? p.priceA : (it.priceA || 0));
-    var amount = price * it.qty;
-    var vat = isVatExempt ? 0 : Math.round(amount * 0.1);
-    totalAmount += amount;
-    return {
-      code: p ? (p.manageCode || p.code) : it.code,
-      qty: it.qty,
-      price: price,
-      amount: amount,
-      vat: vat,
-      memo: it.memo || ''
-    };
-  });
-
-  if (!itemsData.length) { alert('수량이 0인 품목은 등록할 수 없습니다'); return; }
-
-  // 확인
-  if (!confirm('매출 전표를 등록하시겠습니까?\n거래처: ' + clientName + '\n품목: ' + itemsData.length + '건\n합계: ' + totalAmount.toLocaleString() + '원')) return;
-
-  // API 호출
-  btn.disabled = true;
-  btn.textContent = '등록 중...';
-
-  try {
-    var resp = await fetch('/api/erp/order-out', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customerCode: customerCode,
-        memo: '',
-        date: erpDate,
-        items: itemsData
-      })
-    });
-    var data = await resp.json();
-
-    if (!resp.ok || data.error) {
-      alert('전표 등록 실패: ' + (data.error || '서버 오류') + (data.detail ? '\n' + data.detail : ''));
-    } else {
-      alert('전표 등록 완료\n' + (data.result || ''));
-      // 카운터 업데이트
-      updateInvoiceCounter(clientName, customerCode, totalAmount);
-      // 작업이력 기록
-      if (typeof saveActionHistory === 'function') {
-        saveActionHistory('전표등록', '밀워키', itemsData.length, null);
-      }
-    }
-  } catch (err) {
-    alert('전표 등록 실패: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📋 전표 등록';
-  }
-}
 
 // ======================== 전표 카운터 + 팝오버 ========================
 function getInvoiceToday() {
@@ -15009,7 +14144,6 @@ async function init() {
         DB.rebate = load(KEYS.rebate);
         _stockMap = null;
         if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gp = loadObj('mw_gen_products', []); for (var j = 0; j < _gp.length; j++) genProducts.push(_gp[j]); }
-        if (typeof estimates !== 'undefined') { estimates.length = 0; var _es = loadObj('mw_estimates', []); for (var j = 0; j < _es.length; j++) estimates.push(_es[j]); }
         if (typeof clientData !== 'undefined') { clientData.length = 0; var _cl = loadObj('mw_clients', []); for (var j = 0; j < _cl.length; j++) clientData.push(_cl[j]); }
         // 렌더링된 탭 초기화 → 다시 렌더링
         _renderedTabs = {};
@@ -15026,7 +14160,6 @@ async function init() {
   // 2. 나머지 탭은 지연 렌더링 (유저가 클릭할 때 또는 백그라운드)
   setTimeout(function() {
     var t = performance.now();
-    newEstimate();
     updateSyncTimeDisplay();
     console.log('[PERF] init — 지연 초기화: ' + (performance.now() - t).toFixed(0) + 'ms');
   }, 200);
