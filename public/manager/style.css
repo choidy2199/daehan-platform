@@ -2380,7 +2380,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 /* 발주서 리스트 — 행별 작업 컬럼 (PDF / 인보이스 연결) */
 .po-list-table td.po-list-td-actions { text-align:center; padding:4px 6px; white-space:nowrap; }
 .po-list-row-actions { display:inline-flex; gap:6px; justify-content:center; }
-.po-row-btn { width:140px; height:30px; display:inline-flex; align-items:center; justify-content:center; gap:4px; background:#fff; border:1px solid #DDE1EB; border-radius:4px; padding:0 10px; font-size:12px; font-weight:500; cursor:pointer; font-family:Pretendard,sans-serif; color:#1A1D23; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; }
+.po-row-btn { width:110px; height:28px; display:inline-flex; align-items:center; justify-content:center; gap:3px; background:#fff; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:11.5px; font-weight:500; cursor:pointer; font-family:Pretendard,sans-serif; color:#1A1D23; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-sizing:border-box; }
 .po-row-btn:hover:not(:disabled) { background:#F4F6FA; border-color:#B0B8CC; }
 .po-row-btn-pdf { color:#185FA5; border-color:#185FA5; }
 .po-row-btn-pdf:hover { background:#E6F1FB; }
@@ -2390,6 +2390,40 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-row-btn-invoice-linked:hover { background:#DDE1EB; }
 .po-list-current-label { color:#9BA3B2; font-size:12px; font-style:italic; }
 .po-list-draft-label { color:#9BA3B2; font-size:12px; }
+
+/* 발주서 리스트 — 테이블 폰트/패딩 축소 (840px 모달 대응) */
+.po-list-table th { padding:8px 8px; font-size:12px; }
+.po-list-table td { padding:8px 8px; font-size:12px; }
+
+/* 필터 레이아웃 (상태 탭 + 날짜 필터) */
+.po-filter-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:10px 16px 0 16px; flex-wrap:wrap; position:relative; }
+.po-list-filter-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+
+/* 날짜 빠른 필터 */
+.po-date-filter { display:flex; gap:6px; align-items:center; }
+.po-date-quick-btn { background:#fff; color:#5A6070; border:1px solid #DDE1EB; border-radius:4px; padding:5px 12px; font-size:12px; font-weight:500; cursor:pointer; font-family:Pretendard,sans-serif; }
+.po-date-quick-btn:hover:not(.active) { background:#F4F6FA; }
+.po-date-quick-btn.active { background:#E6F1FB; color:#185FA5; border-color:#185FA5; }
+
+/* 월 선택 드롭다운 */
+.po-month-picker { position:absolute; top:calc(100% + 4px); right:0; z-index:10002; background:#fff; border:1px solid #DDE1EB; border-radius:6px; padding:12px; width:260px; box-shadow:0 4px 12px rgba(26,29,35,0.12); font-family:Pretendard,sans-serif; }
+.po-month-picker-nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.po-month-picker-nav button { width:22px; height:22px; background:#fff; border:1px solid #DDE1EB; border-radius:4px; cursor:pointer; color:#5A6070; font-size:13px; }
+.po-month-picker-nav button:hover { background:#F4F6FA; }
+.po-month-picker-year { font-size:13px; font-weight:600; color:#1A1D23; }
+.po-month-picker-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }
+.po-month-cell { padding:10px 0; text-align:center; border-radius:4px; cursor:pointer; font-size:12px; color:#1A1D23; border:1px solid #DDE1EB; background:#fff; font-family:Pretendard,sans-serif; }
+.po-month-cell:hover:not(.active) { background:#F4F6FA; }
+.po-month-cell.active { background:#185FA5; color:#fff; border-color:#185FA5; }
+
+/* 페이지네이션 */
+.po-pagination-wrapper { display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding:12px 16px 0 16px; border-top:1px solid #DDE1EB; }
+.po-pagination-info { font-size:12px; color:#5A6070; font-family:Pretendard,sans-serif; }
+.po-pagination { display:flex; gap:4px; }
+.po-page-btn { min-width:28px; height:28px; padding:0 8px; background:#fff; border:1px solid #DDE1EB; border-radius:4px; font-size:12px; cursor:pointer; color:#5A6070; font-family:Pretendard,sans-serif; display:inline-flex; align-items:center; justify-content:center; }
+.po-page-btn:hover:not(:disabled):not(.active) { background:#F4F6FA; border-color:#B0B8CC; }
+.po-page-btn.active { background:#185FA5; color:#fff; border-color:#185FA5; }
+.po-page-btn:disabled { background:#F4F6FA; color:#9BA3B2; cursor:not-allowed; }
 
 /* ===== 커밋 7 — PDF 미리보기 모달 + A4 문서 ===== */
 .po-pdf-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:10001; display:flex; align-items:center; justify-content:center; padding:20px; font-family:Pretendard,sans-serif; }

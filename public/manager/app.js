@@ -21759,13 +21759,14 @@ function _poBuildPdfHtml(po, items) {
   var poDateFmt = po && po.po_date ? String(po.po_date).replace(/-/g, '. ') : '-';
   items = Array.isArray(items) ? items : [];
 
-  var totalQty = 0, totalPallet = 0, totalFob = 0;
+  var totalQty = 0, totalPalletCount = 0, totalFob = 0;
   items.forEach(function(it) {
     var q = Number(it.quantity) || 0;
-    var p = Number(it.pallet_qty) || 0;
+    var pUnit = Number(it.pallet_qty) || 0;
+    var pc = pUnit > 0 ? (q / pUnit) : 0;
     var f = Number(it.fob_usd) || 0;
     totalQty += q;
-    totalPallet += p;
+    totalPalletCount += pc;
     totalFob += q * f;
   });
 
@@ -21775,6 +21776,9 @@ function _poBuildPdfHtml(po, items) {
 
   var itemRows = items.map(function(it, idx) {
     var qty = Number(it.quantity) || 0;
+    var pUnit = Number(it.pallet_qty) || 0;
+    var pCount = pUnit > 0 ? (qty / pUnit) : 0;
+    var palletDisp = pCount > 0 ? pCount.toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'P' : '-';
     var fob = Number(it.fob_usd) || 0;
     var lineTotal = qty * fob;
     return '<tr>' +
@@ -21782,7 +21786,7 @@ function _poBuildPdfHtml(po, items) {
       '<td class="center">' + _poEsc(it.brand || '-') + '</td>' +
       '<td>' + _poEsc(it.model || '-') + '</td>' +
       '<td>' + _poEsc(it.product_name || '-') + '</td>' +
-      '<td class="right">' + (Number(it.pallet_qty) || 0).toLocaleString() + '</td>' +
+      '<td class="right">' + palletDisp + '</td>' +
       '<td class="right">' + qty.toLocaleString() + '</td>' +
       '<td class="right">$' + fob.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
       '<td class="right">$' + lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
@@ -21847,7 +21851,7 @@ function _poBuildPdfHtml(po, items) {
   if (items.length > 0) {
     h += '<tfoot><tr>';
     h += '<td colspan="4" class="right"><strong>합계</strong></td>';
-    h += '<td class="right"><strong>' + totalPallet.toLocaleString() + '</strong></td>';
+    h += '<td class="right"><strong>' + totalPalletCount.toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'P</strong></td>';
     h += '<td class="right"><strong>' + totalQty.toLocaleString() + '</strong></td>';
     h += '<td class="right">-</td>';
     h += '<td class="right"><strong>$' + totalFob.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</strong></td>';
@@ -21911,10 +21915,155 @@ function _poDownloadPdf() {
 // ===== 커밋 6 후속 — 발주서 리스트 모달 =====
 
 var _poListFilter = 'all';
+var _poListPage = 1;
+var _PO_LIST_PAGE_SIZE = 10;
+var _poDateFilter = { mode: 'thisMonth', year: new Date().getFullYear(), month: new Date().getMonth() + 1 };
+
+function _poApplyDateFilter(list) {
+  var f = _poDateFilter;
+  if (!f || f.mode === 'all') return list;
+  var now = new Date();
+  if (f.mode === 'thisYear') {
+    var y = String(now.getFullYear());
+    return list.filter(function(p) { return p.po_date && String(p.po_date).slice(0, 4) === y; });
+  }
+  if (f.mode === 'thisMonth') {
+    var prefix = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    return list.filter(function(p) { return p.po_date && String(p.po_date).slice(0, 7) === prefix; });
+  }
+  if (f.mode === 'specificMonth') {
+    var pm = f.year + '-' + String(f.month).padStart(2, '0');
+    return list.filter(function(p) { return p.po_date && String(p.po_date).slice(0, 7) === pm; });
+  }
+  return list;
+}
+
+function _poSetDateFilter(mode) {
+  _poDateFilter.mode = mode;
+  _poListPage = 1;
+  _poRefreshListModal();
+}
+
+function _poSetListPage(page) {
+  if (page < 1) return;
+  _poListPage = page;
+  _poRefreshListModal();
+}
+
+function _poRenderDateFilter() {
+  var f = _poDateFilter;
+  var specLabel = f.mode === 'specificMonth' ? (f.year + '년 ' + f.month + '월 ▾') : '월 선택 ▾';
+  var h = '<div class="po-date-filter">';
+  h += '<button class="po-date-quick-btn' + (f.mode === 'thisMonth' ? ' active' : '') + '" onclick="_poSetDateFilter(\'thisMonth\')">이번달</button>';
+  h += '<button class="po-date-quick-btn' + (f.mode === 'specificMonth' ? ' active' : '') + '" onclick="_poOpenMonthPicker(event)">' + specLabel + '</button>';
+  h += '<button class="po-date-quick-btn' + (f.mode === 'thisYear' ? ' active' : '') + '" onclick="_poSetDateFilter(\'thisYear\')">이번해</button>';
+  h += '<button class="po-date-quick-btn' + (f.mode === 'all' ? ' active' : '') + '" onclick="_poSetDateFilter(\'all\')">전체</button>';
+  h += '</div>';
+  return h;
+}
+
+function _poRenderMonthPickerGrid(year, activeYear, activeMonth) {
+  var cells = '';
+  for (var m = 1; m <= 12; m++) {
+    var active = (year === activeYear && m === activeMonth) ? ' active' : '';
+    cells += '<button class="po-month-cell' + active + '" onclick="_poSelectMonth(' + year + ',' + m + ')">' + m + '월</button>';
+  }
+  return cells;
+}
+
+function _poOpenMonthPicker(ev) {
+  if (ev) ev.stopPropagation();
+  var existing = document.getElementById('po-month-picker');
+  if (existing) { existing.remove(); return; }
+  var f = _poDateFilter;
+  var targetYear = f.year || new Date().getFullYear();
+  var picker = document.createElement('div');
+  picker.id = 'po-month-picker';
+  picker.className = 'po-month-picker';
+  picker.setAttribute('data-year', String(targetYear));
+  picker.innerHTML =
+    '<div class="po-month-picker-nav">' +
+      '<button onclick="_poShiftPickerYear(-1)">‹</button>' +
+      '<span class="po-month-picker-year">' + targetYear + '년</span>' +
+      '<button onclick="_poShiftPickerYear(1)">›</button>' +
+    '</div>' +
+    '<div class="po-month-picker-grid">' + _poRenderMonthPickerGrid(targetYear, f.year, f.month) + '</div>';
+  var filterArea = document.querySelector('#po-list-modal .po-filter-row');
+  if (!filterArea) return;
+  filterArea.style.position = 'relative';
+  filterArea.appendChild(picker);
+  setTimeout(function() {
+    document.addEventListener('click', _poMonthPickerOutsideClick, true);
+  }, 0);
+}
+
+function _poMonthPickerOutsideClick(e) {
+  var picker = document.getElementById('po-month-picker');
+  if (!picker) {
+    document.removeEventListener('click', _poMonthPickerOutsideClick, true);
+    return;
+  }
+  if (picker.contains(e.target)) return;
+  if (e.target && e.target.closest && e.target.closest('.po-date-quick-btn')) return;
+  picker.remove();
+  document.removeEventListener('click', _poMonthPickerOutsideClick, true);
+}
+
+function _poShiftPickerYear(delta) {
+  var picker = document.getElementById('po-month-picker');
+  if (!picker) return;
+  var year = parseInt(picker.getAttribute('data-year'), 10) || new Date().getFullYear();
+  year += delta;
+  picker.setAttribute('data-year', String(year));
+  var yearSpan = picker.querySelector('.po-month-picker-year');
+  if (yearSpan) yearSpan.textContent = year + '년';
+  var grid = picker.querySelector('.po-month-picker-grid');
+  if (grid) grid.innerHTML = _poRenderMonthPickerGrid(year, _poDateFilter.year, _poDateFilter.month);
+}
+
+function _poSelectMonth(year, month) {
+  _poDateFilter.mode = 'specificMonth';
+  _poDateFilter.year = year;
+  _poDateFilter.month = month;
+  _poListPage = 1;
+  var picker = document.getElementById('po-month-picker');
+  if (picker) picker.remove();
+  document.removeEventListener('click', _poMonthPickerOutsideClick, true);
+  _poRefreshListModal();
+}
+
+function _poRenderPagination(filteredCount) {
+  var pageSize = _PO_LIST_PAGE_SIZE;
+  var totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+  var current = _poListPage;
+  var startIdx = filteredCount === 0 ? 0 : (current - 1) * pageSize + 1;
+  var endIdx = Math.min(current * pageSize, filteredCount);
+  var maxVisible = 5;
+  var startP, endP;
+  if (totalPages <= maxVisible) { startP = 1; endP = totalPages; }
+  else {
+    var half = Math.floor(maxVisible / 2);
+    if (current <= half) { startP = 1; endP = maxVisible; }
+    else if (current + half >= totalPages) { startP = totalPages - maxVisible + 1; endP = totalPages; }
+    else { startP = current - half; endP = current + half; }
+  }
+  var pageBtns = '';
+  for (var pn = startP; pn <= endP; pn++) {
+    pageBtns += '<button class="po-page-btn' + (pn === current ? ' active' : '') + '" onclick="_poSetListPage(' + pn + ')">' + pn + '</button>';
+  }
+  return '<div class="po-pagination-wrapper">' +
+    '<div class="po-pagination-info">총 ' + filteredCount + '건 중 ' + startIdx + '-' + endIdx + ' 표시</div>' +
+    '<div class="po-pagination">' +
+      '<button class="po-page-btn"' + (current === 1 ? ' disabled' : '') + ' onclick="_poSetListPage(' + (current - 1) + ')">‹</button>' +
+      pageBtns +
+      '<button class="po-page-btn"' + (current === totalPages ? ' disabled' : '') + ' onclick="_poSetListPage(' + (current + 1) + ')">›</button>' +
+    '</div></div>';
+}
 
 function _poOpenPoListModal() {
   // 이미 열려있으면 무시
   if (document.getElementById('po-list-modal-overlay')) return;
+  _poListPage = 1;
   fetch('/api/import-po', { cache: 'no-store' })
     .then(function(r) { return r.json(); })
     .then(function(json) {
@@ -21931,7 +22080,15 @@ function _poRenderPoListModal(list) {
   if (existingOverlay && existingOverlay.parentNode) existingOverlay.parentNode.removeChild(existingOverlay);
 
   var currentId = (_poState && _poState.currentPo) ? _poState.currentPo.id : null;
-  var filtered = _poListFilter === 'all' ? list : list.filter(function(p) { return p.status === _poListFilter; });
+  var statusFiltered = _poListFilter === 'all' ? list : list.filter(function(p) { return p.status === _poListFilter; });
+  var filtered = _poApplyDateFilter(statusFiltered);
+
+  // 페이지 보정
+  var totalPages = Math.max(1, Math.ceil(filtered.length / _PO_LIST_PAGE_SIZE));
+  if (_poListPage > totalPages) _poListPage = totalPages;
+  if (_poListPage < 1) _poListPage = 1;
+  var startIdx = (_poListPage - 1) * _PO_LIST_PAGE_SIZE;
+  var pageItems = filtered.slice(startIdx, startIdx + _PO_LIST_PAGE_SIZE);
 
   var overlay = document.createElement('div');
   overlay.id = 'po-list-modal-overlay';
@@ -21941,7 +22098,7 @@ function _poRenderPoListModal(list) {
   var modal = document.createElement('div');
   modal.className = 'po-picker-modal';
   modal.id = 'po-list-modal';
-  modal.style.width = '1200px';
+  modal.style.width = '840px';
   modal.style.maxWidth = '95vw';
 
   var h = '';
@@ -21952,13 +22109,17 @@ function _poRenderPoListModal(list) {
   h += '<button class="po-picker-close" onclick="_poClosePoListModal()" aria-label="닫기">✕</button>';
   h += '</div>';
   h += '</div>';
+  h += '<div class="po-filter-row">';
   h += '<div class="po-list-filter-tabs">' + _poRenderListFilterTabs(list) + '</div>';
+  h += _poRenderDateFilter();
+  h += '</div>';
   h += '<div class="po-picker-body">';
   if (filtered.length === 0) {
-    h += '<div class="po-list-empty">' + (list.length === 0 ? '등록된 발주서가 없습니다.' : '해당 상태의 발주서가 없습니다.') + '</div>';
+    h += '<div class="po-list-empty">해당 조건에 맞는 발주서가 없습니다.</div>';
   } else {
-    h += _poRenderPoListTable(filtered, currentId);
+    h += _poRenderPoListTable(pageItems, currentId);
   }
+  h += _poRenderPagination(filtered.length);
   h += '</div>';
   modal.innerHTML = h;
   overlay.appendChild(modal);
@@ -22021,7 +22182,7 @@ function _poRenderPoListTable(list, currentId) {
       '</tr>';
   }).join('');
   return '<table class="po-list-table">' +
-    '<colgroup><col style="width:36px"><col style="width:140px"><col style="width:100px"><col style="width:110px"><col style="width:140px"><col style="width:90px"><col style=""></colgroup>' +
+    '<colgroup><col style="width:32px"><col style="width:130px"><col style="width:90px"><col style="width:80px"><col style="width:100px"><col style="width:70px"><col style=""></colgroup>' +
     '<thead><tr>' +
     '<th class="po-list-th-check"><input type="checkbox" id="po-list-check-all" onchange="_poListToggleAllChecks(this.checked)"></th>' +
     '<th>발주번호</th><th>날짜</th><th>브랜드</th><th style="text-align:right;">총금액</th><th>상태</th><th>작업</th>' +
@@ -22114,7 +22275,7 @@ function _poListDeleteSelected() {
   });
 }
 
-// 모달 내부 body/필터 탭만 재렌더 (overlay 유지)
+// 모달 내부 body/필터 탭/페이지네이션 재렌더 (overlay 유지)
 function _poRefreshListModal() {
   return fetch('/api/import-po', { cache: 'no-store' })
     .then(function(r) { return r.json(); })
@@ -22122,14 +22283,29 @@ function _poRefreshListModal() {
       if (!json || !json.success) return;
       var list = json.data || [];
       var currentId = (_poState && _poState.currentPo) ? _poState.currentPo.id : null;
-      var filtered = _poListFilter === 'all' ? list : list.filter(function(p) { return p.status === _poListFilter; });
+      var statusFiltered = _poListFilter === 'all' ? list : list.filter(function(p) { return p.status === _poListFilter; });
+      var filtered = _poApplyDateFilter(statusFiltered);
+
+      var totalPages = Math.max(1, Math.ceil(filtered.length / _PO_LIST_PAGE_SIZE));
+      if (_poListPage > totalPages) _poListPage = totalPages;
+      if (_poListPage < 1) _poListPage = 1;
+      var startIdx = (_poListPage - 1) * _PO_LIST_PAGE_SIZE;
+      var pageItems = filtered.slice(startIdx, startIdx + _PO_LIST_PAGE_SIZE);
+
       var tabsEl = document.querySelector('#po-list-modal .po-list-filter-tabs');
       if (tabsEl) tabsEl.innerHTML = _poRenderListFilterTabs(list);
+      var dateEl = document.querySelector('#po-list-modal .po-date-filter');
+      if (dateEl && dateEl.parentNode) {
+        var tempWrap = document.createElement('div');
+        tempWrap.innerHTML = _poRenderDateFilter();
+        dateEl.parentNode.replaceChild(tempWrap.firstChild, dateEl);
+      }
       var bodyEl = document.querySelector('#po-list-modal .po-picker-body');
       if (bodyEl) {
-        bodyEl.innerHTML = filtered.length === 0
-          ? '<div class="po-list-empty">' + (list.length === 0 ? '등록된 발주서가 없습니다.' : '해당 상태의 발주서가 없습니다.') + '</div>'
-          : _poRenderPoListTable(filtered, currentId);
+        var inner = filtered.length === 0
+          ? '<div class="po-list-empty">해당 조건에 맞는 발주서가 없습니다.</div>'
+          : _poRenderPoListTable(pageItems, currentId);
+        bodyEl.innerHTML = inner + _poRenderPagination(filtered.length);
       }
       _poListOnCheckChange();
     });
@@ -22138,7 +22314,8 @@ function _poRefreshListModal() {
 
 function _poSetListFilter(key) {
   _poListFilter = key;
-  _poOpenPoListModal();
+  _poListPage = 1;
+  _poRefreshListModal();
 }
 
 function _poSelectFromList(poId) {
