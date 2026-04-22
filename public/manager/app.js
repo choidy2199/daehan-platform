@@ -20770,7 +20770,7 @@ function _poRenderDetail() {
   h += '<span style="font-size:11px;color:#aaa;font-weight:400;margin-left:8px;font-family:monospace;">' + poNumber + '</span>';
   h += '</div>';
   h += '<div class="pc-panel-actions">';
-  h += '<button class="btn-mini po-allow-readonly" onclick="' + listPlaceholderAlert + '"' + disabledAttr + '>발주서 리스트</button>';
+  h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPoListModal()"' + disabledAttr + '>발주서 리스트</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>비우기</button>';
   if (isReadOnly) {
     h += '<button class="btn-mini" id="po-btn-confirm" disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;">✓ 확정됨</button>';
@@ -21622,6 +21622,124 @@ function _poConfirmOrder() {
       alert('발주 확정 실패: ' + err.message);
       if (btn) { btn.disabled = false; btn.textContent = '✓ 발주확정'; }
     });
+}
+
+// ===== 커밋 6 후속 — 발주서 리스트 모달 =====
+
+var _poListFilter = 'all';
+
+function _poOpenPoListModal() {
+  // 이미 열려있으면 무시
+  if (document.getElementById('po-list-modal-overlay')) return;
+  fetch('/api/import-po', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.success) throw new Error((json && json.error) || '목록 조회 실패');
+      _poRenderPoListModal(json.data || []);
+    })
+    .catch(function(err) {
+      alert('발주서 리스트 조회 실패: ' + err.message);
+    });
+}
+
+function _poRenderPoListModal(list) {
+  var existingOverlay = document.getElementById('po-list-modal-overlay');
+  if (existingOverlay && existingOverlay.parentNode) existingOverlay.parentNode.removeChild(existingOverlay);
+
+  var currentId = (_poState && _poState.currentPo) ? _poState.currentPo.id : null;
+  var filtered = _poListFilter === 'all' ? list : list.filter(function(p) { return p.status === _poListFilter; });
+
+  var overlay = document.createElement('div');
+  overlay.id = 'po-list-modal-overlay';
+  overlay.className = 'po-picker-overlay';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) _poClosePoListModal(); });
+
+  var modal = document.createElement('div');
+  modal.className = 'po-picker-modal';
+  modal.id = 'po-list-modal';
+  modal.style.maxWidth = '720px';
+
+  var h = '';
+  h += '<div class="po-picker-header" id="po-list-modal-header">';
+  h += '<span class="po-picker-title">발주서 리스트</span>';
+  h += '<button class="po-picker-close" onclick="_poClosePoListModal()" aria-label="닫기">✕</button>';
+  h += '</div>';
+  h += '<div class="po-list-filter-tabs">' + _poRenderListFilterTabs(list) + '</div>';
+  h += '<div class="po-picker-body">';
+  if (filtered.length === 0) {
+    h += '<div class="po-list-empty">' + (list.length === 0 ? '등록된 발주서가 없습니다.' : '해당 상태의 발주서가 없습니다.') + '</div>';
+  } else {
+    h += _poRenderPoListTable(filtered, currentId);
+  }
+  h += '</div>';
+  modal.innerHTML = h;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  if (typeof _makeDraggable === 'function') {
+    _makeDraggable(modal, document.getElementById('po-list-modal-header'));
+  }
+  document.addEventListener('keydown', _poListModalEscHandler, true);
+}
+
+function _poRenderListFilterTabs(list) {
+  var counts = { all: list.length, draft: 0, confirmed: 0, linked: 0, completed: 0 };
+  list.forEach(function(p) { if (counts[p.status] != null) counts[p.status]++; });
+  var tabs = [
+    { key: 'all', label: '전체' },
+    { key: 'draft', label: '작성중' },
+    { key: 'confirmed', label: '확정' },
+    { key: 'linked', label: '연결됨' },
+    { key: 'completed', label: '완료' }
+  ];
+  return tabs.map(function(t) {
+    var active = _poListFilter === t.key ? ' active' : '';
+    return '<button class="po-list-filter-tab' + active + '" onclick="_poSetListFilter(\'' + t.key + '\')">' + t.label + ' (' + (counts[t.key] || 0) + ')</button>';
+  }).join('');
+}
+
+function _poRenderPoListTable(list, currentId) {
+  var rows = list.map(function(p) {
+    var isCurrent = p.id === currentId;
+    var cls = 'po-list-row' + (isCurrent ? ' current' : '');
+    var onclick = isCurrent ? '' : ' onclick="_poSelectFromList(\'' + _poEsc(p.id) + '\')"';
+    return '<tr class="' + cls + '"' + onclick + '>' +
+      '<td style="font-family:monospace;font-size:12px;">' + _poEsc(p.po_number || '-') + '</td>' +
+      '<td>' + _poFormatDate(p.po_date) + '</td>' +
+      '<td>' + _poEsc(p.brand || '-') + '</td>' +
+      '<td>' + _poFormatStatusBadge(p.status) + '</td>' +
+      '</tr>';
+  }).join('');
+  return '<table class="po-list-table">' +
+    '<colgroup><col style="width:34%"><col style="width:22%"><col style="width:22%"><col style="width:22%"></colgroup>' +
+    '<thead><tr><th>발주번호</th><th>날짜</th><th>브랜드</th><th>상태</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody>' +
+    '</table>';
+}
+
+function _poSetListFilter(key) {
+  _poListFilter = key;
+  _poOpenPoListModal();
+}
+
+function _poSelectFromList(poId) {
+  _poClosePoListModal();
+  if (typeof _poLoadDetail === 'function') _poLoadDetail(poId);
+}
+
+function _poListModalEscHandler(e) {
+  if (e.key !== 'Escape') return;
+  if (!document.getElementById('po-list-modal-overlay')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+  _poClosePoListModal();
+}
+
+function _poClosePoListModal() {
+  var o = document.getElementById('po-list-modal-overlay');
+  if (o && o.parentNode) o.parentNode.removeChild(o);
+  document.removeEventListener('keydown', _poListModalEscHandler, true);
 }
 
 // 헤더 필드 blur 자동 저장 (PUT /api/import-po)
