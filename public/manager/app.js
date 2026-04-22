@@ -1780,7 +1780,6 @@ var _windowConfig = {
   '발주':       { tabId: 'mw-order',       color: 'red' },
   '세트및분해': { tabId: 'mw-set',         color: 'red' },
   '일반단가표': { tabId: 'gen-price',      color: 'blue' },
-  '매입매출':   { tabId: 'gen-trade',     color: 'blue' },
   '거래명세서': { tabId: 'transactions',   color: 'blue' },
   '온라인':     { tabId: 'sales-online',   color: 'green' },
   '마케팅':     { tabId: 'sales-marketing',color: 'green' },
@@ -1807,7 +1806,7 @@ var _windowConfig = {
 })();
 
 // 삭제된 탭 ID (즐겨찾기/열린창 자동 정리용)
-var _removedWindowNames = ['매출', '매입', '견적', '제품V2', '제품', '수입계산기', '인보이스'];
+var _removedWindowNames = ['매출', '매입', '견적', '제품V2', '제품', '수입계산기', '인보이스', '매입매출'];
 
 var _openWindows = [];    // 열린 창 이름 목록 (순서 유지)
 var _activeWindow = null; // 현재 활성 창 이름
@@ -2419,7 +2418,6 @@ var _tabIdMap = {
   'mw-order':         { contentId: 'tab-order',            render: 'order' },
   'mw-set':           { contentId: 'tab-setbun',           render: 'setbun' },
   'gen-price':        { contentId: 'tab-general',          render: 'general' },
-  'gen-trade':        { contentId: 'tab-gen-trade',        placeholder: true },
   'transactions':     { contentId: 'tab-transactions',     render: 'tx' },
   'sales-online':     { contentId: 'tab-sales',            render: 'sales' },
   'sales-marketing':  { contentId: 'tab-sales-marketing',  placeholder: true },
