@@ -23130,6 +23130,9 @@ function _ipinv2DoRenderDetail(container) {
   h += '<button onclick="_ipinv2DeleteInvoice()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
   h += '</div></div>';
 
+  // 상단 통합 다크 표시바 (B-1d-3 v2: 최상단 이동, 제품/송금 2그룹)
+  h += '<div id="ipinv2-combined-summary" style="padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px;margin:10px 20px;font-family:Pretendard,sans-serif;display:flex;align-items:center;gap:20px;flex-wrap:wrap;"></div>';
+
   // 상단 2분할 (좌 30%: 기본정보 카드 / 우 70%: 제품 라인 카드)
   var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:4px;font-weight:500;';
   var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
@@ -23198,9 +23201,6 @@ function _ipinv2DoRenderDetail(container) {
   h += '</div>';
   h += '</div>';
   h += '</div>';
-
-  // 하단 통합 다크 표시바 (B-1d-3, 9개 지표)
-  h += '<div id="ipinv2-combined-summary" style="padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px;margin:10px 20px;font-family:Pretendard,sans-serif;display:flex;align-items:center;gap:20px;flex-wrap:wrap;"></div>';
 
   h += '</div>';
 
@@ -24720,17 +24720,27 @@ function _ipinv2RenderCombinedSummary() {
   var valSBlue = 'font-size:13px;color:#BAE6FD;font-weight:500;line-height:1.3;';
   var valSOrange = 'font-size:13px;color:#EF9F27;font-weight:600;line-height:1.3;';
   var sepS = 'width:1px;height:30px;background:rgba(255,255,255,0.18);flex-shrink:0;';
+  var sepGroupS = 'width:3px;height:40px;background:rgba(255,255,255,0.3);flex-shrink:0;border-radius:2px;margin:0 8px;';
   var colS = 'display:flex;flex-direction:column;gap:3px;';
 
   var h = '';
-  h += '<div style="' + colS + '"><span style="' + lblS + '">총 수량</span><span style="' + valS + '">' + _ipinv2Int(totalQty) + ' EA</span></div>';
+  // === 제품 그룹 ===
+  h += '<div style="' + colS + '"><span style="' + lblS + '">총 수량</span><span style="' + valS + '">' + _ipinv2Int(totalQty) + ' EA · 팔렛 ' + palletCount + '개</span></div>';
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="' + colS + '"><span style="' + lblS + '">제품합계</span><span style="' + valS + '">' + _ipinv2Money(subtotal) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="' + colS + '"><span style="' + lblS + '">할인(' + discountRate + '%)</span><span style="' + valSRed + '">-' + _ipinv2Money(discountAmount) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
-  h += '<div style="' + colS + '"><span style="' + lblS + '">팔렛(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valSBlue + '">+' + _ipinv2Money(palletTotal) + '</span></div>';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">팔렛비용(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valSBlue + '">+' + _ipinv2Money(palletTotal) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
+  // 최종 금액 박스 (제품 그룹 마지막)
+  h += '<div style="display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:#EF9F27;border-radius:6px;">';
+  h += '<span style="font-size:10px;color:#1A1D23;font-weight:500;">최종 금액</span>';
+  h += '<span style="font-size:15px;font-weight:700;color:#1A1D23;">' + _ipinv2Money(finalTotal) + '</span>';
+  h += '</div>';
+  // === 그룹 구분선 (두꺼운 3px) ===
+  h += '<span style="' + sepGroupS + '"></span>';
+  // === 송금 그룹 ===
   h += '<div style="' + colS + '"><span style="' + lblS + '">1차 송금</span><span style="' + valS + '">' + _ipinv2Krw(group1Krw) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="' + colS + '"><span style="' + lblS + '">2차 송금</span><span style="' + valS + '">' + _ipinv2Krw(group2Krw) + '</span></div>';
@@ -24743,12 +24753,6 @@ function _ipinv2RenderCombinedSummary() {
   } else {
     h += '<span style="font-size:13px;color:rgba(255,255,255,0.4);line-height:1.3;">—</span>';
   }
-  h += '</div>';
-
-  // 최종 금액 (우측 주황 박스)
-  h += '<div style="margin-left:auto;display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:#EF9F27;border-radius:6px;">';
-  h += '<span style="font-size:10px;color:#1A1D23;font-weight:500;">최종 금액</span>';
-  h += '<span style="font-size:15px;font-weight:700;color:#1A1D23;">' + _ipinv2Money(finalTotal) + '</span>';
   h += '</div>';
 
   bar.innerHTML = h;
