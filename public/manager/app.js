@@ -23040,22 +23040,13 @@ function _ipinv2BindCustomerInput() {
   if (!input || input._ipinv2CustBound) return;
   input._ipinv2CustBound = true;
 
-  var isComposing = false;
-  var compositionTimer = null;
-  input.addEventListener('compositionstart', function() {
-    isComposing = true;
-    if (compositionTimer) { clearTimeout(compositionTimer); compositionTimer = null; }
-  });
-  input.addEventListener('compositionend', function(e) {
-    isComposing = false;
-    if (compositionTimer) clearTimeout(compositionTimer);
-    compositionTimer = setTimeout(function() {
-      if (!isComposing) _ipinv2Customer.onInput(e.target.value);
-    }, 50);
-  });
+  var inputTimer = null;
   input.addEventListener('input', function(e) {
-    if (isComposing) return;
-    _ipinv2Customer.onInput(e.target.value);
+    if (inputTimer) clearTimeout(inputTimer);
+    var val = e.target.value;
+    inputTimer = setTimeout(function() {
+      _ipinv2Customer.onInput(val);
+    }, 150);
   });
   input.addEventListener('focus', function() {
     _ipinv2Customer.openDropdown();
