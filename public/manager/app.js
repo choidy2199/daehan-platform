@@ -22483,10 +22483,10 @@ var _ipinv2Customer = {
   _load: function() {
     if (this._cache) return this._cache;
     try {
-      var raw = localStorage.getItem('mw_customers');
+      var raw = localStorage.getItem('mw_clients');
       this._cache = raw ? JSON.parse(raw) : [];
     } catch (e) {
-      console.error('[_ipinv2Customer] mw_customers 로드 실패:', e);
+      console.error('[_ipinv2Customer] mw_clients 로드 실패:', e);
       this._cache = [];
     }
     return this._cache;
@@ -22577,7 +22577,7 @@ var _ipinv2Customer = {
     for (var i = 0; i < filtered.length; i++) {
       var c = filtered[i];
       var active = i === 0 ? 'background:#E6F1FB;' : '';
-      var code2 = c.code2 || c.CODE2 || c.code || '';
+      var code2 = c.manageCode || c.code || '';
       html += '<div class="ipinv2-customer-dd-item" data-idx="' + i + '" style="' + active + 'padding:8px 12px;font-size:13px;color:#1A1D23;cursor:pointer;border-bottom:1px solid #F0F2F7;display:flex;justify-content:space-between;align-items:center;gap:10px;">';
       html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(c.name) + '</span>';
       if (code2) html += '<span style="font-size:10px;color:#9BA3B2;flex-shrink:0;">' + this._esc(code2) + '</span>';
@@ -22625,7 +22625,7 @@ var _ipinv2Customer = {
   onSelect: function(idx) {
     var item = this._visibleItems[idx];
     if (!item) return;
-    var code2 = item.code2 || item.CODE2 || item.code || '';
+    var code2 = item.manageCode || item.code || '';
     this.setValue(code2, item.name);
     this.closeDropdown();
     // 저장 트리거 (blur autosave와 동일 경로)
@@ -22676,7 +22676,7 @@ var _ipinv2Customer = {
       if (customers[i] && customers[i].name === name) { matched = customers[i]; break; }
     }
     if (matched) {
-      var code2 = matched.code2 || matched.CODE2 || matched.code || '';
+      var code2 = matched.manageCode || matched.code || '';
       this.setValue(code2, matched.name);
       this._triggerSave();
     } else {
