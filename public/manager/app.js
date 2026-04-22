@@ -19369,14 +19369,14 @@ function _renderBackorderList(container) {
   }).length;
 
   var h = '<style>'
-    + '#backorders-table { min-width: 1720px; table-layout: fixed; }'
+    + '#backorders-table { min-width: 1200px; width: 100%; table-layout: fixed; }'
     + '#backorders-table th.bo-col-check { width: 36px; }'
     + '#backorders-table th.bo-col-no { width: 40px; }'
     + '#backorders-table th.bo-col-date { width: 58px; }'
     + '#backorders-table th.bo-col-cust { width: 130px; }'
     + '#backorders-table th.bo-col-brand { width: 80px; }'
     + '#backorders-table th.bo-col-model { width: 130px; }'
-    + '#backorders-table th.bo-col-name { min-width: 200px; }'
+    + '#backorders-table th.bo-col-name { width: auto; min-width: 200px; }'
     + '#backorders-table th.bo-col-price { width: 90px; }'
     + '#backorders-table th.bo-col-stock { width: 65px; }'
     + '#backorders-table th.bo-col-req { width: 80px; }'
