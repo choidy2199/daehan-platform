@@ -2206,9 +2206,8 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .pc-badge-state { background:#EF9F27; color:#1A1D23; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
 .pc-mh-meta { font-size:12px; color:#aaa; font-family:Pretendard,sans-serif; }
 
-.pc-split { display:grid; grid-template-columns:65fr 35fr; background:#fff; flex:1; min-height:0; }
-.pc-panel { display:flex; flex-direction:column; min-width:0; min-height:0; border-right:1px solid #DDE1EB; overflow:hidden; }
-.pc-panel:last-child { border-right:none; }
+.pc-split { display:grid; grid-template-columns:65fr 35fr; gap:12px; padding:12px; background:#F4F6FA; flex:1; min-height:0; }
+.pc-panel { display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid #DDE1EB; border-radius:6px; background:#fff; overflow:hidden; }
 
 .pc-panel-header { display:flex; align-items:center; justify-content:space-between; padding:0 14px; height:40px; background:#1A1D23; color:white; }
 .pc-panel-title { font-size:14px; font-weight:600; display:flex; align-items:center; gap:10px; font-family:Pretendard,sans-serif; }

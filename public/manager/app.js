@@ -20835,13 +20835,14 @@ function _poRenderDetail() {
   // 우측 패널 (35% — 제품발주 장바구니)
   h += '<div class="pc-panel pc-panel-right">';
   h += '<div class="pc-panel-header">';
-  h += '<div class="pc-panel-title">제품발주 <span class="pc-panel-count" id="po-cart-count">' + cartCount + '건</span></div>';
+  h += '<div class="pc-panel-title">제품발주 <span class="pc-panel-count" id="po-cart-count">' + cartCount + '건</span>';
+  h += '<span style="font-size:11px;color:#aaa;font-weight:400;margin-left:8px;font-family:monospace;">' + poNumber + '</span>';
+  h += '</div>';
   h += '<div class="pc-panel-actions">';
   h += '<button class="btn-mini" onclick="' + listPlaceholderAlert + '"' + disabledAttr + '>발주서 리스트</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>비우기</button>';
   h += '<button class="btn-mini btn-mini-confirm" onclick="' + placeholderAlert + '"' + disabledAttr + '>✓ 발주확정</button>';
   h += '</div></div>';
-  h += '<div class="pc-info-strip">발주번호: <strong>' + poNumber + '</strong> · 자동부여</div>';
   if (hasError) {
     h += '<div class="pc-tbl-placeholder">로드 실패</div>';
   } else {
