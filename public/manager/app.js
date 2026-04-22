@@ -22826,10 +22826,17 @@ function _ipinv2BindCustomerInput() {
   input._ipinv2CustBound = true;
 
   var isComposing = false;
-  input.addEventListener('compositionstart', function() { isComposing = true; });
+  var compositionTimer = null;
+  input.addEventListener('compositionstart', function() {
+    isComposing = true;
+    if (compositionTimer) { clearTimeout(compositionTimer); compositionTimer = null; }
+  });
   input.addEventListener('compositionend', function(e) {
     isComposing = false;
-    _ipinv2Customer.onInput(e.target.value);
+    if (compositionTimer) clearTimeout(compositionTimer);
+    compositionTimer = setTimeout(function() {
+      if (!isComposing) _ipinv2Customer.onInput(e.target.value);
+    }, 50);
   });
   input.addEventListener('input', function(e) {
     if (isComposing) return;
