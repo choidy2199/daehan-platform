@@ -23154,9 +23154,6 @@ function _ipinv2DoRenderDetail(container) {
 
   h += '</div>'; // 상단 2분할 끝
 
-  // 금액 요약 바 (다크, 제품 관련 합계)
-  h += '<div id="ipinv2-summary-bar" style="padding:10px 20px;background:#1A1D23;color:#fff;display:flex;align-items:center;gap:14px;font-family:Pretendard,sans-serif;flex-wrap:wrap;"></div>';
-
   // 송금 스케줄 섹션 (B-1d-2: 좌우 50:50 분할, 1차/2차)
   h += '<div id="ipinv2-payments-section" style="padding:0;background:#fff;border-top:0.5px solid #eee;">';
   // 섹션 헤더 ([+ 분할 추가] 버튼 제거, 카운터만 유지)
@@ -23179,8 +23176,10 @@ function _ipinv2DoRenderDetail(container) {
   h += '<button onclick="_ipinv2AddPaymentToGroup(2)" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;align-self:flex-start;">+ 2차 분할 추가</button>';
   h += '</div>';
   h += '</div>';
-  h += '<div id="ipinv2-payments-summary" style="padding:14px 20px;background:#1A1D23;color:#fff;font-family:Pretendard,sans-serif;"></div>';
   h += '</div>';
+
+  // 하단 통합 다크 표시바 (B-1d-3, 9개 지표)
+  h += '<div id="ipinv2-combined-summary" style="padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px;margin:10px 20px;font-family:Pretendard,sans-serif;display:flex;align-items:center;gap:20px;flex-wrap:wrap;"></div>';
 
   h += '</div>';
 
@@ -23350,7 +23349,7 @@ function _ipinv2RenderSummaryBar() {
   var finalTotal = Number(inv.final_total_usd || inv.final_amount_usd || 0);
 
   var bar = document.getElementById('ipinv2-summary-bar');
-  if (!bar) return;
+  if (!bar) { _ipinv2RenderCombinedSummary(); return; }
   var labelS = 'font-size:10px;color:rgba(255,255,255,0.5);margin-right:5px;';
   var valS = 'font-size:13px;color:#fff;font-weight:500;';
   var sepS = 'width:1px;height:18px;background:rgba(255,255,255,0.18);';
@@ -24590,7 +24589,7 @@ function _ipinv2DeletePayment(paymentId) {
 // ── 송금 통합 요약 바 (5열, 컴팩트 1줄) ──
 function _ipinv2RenderPaymentSummary() {
   var bar = document.getElementById('ipinv2-payments-summary');
-  if (!bar) return;
+  if (!bar) { _ipinv2RenderCombinedSummary(); return; }
   var list = _ipinv2Payments;
   var inv = _ipinv2CurrentInvoice;
   var finalTotal = Number(inv && (inv.final_total_usd || inv.final_amount_usd) || 0);
@@ -24658,6 +24657,77 @@ function _ipinv2RenderPaymentSummary() {
   }
   h += '</div>';
 
+  h += '</div>';
+
+  bar.innerHTML = h;
+}
+
+// B-1d-3: 하단 통합 다크 표시바 (9개 지표 1줄)
+function _ipinv2RenderCombinedSummary() {
+  var bar = document.getElementById('ipinv2-combined-summary');
+  if (!bar) return;
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+
+  var items = _ipinv2CurrentItems || [];
+  var list = _ipinv2Payments || [];
+
+  // 제품 관련 (기존 _ipinv2RenderSummaryBar 계산 동일)
+  var totalQty = items.reduce(function(s, it) { return s + Number(it.qty || 0); }, 0);
+  var subtotal = Number(inv.subtotal_usd || 0);
+  var discountAmount = Number(inv.discount_amount_usd || inv.discount_usd || 0);
+  var discountRate = Number(inv.discount_rate || 0);
+  var palletCount = Number(inv.pallet_count || 0);
+  var palletTotal = Number(inv.pallet_total_usd || inv.pallets_usd || 0);
+  var palletUnit = Number(inv.pallet_unit_price_usd || 0);
+  var finalTotal = Number(inv.final_total_usd || inv.final_amount_usd || 0);
+
+  // 송금 관련
+  var confirmed = list.filter(function(p) { return _ipinv2IsPaymentConfirmed(p); });
+  var sumKrw = confirmed.reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
+  var sumUsd = confirmed.reduce(function(s, p) { return s + Number(p.actual_usd || 0); }, 0);
+  var weightedAvg = sumUsd > 0 ? sumKrw / sumUsd : null;
+
+  // 1차/2차 그룹 합계 (B-1d-2 seq 홀짝 규칙)
+  var group1Krw = confirmed.filter(function(p) { return p.seq % 2 === 1; }).reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
+  var group2Krw = confirmed.filter(function(p) { return p.seq % 2 === 0; }).reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
+
+  // 스타일
+  var lblS = 'font-size:10px;color:rgba(255,255,255,0.5);';
+  var valS = 'font-size:13px;color:#fff;font-weight:500;line-height:1.3;';
+  var valSRed = 'font-size:13px;color:#FCA5A5;font-weight:500;line-height:1.3;';
+  var valSBlue = 'font-size:13px;color:#BAE6FD;font-weight:500;line-height:1.3;';
+  var valSOrange = 'font-size:13px;color:#EF9F27;font-weight:600;line-height:1.3;';
+  var sepS = 'width:1px;height:30px;background:rgba(255,255,255,0.18);flex-shrink:0;';
+  var colS = 'display:flex;flex-direction:column;gap:3px;';
+
+  var h = '';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">총 수량</span><span style="' + valS + '">' + _ipinv2Int(totalQty) + ' EA</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">제품합계</span><span style="' + valS + '">' + _ipinv2Money(subtotal) + '</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">할인(' + discountRate + '%)</span><span style="' + valSRed + '">-' + _ipinv2Money(discountAmount) + '</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">팔렛(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valSBlue + '">+' + _ipinv2Money(palletTotal) + '</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">1차 송금</span><span style="' + valS + '">' + _ipinv2Krw(group1Krw) + '</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">2차 송금</span><span style="' + valS + '">' + _ipinv2Krw(group2Krw) + '</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">원화 총 지불액</span><span style="' + valSOrange + '">' + _ipinv2Krw(sumKrw) + '</span></div>';
+  h += '<span style="' + sepS + '"></span>';
+  h += '<div style="' + colS + '"><span style="' + lblS + '">가중평균 환율</span>';
+  if (weightedAvg != null) {
+    h += '<span style="' + valSOrange + '">₩' + _ipinv2FormatRate(weightedAvg) + '</span>';
+  } else {
+    h += '<span style="font-size:13px;color:rgba(255,255,255,0.4);line-height:1.3;">—</span>';
+  }
+  h += '</div>';
+
+  // 최종 금액 (우측 주황 박스)
+  h += '<div style="margin-left:auto;display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:#EF9F27;border-radius:6px;">';
+  h += '<span style="font-size:10px;color:#1A1D23;font-weight:500;">최종 금액</span>';
+  h += '<span style="font-size:15px;font-weight:700;color:#1A1D23;">' + _ipinv2Money(finalTotal) + '</span>';
   h += '</div>';
 
   bar.innerHTML = h;
