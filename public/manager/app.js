@@ -19413,8 +19413,11 @@ function _renderBackorderList(container) {
     + '#backorders-table .bo-note-cell { font-size:11px; color:#666; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }'
     + '#backorders-table .bo-done-date { font-size:11px; color:#999; }'
     + '.bo-filter-btn { background:#fff; border:1px solid #DDE1EB; border-radius:6px; padding:4px 12px; font-size:12px; font-weight:500; cursor:pointer; font-family:Pretendard,sans-serif; }'
-    + '#backorders-table thead th { position: relative; border-right: 1px solid #B0B8CC; }'
+    + '#backorders-table thead th { position: relative; border-right: 1px solid #DDE1EB; }'
     + '#backorders-table thead th:last-child { border-right: none; }'
+    + '#backorders-table th.resizable { position: relative; }'
+    + '#backorders-table th .col-resize { position:absolute; right:-1px; top:0; width:7px; height:100%; cursor:col-resize; user-select:none; z-index:11; }'
+    + '#backorders-table th .col-resize:hover, #backorders-table th .col-resize.active { background: var(--tl-primary); opacity:0.6; }'
     + '</style>';
 
   h += '<div style="display:block !important;text-align:left !important;">';
