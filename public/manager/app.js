@@ -20404,9 +20404,28 @@ function _poFormatUsd(n) {
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// 캐시 저장/로드 헬퍼 (탭 재진입 즉시 렌더용)
+var _PO_LS_LAST_ID = 'mw_import_po_last_id';
+var _PO_LS_LAST_DATA = 'mw_import_po_last_data';
+
+function _poCacheCurrentPo() {
+  try {
+    if (!_poState || !_poState.currentPo || !_poState.currentPo.id) {
+      localStorage.removeItem(_PO_LS_LAST_ID);
+      localStorage.removeItem(_PO_LS_LAST_DATA);
+      return;
+    }
+    localStorage.setItem(_PO_LS_LAST_ID, String(_poState.currentPo.id));
+    localStorage.setItem(_PO_LS_LAST_DATA, JSON.stringify({
+      header: _poState.currentPo,
+      items: _poState.currentItems || []
+    }));
+  } catch (e) { /* quota 등 무시 */ }
+}
+
 // P1 후속: 탭 진입 시 상세화면(65/35 뼈대) 바로 표시.
-// 기본 흐름: 최근 draft 재사용 → 없으면 새 draft 자동 생성 → _poRenderDetail
-// _poRenderList / _poLoadList / 캐시 키 'mw_cache_import_po_v2' 는 P7 발주서 리스트 모달 재활용용으로 보존 (현재 미사용).
+// 즉시 렌더: localStorage 캐시 있으면 바로 렌더 → 백그라운드에서 Supabase 갱신
+// 캐시 없으면 기존 로딩 메시지 + fetch 흐름
 function _poInit() {
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
@@ -20415,57 +20434,85 @@ function _poInit() {
   container.style.overflowY = 'auto';
   container.style.height = '100%';
 
-  // 로딩 UI
-  container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">발주서를 준비하는 중...</div>';
-
   // 상태 초기화 (상세 모드)
   _poState.mode = 'detail';
   _poState.loadError = false;
   _poState.loadErrorMsg = null;
 
-  // 1) 최근 draft 조회
+  // 1) 캐시 즉시 렌더 (있으면)
+  var cachedId = null;
+  var rendered = false;
+  try {
+    cachedId = localStorage.getItem(_PO_LS_LAST_ID);
+    var cachedStr = localStorage.getItem(_PO_LS_LAST_DATA);
+    if (cachedStr) {
+      var cached = JSON.parse(cachedStr);
+      if (cached && cached.header && cached.header.id) {
+        _poState.currentPo = cached.header;
+        _poState.currentPoId = cached.header.id;
+        _poState.currentItems = Array.isArray(cached.items) ? cached.items : [];
+        _poRenderDetail();
+        rendered = true;
+      }
+    }
+  } catch (e) { /* 캐시 파싱 실패 무시 */ }
+
+  // 2) 캐시 없으면 로딩 메시지
+  if (!rendered) {
+    container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">발주서를 준비하는 중...</div>';
+  }
+
+  // 3) 백그라운드 최신 draft 조회/생성
   fetch('/api/import-po?status=draft', { cache: 'no-store' })
     .then(function(r) { return r.json(); })
     .then(function(json) {
-      if (!json || !json.success) {
-        throw new Error((json && json.error) || 'draft 조회 실패');
-      }
+      if (!json || !json.success) throw new Error((json && json.error) || 'draft 조회 실패');
       var drafts = json.data || [];
       if (drafts.length > 0) {
-        // 재사용: 빈 누적 방지
-        return drafts[0];
+        // 캐시된 id와 같은 draft 우선, 없으면 첫번째
+        var target = null;
+        if (cachedId) target = drafts.find(function(p) { return p.id === cachedId; });
+        return target || drafts[0];
       }
-      // 2) 없으면 신규 draft 자동 생성 (PO-YYYY-NNN 자동 부여)
+      // 없으면 신규 draft 생성
       return fetch('/api/import-po', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       }).then(function(r) { return r.json(); }).then(function(cj) {
-        if (!cj || !cj.success || !cj.data) {
-          throw new Error((cj && cj.error) || '발주서 생성 실패');
-        }
+        if (!cj || !cj.success || !cj.data) throw new Error((cj && cj.error) || '발주서 생성 실패');
         return cj.data;
       });
     })
     .then(function(po) {
-      _poState.currentPoId = po.id;
-      _poState.currentPo = po;
-      // 3) 아이템 로드 (빈 draft여도 배열은 항상 초기화)
+      // items 로드
       return fetch('/api/import-po/' + po.id + '/items', { cache: 'no-store' })
         .then(function(r) { return r.json(); })
         .then(function(ij) {
-          _poState.currentItems = (ij && ij.success) ? (ij.data || []) : [];
-          _poRenderDetail();
+          var items = (ij && ij.success) ? (ij.data || []) : [];
+          var prevPoStr = JSON.stringify(_poState.currentPo || null);
+          var prevItemsStr = JSON.stringify(_poState.currentItems || []);
+          _poState.currentPoId = po.id;
+          _poState.currentPo = po;
+          _poState.currentItems = items;
+          var changed = !rendered
+            || prevPoStr !== JSON.stringify(po)
+            || prevItemsStr !== JSON.stringify(items);
+          if (changed) _poRenderDetail();
+          _poCacheCurrentPo();
         });
     })
     .catch(function(err) {
       console.error('[po] _poInit error', err);
-      _poState.loadError = true;
-      _poState.loadErrorMsg = (err && err.message) || '발주서 로드 실패';
-      _poState.currentPoId = null;
-      _poState.currentPo = null;
-      _poState.currentItems = [];
-      _poRenderDetail();
+      if (!rendered) {
+        _poState.loadError = true;
+        _poState.loadErrorMsg = (err && err.message) || '발주서 로드 실패';
+        _poState.currentPoId = null;
+        _poState.currentPo = null;
+        _poState.currentItems = [];
+        _poRenderDetail();
+      }
+      // 캐시 렌더 성공 후 실패는 조용히 스킵 (사용자는 작업 계속 가능)
     });
 }
 
@@ -20701,8 +20748,10 @@ function _poLoadDetail(poId) {
       return;
     }
     _poState.currentPo = headerRes.data.header;
+    _poState.currentPoId = headerRes.data.header.id;
     _poState.currentItems = (itemsRes && itemsRes.success) ? (itemsRes.data || []) : [];
     _poRenderDetail();
+    _poCacheCurrentPo();
   }).catch(function(err) {
     console.error('[po] loadDetail error', err);
     _poToast('상세 로드 실패: ' + (err.message || err), 'error');
@@ -20997,10 +21046,37 @@ function _poOnPalletKeyDown(ev, inputEl) {
   _poOnCartBtnClick(code);
 }
 
-// 🛒 버튼 또는 엔터 키 공통 핸들러
+// PO 없을 때 자동 draft 생성 (서버 POST + state 세팅 + 렌더)
+function _poCreateAndLoadNewDraft() {
+  return fetch('/api/import-po', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ po_date: new Date().toISOString().slice(0, 10) })
+  })
+    .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, j: j }; }); })
+    .then(function(x) {
+      if (!x.ok || !x.j || !x.j.success || !x.j.data) {
+        throw new Error((x.j && x.j.error) || '새 발주서 생성 실패');
+      }
+      var po = x.j.data;
+      _poState.currentPo = po;
+      _poState.currentPoId = po.id;
+      _poState.currentItems = [];
+      _poRenderDetail();
+      if (typeof _poCacheCurrentPo === 'function') _poCacheCurrentPo();
+      return po;
+    });
+}
+
+// 🛒 버튼 또는 엔터 키 공통 핸들러 (PO 없으면 자동 draft 생성)
 function _poOnCartBtnClick(code) {
   var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
-  if (!po || !po.id) { alert('PO가 로드되지 않았습니다.'); return; }
+  if (!po || !po.id) {
+    _poCreateAndLoadNewDraft()
+      .then(function() { _poOnCartBtnClick(code); })
+      .catch(function(err) { alert('새 발주서 생성 실패: ' + (err && err.message || err)); });
+    return;
+  }
   var row = document.querySelector('#po-product-list-body tr[data-code="' + code + '"]');
   if (!row) return;
   var input = row.querySelector('.po-pallet-input');
@@ -21214,9 +21290,15 @@ function _poRenderCart(poId) {
 var _poPickerState = { brandFilter: 'all', search: '', stockOnly: false, selectedCodes: {}, brands: [] };
 
 function _poOpenProductPicker() {
-  if (!_poState || !_poState.currentPo) { alert('PO가 로드되지 않았습니다.'); return; }
   // 이미 열려있으면 무시
   if (document.getElementById('po-picker-overlay')) return;
+  // PO 없으면 자동 draft 생성 후 재호출
+  if (!_poState || !_poState.currentPo || !_poState.currentPo.id) {
+    _poCreateAndLoadNewDraft()
+      .then(function() { _poOpenProductPicker(); })
+      .catch(function(err) { alert('새 발주서 생성 실패: ' + (err && err.message || err)); });
+    return;
+  }
 
   var gp = loadObj('mw_gen_products', []);
   // 브랜드 목록 수집
@@ -21670,6 +21752,7 @@ function _poConfirmOrder() {
       _poState.currentPo = null;
       _poState.currentPoId = null;
       _poState.currentItems = [];
+      _poCacheCurrentPo();
       _poRenderDetail();
     })
     .catch(function(err) {
@@ -22196,13 +22279,19 @@ function _poRenderPoListTable(list, currentId) {
       '<td class="po-list-td-actions">' + actionsHtml + '</td>' +
       '</tr>';
   }).join('');
+  // 10행 미만일 때 빈 행으로 채워 높이 일정 유지 (페이지당 _PO_LIST_PAGE_SIZE = 10)
+  var emptyCount = Math.max(0, _PO_LIST_PAGE_SIZE - list.length);
+  var emptyRows = '';
+  for (var i = 0; i < emptyCount; i++) {
+    emptyRows += '<tr class="po-list-row po-list-empty-row"><td colspan="7">&nbsp;</td></tr>';
+  }
   return '<table class="po-list-table">' +
     '<colgroup><col style="width:32px"><col style="width:130px"><col style="width:90px"><col style="width:80px"><col style="width:100px"><col style="width:70px"><col style=""></colgroup>' +
     '<thead><tr>' +
     '<th class="po-list-th-check"><input type="checkbox" id="po-list-check-all" onchange="_poListToggleAllChecks(this.checked)"></th>' +
     '<th>발주번호</th><th>날짜</th><th>브랜드</th><th style="text-align:right;">총금액</th><th>상태</th><th>작업</th>' +
     '</tr></thead>' +
-    '<tbody>' + rows + '</tbody>' +
+    '<tbody>' + rows + emptyRows + '</tbody>' +
     '</table>';
 }
 
@@ -22279,6 +22368,7 @@ function _poListDeleteSelected() {
       _poState.currentPo = null;
       _poState.currentPoId = null;
       _poState.currentItems = [];
+      _poCacheCurrentPo();
       _poRenderDetail();
     }
     // 모달 내부만 갱신 (닫기/재오픈 없음)
