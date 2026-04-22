@@ -20820,7 +20820,7 @@ function _poRenderDetail() {
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>백업</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>복원</button>';
   h += '<button class="btn-mini btn-mini-p" onclick="_poOpenProductPicker()"' + disabledAttr + '>+ 제품등록</button>';
-  h += '<button class="btn-mini btn-mini-erp" onclick="' + placeholderAlert + '"' + disabledAttr + '>↻ 경영박사 재고</button>';
+  h += '<button class="btn-mini btn-mini-danger" onclick="_poDeleteSelectedProducts()"' + disabledAttr + '>삭제</button>';
   h += '</div></div>';
   h += '<div class="pc-search-bar">';
   h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" oninput="_poFilterProductList(this.value)" autocomplete="off"' + (hasError ? ' disabled' : '') + '>';
@@ -21240,11 +21240,10 @@ function _poRenderCart(poId) {
   h += '</tbody></table>';
   body.innerHTML = h;
 
-  var sHtml = '<div class="po-cart-summary-group">';
-  sHtml += '<span>총 수량<b class="po-num">' + totalUnit.toLocaleString() + '</b></span>';
-  sHtml += '<span>총 파렛<b class="po-num">' + totalPallet.toLocaleString() + '</b></span>';
-  sHtml += '</div>';
-  sHtml += '<div class="po-cart-total">$' + totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</div>';
+  var sHtml = '';
+  sHtml += '<div class="po-cart-summary-row"><span>총 수량</span><b>' + totalUnit.toLocaleString() + '개</b></div>';
+  sHtml += '<div class="po-cart-summary-row"><span>총 파렛</span><b>' + totalPallet.toLocaleString() + 'P</b></div>';
+  sHtml += '<div class="po-cart-summary-total"><span>총 금액</span><span>$' + totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</span></div>';
   summary.innerHTML = sHtml;
 }
 
@@ -21312,20 +21311,25 @@ function _poOpenProductPicker() {
     _makeDraggable(modal, document.getElementById('po-picker-header'));
   }
 
-  // ESC 처리
-  document.addEventListener('keydown', _poPickerEscHandler);
+  // ESC 처리 — capture 단계 등록 + stopImmediatePropagation으로 전역 탭 핸들러 차단
+  document.addEventListener('keydown', _poPickerEscHandler, true);
   // 첫 input 포커스
   setTimeout(function() { var s = document.getElementById('po-picker-search'); if (s) s.focus(); }, 0);
 }
 
 function _poPickerEscHandler(e) {
-  if (e.key === 'Escape') _poClosePicker();
+  if (e.key !== 'Escape') return;
+  if (!document.getElementById('po-picker-overlay')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+  _poClosePicker();
 }
 
 function _poClosePicker() {
   var o = document.getElementById('po-picker-overlay');
   if (o && o.parentNode) o.parentNode.removeChild(o);
-  document.removeEventListener('keydown', _poPickerEscHandler);
+  document.removeEventListener('keydown', _poPickerEscHandler, true);
 }
 
 function _poPickerRenderBrandBar() {
@@ -21532,6 +21536,31 @@ function _poRemoveProductFromList(code) {
   _poRenderProductList();
   if (typeof _poRefreshMetaCounts === 'function') _poRefreshMetaCounts();
   _poToast('제거됨', 'success');
+}
+
+// 좌측 테이블 체크박스 → 일괄 삭제 (헤더 [삭제] 버튼)
+function _poDeleteSelectedProducts() {
+  var boxes = document.querySelectorAll('#po-product-list-body input[type="checkbox"][data-code]:checked');
+  if (boxes.length === 0) { alert('삭제할 제품을 선택하세요.'); return; }
+  var codes = [];
+  boxes.forEach(function(cb) { var c = cb.getAttribute('data-code'); if (c) codes.push(String(c)); });
+  if (!confirm('선택한 ' + codes.length + '개 제품을 목록에서 제거할까요?')) return;
+  var codeSet = {};
+  codes.forEach(function(c) { codeSet[c] = true; });
+  var list = loadObj('mw_import_po_products', []);
+  var newList = list.filter(function(x) { return !(x && codeSet[String(x.productCode)]); });
+  save('mw_import_po_products', newList);
+  // 장바구니에도 있으면 같이 제거
+  var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+  if (po && po.id) {
+    var cart = _poLoadCart(po.id);
+    var newCart = cart.filter(function(c) { return !(c && codeSet[String(c.productCode)]); });
+    if (newCart.length !== cart.length) _poSaveCart(po.id, newCart);
+    _poRenderCart(po.id);
+  }
+  _poRenderProductList();
+  if (typeof _poRefreshMetaCounts === 'function') _poRefreshMetaCounts();
+  _poToast(codes.length + '건 제거됨', 'success');
 }
 
 // 헤더 필드 blur 자동 저장 (PUT /api/import-po)
