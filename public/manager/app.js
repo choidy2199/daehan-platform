@@ -21002,9 +21002,14 @@ function _poOpenInvoiceLink(poId) {
           var nextInvNo = prefix + String(maxSeq + 1).padStart(3, '0');
           var today = new Date();
           var dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+          // 공장명 산출: brand 우선 → 실제 factory_name → placeholder
+          var brandName = String(po.brand || '').trim();
+          var rawFactoryName = String(po.factory_name || '').trim();
+          var isPlaceholder = !rawFactoryName || rawFactoryName === '(공장명)' || rawFactoryName === '공장명';
+          var factoryName = brandName || (isPlaceholder ? '(공장명)' : rawFactoryName);
           return { po: po, invoicePayload: {
             invoice_no: nextInvNo,
-            factory_name: po.factory_name || po.brand || '(공장명)',
+            factory_name: factoryName,
             factory_code: po.factory_code || null,
             invoice_date: dateStr,
             memo: '발주서 ' + (po.po_number || '') + '에서 자동 생성'
