@@ -21662,7 +21662,10 @@ function _poRenderPoListModal(list) {
   var h = '';
   h += '<div class="po-picker-header" id="po-list-modal-header">';
   h += '<span class="po-picker-title">발주서 리스트</span>';
+  h += '<div class="po-list-header-actions">';
+  h += '<button class="btn-mini btn-mini-danger" id="po-list-delete-btn" onclick="_poListDeleteSelected()" disabled>선택 삭제 (<span id="po-list-check-count">0</span>)</button>';
   h += '<button class="po-picker-close" onclick="_poClosePoListModal()" aria-label="닫기">✕</button>';
+  h += '</div>';
   h += '</div>';
   h += '<div class="po-list-filter-tabs">' + _poRenderListFilterTabs(list) + '</div>';
   h += '<div class="po-picker-body">';
@@ -21702,19 +21705,97 @@ function _poRenderPoListTable(list, currentId) {
   var rows = list.map(function(p) {
     var isCurrent = p.id === currentId;
     var cls = 'po-list-row' + (isCurrent ? ' current' : '');
-    var onclick = isCurrent ? '' : ' onclick="_poSelectFromList(\'' + _poEsc(p.id) + '\')"';
-    return '<tr class="' + cls + '"' + onclick + '>' +
-      '<td style="font-family:monospace;font-size:12px;">' + _poEsc(p.po_number || '-') + '</td>' +
-      '<td>' + _poFormatDate(p.po_date) + '</td>' +
-      '<td>' + _poEsc(p.brand || '-') + '</td>' +
-      '<td>' + _poFormatStatusBadge(p.status) + '</td>' +
+    var idEsc = _poEsc(p.id);
+    var selAttr = isCurrent ? '' : ' onclick="_poSelectFromList(\'' + idEsc + '\')"';
+    var brandTxt = _poEsc(p.display_brand || p.brand || '-');
+    var totalTxt = (p.total_fob_usd != null && !isNaN(Number(p.total_fob_usd)))
+      ? '$' + Number(p.total_fob_usd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : '-';
+    return '<tr class="' + cls + '">' +
+      '<td class="po-list-td-check" onclick="event.stopPropagation();"><input type="checkbox" class="po-list-check" data-po-id="' + idEsc + '" onchange="_poListOnCheckChange()"></td>' +
+      '<td style="font-family:monospace;font-size:12px;"' + selAttr + '>' + _poEsc(p.po_number || '-') + '</td>' +
+      '<td' + selAttr + '>' + _poFormatDate(p.po_date) + '</td>' +
+      '<td' + selAttr + '>' + brandTxt + '</td>' +
+      '<td style="text-align:right;font-variant-numeric:tabular-nums;"' + selAttr + '>' + totalTxt + '</td>' +
+      '<td' + selAttr + '>' + _poFormatStatusBadge(p.status) + '</td>' +
       '</tr>';
   }).join('');
   return '<table class="po-list-table">' +
-    '<colgroup><col style="width:34%"><col style="width:22%"><col style="width:22%"><col style="width:22%"></colgroup>' +
-    '<thead><tr><th>발주번호</th><th>날짜</th><th>브랜드</th><th>상태</th></tr></thead>' +
+    '<colgroup><col style="width:36px"><col style="width:24%"><col style="width:16%"><col style="width:16%"><col style="width:20%"><col style="width:16%"></colgroup>' +
+    '<thead><tr>' +
+    '<th class="po-list-th-check"><input type="checkbox" id="po-list-check-all" onchange="_poListToggleAllChecks(this.checked)"></th>' +
+    '<th>발주번호</th><th>날짜</th><th>브랜드</th><th style="text-align:right;">총금액</th><th>상태</th>' +
+    '</tr></thead>' +
     '<tbody>' + rows + '</tbody>' +
     '</table>';
+}
+
+// 체크박스: 전체 선택/해제
+function _poListToggleAllChecks(checked) {
+  var boxes = document.querySelectorAll('.po-list-check');
+  boxes.forEach(function(cb) { cb.checked = !!checked; });
+  _poListOnCheckChange();
+}
+
+// 체크박스 상태 변경 → 버튼 활성/건수 + indeterminate 동기화
+function _poListOnCheckChange() {
+  var boxes = document.querySelectorAll('.po-list-check');
+  var checked = document.querySelectorAll('.po-list-check:checked');
+  var count = checked.length;
+  var total = boxes.length;
+  var btn = document.getElementById('po-list-delete-btn');
+  var countSpan = document.getElementById('po-list-check-count');
+  if (countSpan) countSpan.textContent = count;
+  if (btn) btn.disabled = count === 0;
+  var all = document.getElementById('po-list-check-all');
+  if (all) {
+    all.checked = count === total && total > 0;
+    all.indeterminate = count > 0 && count < total;
+  }
+}
+
+// 선택 일괄 삭제
+function _poListDeleteSelected() {
+  var checks = document.querySelectorAll('.po-list-check:checked');
+  var ids = Array.prototype.map.call(checks, function(cb) { return cb.getAttribute('data-po-id'); });
+  if (ids.length === 0) return;
+  var msg = ids.length + '개의 발주서를 삭제하시겠습니까?\n\n확정된 발주서도 삭제됩니다.\n이 동작은 되돌릴 수 없습니다.';
+  if (!confirm(msg)) return;
+
+  var btn = document.getElementById('po-list-delete-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '삭제 중...'; }
+
+  var currentId = (_poState && _poState.currentPo) ? _poState.currentPo.id : null;
+  var deletingCurrent = currentId && ids.indexOf(String(currentId)) >= 0;
+
+  Promise.allSettled(ids.map(function(id) {
+    return fetch('/api/import-po?id=' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function(r) { return r.json().then(function(j) { return { ok: r.ok && j.success, error: j.error }; }); });
+  })).then(function(results) {
+    var successCount = 0, failed = [];
+    results.forEach(function(r, idx) {
+      if (r.status === 'fulfilled' && r.value && r.value.ok) successCount++;
+      else failed.push(ids[idx]);
+    });
+    // 삭제 성공한 PO의 localStorage cart 정리
+    ids.forEach(function(id, idx) {
+      if (results[idx].status === 'fulfilled' && results[idx].value && results[idx].value.ok) {
+        try { localStorage.removeItem('mw_import_po_cart_' + id); } catch (e) {}
+      }
+    });
+    if (failed.length > 0) {
+      alert(successCount + '건 삭제 성공 / ' + failed.length + '건 실패');
+    } else {
+      _poToast(successCount + '건 삭제 완료', 'success');
+    }
+    if (deletingCurrent) {
+      _poState.currentPo = null;
+      _poClosePoListModal();
+      if (typeof _poInit === 'function') _poInit();
+    } else {
+      _poOpenPoListModal();
+    }
+  });
 }
 
 function _poSetListFilter(key) {

@@ -29,7 +29,29 @@ export async function GET(request: NextRequest) {
     if (status && status !== 'all') q = q.eq('status', status);
     const { data, error } = await q;
     if (error) throw error;
-    return NextResponse.json({ success: true, data: data || [] });
+
+    // display_brand 폴백: headers.brand가 비었으면 items[0].brand 집계하여 주입
+    const headers = (data || []) as Array<Record<string, unknown>>;
+    const nullBrandIds = headers
+      .filter(h => !h.brand)
+      .map(h => h.id as string);
+    const firstBrandByPo: Record<string, string> = {};
+    if (nullBrandIds.length > 0) {
+      const { data: itemBrands } = await supabase
+        .from('import_po_items')
+        .select('po_id, brand, sort_order')
+        .in('po_id', nullBrandIds)
+        .order('sort_order', { ascending: true });
+      (itemBrands || []).forEach((r: { po_id: string; brand: string | null }) => {
+        if (r.brand && !firstBrandByPo[r.po_id]) firstBrandByPo[r.po_id] = r.brand;
+      });
+    }
+    headers.forEach(h => {
+      const id = h.id as string;
+      h.display_brand = (h.brand as string) || firstBrandByPo[id] || '';
+    });
+
+    return NextResponse.json({ success: true, data: headers });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

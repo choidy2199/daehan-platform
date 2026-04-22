@@ -2373,3 +2373,6 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-list-table tr.po-list-row.current { background:rgba(26,29,35,0.06); cursor:default; }
 .po-list-table tr.po-list-row.current:hover { background:rgba(26,29,35,0.06); }
 .po-list-empty { padding:60px 20px; text-align:center; color:#9BA3B2; font-size:13px; font-family:Pretendard,sans-serif; }
+.po-list-header-actions { display:flex; align-items:center; gap:8px; }
+.po-list-check, #po-list-check-all { width:14px; height:14px; cursor:pointer; }
+.po-list-table th.po-list-th-check, .po-list-table td.po-list-td-check { text-align:center !important; padding-left:10px; cursor:default; }
