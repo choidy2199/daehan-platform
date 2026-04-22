@@ -4,14 +4,14 @@
 ## 프로젝트 정보
 - 사이트: https://daehantool.dev
 - GitHub: choidy2199/daehan-platform
-- 작업 폴더: ~/1.클로드/웹개발/0.daehan-platform
+- 작업 폴더: ~/1.클로드/웹개발/daehan-platform
 - 기술 스택: Next.js App Router + TypeScript + Tailwind + Supabase + Vercel
 - Vercel: Pro 플랜, maxDuration 60초
 - 로그인: admin / admin1234
 - 사용자 3명: admin(Mac), hwon(Windows), jyoung(Windows) — 같은 데이터 공유
 
 ## 프로젝트 구조
-- 기존 HTML: public/manager/ (index.html, style.css, app.js ~7,100줄)
+- 기존 HTML: public/manager/ (index.html, style.css, app.js ~27,000줄)
 - Next.js: src/app/ (API Routes, React 페이지)
 - DB: Supabase (PostgreSQL)
 - 배포: git push → Vercel 자동 배포
@@ -73,6 +73,116 @@ NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
 SUPABASE_SERVICE_ROLE_KEY, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET,
 ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 ```
+
+## 🆕 새 메뉴 개발 원칙 (2026-04-22 확정)
+
+### 기본 원칙
+
+> **새 메뉴 = 무조건 Next.js / 기존 메뉴 수정 = app.js 유지**
+
+app.js는 약 27,000줄로 이미 포화 상태. 앞으로 app.js에 새 메뉴 로직 추가 금지.
+모든 신규 메뉴는 Next.js로 만들어 **한 메뉴 = 한 폴더** 구조로 독립 관리.
+
+### 판단 기준
+
+| 요청 유형 | 처리 방식 |
+|----------|----------|
+| 🆕 새 메뉴 추가 | ✅ Next.js (무조건) |
+| 🆕 새 대시보드 / 리포트 | ✅ Next.js (무조건) |
+| 🆕 새 외부 API 연동 메뉴 | ✅ Next.js (무조건) |
+| 🔧 기존 메뉴 버그 수정 | app.js 유지 |
+| 🔧 기존 메뉴 소소한 기능 추가 | app.js 유지 |
+| 🔧 기존 메뉴 UI 개선 | app.js 유지 |
+| 🔄 기존 메뉴 대폭 개편 | ⚠️ 협의 — Next.js 마이그레이션 검토 |
+
+### Next.js 신규 메뉴 표준 폴더 구조
+```
+src/app/manager/[메뉴이름]/
+├── page.tsx              ← 메인 페이지 UI
+├── components/           ← 이 메뉴 전용 컴포넌트
+│   ├── Table.tsx
+│   ├── Popup.tsx
+│   └── ...
+├── lib/                  ← 이 메뉴 전용 유틸
+│   └── utils.ts
+└── types.ts              ← 이 메뉴 전용 타입
+```
+
+**필요 시 추가:**
+- `src/app/api/[메뉴이름]/route.ts` — 이 메뉴 전용 API
+
+**원칙:** 한 메뉴 = 한 폴더 = 완전히 독립. 다른 메뉴 폴더 건드리지 않음.
+
+### app.js ↔ Next.js 연결 방식 (iframe)
+
+기존 사이드바에서 새 메뉴 클릭 시 해당 탭 영역에 iframe 삽입:
+```
+사이드바 메뉴 클릭
+↓
+app.js가 해당 탭 영역에 iframe 삽입
+↓
+iframe src = "/manager/[메뉴이름]"
+↓
+Next.js 페이지 로드
+```
+
+**장점:**
+- 기존 app.js 구조 안 건드림 (사이드바 메뉴 1개 + iframe 삽입 로직만 추가)
+- Next.js 페이지는 독립적으로 동작
+- 로그인 세션 공유 (같은 도메인)
+- 데이터 공유 (Supabase, localStorage, API 엔드포인트 전부 동일하게 접근 가능)
+
+### 데이터 공유 (Next.js ↔ app.js)
+
+같은 도메인(daehantool.dev)이므로 둘 다 동일하게 접근 가능:
+
+| 자원 | 공유 방식 |
+|------|----------|
+| Supabase DB | `src/lib/supabase.ts` 동일 사용 |
+| 로그인 세션 | 쿠키 자동 공유 |
+| API 엔드포인트 | `/api/...` 직접 fetch |
+| localStorage | 같은 도메인이라 공유됨 |
+| 환경변수 | `.env.local` 공유 |
+
+### 신규 메뉴 생성 체크리스트
+
+새 메뉴 만들 때 Claude Code는 반드시 이 순서로:
+
+1. [ ] `src/app/manager/[메뉴이름]/` 폴더 생성
+2. [ ] `page.tsx` — 메인 페이지 (React 컴포넌트)
+3. [ ] `types.ts` — 타입 정의
+4. [ ] 필요 시 `components/`, `lib/`, `api/` 하위 폴더 생성
+5. [ ] app.js의 사이드바 메뉴 배열에 신규 항목 1줄 추가
+6. [ ] 해당 탭 클릭 시 iframe 삽입 로직 1곳 추가
+7. [ ] `npm run build` 성공 확인
+8. [ ] git commit & push
+9. [ ] `https://daehantool.dev/manager/[메뉴이름]` URL 직접 접속 테스트
+10. [ ] 사이드바에서 iframe 로드 테스트
+11. [ ] app.js 기존 메뉴 정상 동작 확인
+
+### 디자인 시스템 (필수)
+
+신규 Next.js 메뉴도 기존 디자인 시스템 엄격 준수:
+- `var(--tl-*)` 토큰 + shadcn alias만 사용 (하드코딩 금지)
+- `src/components/ui/*.tsx` (shadcn) 최우선
+- `~/.claude/skills/toollab-design-system/SKILL.md` 참조
+- 세부 규칙은 "## 디자인 시스템 준수 규칙" 섹션 참조
+
+### 금지 사항
+
+- ❌ 새 메뉴 로직을 app.js에 추가 (예외 없음)
+- ❌ 여러 메뉴가 컴포넌트/유틸을 공유 (처음엔 각 메뉴 폴더 내 독립, 반복 사용되면 그때 `src/components/shared/`로 추출)
+- ❌ 기존 메뉴 iframe 연결 중 다른 메뉴 로직 수정
+- ❌ Tailwind 외 CSS 프레임워크 혼용 (프로젝트 표준: Tailwind)
+
+### 첫 테스트 메뉴 (2026-04-22 지정)
+
+**공지사항 관리 메뉴**
+- 이유: 작고 독립적, CRUD만 있어 표준화 검증에 이상적
+- 위치: `src/app/manager/notices/` (참고: 기존 `/api/notices` API는 이미 존재)
+- 선행 작업: 현재 제품·발주 탭 커밋6 완료 후 진행
+- 목적: 이 메뉴를 만들면서 발견한 문제점을 기반으로 `~/.claude/skills/nextjs-new-menu/SKILL.md` 스킬 파일 작성
+
 
 ## 이 프로젝트 고유 규칙
 - localStorage 16개+ 키 보존 필수 (절대 초기화 금지)
@@ -435,6 +545,13 @@ ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
   - DB 정리 (Supabase MCP 직접 실행, git 커밋 없음): `import_products_v2` 27건 + `import_po_headers` 2건 + `import_po_items` 48건 + `app_data['mw_import_calcs']` 1건 = **총 78건 삭제**. DROP/ALTER 일절 없음. 테이블 구조/FK/컬럼 전부 유지
   - **보존**: 인보이스V2 (`_ipinv2*`, ~1,810줄) + 수입건V2 (`_ipbat2*`, ~2,370줄) + `src/app/api/import-invoices/` + `src/app/api/import-batches/` + `src/app/api/import-products-v2/` (인보이스V2가 제품 검색/자동 등록에 호출 중) + `src/lib/import-v2.ts` + `src/lib/import-invoice-calc.ts`
   - 다음 단계 (P2-b): 제품·발주 탭 좌측 "제품 목록"을 `mw_gen_products` 기반으로 재설계. 브랜드 탭 필터는 `getGenBrand()` 기반
+
+- [2026-04-22] 🆕 새 메뉴 개발 원칙 섹션 추가 — 신규 메뉴는 Next.js 원칙 확정
+  - app.js 포화 상태 (27,000줄) 대응
+  - Next.js 표준 폴더 구조: `src/app/manager/[메뉴이름]/`
+  - app.js ↔ Next.js 연결: iframe 삽입 방식
+  - 첫 테스트 메뉴: 공지사항 관리 (제품·발주 커밋6 완료 후 진행)
+  - CLAUDE.md 오류 2곳 수정: 작업 폴더 경로(0. 제거), app.js 줄수(7,100→27,000)
 
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
