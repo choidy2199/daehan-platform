@@ -19210,6 +19210,8 @@ var _backordersCache = null;
 var _boFilterType = 'all';
 var _boFilterStatus = 'all';
 var _boSearch = '';
+var _boCustActiveIdx = -1;
+var _boProdActiveIdx = -1;
 
 async function _fetchBackorders() {
   try {
@@ -19366,12 +19368,12 @@ function _showBackorderForm() {
   overlay.id = 'bo-form-popup';
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
   var modal = document.createElement('div');
-  modal.style.cssText = 'background:#fff;border-radius:8px;width:620px;max-width:95vw;overflow:hidden;border:0.5px solid #eee;';
+  modal.style.cssText = 'background:#fff;border-radius:8px;width:1080px;max-width:95vw;overflow:hidden;border:0.5px solid #eee;';
   modal.innerHTML =
     '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:14px 20px;background:#1A1D23;color:#fff;cursor:move;"><span style="font-size:16px;font-weight:500;">백오더 등록</span><button onclick="document.getElementById(\'bo-form-popup\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">✕</button></div>' +
     '<div style="padding:20px 24px;">' +
     // 거래처 + 제품 2열
-    '<div style="display:grid !important;grid-template-columns:1fr 1.3fr;gap:12px;">' +
+    '<div style="display:grid !important;grid-template-columns:300px 700px;gap:12px;">' +
       // 거래처
       '<div style="margin-bottom:14px;position:relative;">' +
         '<label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">거래처</label>' +
@@ -19441,6 +19443,31 @@ function _showBackorderForm() {
   custInput.addEventListener('compositionstart', function() { custC = true; });
   custInput.addEventListener('compositionend', function() { custC = false; _boSearchCust(custInput.value, custDd); _boUpdateSubmitState(); });
   custInput.addEventListener('input', function() { if (!custC) _boSearchCust(custInput.value, custDd); document.getElementById('bo-customer-code').value = ''; _boUpdateSubmitState(); });
+  custInput.addEventListener('keydown', function(e) {
+    var dd = document.getElementById('bo-cust-dropdown');
+    if (!dd || dd.style.display === 'none') return;
+    var items = document.querySelectorAll('.bo-cust-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _boCustActiveIdx = (_boCustActiveIdx + 1) % items.length;
+      _boCustApplyActive();
+      items[_boCustActiveIdx].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _boCustActiveIdx = (_boCustActiveIdx - 1 + items.length) % items.length;
+      _boCustApplyActive();
+      items[_boCustActiveIdx].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (_boCustActiveIdx >= 0 && items[_boCustActiveIdx]) {
+        _boSelCust(items[_boCustActiveIdx]);
+      }
+    } else if (e.key === 'Escape') {
+      dd.style.display = 'none';
+      _boCustActiveIdx = -1;
+    }
+  });
 
   _boBindProductInput();
 
@@ -19459,16 +19486,52 @@ function _showBackorderForm() {
 }
 
 function _boSearchCust(q, dd) {
-  if (!q || q.length < 2) { dd.style.display = 'none'; return; }
-  var ql = q.toLowerCase(), matches = [];
-  for (var i = 0; i < clientData.length && matches.length < 10; i++) {
+  if (!q || q.length < 1) { dd.style.display = 'none'; _boCustActiveIdx = -1; return; }
+  var ql = q.toLowerCase();
+  var matches = [];
+  for (var i = 0; i < clientData.length && matches.length < 5; i++) {
     if ((clientData[i].name||'').toLowerCase().indexOf(ql) !== -1) matches.push(clientData[i]);
   }
-  if (!matches.length) { dd.innerHTML = '<div style="padding:12px;font-size:12px;color:#999;text-align:center;">없음</div>'; dd.style.display = 'block'; return; }
-  dd.innerHTML = matches.map(function(c) { return '<div onclick="_boSelCust(this)" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'" data-code="'+(c.manageCode||c.code||'')+'" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">'+(c.name||'')+' <span style="font-size:11px;color:#999;">'+(c.manageCode||c.code||'')+'</span></div>'; }).join('');
+  if (!matches.length) {
+    dd.innerHTML = '<div style="padding:12px;font-size:12px;color:#999;text-align:center;">검색 결과 없음</div>';
+    dd.style.display = 'block';
+    _boCustActiveIdx = -1;
+    return;
+  }
+  dd.innerHTML = matches.map(function(c, idx) {
+    return '<div class="bo-cust-item" onclick="_boSelCust(this)" onmouseenter="_boCustSetActive(' + idx + ')" data-idx="' + idx + '" data-name="'+(c.name||'').replace(/"/g,'&quot;')+'" data-code="'+(c.manageCode||c.code||'')+'" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;">'
+      + (c.name||'')
+      + ' <span style="font-size:11px;color:#999;">'+(c.manageCode||c.code||'')+'</span>'
+      + '</div>';
+  }).join('');
   dd.style.display = 'block';
+  _boCustActiveIdx = 0;
+  _boCustApplyActive();
 }
-function _boSelCust(el) { document.getElementById('bo-customer').value = el.getAttribute('data-name'); document.getElementById('bo-customer-code').value = el.getAttribute('data-code'); document.getElementById('bo-cust-dropdown').style.display = 'none'; }
+
+function _boCustSetActive(idx) {
+  _boCustActiveIdx = idx;
+  _boCustApplyActive();
+}
+
+function _boCustApplyActive() {
+  var items = document.querySelectorAll('.bo-cust-item');
+  items.forEach(function(el, i) {
+    el.style.background = (i === _boCustActiveIdx) ? '#F4F6FA' : '#fff';
+  });
+}
+
+function _boSelCust(el) {
+  var name = el.getAttribute('data-name');
+  var code = el.getAttribute('data-code');
+  var input = document.getElementById('bo-customer');
+  input.value = name;
+  input.setAttribute('title', name);
+  document.getElementById('bo-customer-code').value = code;
+  document.getElementById('bo-cust-dropdown').style.display = 'none';
+  _boCustActiveIdx = -1;
+  _boUpdateSubmitState();
+}
 
 function _boGetAllProducts() {
   var results = [];
@@ -19499,7 +19562,7 @@ function _boGetAllProducts() {
 }
 
 function _boSearchProd(q, dd) {
-  if (!q || q.length < 1) { dd.style.display = 'none'; return; }
+  if (!q || q.length < 1) { dd.style.display = 'none'; _boProdActiveIdx = -1; return; }
   var ql = q.toLowerCase();
   var all = _boGetAllProducts();
   var matches = [];
@@ -19511,20 +19574,35 @@ function _boSearchProd(q, dd) {
   if (!matches.length) {
     dd.innerHTML = '<div style="padding:12px;font-size:12px;color:#999;text-align:center;">검색 결과 없음</div>';
     dd.style.display = 'block';
+    _boProdActiveIdx = -1;
     return;
   }
-  dd.innerHTML = matches.map(function(p) {
+  dd.innerHTML = matches.map(function(p, idx) {
     var badgeStyle = p.type === 'milwaukee'
       ? 'background:#E24B4A;color:#fff;'
       : 'background:#E6F1FB;color:#0C447C;';
-    var nameShort = (p.name || '').substring(0, 40);
-    return '<div onclick="_boSelProd(this)" data-code="'+(p.code||'').replace(/"/g,'&quot;')+'" data-name="'+(p.name||'').replace(/"/g,'&quot;')+'" data-model="'+(p.model||'').replace(/"/g,'&quot;')+'" data-type="'+p.type+'" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">'
+    var nameShort = (p.name || '').substring(0, 60);
+    return '<div class="bo-prod-item" onclick="_boSelProd(this)" onmouseenter="_boProdSetActive(' + idx + ')" data-idx="' + idx + '" data-code="'+(p.code||'').replace(/"/g,'&quot;')+'" data-name="'+(p.name||'').replace(/"/g,'&quot;')+'" data-model="'+(p.model||'').replace(/"/g,'&quot;')+'" data-type="'+p.type+'" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;">'
       + '<span style="font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500;flex-shrink:0;'+badgeStyle+'">'+p.typeLabel+'</span>'
-      + '<span style="font-weight:500;color:#1A1D23;min-width:90px;flex-shrink:0;">'+(p.model||'')+'</span>'
+      + '<span style="font-weight:500;color:#1A1D23;min-width:140px;flex-shrink:0;">'+(p.model||'')+'</span>'
       + '<span style="font-size:12px;color:#5A6070;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+nameShort+'</span>'
       + '</div>';
   }).join('');
   dd.style.display = 'block';
+  _boProdActiveIdx = 0;
+  _boProdApplyActive();
+}
+
+function _boProdSetActive(idx) {
+  _boProdActiveIdx = idx;
+  _boProdApplyActive();
+}
+
+function _boProdApplyActive() {
+  var items = document.querySelectorAll('.bo-prod-item');
+  items.forEach(function(el, i) {
+    el.style.background = (i === _boProdActiveIdx) ? '#F4F6FA' : '#fff';
+  });
 }
 
 function _boSelProd(el) {
@@ -19655,6 +19733,30 @@ function _boBindProductInput() {
   });
   prodInput.addEventListener('input', function() {
     if (!prodC) _boSearchProd(prodInput.value, prodDd);
+  });
+  prodInput.addEventListener('keydown', function(e) {
+    if (prodDd.style.display === 'none') return;
+    var items = document.querySelectorAll('.bo-prod-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _boProdActiveIdx = (_boProdActiveIdx + 1) % items.length;
+      _boProdApplyActive();
+      items[_boProdActiveIdx].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _boProdActiveIdx = (_boProdActiveIdx - 1 + items.length) % items.length;
+      _boProdApplyActive();
+      items[_boProdActiveIdx].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (_boProdActiveIdx >= 0 && items[_boProdActiveIdx]) {
+        _boSelProd(items[_boProdActiveIdx]);
+      }
+    } else if (e.key === 'Escape') {
+      prodDd.style.display = 'none';
+      _boProdActiveIdx = -1;
+    }
   });
 }
 
