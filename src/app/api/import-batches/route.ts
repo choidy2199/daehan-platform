@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('import_batches')
-      .select('*, import_invoices(id, final_amount_usd)', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('customs_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (status && status !== 'all') query = query.eq('status', status);
@@ -38,8 +38,24 @@ export async function GET(request: NextRequest) {
       (linked || []).forEach((inv: { id: string }) => { linkedMap[inv.id] = inv; });
     }
 
+    // batch_id 방향 인보이스 조회 (레거시 1:N, invoice_count/total_usd 계산용)
+    // — PostgREST 다중 embed 대신 2nd query (5587c8b와 동일 패턴)
+    const batchIds = rows.map(r => r.id as string).filter(Boolean);
+    const invoiceByBatchMap = new Map<string, Array<{ final_amount_usd: number }>>();
+    if (batchIds.length > 0) {
+      const { data: invs } = await supabase
+        .from('import_invoices')
+        .select('id, batch_id, final_amount_usd')
+        .in('batch_id', batchIds);
+      for (const inv of (invs || []) as Array<{ id: string; batch_id: string; final_amount_usd: number }>) {
+        if (!inv.batch_id) continue;
+        if (!invoiceByBatchMap.has(inv.batch_id)) invoiceByBatchMap.set(inv.batch_id, []);
+        invoiceByBatchMap.get(inv.batch_id)!.push({ final_amount_usd: inv.final_amount_usd });
+      }
+    }
+
     const shaped = rows.map(row => {
-      const invs = (row.import_invoices as Array<{ final_amount_usd: number }> | null) || [];
+      const invs = invoiceByBatchMap.get(row.id as string) || [];
       const total = invs.reduce((s, i) => s + Number(i.final_amount_usd || 0), 0);
       const linkId = row.linked_invoice_id as string | null;
       return {
