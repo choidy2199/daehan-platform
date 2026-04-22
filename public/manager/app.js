@@ -20703,16 +20703,17 @@ function _poRenderDetail() {
 
   var hasError = !!(_poState && _poState.loadError);
   var po = (_poState && _poState.currentPo) ? _poState.currentPo : {};
-  var poNumber = _poEsc(po.po_number || (hasError ? '-' : '로드 중...'));
+  var noPo = !hasError && !po.id;
+  var poNumber = _poEsc(po.po_number || (hasError ? '-' : (noPo ? '제품발주' : '로드 중...')));
   var statusBadge = hasError
     ? '<span class="pc-badge-state" style="background:#CC2222;color:#fff">오류</span>'
-    : _poFormatStatusBadge(po.status || 'draft');
-  var poDate = hasError ? '-' : _poFormatDate(po.po_date);
-  var brand = hasError ? '-' : _poEsc(po.brand || '-');
+    : (noPo ? '' : _poFormatStatusBadge(po.status || 'draft'));
+  var poDate = (hasError || noPo) ? '' : _poFormatDate(po.po_date);
+  var brand = (hasError || noPo) ? '' : _poEsc(po.brand || '-');
   var productCount = (loadObj('mw_import_po_products', []) || []).length;
   var cartCount = (hasError || !po.id) ? 0 : _poLoadCart(po.id).length;
   var isReadOnly = !hasError && po.status && po.status !== 'draft';
-  var disabledAttr = hasError ? ' disabled' : '';
+  var disabledAttr = (hasError || noPo) ? ' disabled' : '';
   var readOnlyClass = isReadOnly ? ' po-readonly' : '';
   var placeholderAlert = "alert('P2~P9에서 구현 예정')";
   var listPlaceholderAlert = "alert('발주서 리스트 모달은 P7에서 구현 예정')";
@@ -20725,8 +20726,18 @@ function _poRenderDetail() {
   h += '<div class="pc-mh-left">';
   h += '<span class="pc-mh-title">' + poNumber + '</span>';
   h += statusBadge;
-  h += '<span class="pc-mh-meta" id="po-mh-meta">· ' + poDate + ' · ' + brand + ' (' + productCount + '개 제품 · ' + cartCount + '개 장바구니)</span>';
+  if (noPo) {
+    h += '<span class="pc-mh-meta" id="po-mh-meta">· 발주서를 선택하세요 (' + productCount + '개 제품 등록)</span>';
+  } else {
+    h += '<span class="pc-mh-meta" id="po-mh-meta">· ' + poDate + ' · ' + brand + ' (' + productCount + '개 제품 · ' + cartCount + '개 장바구니)</span>';
+  }
   h += '</div>';
+  if (noPo) {
+    h += '<div style="margin-left:auto;display:flex;gap:6px;">';
+    h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPoListModal()">발주서 리스트</button>';
+    h += '<button class="btn-mini btn-mini-p" onclick="_poInit()">+ 새 발주서</button>';
+    h += '</div>';
+  }
   h += '</div>';
 
   // 에러 배너 (loadError true일 때만 표시)
@@ -20770,7 +20781,7 @@ function _poRenderDetail() {
   h += '<span style="font-size:11px;color:#aaa;font-weight:400;margin-left:8px;font-family:monospace;">' + poNumber + '</span>';
   h += '</div>';
   h += '<div class="pc-panel-actions">';
-  h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPoListModal()"' + disabledAttr + '>발주서 리스트</button>';
+  h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPoListModal()"' + (hasError ? ' disabled' : '') + '>발주서 리스트</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>비우기</button>';
   if (isReadOnly) {
     h += '<button class="btn-mini" id="po-btn-confirm" disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;">✓ 확정됨</button>';
@@ -21827,12 +21838,12 @@ function _poListDeleteSelected() {
     } else if (successCount > 0) {
       _poToast(successCount + '건 삭제 완료', 'success');
     }
-    // 현재 PO가 삭제 성공 목록에 있으면 상세 영역을 빈 상태로 (리로드 없음)
+    // 현재 PO가 삭제 성공 목록에 있으면 state만 정리 후 동일 레이아웃으로 재렌더
     if (currentId && successIds.indexOf(String(currentId)) >= 0) {
       _poState.currentPo = null;
       _poState.currentPoId = null;
       _poState.currentItems = [];
-      _poRenderEmptyDetail();
+      _poRenderDetail();
     }
     // 모달 내부만 갱신 (닫기/재오픈 없음)
     _poRefreshListModal().catch(function(){}).then(restoreBtn, restoreBtn);
@@ -21864,18 +21875,6 @@ function _poRefreshListModal() {
     });
 }
 
-// 현재 PO 삭제 후 상세 영역 빈 상태 (자동 draft 생성 금지)
-function _poRenderEmptyDetail() {
-  var container = document.getElementById('tab-import-po-v2');
-  if (!container) return;
-  container.innerHTML = '<div style="padding:80px 20px;text-align:center;font-family:Pretendard,sans-serif;">' +
-    '<div style="font-size:40px;color:#DDE1EB;margin-bottom:14px;">📋</div>' +
-    '<div style="font-size:15px;color:#5A6070;margin-bottom:8px;font-weight:500;">표시할 발주서가 없습니다</div>' +
-    '<div style="font-size:12px;color:#9BA3B2;margin-bottom:20px;">발주서 리스트에서 다른 발주서를 선택하거나 새로 생성하세요.</div>' +
-    '<button onclick="_poInit()" style="font-size:13px;padding:8px 18px;border-radius:6px;background:#185FA5;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:600;margin-right:8px;">+ 새 발주서</button>' +
-    '<button onclick="_poOpenPoListModal()" style="font-size:13px;padding:8px 18px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:600;">발주서 리스트</button>' +
-    '</div>';
-}
 
 function _poSetListFilter(key) {
   _poListFilter = key;
