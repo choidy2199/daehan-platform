@@ -1,11 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Backorder, BackordersResponse } from './types';
+import BackorderHeader from './components/BackorderHeader';
+import BackorderKPI from './components/BackorderKPI';
+import BackorderFilters, {
+  type FilterType,
+  type FilterStatus,
+} from './components/BackorderFilters';
 
 export default function BackorderPage() {
   const [items, setItems] = useState<Backorder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<FilterType>('all');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     let aborted = false;
@@ -26,6 +35,36 @@ export default function BackorderPage() {
       aborted = true;
     };
   }, []);
+
+  const counts = useMemo(() => {
+    const data = items || [];
+    return {
+      total: data.length,
+      waiting: data.filter((d) => d.status === 'waiting').length,
+      partial: data.filter((d) => d.status === 'partial').length,
+      done: data.filter((d) => d.status === 'done').length,
+      stockIn: 0,
+    };
+  }, [items]);
+
+  const filtered = useMemo(() => {
+    const data = items || [];
+    const q = search.trim().toLowerCase();
+    return data.filter((d) => {
+      if (filterType !== 'all' && d.product_type !== filterType) return false;
+      if (filterStatus !== 'all' && d.status !== filterStatus) return false;
+      if (q) {
+        if (
+          !(d.product_name || '').toLowerCase().includes(q) &&
+          !(d.customer_name || '').toLowerCase().includes(q) &&
+          !(d.model || '').toLowerCase().includes(q)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [items, filterType, filterStatus, search]);
 
   const containerStyle: React.CSSProperties = {
     padding: 24,
@@ -48,35 +87,47 @@ export default function BackorderPage() {
     );
   }
 
-  const recent = items.slice(0, 5);
-
   return (
     <div style={containerStyle}>
-      <h1 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
-        백오더 {items.length.toLocaleString()}건
-      </h1>
-      {recent.length === 0 ? (
-        <p style={{ color: '#9BA3B2' }}>등록된 백오더가 없습니다.</p>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-          {recent.map((b) => (
-            <li
-              key={b.id}
-              style={{
-                padding: '10px 0',
-                borderBottom: '1px solid #EEF0F4',
-                fontSize: 13,
-              }}
-            >
-              <span style={{ fontWeight: 600 }}>{b.product_name}</span>
-              <span style={{ color: '#5A6070', margin: '0 8px' }}>·</span>
-              <span>{b.customer_name}</span>
-              <span style={{ color: '#5A6070', margin: '0 8px' }}>·</span>
-              <span>{b.quantity.toLocaleString()}개</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div
+        style={{
+          background: '#fff',
+          border: '0.5px solid #eee',
+          borderRadius: 8,
+          overflow: 'hidden',
+        }}
+      >
+        <BackorderHeader
+          totalCount={counts.total}
+          waitingCount={counts.waiting}
+          stockInCount={counts.stockIn}
+          onAddClick={() => alert('Step 4에서 구현')}
+        />
+        <BackorderKPI
+          waitingCount={counts.waiting}
+          partialCount={counts.partial}
+          doneCount={counts.done}
+          stockInCount={counts.stockIn}
+        />
+        <BackorderFilters
+          filterType={filterType}
+          filterStatus={filterStatus}
+          search={search}
+          onTypeChange={setFilterType}
+          onStatusChange={setFilterStatus}
+          onSearchChange={setSearch}
+        />
+        <div
+          style={{
+            padding: 24,
+            textAlign: 'center',
+            color: '#9BA3B2',
+            fontSize: 14,
+          }}
+        >
+          {filtered.length.toLocaleString()}건 (테이블 Step 3)
+        </div>
+      </div>
     </div>
   );
 }
