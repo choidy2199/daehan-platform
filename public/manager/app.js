@@ -20783,6 +20783,8 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-actions">';
   h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPoListModal()"' + (hasError ? ' disabled' : '') + '>발주서 리스트</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>비우기</button>';
+  var canExportPdf = !hasError && !noPo && po.status && po.status !== 'draft';
+  h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPdfPreview()"' + (canExportPdf ? '' : ' disabled') + '>📄 발주서 PDF</button>';
   if (isReadOnly) {
     h += '<button class="btn-mini" id="po-btn-confirm" disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;">✓ 확정됨</button>';
   } else {
@@ -21661,6 +21663,233 @@ function _poConfirmOrder() {
       console.error('[_poConfirmOrder]', err);
       alert('발주 확정 실패: ' + err.message);
       if (btn) { btn.disabled = false; btn.textContent = '✓ 발주확정'; }
+    });
+}
+
+// ===== 커밋 7 — 발주서 PDF 미리보기/다운로드 =====
+
+var _DAEHAN_COMPANY_INFO = {
+  name: '대한종합상사',
+  ceo: '최병우',
+  bizNumber: '000-00-00000',
+  address: '서울특별시 ○○구 ○○로 ○○',
+  phone: '02-0000-0000',
+  fax: '02-0000-0000',
+  email: 'toollab.studio@gmail.com',
+  logoUrl: '/manager/daehanrogo.png'
+};
+
+function _poOpenPdfPreview() {
+  var po = _poState && _poState.currentPo;
+  if (!po) return;
+  if (!po.status || po.status === 'draft') {
+    alert('확정된 발주서만 PDF 생성이 가능합니다.');
+    return;
+  }
+  // 최신 데이터 (headers + items) 재조회
+  fetch('/api/import-po/' + po.id, { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.success) throw new Error((json && json.error) || '데이터 로드 실패');
+      var data = json.data || {};
+      var header = data.header || po;
+      var items = data.items || (_poState.currentItems || []);
+      _poRenderPdfPreview(header, items);
+    })
+    .catch(function(err) { alert('데이터 로드 실패: ' + (err && err.message || err)); });
+}
+
+function _poClosePdfPreview() {
+  var o = document.getElementById('po-pdf-overlay');
+  if (o && o.parentNode) o.parentNode.removeChild(o);
+  document.removeEventListener('keydown', _poPdfEscHandler, true);
+}
+
+function _poPdfEscHandler(e) {
+  if (e.key !== 'Escape') return;
+  if (!document.getElementById('po-pdf-overlay')) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+  _poClosePdfPreview();
+}
+
+function _poRenderPdfPreview(po, items) {
+  if (document.getElementById('po-pdf-overlay')) return;
+  var overlay = document.createElement('div');
+  overlay.className = 'po-pdf-overlay';
+  overlay.id = 'po-pdf-overlay';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) _poClosePdfPreview(); });
+
+  var modal = document.createElement('div');
+  modal.className = 'po-pdf-modal';
+
+  var h = '';
+  h += '<div class="po-pdf-modal-header">';
+  h += '<span class="po-pdf-modal-title">발주서 미리보기</span>';
+  h += '<div class="po-pdf-modal-actions">';
+  h += '<button class="btn-mini btn-mini-p" id="po-pdf-download-btn" onclick="_poDownloadPdf()">다운로드</button>';
+  h += '<button class="po-pdf-modal-close" onclick="_poClosePdfPreview()" aria-label="닫기">✕</button>';
+  h += '</div>';
+  h += '</div>';
+  h += '<div class="po-pdf-modal-body">';
+  h += '<div id="po-pdf-document" class="po-pdf-document">' + _poBuildPdfHtml(po, items) + '</div>';
+  h += '</div>';
+  modal.innerHTML = h;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  document.addEventListener('keydown', _poPdfEscHandler, true);
+}
+
+function _poBuildPdfHtml(po, items) {
+  var info = _DAEHAN_COMPANY_INFO;
+  var poDateFmt = po && po.po_date ? String(po.po_date).replace(/-/g, '. ') : '-';
+  items = Array.isArray(items) ? items : [];
+
+  var totalQty = 0, totalPallet = 0, totalFob = 0;
+  items.forEach(function(it) {
+    var q = Number(it.quantity) || 0;
+    var p = Number(it.pallet_qty) || 0;
+    var f = Number(it.fob_usd) || 0;
+    totalQty += q;
+    totalPallet += p;
+    totalFob += q * f;
+  });
+
+  var statusLabel = { confirmed: '확정', linked: '인보이스연결', completed: '완료' }[po.status] || (po.status || '-');
+  var firstItemBrand = items.length > 0 ? (items[0].brand || '') : '';
+  var brandTxt = _poEsc(po.brand || firstItemBrand || '-');
+
+  var itemRows = items.map(function(it, idx) {
+    var qty = Number(it.quantity) || 0;
+    var fob = Number(it.fob_usd) || 0;
+    var lineTotal = qty * fob;
+    return '<tr>' +
+      '<td class="center">' + (idx + 1) + '</td>' +
+      '<td class="center">' + _poEsc(it.brand || '-') + '</td>' +
+      '<td>' + _poEsc(it.model || '-') + '</td>' +
+      '<td>' + _poEsc(it.product_name || '-') + '</td>' +
+      '<td class="right">' + (Number(it.pallet_qty) || 0).toLocaleString() + '</td>' +
+      '<td class="right">' + qty.toLocaleString() + '</td>' +
+      '<td class="right">$' + fob.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
+      '<td class="right">$' + lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
+    '</tr>';
+  }).join('');
+
+  var emptyRow = '<tr><td colspan="8" class="center" style="padding:24px;color:#9BA3B2;">등록된 제품이 없습니다.</td></tr>';
+
+  var memoHtml = '';
+  if (po.memo) {
+    memoHtml = '<div class="pdf-memo">' +
+      '<div class="pdf-memo-heading">비고</div>' +
+      '<div class="pdf-memo-content">' + _poEsc(po.memo).replace(/\n/g, '<br>') + '</div>' +
+      '</div>';
+  }
+
+  var h = '';
+  h += '<div class="pdf-header">';
+  h += '<div class="pdf-header-left"><img src="' + info.logoUrl + '" alt="로고" class="pdf-logo"></div>';
+  h += '<div class="pdf-header-right"><h1 class="pdf-title">발 주 서</h1></div>';
+  h += '</div>';
+
+  h += '<div class="pdf-info-grid">';
+  h += '<div class="pdf-info-block">';
+  h += '<div class="pdf-info-heading">발주자</div>';
+  h += '<table class="pdf-info-table">';
+  h += '<tr><th>회사명</th><td>' + _poEsc(info.name) + '</td></tr>';
+  h += '<tr><th>대표자</th><td>' + _poEsc(info.ceo) + '</td></tr>';
+  h += '<tr><th>사업자번호</th><td>' + _poEsc(info.bizNumber) + '</td></tr>';
+  h += '<tr><th>주소</th><td>' + _poEsc(info.address) + '</td></tr>';
+  h += '<tr><th>연락처</th><td>' + _poEsc(info.phone) + '</td></tr>';
+  h += '</table>';
+  h += '</div>';
+
+  h += '<div class="pdf-info-block">';
+  h += '<div class="pdf-info-heading">발주 정보</div>';
+  h += '<table class="pdf-info-table">';
+  h += '<tr><th>발주번호</th><td>' + _poEsc(po.po_number || '-') + '</td></tr>';
+  h += '<tr><th>발주일</th><td>' + poDateFmt + '</td></tr>';
+  h += '<tr><th>브랜드</th><td>' + brandTxt + '</td></tr>';
+  h += '<tr><th>공장</th><td>' + _poEsc(po.factory_name || '-') + '</td></tr>';
+  h += '<tr><th>상태</th><td>' + statusLabel + '</td></tr>';
+  h += '</table>';
+  h += '</div>';
+  h += '</div>';
+
+  h += '<table class="pdf-items-table">';
+  h += '<thead><tr>';
+  h += '<th style="width:40px;">No.</th>';
+  h += '<th style="width:72px;">브랜드</th>';
+  h += '<th style="width:120px;">모델명</th>';
+  h += '<th>품명</th>';
+  h += '<th style="width:50px;">파렛</th>';
+  h += '<th style="width:70px;">수량</th>';
+  h += '<th style="width:84px;">단가(USD)</th>';
+  h += '<th style="width:100px;">금액(USD)</th>';
+  h += '</tr></thead>';
+  h += '<tbody>' + (itemRows || emptyRow) + '</tbody>';
+  if (items.length > 0) {
+    h += '<tfoot><tr>';
+    h += '<td colspan="4" class="right"><strong>합계</strong></td>';
+    h += '<td class="right"><strong>' + totalPallet.toLocaleString() + '</strong></td>';
+    h += '<td class="right"><strong>' + totalQty.toLocaleString() + '</strong></td>';
+    h += '<td class="right">-</td>';
+    h += '<td class="right"><strong>$' + totalFob.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</strong></td>';
+    h += '</tr></tfoot>';
+  }
+  h += '</table>';
+
+  h += memoHtml;
+
+  h += '<div class="pdf-footer">';
+  h += '<div class="pdf-signature">';
+  h += '<div class="pdf-signature-label">발주자</div>';
+  h += '<div class="pdf-signature-name">' + _poEsc(info.name) + ' (인)</div>';
+  h += '</div>';
+  h += '<div class="pdf-footer-note">본 발주서는 ' + _poEsc(info.name) + '에서 발행된 공식 문서입니다.</div>';
+  h += '</div>';
+
+  return h;
+}
+
+function _poDownloadPdf() {
+  var po = _poState && _poState.currentPo;
+  if (!po) return;
+  var element = document.getElementById('po-pdf-document');
+  if (!element) return;
+  if (typeof window === 'undefined' || typeof window.html2pdf !== 'function') {
+    alert('PDF 라이브러리가 로드되지 않았습니다. 페이지를 새로고침해 주세요.');
+    return;
+  }
+
+  var today = new Date();
+  var yyyymmdd = today.getFullYear() +
+    String(today.getMonth() + 1).padStart(2, '0') +
+    String(today.getDate()).padStart(2, '0');
+  var filename = '발주서_' + (po.po_number || 'UNKNOWN') + '_' + yyyymmdd + '.pdf';
+
+  var opt = {
+    margin: [10, 10, 10, 10],
+    filename: filename,
+    image: { type: 'jpeg', quality: 0.95 },
+    html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#FFFFFF' },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  var btn = document.getElementById('po-pdf-download-btn');
+  var originalText = btn ? btn.textContent : '다운로드';
+  if (btn) { btn.disabled = true; btn.textContent = 'PDF 생성 중...'; }
+
+  window.html2pdf().set(opt).from(element).save()
+    .then(function() {
+      if (btn) { btn.disabled = false; btn.textContent = originalText; }
+    })
+    .catch(function(err) {
+      console.error('[_poDownloadPdf]', err);
+      alert('PDF 생성 실패: ' + (err && err.message || err));
+      if (btn) { btn.disabled = false; btn.textContent = originalText; }
     });
 }
 
