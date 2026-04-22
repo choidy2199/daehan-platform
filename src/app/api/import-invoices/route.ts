@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { invoice_no, batch_id, factory_name, factory_code, invoice_date, payment_terms, memo } = body || {};
+    const { invoice_no, batch_id, factory_name, factory_code, invoice_date, payment_terms, memo, customer_code, customer_name } = body || {};
     if (!invoice_no || !factory_name || !invoice_date) {
       return NextResponse.json({ success: false, error: '인보이스 번호, 공장명, 인보이스 일자는 필수입니다' }, { status: 400 });
     }
@@ -59,6 +59,8 @@ export async function POST(request: NextRequest) {
         invoice_date,
         payment_terms: payment_terms?.trim() || null,
         memo: memo?.trim() || null,
+        customer_code: customer_code ?? null,
+        customer_name: customer_name ?? null,
       })
       .select('*')
       .single();
