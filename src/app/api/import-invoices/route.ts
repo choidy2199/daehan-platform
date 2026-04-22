@@ -68,6 +68,68 @@ export async function POST(request: NextRequest) {
       }
       throw error;
     }
+
+    // 1:1 자동 생성: body에 batch_id가 없을 때만 수입건(import_batches) 생성
+    // batch_no: IMP-YYYY-NN 형식 (기존 2자리 순번 유지) + 23505 재시도 최대 3회
+    if (!batch_id && data?.id) {
+      const year = new Date().getFullYear();
+      const prefix = `IMP-${year}-`;
+      let batchInsertError: unknown = null;
+      let batchData: unknown = null;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        // 현재 연도 최대 batch_no 조회
+        const { data: last } = await supabase
+          .from('import_batches')
+          .select('batch_no')
+          .like('batch_no', `${prefix}%`)
+          .order('batch_no', { ascending: false })
+          .limit(1);
+        let nextNum = 1;
+        if (last && last.length > 0 && last[0].batch_no) {
+          const match = String(last[0].batch_no).match(/IMP-\d{4}-(\d+)/);
+          if (match) nextNum = parseInt(match[1], 10) + attempt + 1;
+          else nextNum = attempt + 1;
+        } else {
+          nextNum = attempt + 1;
+        }
+        const batchNo = `${prefix}${String(nextNum).padStart(2, '0')}`;
+
+        const { data: b, error: bErr } = await supabase
+          .from('import_batches')
+          .insert({
+            batch_no: batchNo,
+            batch_name: data.factory_name || data.invoice_no,
+            linked_invoice_id: data.id,
+            status: 'planning',
+          })
+          .select('*')
+          .single();
+
+        if (!bErr && b) { batchData = b; batchInsertError = null; break; }
+        if (bErr && bErr.code === '23505') {
+          batchInsertError = bErr;
+          continue; // batch_no 또는 linked_invoice_id unique 충돌 → 재시도
+        }
+        batchInsertError = bErr; // 비-23505 에러 즉시 탈출
+        break;
+      }
+
+      if (batchInsertError) {
+        // 롤백: 방금 생성된 invoice 삭제
+        const { error: delErr } = await supabase.from('import_invoices').delete().eq('id', data.id);
+        if (delErr) console.error('[invoice POST rollback] invoice delete failed:', delErr);
+        const msg = (batchInsertError instanceof Error) ? batchInsertError.message : String((batchInsertError as { message?: string } | null)?.message || batchInsertError);
+        return NextResponse.json(
+          { success: false, error: '수입건 자동 생성 실패, 인보이스도 취소됨: ' + msg },
+          { status: 500 }
+        );
+      }
+
+      // 응답에 생성된 batch 정보 포함
+      return NextResponse.json({ success: true, data, batch: batchData });
+    }
+
     return NextResponse.json({ success: true, data });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -141,7 +203,14 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    // 2) 인보이스 삭제 (import_invoice_items는 FK cascade 기대, 미설정이면 명시 삭제)
+    // 2) 연결된 수입건(import_batches) 삭제 — 1:1 관계, linked_invoice_id 고아 방지
+    const { error: batchDelErr } = await supabase
+      .from('import_batches')
+      .delete()
+      .eq('linked_invoice_id', id);
+    if (batchDelErr) console.error('[invoice DELETE] batch delete error:', batchDelErr);
+
+    // 3) 인보이스 삭제 (import_invoice_items는 FK cascade 기대, 미설정이면 명시 삭제)
     const { error } = await supabase.from('import_invoices').delete().eq('id', id);
     if (error) throw error;
     return NextResponse.json({ success: true, restoredPOCount: restoredCount });
