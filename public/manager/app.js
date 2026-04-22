@@ -19370,7 +19370,7 @@ function _renderBackorderList(container) {
 
   var h = '<style>'
     + '#backorders-table { min-width: 1200px; width: 100%; table-layout: fixed; }'
-    + '#backorders-table th.bo-col-check { width: 36px; }'
+    + '#backorders-table th.bo-col-delete { width: 48px; }'
     + '#backorders-table th.bo-col-no { width: 40px; }'
     + '#backorders-table th.bo-col-date { width: 58px; }'
     + '#backorders-table th.bo-col-cust { width: 130px; }'
@@ -19385,8 +19385,11 @@ function _renderBackorderList(container) {
     + '#backorders-table th.bo-col-action { width: 90px; }'
     + '#backorders-table th.bo-col-done { width: 68px; }'
     + '#backorders-table th.bo-th-left { text-align: left; padding-left: 12px; }'
-    + '#backorders-table td { vertical-align: middle; padding: 8px; text-align: center; font-size: 13px; }'
+    + '#backorders-table td { vertical-align: middle; padding: 8px 12px; text-align: center; font-size: 13px; }'
     + '#backorders-table td.bo-td-left { text-align: left; padding-left: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }'
+    + '#backorders-table tbody tr:nth-child(even) { background: #FAFBFC; }'
+    + '#backorders-table .bo-btn-delete { background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px; color: #9BA3B2; transition: background 0.12s, color 0.12s; }'
+    + '#backorders-table .bo-btn-delete:hover { background: #FCEBEB; color: #CC2222; }'
     + '#backorders-table tr { border-bottom: 1px solid #F0F2F7; }'
     + '#backorders-table tr.bo-row-stockin { background: rgba(234,243,222,.35); }'
     + '#backorders-table tr.bo-row-stockin:hover { background: rgba(234,243,222,.55); }'
@@ -19431,7 +19434,7 @@ function _renderBackorderList(container) {
   if (waitingCount > 0) h += '<span style="font-size:11px;padding:3px 10px;border-radius:10px;background:#E24B4A;color:#fff;font-weight:500;">대기 ' + waitingCount + '</span>';
   if (stockInCount > 0) h += '<span style="font-size:11px;padding:3px 10px;border-radius:10px;background:#1D9E75;color:#fff;font-weight:500;">입고 ' + stockInCount + '</span>';
   h += '</div>';
-  h += '<button onclick="_showBackorderForm()" style="font-size:13px;padding:7px 16px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-weight:500;font-family:Pretendard,sans-serif;">+ 백오더 등록</button>';
+  h += '<button onclick="_showBackorderForm()" style="font-size:13px;padding:7px 16px;border-radius:6px;background:#185FA5;color:#fff;border:none;cursor:pointer;font-weight:500;font-family:Pretendard,sans-serif;">+ 백오더 등록</button>';
   h += '</div>';
 
   // KPI
@@ -19464,8 +19467,8 @@ function _renderBackorderList(container) {
   h += '<div style="overflow:auto;max-height:calc(100vh - 320px);">';
   h += '<table id="backorders-table" style="width:100%;border-collapse:collapse;">';
   h += '<thead><tr>';
-  var thS = 'padding:10px 8px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;text-align:center;';
-  h += '<th class="bo-col-check" style="'+thS+'"><input type="checkbox" id="bo-check-all" onchange="_boToggleAll(this.checked)"></th>';
+  var thS = 'padding:10px 8px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;text-align:center;';
+  h += '<th class="bo-col-delete" style="'+thS+'"></th>';
   h += '<th class="bo-col-no" style="'+thS+'">No</th>';
   h += '<th class="bo-col-date" style="'+thS+'">날짜</th>';
   h += '<th class="bo-col-cust bo-th-left" style="'+thS+'text-align:left;">거래처</th>';
@@ -19542,7 +19545,7 @@ function _renderBackorderList(container) {
       var palletCell = isMw ? _boRenderPriceCell(null, null) : _boRenderPriceCell(info && info.palletQty, info && info.palletPrice);
 
       h += '<tr class="' + rowClass + '" data-id="' + d.id + '">';
-      h += '<td><input type="checkbox" class="bo-check" data-id="' + d.id + '" data-qty="' + d.quantity + '" data-shipped="' + (d.shipped_qty || 0) + '"' + (isDone || isCancelled ? ' disabled' : '') + ' onclick="event.stopPropagation()"></td>';
+      h += '<td><button class="bo-btn-delete" title="삭제" onclick="event.stopPropagation();_deleteBackorder(' + d.id + ')">🗑️</button></td>';
       h += '<td>' + (idx + 1) + '</td>';
       h += '<td>' + dateShort + '</td>';
       h += '<td class="bo-td-left" title="' + escCust + '">' + (d.customer_name || '') + '</td>';
@@ -19586,7 +19589,25 @@ function _renderBackorderList(container) {
 
 function _setBoFilterType(t) { _boFilterType = t; var c = document.getElementById('tab-backorder'); if (c) _renderBackorderList(c); }
 function _setBoFilterStatus(s) { _boFilterStatus = s; var c = document.getElementById('tab-backorder'); if (c) _renderBackorderList(c); }
-function _boToggleAll(checked) { document.querySelectorAll('.bo-check:not(:disabled)').forEach(function(cb) { cb.checked = checked; }); }
+async function _deleteBackorder(id) {
+  var cache = _backordersCache || [];
+  var d = null;
+  for (var i = 0; i < cache.length; i++) { if (cache[i].id === id) { d = cache[i]; break; } }
+  var cust = d ? (d.customer_name || '') : '';
+  var name = d ? (d.product_name || '') : '';
+  var msg = '[' + cust + '] ' + name + '\n\n이 백오더를 삭제하시겠습니까?';
+  if (!confirm(msg)) return;
+  try {
+    var res = await fetch('/api/backorders', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+    var json = await res.json();
+    if (json && json.error) throw new Error(json.error);
+    toast('백오더 삭제 완료');
+    _backordersCache = null;
+    await _fetchBackorders();
+    var c = document.getElementById('tab-backorder'); if (c) _renderBackorderList(c);
+    _updateBackorderBadge();
+  } catch(e) { alert('삭제 실패: ' + e.message); }
+}
 
 // ── 백오더 등록 팝업 ──
 function _showBackorderForm() {
