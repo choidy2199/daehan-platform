@@ -32,11 +32,9 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const { data, error } = await supabase
+    const { data: batch, error } = await supabase
       .from('import_batches')
-      .select(
-        '*, linked_invoice:import_invoices!linked_invoice_id(id, invoice_no, factory_name, factory_code, invoice_date, customer_code, customer_name, status, final_amount_usd, subtotal_usd, weighted_avg_rate)'
-      )
+      .select('*')
       .eq('id', id)
       .single();
     if (error) {
@@ -45,9 +43,21 @@ export async function GET(
       }
       throw error;
     }
-    return NextResponse.json({ success: true, data });
+
+    // linked_invoice (1:1) 별도 조회
+    let linkedInvoice: unknown = null;
+    if (batch && batch.linked_invoice_id) {
+      const { data: inv } = await supabase
+        .from('import_invoices')
+        .select('id, invoice_no, factory_name, factory_code, invoice_date, customer_code, customer_name, status, final_amount_usd, subtotal_usd, weighted_avg_rate')
+        .eq('id', batch.linked_invoice_id)
+        .maybeSingle();
+      linkedInvoice = inv || null;
+    }
+
+    return NextResponse.json({ success: true, data: { ...batch, linked_invoice: linkedInvoice } });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = err instanceof Error ? err.message : (typeof err === 'object' ? JSON.stringify(err) : String(err));
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }

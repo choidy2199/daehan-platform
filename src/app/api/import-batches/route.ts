@@ -15,10 +15,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('import_batches')
-      .select(
-        '*, import_invoices!batch_id(id, final_amount_usd), linked_invoice:import_invoices!linked_invoice_id(id, invoice_no, factory_name, factory_code, invoice_date, customer_code, customer_name, status, final_amount_usd)',
-        { count: 'exact' }
-      )
+      .select('*, import_invoices(id, final_amount_usd)', { count: 'exact' })
       .order('customs_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (status && status !== 'all') query = query.eq('status', status);
@@ -26,15 +23,36 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query.range(offset, offset + limit - 1);
     if (error) throw error;
 
-    const shaped = (data || []).map((row: Record<string, unknown>) => {
+    const rows = (data || []) as Array<Record<string, unknown>>;
+
+    // linked_invoice (1:1) 배치 조회 — PostgREST 다중 embed 대신 2nd query
+    const linkedIds = rows
+      .map(r => r.linked_invoice_id as string | null)
+      .filter((v): v is string => !!v);
+    const linkedMap: Record<string, unknown> = {};
+    if (linkedIds.length > 0) {
+      const { data: linked } = await supabase
+        .from('import_invoices')
+        .select('id, invoice_no, factory_name, factory_code, invoice_date, customer_code, customer_name, status, final_amount_usd')
+        .in('id', linkedIds);
+      (linked || []).forEach((inv: { id: string }) => { linkedMap[inv.id] = inv; });
+    }
+
+    const shaped = rows.map(row => {
       const invs = (row.import_invoices as Array<{ final_amount_usd: number }> | null) || [];
       const total = invs.reduce((s, i) => s + Number(i.final_amount_usd || 0), 0);
-      return { ...row, invoice_count: invs.length, total_usd: Number(total.toFixed(2)) };
+      const linkId = row.linked_invoice_id as string | null;
+      return {
+        ...row,
+        invoice_count: invs.length,
+        total_usd: Number(total.toFixed(2)),
+        linked_invoice: linkId && linkedMap[linkId] ? linkedMap[linkId] : null,
+      };
     });
 
     return NextResponse.json({ success: true, data: shaped, total: count ?? shaped.length });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = err instanceof Error ? err.message : (typeof err === 'object' ? JSON.stringify(err) : String(err));
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
