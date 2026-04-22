@@ -21898,12 +21898,10 @@ function _poOpenInvoiceLink(poId) {
       // 5) 성공 → 알림 + 리스트 닫기 + 인보이스V2 이동 + 상세 열기
       alert('인보이스 ' + invoice.invoice_no + '가 생성되었습니다.\n인보이스V2 메뉴로 이동합니다.');
       _poClosePoListModal();
-      if (typeof switchTab === 'function') {
-        switchTab('import-invoice-v2');
-        setTimeout(function() {
-          if (typeof _ipinv2OpenDetail === 'function') _ipinv2OpenDetail(invoice.id);
-        }, 250);
-      }
+      if (typeof openWindow === 'function') openWindow('인보이스V2');
+      setTimeout(function() {
+        if (typeof _ipinv2OpenDetail === 'function') _ipinv2OpenDetail(invoice.id);
+      }, 250);
     })
     .catch(function(err) {
       console.error('[_poOpenInvoiceLink]', err);
@@ -21915,12 +21913,10 @@ function _poOpenInvoiceLink(poId) {
 function _poGotoInvoice(invoiceId) {
   if (!invoiceId) return;
   _poClosePoListModal();
-  if (typeof switchTab === 'function') {
-    switchTab('import-invoice-v2');
-    setTimeout(function() {
-      if (typeof _ipinv2OpenDetail === 'function') _ipinv2OpenDetail(invoiceId);
-    }, 250);
-  }
+  if (typeof openWindow === 'function') openWindow('인보이스V2');
+  setTimeout(function() {
+    if (typeof _ipinv2OpenDetail === 'function') _ipinv2OpenDetail(invoiceId);
+  }, 250);
 }
 
 function _poClosePdfPreview() {
