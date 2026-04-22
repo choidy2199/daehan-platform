@@ -103,9 +103,19 @@ export async function syncAllStock(): Promise<StockSyncResult> {
   // 1) Supabase 로드
   const mwProducts = await loadAppData<any[]>('mw_products', []);
   const genProducts = await loadAppData<any[]>('mw_gen_products', []);
+  // mw_inventory 기존 배열 로드 (기존 수동 syncInventory와 동일 포맷: { code, stock, note1, note2 })
+  const inventory = await loadAppData<any[]>('mw_inventory', []);
 
   const mwList: any[] = Array.isArray(mwProducts) ? mwProducts : [];
   const genList: any[] = Array.isArray(genProducts) ? genProducts : [];
+  const invArr: Array<{ code: string; stock: number; note1: string; note2: string }> =
+    Array.isArray(inventory) ? inventory : [];
+
+  // mw_inventory: code → index 매핑 (upsert용)
+  const invIndexByCode = new Map<string, number>();
+  invArr.forEach((inv, idx) => {
+    if (inv && inv.code != null) invIndexByCode.set(String(inv.code), idx);
+  });
 
   // 2) 관리코드 수집
   type Item = { source: 'mw' | 'gen'; manageCode: string; index: number };
@@ -153,9 +163,22 @@ export async function syncAllStock(): Promise<StockSyncResult> {
     const mc = (p?.manageCode || '').trim();
     if (!mc || mc === '-') continue;
     if (Object.prototype.hasOwnProperty.call(stockMap, mc)) {
-      p.stock = stockMap[mc];
+      const stockVal = stockMap[mc];
+      p.stock = stockVal;
       p.lastFetchedAt = nowIso;
       mwSuccess++;
+
+      // mw_inventory 동시 upsert (기존 수동 syncInventory app.js:10164~10168과 동일 구조)
+      const pCode = p?.code != null ? String(p.code) : '';
+      if (pCode) {
+        const existingIdx = invIndexByCode.get(pCode);
+        if (existingIdx != null) {
+          invArr[existingIdx].stock = stockVal;
+        } else {
+          invArr.push({ code: pCode, stock: stockVal, note1: '', note2: '' });
+          invIndexByCode.set(pCode, invArr.length - 1);
+        }
+      }
     } else {
       mwFailed++;
     }
@@ -172,9 +195,10 @@ export async function syncAllStock(): Promise<StockSyncResult> {
     }
   }
 
-  // 5) Supabase 저장
+  // 5) Supabase 저장 (mw_inventory 포함 — 밀워키 단가표 UI는 mw_inventory를 참조)
   await saveAppData('mw_products', mwList);
   await saveAppData('mw_gen_products', genList);
+  await saveAppData('mw_inventory', invArr);
 
   const finishedAt = new Date();
   const result: StockSyncResult = {
