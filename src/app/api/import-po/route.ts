@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, po_date, brand, factory_code, factory_name, status, linked_invoice_id, memo } = body || {};
+    const { id, po_date, brand, factory_code, factory_name, status, linked_invoice_id, memo, total_fob_usd, total_quantity } = body || {};
     if (!id) return NextResponse.json({ success: false, error: 'id 필수' }, { status: 400 });
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (po_date !== undefined) payload.po_date = po_date;
@@ -114,6 +114,8 @@ export async function PUT(request: NextRequest) {
     }
     if (linked_invoice_id !== undefined) payload.linked_invoice_id = linked_invoice_id || null;
     if (memo !== undefined) payload.memo = memo ? String(memo).trim() || null : null;
+    if (total_fob_usd !== undefined) payload.total_fob_usd = Math.max(0, Number(total_fob_usd) || 0);
+    if (total_quantity !== undefined) payload.total_quantity = Math.max(0, Number(total_quantity) || 0);
     const { data, error } = await supabase
       .from('import_po_headers')
       .update(payload)

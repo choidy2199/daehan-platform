@@ -21551,18 +21551,38 @@ function _poBuildConfirmSummary(cart) {
   return lines.join('\n');
 }
 
-// Status 변경 — PUT /api/import-po (루트, body.id)
-function _poUpdateStatus(poId, newStatus) {
+// Header 업데이트 — PUT /api/import-po (루트, body.id + 변경 필드)
+function _poUpdateHeader(poId, patch) {
+  var body = Object.assign({ id: poId }, patch || {});
   return fetch('/api/import-po', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: poId, status: newStatus })
+    body: JSON.stringify(body)
   }).then(function(r) {
     return r.json().then(function(json) {
-      if (!r.ok || !json.success) throw new Error(json.error || '상태 변경 실패');
+      if (!r.ok || !json.success) throw new Error(json.error || '헤더 업데이트 실패');
       return json.data;
     });
   });
+}
+
+// Status 변경 — _poUpdateHeader 래퍼 (기존 호출처 호환)
+function _poUpdateStatus(poId, newStatus) {
+  return _poUpdateHeader(poId, { status: newStatus });
+}
+
+// 장바구니 합산 (총 수량/파렛/금액) — _poBuildConfirmSummary / _poConfirmOrder 공용
+function _poCalcCartTotals(cart) {
+  var totalUnit = 0, totalPallet = 0, totalFobUsd = 0;
+  (cart || []).forEach(function(c) {
+    var p = _poFindGenProduct(c.productCode);
+    var unit = Number(c.unitCount) || 0;
+    var pc = Number(c.palletCount) || 0;
+    totalUnit += unit;
+    totalPallet += pc;
+    if (p && p.importPrice != null) totalFobUsd += Number(p.importPrice) * unit;
+  });
+  return { totalUnit: totalUnit, totalPallet: totalPallet, totalFobUsd: totalFobUsd };
 }
 
 // 발주확정 메인 함수 — 장바구니 → items 저장 → status draft→confirmed
@@ -21608,13 +21628,22 @@ function _poConfirmOrder() {
     return;
   }
 
-  // 2) 기존 items 삭제 → INSERT → status 전환
+  // 2) 기존 items 삭제 → INSERT → headers 업데이트 (status + totals)
+  var totals = _poCalcCartTotals(cart);
   _poClearItems(po.id)
     .then(function() { return _poInsertItemsFromProducts(po.id, products); })
-    .then(function() { return _poUpdateStatus(po.id, 'confirmed'); })
+    .then(function() { return _poUpdateHeader(po.id, {
+      status: 'confirmed',
+      total_fob_usd: totals.totalFobUsd,
+      total_quantity: totals.totalUnit
+    }); })
     .then(function(updatedPo) {
       alert('발주가 확정되었습니다.');
-      _poState.currentPo = updatedPo || Object.assign({}, po, { status: 'confirmed' });
+      _poState.currentPo = updatedPo || Object.assign({}, po, {
+        status: 'confirmed',
+        total_fob_usd: totals.totalFobUsd,
+        total_quantity: totals.totalUnit
+      });
       _poRenderDetail();
     })
     .catch(function(err) {
@@ -21754,7 +21783,7 @@ function _poListOnCheckChange() {
   }
 }
 
-// 선택 일괄 삭제
+// 선택 일괄 삭제 — 성공한 건만 리스트에서 제거, 모달 유지, 버튼 복원 보장
 function _poListDeleteSelected() {
   var checks = document.querySelectorAll('.po-list-check:checked');
   var ids = Array.prototype.map.call(checks, function(cb) { return cb.getAttribute('data-po-id'); });
@@ -21766,36 +21795,86 @@ function _poListDeleteSelected() {
   if (btn) { btn.disabled = true; btn.textContent = '삭제 중...'; }
 
   var currentId = (_poState && _poState.currentPo) ? _poState.currentPo.id : null;
-  var deletingCurrent = currentId && ids.indexOf(String(currentId)) >= 0;
+
+  function restoreBtn() {
+    var b = document.getElementById('po-list-delete-btn');
+    if (b) {
+      b.disabled = true;
+      b.innerHTML = '선택 삭제 (<span id="po-list-check-count">0</span>)';
+    }
+  }
 
   Promise.allSettled(ids.map(function(id) {
     return fetch('/api/import-po?id=' + encodeURIComponent(id), { method: 'DELETE' })
       .then(function(r) { return r.json().then(function(j) { return { ok: r.ok && j.success, error: j.error }; }); });
   })).then(function(results) {
     var successCount = 0, failed = [];
+    var successIds = [];
     results.forEach(function(r, idx) {
-      if (r.status === 'fulfilled' && r.value && r.value.ok) successCount++;
-      else failed.push(ids[idx]);
+      if (r.status === 'fulfilled' && r.value && r.value.ok) {
+        successCount++;
+        successIds.push(ids[idx]);
+      } else {
+        failed.push(ids[idx]);
+      }
     });
     // 삭제 성공한 PO의 localStorage cart 정리
-    ids.forEach(function(id, idx) {
-      if (results[idx].status === 'fulfilled' && results[idx].value && results[idx].value.ok) {
-        try { localStorage.removeItem('mw_import_po_cart_' + id); } catch (e) {}
-      }
+    successIds.forEach(function(id) {
+      try { localStorage.removeItem('mw_import_po_cart_' + id); } catch (e) {}
     });
     if (failed.length > 0) {
       alert(successCount + '건 삭제 성공 / ' + failed.length + '건 실패');
-    } else {
+    } else if (successCount > 0) {
       _poToast(successCount + '건 삭제 완료', 'success');
     }
-    if (deletingCurrent) {
+    // 현재 PO가 삭제 성공 목록에 있으면 상세 영역을 빈 상태로 (리로드 없음)
+    if (currentId && successIds.indexOf(String(currentId)) >= 0) {
       _poState.currentPo = null;
-      _poClosePoListModal();
-      if (typeof _poInit === 'function') _poInit();
-    } else {
-      _poOpenPoListModal();
+      _poState.currentPoId = null;
+      _poState.currentItems = [];
+      _poRenderEmptyDetail();
     }
+    // 모달 내부만 갱신 (닫기/재오픈 없음)
+    _poRefreshListModal().catch(function(){}).then(restoreBtn, restoreBtn);
+  }).catch(function(err) {
+    console.error('[_poListDeleteSelected]', err);
+    alert('삭제 실패: ' + (err && err.message || err));
+    restoreBtn();
   });
+}
+
+// 모달 내부 body/필터 탭만 재렌더 (overlay 유지)
+function _poRefreshListModal() {
+  return fetch('/api/import-po', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.success) return;
+      var list = json.data || [];
+      var currentId = (_poState && _poState.currentPo) ? _poState.currentPo.id : null;
+      var filtered = _poListFilter === 'all' ? list : list.filter(function(p) { return p.status === _poListFilter; });
+      var tabsEl = document.querySelector('#po-list-modal .po-list-filter-tabs');
+      if (tabsEl) tabsEl.innerHTML = _poRenderListFilterTabs(list);
+      var bodyEl = document.querySelector('#po-list-modal .po-picker-body');
+      if (bodyEl) {
+        bodyEl.innerHTML = filtered.length === 0
+          ? '<div class="po-list-empty">' + (list.length === 0 ? '등록된 발주서가 없습니다.' : '해당 상태의 발주서가 없습니다.') + '</div>'
+          : _poRenderPoListTable(filtered, currentId);
+      }
+      _poListOnCheckChange();
+    });
+}
+
+// 현재 PO 삭제 후 상세 영역 빈 상태 (자동 draft 생성 금지)
+function _poRenderEmptyDetail() {
+  var container = document.getElementById('tab-import-po-v2');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:80px 20px;text-align:center;font-family:Pretendard,sans-serif;">' +
+    '<div style="font-size:40px;color:#DDE1EB;margin-bottom:14px;">📋</div>' +
+    '<div style="font-size:15px;color:#5A6070;margin-bottom:8px;font-weight:500;">표시할 발주서가 없습니다</div>' +
+    '<div style="font-size:12px;color:#9BA3B2;margin-bottom:20px;">발주서 리스트에서 다른 발주서를 선택하거나 새로 생성하세요.</div>' +
+    '<button onclick="_poInit()" style="font-size:13px;padding:8px 18px;border-radius:6px;background:#185FA5;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:600;margin-right:8px;">+ 새 발주서</button>' +
+    '<button onclick="_poOpenPoListModal()" style="font-size:13px;padding:8px 18px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:600;">발주서 리스트</button>' +
+    '</div>';
 }
 
 function _poSetListFilter(key) {
