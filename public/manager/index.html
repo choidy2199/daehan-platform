@@ -155,7 +155,15 @@ document.head.appendChild(s);
   </div>
   <div class="chrome-tab-items" id="chromeTabItems"></div>
   <div class="chrome-tab-bar-right">
-    <button class="chrome-bar-badge" onclick="syncInventory()" title="경영박사 재고 동기화" id="erpSyncBtn">경영박사</button>
+    <div id="erpSyncPill" class="kb-stock-pill kb-stock-pill--hidden" role="status" aria-live="polite">
+      <span class="kb-stock-pill__icon"></span>
+      <span class="kb-stock-pill__text"></span>
+    </div>
+    <button id="erpSyncBtn" class="kb-stock-btn" onclick="syncInventory()" title="경영박사 재고 동기화">
+      <span class="kb-stock-btn__label">경박재고</span>
+      <span class="kb-stock-btn__divider"></span>
+      <span class="kb-stock-btn__time" id="erpSyncTime">--:--</span>
+    </button>
     <button class="chrome-bar-btn" title="알림" id="notificationBtn" style="color:#1A1D23">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1D23" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
       <span class="chrome-bar-dot" id="notifDot"></span>

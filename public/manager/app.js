@@ -673,6 +673,30 @@ async function realtimeDownloadAndRefresh() {
       refreshActiveTab();
     }
 
+    // mw_stock_last_sync 변경 감지 시 pill/시각 자동 갱신 (Step 3)
+    try {
+      var lastSyncRaw = localStorage.getItem('mw_stock_last_sync');
+      if (lastSyncRaw) {
+        var lastSync = JSON.parse(lastSyncRaw);
+        if (lastSync && lastSync.finishedAt) {
+          if (typeof _kbUpdateSyncTime === 'function') _kbUpdateSyncTime(lastSync.finishedAt);
+          var ttl = (lastSync.mwSuccess || 0) + (lastSync.genSuccess || 0);
+          var fld = (lastSync.mwFailed || 0) + (lastSync.genFailed || 0);
+          if (typeof _kbSetPill === 'function') {
+            if (!lastSync.success) {
+              _kbSetPill('error', '✕ ERP 접속 실패');
+            } else if (fld > 0) {
+              _kbSetPill('warn', '⚠ 성공 ' + ttl.toLocaleString() + ' / 실패 ' + fld.toLocaleString());
+            } else {
+              _kbSetPill('success', '✓ 업데이트 완료 ' + ttl.toLocaleString() + '건');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Realtime] mw_stock_last_sync 파싱 실패:', e);
+    }
+
     updateSyncStatus('동기화 완료');
   } catch (err) {
     console.error('[Realtime] 다운로드 실패:', err.message);
@@ -10047,165 +10071,70 @@ function executeFullReset() {
 
 // 커머셜 프로모션은 설정 팝업(mw_settings)에서 통합 관리
 
+// Step 3: 신규 /api/erp/stock-sync 단일 호출로 교체
+// 서버가 mw_products/mw_gen_products/mw_inventory 3곳을 Supabase에 직접 저장 → Realtime이 자동 반영
 async function syncInventory() {
-  // 1) mw_products + mw_gen_products에서 관리코드 수집
-  var allItems = [];
-  DB.products.forEach(function(p, i) {
-    var mc = (p.manageCode || '').trim();
-    if (mc && mc !== '-') {
-      allItems.push({ source: 'mw', code: p.code, manageCode: mc, index: i });
-    }
-  });
-  var gp = [];
-  try { gp = JSON.parse(localStorage.getItem('mw_gen_products') || '[]') || []; } catch(e) { gp = []; }
-  gp.forEach(function(p, i) {
-    var mc = (p.manageCode || '').trim();
-    if (mc && mc !== '-') {
-      allItems.push({ source: 'gen', code: p.code, manageCode: mc, index: i });
-    }
-  });
+  var btn = document.getElementById('erpSyncBtn');
+  if (btn && btn.disabled) return;
 
-  if (allItems.length === 0) {
-    toast('관리코드가 있는 품목이 없습니다');
-    return;
-  }
+  try {
+    if (btn) btn.disabled = true;
+    _kbSetPill('loading', '재고 조회 중...');
 
-  var mwCount = allItems.filter(function(x){return x.source==='mw'}).length;
-  var genCount = allItems.filter(function(x){return x.source==='gen'}).length;
-  console.log('[재고동기화] 시작 — 총 ' + allItems.length + '건 (mw: ' + mwCount + ', gen: ' + genCount + ')');
-
-  // 2) 진행상황 표시
-  var total = allItems.length;
-  var updatedMw = 0;
-  var updatedGen = 0;
-  var notFound = [];
-  var errors = [];
-
-  // 3) 200개씩 배치 분할 → 병렬 호출 (Promise.all)
-  var BATCH = 200;
-  var batches = [];
-  for (var b = 0; b < allItems.length; b += BATCH) {
-    batches.push(allItems.slice(b, b + BATCH));
-  }
-  console.log('[재고동기화] 배치 ' + batches.length + '개로 분할 (각 최대 ' + BATCH + '건), 병렬 호출');
-  toast('재고 조회 중... ' + total + '건 (' + batches.length + '개 배치)');
-
-  // 배치별 fetch 함수
-  function fetchBatch(batch, batchIdx) {
-    var codes = batch.map(function(item) { return item.manageCode; });
-    console.log('[재고동기화] 배치 ' + (batchIdx+1) + ' 전송: ' + codes.length + '건, 샘플: ' + codes.slice(0,3).join(', '));
-    var controller = new AbortController();
-    var timeoutId = setTimeout(function() { controller.abort(); }, 60000);
-
-    return fetch('/api/erp/stock', {
+    var res = await fetch('/api/erp/stock-sync', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ codes: codes }),
-      signal: controller.signal
-    }).then(function(resp) {
-      clearTimeout(timeoutId);
-      if (!resp.ok) {
-        return resp.json().catch(function() { return {}; }).then(function(errData) {
-          throw new Error(errData.error || resp.statusText);
-        });
-      }
-      return resp.json();
-    }).then(function(data) {
-      console.log('[재고동기화] 배치 ' + (batchIdx+1) + ' 응답:', JSON.stringify({
-        results: data.results ? data.results.length + '건' : 'null',
-        errors: data.errors || [],
-        sample: data.results && data.results.length > 0 ? data.results.slice(0, 3) : 'empty'
-      }));
-      return { batch: batch, data: data, error: null };
-    }).catch(function(err) {
-      clearTimeout(timeoutId);
-      var msg = err.name === 'AbortError' ? '타임아웃 (60초)' : (err.message || '네트워크 오류');
-      console.error('[재고동기화] 배치 ' + (batchIdx+1) + ' 오류:', msg);
-      return { batch: batch, data: null, error: '배치 ' + (batchIdx+1) + ': ' + msg };
+      headers: { 'x-sync-key': 'daehan-stock-sync-2026' },
     });
-  }
 
-  // 4) 병렬 호출
-  var promises = batches.map(function(batch, idx) { return fetchBatch(batch, idx); });
-  var results = await Promise.all(promises);
-
-  // 5) 결과 처리
-  results.forEach(function(result) {
-    if (result.error) {
-      errors.push(result.error);
+    if (!res.ok) {
+      console.error('[syncInventory] HTTP ' + res.status);
+      _kbSetPill('error', '✕ ERP 접속 실패');
       return;
     }
-    var data = result.data;
-    var batch = result.batch;
 
-    // 관리코드 → 재고 맵
-    var stockMap = {};
-    (data.results || []).forEach(function(r) {
-      stockMap[r.code] = r.stock;
-    });
+    var data = await res.json();
+    console.log('[syncInventory] 완료', data);
 
-    var mapKeys = Object.keys(stockMap);
-    console.log('[재고동기화] stockMap 키 ' + mapKeys.length + '개, 샘플:', mapKeys.slice(0, 5).map(function(k) { return k + '=' + stockMap[k]; }).join(', '));
+    var total = (data.mwSuccess || 0) + (data.genSuccess || 0);
+    var failed = (data.mwFailed || 0) + (data.genFailed || 0);
 
-    if (data.errors && data.errors.length > 0) {
-      console.warn('[재고동기화] API 오류 목록:', data.errors);
-      errors = errors.concat(data.errors);
+    if (!data.success) {
+      _kbSetPill('error', '✕ ERP 접속 실패');
+    } else if (failed > 0) {
+      _kbSetPill('warn', '⚠ 성공 ' + total.toLocaleString() + ' / 실패 ' + failed.toLocaleString());
+    } else {
+      _kbSetPill('success', '✓ 업데이트 완료 ' + total.toLocaleString() + '건');
     }
 
-    // 각 품목에 재고 반영
-    batch.forEach(function(item) {
-      var stock = stockMap[item.manageCode];
-      if (stock === undefined || stock === null) {
-        notFound.push(item.manageCode);
-        return;
-      }
-
-      if (item.source === 'mw') {
-        var inv = DB.inventory.find(function(i) { return String(i.code) === String(item.code); });
-        if (inv) {
-          inv.stock = stock;
-        } else {
-          DB.inventory.push({ code: item.code, stock: stock, note1: '', note2: '' });
-        }
-        updatedMw++;
-      } else if (item.source === 'gen') {
-        if (gp[item.index]) {
-          gp[item.index].stock = stock;
-          updatedGen++;
-        }
-      }
-    });
-  });
-
-  // 6) localStorage 저장
-  save(KEYS.inventory, DB.inventory);
-  autoSyncToSupabase('mw_products');
-  localStorage.setItem('mw_gen_products', JSON.stringify(gp)); autoSyncToSupabase('mw_gen_products');
-
-  // 7) 테이블 새로고침
-  if (typeof renderCatalog === 'function') renderCatalog();
-  if (typeof renderGenProducts === 'function') renderGenProducts();
-  if (typeof updateStatus === 'function') updateStatus();
-
-  // 8) 완료 시간 저장 및 표시
-  var now = new Date();
-  var dateTimeStr = now.getFullYear() + '/' + String(now.getMonth()+1).padStart(2,'0') + '/' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
-  localStorage.setItem('last_inventory_sync', dateTimeStr);
-  updateSyncTimeDisplay();
-
-  // 9) 완료 알림 + 디버깅 로그
-  var totalUpdated = updatedMw + updatedGen;
-  console.log('[재고동기화] 완료 — 밀워키: ' + updatedMw + '건, 일반: ' + updatedGen + '건, 매칭실패: ' + notFound.length + '건, 오류: ' + errors.length + '건');
-  if (notFound.length > 0) {
-    console.log('[재고동기화] 매칭 안 된 관리코드:', notFound.slice(0, 20).join(', ') + (notFound.length > 20 ? ' 외 ' + (notFound.length - 20) + '건' : ''));
+    if (data.finishedAt) _kbUpdateSyncTime(data.finishedAt);
+  } catch (e) {
+    console.error('[syncInventory] 실패:', e);
+    _kbSetPill('error', '✕ 네트워크 오류');
+  } finally {
+    if (btn) btn.disabled = false;
   }
-  var msg = '재고 업데이트 완료 — 밀워키 ' + updatedMw + '건';
-  if (updatedGen > 0) msg += ' + 일반 ' + updatedGen + '건';
-  if (errors.length > 0) {
-    msg += ' | 오류 ' + errors.length + '건';
-    console.warn('[재고동기화 오류]', errors);
+}
+
+// 헬퍼: pill 상태 표시
+function _kbSetPill(state, text) {
+  var pill = document.getElementById('erpSyncPill');
+  if (!pill) return;
+  pill.classList.remove('kb-stock-pill--hidden', 'kb-stock-pill--loading', 'kb-stock-pill--success', 'kb-stock-pill--warn', 'kb-stock-pill--error');
+  pill.classList.add('kb-stock-pill--' + state);
+  var textEl = pill.querySelector('.kb-stock-pill__text');
+  if (textEl) textEl.textContent = text;
+}
+
+// 헬퍼: "HH:MM" 시각 업데이트
+function _kbUpdateSyncTime(isoString) {
+  var timeEl = document.getElementById('erpSyncTime');
+  if (!timeEl) return;
+  try {
+    var d = new Date(isoString);
+    timeEl.textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  } catch (e) {
+    timeEl.textContent = '--:--';
   }
-  toast(msg);
 }
 
 function updateSyncTimeDisplay() {
@@ -25942,3 +25871,24 @@ const _tx = {
 
 // 전역 노출 (_tabIdMap 및 디버깅)
 window._tx = _tx;
+
+// Step 3: 페이지 로드 시 경박재고 시각 초기 표시
+(function _kbInitStockTime() {
+  function tryRender() {
+    try {
+      var raw = localStorage.getItem('mw_stock_last_sync');
+      if (!raw) return;
+      var d = JSON.parse(raw);
+      if (!d || !d.finishedAt) return;
+      var t = document.getElementById('erpSyncTime');
+      if (!t) return;
+      var dt = new Date(d.finishedAt);
+      t.textContent = String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+    } catch (e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tryRender);
+  } else {
+    tryRender();
+  }
+})();
