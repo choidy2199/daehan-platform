@@ -45,3 +45,6 @@ daehan-platform-setup-complete.md
 
 # 로컬 심볼릭 링크 (사용자별 home 절대경로 의존)
 .claude/skills
+
+# Claude Code 로컬 작업파일 (launch.json, scheduled_tasks.lock 등)
+.claude/
