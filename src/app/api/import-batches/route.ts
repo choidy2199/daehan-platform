@@ -15,7 +15,10 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('import_batches')
-      .select('*, import_invoices(id, final_amount_usd)', { count: 'exact' })
+      .select(
+        '*, import_invoices!batch_id(id, final_amount_usd), linked_invoice:import_invoices!linked_invoice_id(id, invoice_no, factory_name, factory_code, invoice_date, customer_code, customer_name, status, final_amount_usd)',
+        { count: 'exact' }
+      )
       .order('customs_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (status && status !== 'all') query = query.eq('status', status);
