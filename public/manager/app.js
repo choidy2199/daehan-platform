@@ -19413,6 +19413,8 @@ function _renderBackorderList(container) {
     + '#backorders-table .bo-note-cell { font-size:11px; color:#666; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }'
     + '#backorders-table .bo-done-date { font-size:11px; color:#999; }'
     + '.bo-filter-btn { background:#fff; border:1px solid #DDE1EB; border-radius:6px; padding:4px 12px; font-size:12px; font-weight:500; cursor:pointer; font-family:Pretendard,sans-serif; }'
+    + '#backorders-table thead th { position: relative; border-right: 1px solid #B0B8CC; }'
+    + '#backorders-table thead th:last-child { border-right: none; }'
     + '</style>';
 
   h += '<div style="display:block !important;text-align:left !important;">';
@@ -19561,6 +19563,14 @@ function _renderBackorderList(container) {
   }
   h += '</tbody></table></div></div></div>';
   container.innerHTML = h;
+
+  if (typeof initColumnResize === 'function') {
+    try {
+      initColumnResize('backorders-table');
+    } catch(e) {
+      console.warn('[backorder] initColumnResize failed:', e);
+    }
+  }
 
   var searchEl = document.getElementById('bo-search');
   if (searchEl) {
