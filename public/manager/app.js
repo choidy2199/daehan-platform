@@ -21078,11 +21078,14 @@ function _poOpenInvoiceLink(poId) {
           var nextInvNo = prefix + String(maxSeq + 1).padStart(3, '0');
           var today = new Date();
           var dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-          // 공장명 산출: brand 우선 → 실제 factory_name → placeholder
+          // 공장명 산출: 실제 factory_name 우선 → brand 폴백 → placeholder
           var brandName = String(po.brand || '').trim();
           var rawFactoryName = String(po.factory_name || '').trim();
           var isPlaceholder = !rawFactoryName || rawFactoryName === '(공장명)' || rawFactoryName === '공장명';
-          var factoryName = brandName || (isPlaceholder ? '(공장명)' : rawFactoryName);
+          var factoryName;
+          if (!isPlaceholder) factoryName = rawFactoryName;
+          else if (brandName) factoryName = brandName;
+          else factoryName = '(공장명)';
           return { po: po, invoicePayload: {
             invoice_no: nextInvNo,
             factory_name: factoryName,
@@ -21103,6 +21106,39 @@ function _poOpenInvoiceLink(poId) {
         if (!cj || !cj.success || !cj.data) throw new Error((cj && cj.error) || '인보이스 생성 실패');
         return { po: ctx.po, invoice: cj.data };
       });
+    })
+    .then(function(ctx) {
+      if (!ctx) return null;
+      // 3-b) 송금 스케줄 1차/2차 자동 생성 (Task B) — best-effort, 실패해도 진행
+      var invId = ctx.invoice.id;
+      return fetch('/api/import-invoices/' + invId + '/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seq: 1, planned_usd: 0, planned_ratio: 0 })
+      }).catch(function(e) { console.warn('[payments seq=1]', e); })
+        .then(function() {
+          return fetch('/api/import-invoices/' + invId + '/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ seq: 2, planned_usd: 0, planned_ratio: 0 })
+          }).catch(function(e) { console.warn('[payments seq=2]', e); });
+        })
+        .then(function() { return ctx; });
+    })
+    .then(function(ctx) {
+      if (!ctx) return null;
+      // 3-c) 콜라보 브랜드 팔렛 단가 $19 기본값 (Task C) — PUT (POST는 수용 안 함)
+      if (String(ctx.po.brand || '').trim() === '콜라보') {
+        return fetch('/api/import-invoices', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: ctx.invoice.id, pallet_unit_price_usd: 19 })
+        }).then(function(r) { return r.json(); }).then(function(uj) {
+          if (uj && uj.success && uj.data) ctx.invoice = uj.data;
+          return ctx;
+        }).catch(function(e) { console.warn('[pallet_unit_price_usd]', e); return ctx; });
+      }
+      return ctx;
     })
     .then(function(ctx) {
       if (!ctx) return null;
