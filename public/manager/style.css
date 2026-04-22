@@ -107,6 +107,32 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 .chrome-tab-items { display:flex; align-items:flex-end; gap:0; flex:1; min-width:0; overflow-x:auto; }
 .chrome-tab-items::-webkit-scrollbar { display:none; }
 .chrome-tab-bar-right { display:flex; align-items:center; gap:2px; margin-left:auto; padding-bottom:4px; flex-shrink:0; }
+
+/* ===== 탭 밀도 4단계 (탭 개수별 자동 축소) ===== */
+.chrome-tab-items .chrome-tab { transition: background 0.15s ease, padding 0.15s ease, max-width 0.15s ease; }
+
+.chrome-tab-items.density-normal .chrome-tab { padding: 0 12px; max-width: 180px; }
+
+.chrome-tab-items.density-compact .chrome-tab { padding: 0 10px; max-width: 140px; }
+.chrome-tab-items.density-compact .chrome-tab .chrome-tab-close { display: none; }
+.chrome-tab-items.density-compact .chrome-tab:hover .chrome-tab-close,
+.chrome-tab-items.density-compact .chrome-tab.active .chrome-tab-close { display: flex; }
+
+.chrome-tab-items.density-tight .chrome-tab { padding: 0 8px; max-width: 80px; gap: 4px; }
+.chrome-tab-items.density-tight .chrome-tab .chrome-tab-close { display: none; }
+.chrome-tab-items.density-tight .chrome-tab.active .chrome-tab-close { display: flex; }
+
+.chrome-tab-items.density-micro .chrome-tab { padding: 0 4px; max-width: 32px; gap: 0; justify-content: center; }
+.chrome-tab-items.density-micro .chrome-tab > span:not(.chrome-tab-close) { display: none; }
+.chrome-tab-items.density-micro .chrome-tab .chrome-tab-close { display: none; }
+.chrome-tab-items.density-micro .chrome-tab.active { max-width: 40px; padding: 0 6px; }
+.chrome-tab-items.density-micro .chrome-tab.active > span:not(.chrome-tab-close) { display: inline-block; font-size: 11px; max-width: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ===== 탭 드래그 시각 피드백 ===== */
+.chrome-tab.dragging { opacity: 0.4; cursor: grabbing; }
+.chrome-tab.drag-over-left { box-shadow: inset 3px 0 0 #185FA5; }
+.chrome-tab.drag-over-right { box-shadow: inset -3px 0 0 #185FA5; }
+
 .chrome-bar-btn { width:28px; height:28px; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer; color:var(--dm-text-secondary); border-radius:6px; transition:background 0.12s; position:relative; }
 .chrome-bar-btn:hover { background:rgba(0,0,0,0.06); }
 .chrome-bar-dot { position:absolute; top:4px; right:4px; width:6px; height:6px; border-radius:50%; background:#E8344E; display:none; }

@@ -46,6 +46,26 @@ function _chromeGoHome() {
 // ── 크롬 탭 바 렌더링 (기존 _renderTabBar 대응) ──
 var _chromeDotColors = { red:'#E24B4A', blue:'#378ADD', green:'#1D9E75', orange:'#EF9F27', purple:'#7F77DD', gray:'#888780', teal:'#14a49c', pink:'#D4537E', darkgray:'#444441' };
 
+var _chromeDragSrcIdx = null;
+var _chromeTabOrderSaveTimer = null;
+function _chromeSaveTabOrderDebounced() {
+  if (_chromeTabOrderSaveTimer) clearTimeout(_chromeTabOrderSaveTimer);
+  _chromeTabOrderSaveTimer = setTimeout(function() {
+    if (typeof _saveWindowState === 'function') _saveWindowState();
+  }, 1000);
+}
+
+function updateTabDensity() {
+  var items = document.getElementById('chromeTabItems');
+  if (!items) return;
+  var n = (typeof _openWindows !== 'undefined' && _openWindows) ? _openWindows.length : 0;
+  items.classList.remove('density-normal', 'density-compact', 'density-tight', 'density-micro');
+  if (n <= 9) items.classList.add('density-normal');
+  else if (n <= 13) items.classList.add('density-compact');
+  else if (n <= 19) items.classList.add('density-tight');
+  else items.classList.add('density-micro');
+}
+
 function _renderChromeTabBar() {
   var items = document.getElementById('chromeTabItems');
   if (!items) return;
@@ -55,7 +75,10 @@ function _renderChromeTabBar() {
   if (homeTab) homeTab.classList.toggle('active', !_activeWindow);
 
   items.innerHTML = '';
-  if (typeof _openWindows === 'undefined' || _openWindows.length === 0) return;
+  if (typeof _openWindows === 'undefined' || _openWindows.length === 0) {
+    updateTabDensity();
+    return;
+  }
 
   _openWindows.forEach(function(name, idx) {
     var cfg = (typeof _windowConfig !== 'undefined') ? _windowConfig[name] : null;
@@ -70,6 +93,8 @@ function _renderChromeTabBar() {
     var tab = document.createElement('div');
     tab.className = 'chrome-tab' + (isActive ? ' active' : '');
     tab.setAttribute('data-window', name);
+    tab.setAttribute('title', name);
+    tab.setAttribute('draggable', 'true');
     tab.onclick = function() { _chromeActivateTab(name); };
 
     var label = (cfg && cfg.displayName) ? cfg.displayName : name;
@@ -77,8 +102,59 @@ function _renderChromeTabBar() {
       + '<span style="overflow:hidden;text-overflow:ellipsis">' + label + '</span>'
       + '<span class="chrome-tab-close" onclick="event.stopPropagation();_chromeCloseTab(\'' + name.replace(/'/g, "\\'") + '\')">✕</span>';
 
+    // 드래그 순서 변경
+    (function(myIdx, tabEl) {
+      tabEl.addEventListener('dragstart', function(e) {
+        _chromeDragSrcIdx = myIdx;
+        tabEl.classList.add('dragging');
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', String(myIdx)); } catch (_) {}
+        }
+      });
+      tabEl.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        if (_chromeDragSrcIdx === null || _chromeDragSrcIdx === myIdx) return;
+        var rect = tabEl.getBoundingClientRect();
+        var mid = rect.left + rect.width / 2;
+        var left = e.clientX < mid;
+        tabEl.classList.toggle('drag-over-left', left);
+        tabEl.classList.toggle('drag-over-right', !left);
+      });
+      tabEl.addEventListener('dragleave', function() {
+        tabEl.classList.remove('drag-over-left', 'drag-over-right');
+      });
+      tabEl.addEventListener('drop', function(e) {
+        e.preventDefault();
+        tabEl.classList.remove('drag-over-left', 'drag-over-right');
+        if (_chromeDragSrcIdx === null || _chromeDragSrcIdx === myIdx) return;
+        var rect = tabEl.getBoundingClientRect();
+        var mid = rect.left + rect.width / 2;
+        var insertAfter = e.clientX >= mid;
+        var src = _chromeDragSrcIdx;
+        var dst = insertAfter ? myIdx + 1 : myIdx;
+        if (typeof _openWindows === 'undefined' || !_openWindows[src]) { _chromeDragSrcIdx = null; return; }
+        var moved = _openWindows.splice(src, 1)[0];
+        if (src < dst) dst--;
+        _openWindows.splice(dst, 0, moved);
+        _chromeDragSrcIdx = null;
+        _renderChromeTabBar();
+        _chromeSaveTabOrderDebounced();
+      });
+      tabEl.addEventListener('dragend', function() {
+        _chromeDragSrcIdx = null;
+        var all = document.querySelectorAll('#chromeTabItems .chrome-tab');
+        for (var k = 0; k < all.length; k++) {
+          all[k].classList.remove('dragging', 'drag-over-left', 'drag-over-right');
+        }
+      });
+    })(idx, tab);
+
     items.appendChild(tab);
   });
+
+  updateTabDensity();
 }
 
 function _chromeActivateTab(name) {
