@@ -19470,33 +19470,207 @@ function _boSearchCust(q, dd) {
 }
 function _boSelCust(el) { document.getElementById('bo-customer').value = el.getAttribute('data-name'); document.getElementById('bo-customer-code').value = el.getAttribute('data-code'); document.getElementById('bo-cust-dropdown').style.display = 'none'; }
 
+function _boGetAllProducts() {
+  var results = [];
+  (DB.products || []).forEach(function(p) {
+    results.push({
+      code: p.code || '',
+      model: p.model || '',
+      name: p.detail || '',
+      type: 'milwaukee',
+      typeLabel: '밀워키',
+      raw: p
+    });
+  });
+  try {
+    var gen = JSON.parse(localStorage.getItem('mw_gen_products') || '[]');
+    gen.forEach(function(p) {
+      results.push({
+        code: p.code || '',
+        model: p.model || '',
+        name: p.description || '',
+        type: 'general',
+        typeLabel: '일반',
+        raw: p
+      });
+    });
+  } catch(e) {}
+  return results;
+}
+
 function _boSearchProd(q, dd) {
-  if (!q || q.length < 2) { dd.style.display = 'none'; return; }
-  var ql = q.toLowerCase(), type = document.getElementById('bo-type').value;
-  var source = (type === 'milwaukee') ? DB.products : (JSON.parse(localStorage.getItem('mw_gen_products') || '[]'));
+  if (!q || q.length < 1) { dd.style.display = 'none'; return; }
+  var ql = q.toLowerCase();
+  var all = _boGetAllProducts();
   var matches = [];
-  for (var i = 0; i < source.length && matches.length < 10; i++) {
-    var p = source[i];
-    if ((p.detail||'').toLowerCase().indexOf(ql) !== -1 || (p.model||'').toLowerCase().indexOf(ql) !== -1 || (p.code||'').toLowerCase().indexOf(ql) !== -1) matches.push(p);
+  for (var i = 0; i < all.length && matches.length < 30; i++) {
+    var p = all[i];
+    var searchText = (p.model + ' ' + p.name + ' ' + p.code).toLowerCase();
+    if (searchText.indexOf(ql) !== -1) matches.push(p);
   }
-  if (!matches.length) { dd.innerHTML = '<div style="padding:12px;font-size:12px;color:#999;text-align:center;">없음</div>'; dd.style.display = 'block'; return; }
-  dd.innerHTML = matches.map(function(p) { return '<div onclick="_boSelProd(this)" data-code="'+(p.code||'')+'" data-name="'+(p.detail||'').replace(/"/g,'&quot;')+'" data-model="'+(p.model||'')+'" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">'+(p.model||'')+' <span style="font-size:11px;color:#666;">'+(p.detail||'').substring(0,30)+'</span></div>'; }).join('');
+  if (!matches.length) {
+    dd.innerHTML = '<div style="padding:12px;font-size:12px;color:#999;text-align:center;">검색 결과 없음</div>';
+    dd.style.display = 'block';
+    return;
+  }
+  dd.innerHTML = matches.map(function(p) {
+    var badgeStyle = p.type === 'milwaukee'
+      ? 'background:#E24B4A;color:#fff;'
+      : 'background:#E6F1FB;color:#0C447C;';
+    var nameShort = (p.name || '').substring(0, 40);
+    return '<div onclick="_boSelProd(this)" data-code="'+(p.code||'').replace(/"/g,'&quot;')+'" data-name="'+(p.name||'').replace(/"/g,'&quot;')+'" data-model="'+(p.model||'').replace(/"/g,'&quot;')+'" data-type="'+p.type+'" style="padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:8px;" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\'#fff\'">'
+      + '<span style="font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500;flex-shrink:0;'+badgeStyle+'">'+p.typeLabel+'</span>'
+      + '<span style="font-weight:500;color:#1A1D23;min-width:90px;flex-shrink:0;">'+(p.model||'')+'</span>'
+      + '<span style="font-size:12px;color:#5A6070;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+nameShort+'</span>'
+      + '</div>';
+  }).join('');
   dd.style.display = 'block';
 }
-function _boSelProd(el) { document.getElementById('bo-product').value = el.getAttribute('data-model')+' '+el.getAttribute('data-name').substring(0,20); document.getElementById('bo-product-code').value = el.getAttribute('data-code'); document.getElementById('bo-product-name').value = el.getAttribute('data-name'); document.getElementById('bo-model').value = el.getAttribute('data-model'); document.getElementById('bo-prod-dropdown').style.display = 'none'; }
+
+function _boSelProd(el) {
+  var code = el.getAttribute('data-code');
+  var name = el.getAttribute('data-name');
+  var model = el.getAttribute('data-model');
+  var type = el.getAttribute('data-type');
+
+  document.getElementById('bo-product-code').value = code;
+  document.getElementById('bo-product-name').value = name;
+  document.getElementById('bo-model').value = model;
+  document.getElementById('bo-product-type').value = type;
+
+  _boRenderSelectedProduct(type, model, name);
+  _boLoadPrices(code, type);
+
+  var dd = document.getElementById('bo-prod-dropdown');
+  if (dd) dd.style.display = 'none';
+
+  _boUpdateSubmitState();
+}
+
+function _boRenderSelectedProduct(type, model, name) {
+  var wrap = document.getElementById('bo-product-wrap');
+  if (!wrap) return;
+  var codeVal = (document.getElementById('bo-product-code') || {}).value || '';
+  var nameVal = (document.getElementById('bo-product-name') || {}).value || '';
+  var modelVal = (document.getElementById('bo-model') || {}).value || '';
+  var typeVal = (document.getElementById('bo-product-type') || {}).value || '';
+  var typeLabel = type === 'milwaukee' ? '밀워키' : '일반';
+  var badgeStyle = type === 'milwaukee'
+    ? 'background:#E24B4A;color:#fff;'
+    : 'background:#E6F1FB;color:#0C447C;';
+  var escModel = String(model || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  var escName = String(name || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  wrap.innerHTML =
+    '<label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">제품</label>' +
+    '<div class="bo-selected-product" style="background:#F4F6FA;border:1px solid #DDE1EB;border-radius:6px;padding:0 12px;height:36px;display:flex;align-items:center;gap:8px;font-size:13px;">' +
+      '<span style="font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500;flex-shrink:0;'+badgeStyle+'">'+typeLabel+'</span>' +
+      '<span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px;">'+escModel+'</span>' +
+      '<span style="color:#5A6070;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;">'+escName+'</span>' +
+      '<button onclick="_boClearProduct()" style="margin-left:auto;background:none;border:none;color:#9BA3B2;cursor:pointer;font-size:13px;flex-shrink:0;">✕</button>' +
+    '</div>' +
+    '<input type="hidden" id="bo-product-code" value="'+codeVal.replace(/"/g,'&quot;')+'">' +
+    '<input type="hidden" id="bo-product-name" value="'+nameVal.replace(/"/g,'&quot;')+'">' +
+    '<input type="hidden" id="bo-model" value="'+modelVal.replace(/"/g,'&quot;')+'">' +
+    '<input type="hidden" id="bo-product-type" value="'+typeVal.replace(/"/g,'&quot;')+'">';
+}
+
+function _boClearProduct() {
+  var wrap = document.getElementById('bo-product-wrap');
+  if (!wrap) return;
+  wrap.innerHTML =
+    '<label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">제품</label>' +
+    '<input type="text" id="bo-product" autocomplete="off" placeholder="제품명/모델/코드 입력..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;">' +
+    '<input type="hidden" id="bo-product-code">' +
+    '<input type="hidden" id="bo-product-name">' +
+    '<input type="hidden" id="bo-model">' +
+    '<input type="hidden" id="bo-product-type">' +
+    '<div id="bo-prod-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE1EB;border-top:none;border-radius:0 0 6px 6px;max-height:260px;overflow-y:auto;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div>';
+  _boBindProductInput();
+  _boClearPrices();
+  _boUpdateSubmitState();
+}
+
+function _boLoadPrices(code, type) {
+  if (type === 'milwaukee') {
+    _boClearPrices();
+    return;
+  }
+  var gen = [];
+  try { gen = JSON.parse(localStorage.getItem('mw_gen_products') || '[]'); } catch(e) {}
+  var product = null;
+  for (var i = 0; i < gen.length; i++) {
+    if (gen[i].code === code) { product = gen[i]; break; }
+  }
+  if (!product) { _boClearPrices(); return; }
+  var fmt = function(n) {
+    var num = parseInt(n);
+    return (num && num > 0) ? num.toLocaleString() : '—';
+  };
+  var fmtBase = function(n) {
+    var num = parseInt(n);
+    return (num && num > 0) ? num + '개' : '—';
+  };
+  var setText = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+  setText('bo-price-in', fmt(product.inPrice));
+  setText('bo-price-out', fmt(product.outPrice));
+  setText('bo-price-pallet', fmt(product.palletPrice));
+  setText('bo-price-in-base', fmtBase(product.inQty));
+  setText('bo-price-out-base', fmtBase(product.outQty));
+  setText('bo-price-pallet-base', fmtBase(product.palletQty));
+}
+
+function _boClearPrices() {
+  ['in', 'out', 'pallet'].forEach(function(k) {
+    var priceEl = document.getElementById('bo-price-'+k);
+    var baseEl = document.getElementById('bo-price-'+k+'-base');
+    if (priceEl) priceEl.textContent = '—';
+    if (baseEl) baseEl.textContent = '—';
+  });
+}
+
+function _boUpdateSubmitState() {
+  var btn = document.getElementById('bo-submit');
+  if (!btn) return;
+  var codeEl = document.getElementById('bo-product-code');
+  var custEl = document.getElementById('bo-customer');
+  var qtyEl = document.getElementById('bo-qty');
+  var hasProduct = !!(codeEl && codeEl.value);
+  var hasCustomer = !!(custEl && custEl.value && custEl.value.trim());
+  var qty = parseInt(qtyEl && qtyEl.value) || 0;
+  var enabled = hasProduct && hasCustomer && qty > 0;
+  btn.disabled = !enabled;
+  btn.style.background = enabled ? '#1A1D23' : '#C6CAD3';
+  btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+}
+
+function _boBindProductInput() {
+  var prodInput = document.getElementById('bo-product');
+  var prodDd = document.getElementById('bo-prod-dropdown');
+  if (!prodInput || !prodDd) return;
+  var prodC = false;
+  prodInput.addEventListener('compositionstart', function() { prodC = true; });
+  prodInput.addEventListener('compositionend', function() {
+    prodC = false;
+    _boSearchProd(prodInput.value, prodDd);
+  });
+  prodInput.addEventListener('input', function() {
+    if (!prodC) _boSearchProd(prodInput.value, prodDd);
+  });
+}
 
 async function _saveBackorder() {
   var cust = document.getElementById('bo-customer').value.trim();
   var pCode = document.getElementById('bo-product-code').value;
-  var pName = document.getElementById('bo-product-name').value || document.getElementById('bo-product').value.trim();
+  var pName = document.getElementById('bo-product-name').value;
   var model = document.getElementById('bo-model').value;
-  var qty = parseInt(document.getElementById('bo-qty').value) || 1;
+  var qty = parseInt(document.getElementById('bo-qty').value) || 0;
   var note = document.getElementById('bo-note').value.trim();
-  var type = document.getElementById('bo-type').value;
+  var type = document.getElementById('bo-product-type').value || 'general';
   var custCode = document.getElementById('bo-customer-code').value;
   var author = (window.currentUser && window.currentUser.loginId) || 'admin';
   if (!cust) { alert('거래처를 입력해주세요.'); return; }
-  if (!pName) { alert('제품을 선택해주세요.'); return; }
+  if (!pCode) { alert('제품을 드롭다운에서 선택해주세요.'); return; }
+  if (!qty || qty <= 0) { alert('수량을 입력해주세요.'); return; }
   try {
     var res = await fetch('/api/backorders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_code: pCode, product_name: pName, product_type: type, model: model, customer_name: cust, customer_code: custCode, quantity: qty, note: note, author: author }) });
     var json = await res.json();
