@@ -48,7 +48,7 @@ export async function POST(
       internal_code: p?.internal_code ? String(p.internal_code).trim() || null : null,
       management_code: p?.management_code ? String(p.management_code).trim() || null : null,
       pallet_qty: Number(p?.pallet_qty) || 0,
-      quantity: 0,
+      quantity: Math.max(0, Number(p?.quantity) || 0),
       fob_usd: Math.max(0, Number(p?.base_fob_usd) || 0),
       sort_order: idx,
     }));

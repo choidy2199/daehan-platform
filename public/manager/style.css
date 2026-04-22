@@ -2257,6 +2257,15 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .btn-mini-danger { background:#CC2222; color:#fff; border-color:#CC2222; font-weight:600; }
 .btn-mini-danger:hover { background:#A81A1A; }
 
+/* 확정 상태 read-only — 편집 UI 잠금 (예외: .po-allow-readonly) */
+.po-readonly .btn-mini,
+.po-readonly .po-cart-btn,
+.po-readonly .po-pallet-input,
+.po-readonly .po-cart-remove-btn,
+.po-readonly .pc-search-input,
+.po-readonly input[type="checkbox"] { pointer-events:none; opacity:0.5; cursor:not-allowed; }
+.po-readonly .btn-mini.po-allow-readonly { pointer-events:auto; opacity:1; cursor:pointer; }
+
 /* 제품 가져오기 모달 */
 .po-picker-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000; font-family:Pretendard,sans-serif; }
 .po-picker-modal { background:#fff; border-radius:6px; width:880px; max-width:95vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 48px rgba(26,29,35,0.18); overflow:hidden; }

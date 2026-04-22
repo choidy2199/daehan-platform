@@ -20440,7 +20440,7 @@ function _poToast(msg, type, ms) {
 function _poFormatStatusBadge(status) {
   var map = {
     draft:     { bg:'#FAEEDA', color:'#854F0B', label:'작성중' },
-    confirmed: { bg:'#E6F1FB', color:'#0C447C', label:'확정' },
+    confirmed: { bg:'#E1F5EE', color:'#085041', label:'확정' },
     linked:    { bg:'#EEEDFE', color:'#3C3489', label:'인보이스연결' },
     completed: { bg:'#E1F5EE', color:'#085041', label:'완료' },
   };
@@ -20782,12 +20782,14 @@ function _poRenderDetail() {
   var brand = hasError ? '-' : _poEsc(po.brand || '-');
   var productCount = (loadObj('mw_import_po_products', []) || []).length;
   var cartCount = (hasError || !po.id) ? 0 : _poLoadCart(po.id).length;
+  var isReadOnly = !hasError && po.status && po.status !== 'draft';
   var disabledAttr = hasError ? ' disabled' : '';
+  var readOnlyClass = isReadOnly ? ' po-readonly' : '';
   var placeholderAlert = "alert('P2~P9에서 구현 예정')";
   var listPlaceholderAlert = "alert('발주서 리스트 모달은 P7에서 구현 예정')";
 
   var h = '';
-  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column;">';
+  h += '<div class="' + (readOnlyClass ? readOnlyClass.trim() : '') + '" style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column;">';
 
   // 상단 다크 헤더 (← 목록 버튼 제거, 메타 정보만. 에러 시 오류 배지)
   h += '<div class="pc-main-header">';
@@ -20839,9 +20841,13 @@ function _poRenderDetail() {
   h += '<span style="font-size:11px;color:#aaa;font-weight:400;margin-left:8px;font-family:monospace;">' + poNumber + '</span>';
   h += '</div>';
   h += '<div class="pc-panel-actions">';
-  h += '<button class="btn-mini" onclick="' + listPlaceholderAlert + '"' + disabledAttr + '>발주서 리스트</button>';
+  h += '<button class="btn-mini po-allow-readonly" onclick="' + listPlaceholderAlert + '"' + disabledAttr + '>발주서 리스트</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>비우기</button>';
-  h += '<button class="btn-mini btn-mini-confirm" onclick="' + placeholderAlert + '"' + disabledAttr + '>✓ 발주확정</button>';
+  if (isReadOnly) {
+    h += '<button class="btn-mini" id="po-btn-confirm" disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;">✓ 확정됨</button>';
+  } else {
+    h += '<button class="btn-mini btn-mini-confirm" id="po-btn-confirm" onclick="_poConfirmOrder()"' + disabledAttr + '>✓ 발주확정</button>';
+  }
   h += '</div></div>';
   if (hasError) {
     h += '<div class="pc-tbl-placeholder">로드 실패</div>';
@@ -21562,6 +21568,131 @@ function _poDeleteSelectedProducts() {
   _poRenderProductList();
   if (typeof _poRefreshMetaCounts === 'function') _poRefreshMetaCounts();
   _poToast(codes.length + '건 제거됨', 'success');
+}
+
+// ===== 커밋 6 — 발주확정 =====
+
+function _poFindGenProduct(code) {
+  var gp = loadObj('mw_gen_products', []);
+  var key = String(code);
+  for (var i = 0; i < gp.length; i++) {
+    if (gp[i] && String(gp[i].code) === key) return gp[i];
+  }
+  return null;
+}
+
+// 장바구니 기반 확정 요약 문자열 (confirm() 용)
+function _poBuildConfirmSummary(cart) {
+  var totalUnit = 0, totalPallet = 0, totalAmount = 0;
+  var shortageList = [];
+  cart.forEach(function(c) {
+    var p = _poFindGenProduct(c.productCode);
+    var unit = Number(c.unitCount) || 0;
+    var pc = Number(c.palletCount) || 0;
+    totalUnit += unit;
+    totalPallet += pc;
+    if (p && p.importPrice != null) totalAmount += Number(p.importPrice) * unit;
+    if (p) {
+      var stock = (p.stock != null && p.stock !== '' && !isNaN(Number(p.stock))) ? Number(p.stock) : 0;
+      if (stock <= 0) {
+        shortageList.push({ code: p.code, model: p.model, stock: stock });
+      }
+    }
+  });
+  var lines = [];
+  lines.push('발주 확정 요약');
+  lines.push('──────────────────');
+  lines.push('제품: ' + cart.length + '건');
+  lines.push('총 파렛: ' + totalPallet.toLocaleString() + 'P');
+  lines.push('총 수량: ' + totalUnit.toLocaleString() + '개');
+  lines.push('총 금액: $' + totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  if (shortageList.length > 0) {
+    lines.push('');
+    lines.push('⚠️ 재고 부족 경고 (' + shortageList.length + '건):');
+    var limit = Math.min(5, shortageList.length);
+    for (var i = 0; i < limit; i++) {
+      var s = shortageList[i];
+      lines.push('- ' + (s.model || s.code) + ' (재고 ' + s.stock + ')');
+    }
+    if (shortageList.length > 5) lines.push('...외 ' + (shortageList.length - 5) + '건');
+  }
+  lines.push('');
+  lines.push('확정 후에는 수정할 수 없습니다.');
+  lines.push('발주를 확정하시겠습니까?');
+  return lines.join('\n');
+}
+
+// Status 변경 — PUT /api/import-po (루트, body.id)
+function _poUpdateStatus(poId, newStatus) {
+  return fetch('/api/import-po', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: poId, status: newStatus })
+  }).then(function(r) {
+    return r.json().then(function(json) {
+      if (!r.ok || !json.success) throw new Error(json.error || '상태 변경 실패');
+      return json.data;
+    });
+  });
+}
+
+// 발주확정 메인 함수 — 장바구니 → items 저장 → status draft→confirmed
+function _poConfirmOrder() {
+  var po = _poState && _poState.currentPo;
+  if (!po) return;
+  if (po.status !== 'draft') {
+    alert('이미 확정된 발주서입니다.');
+    return;
+  }
+  var cart = _poLoadCart(po.id);
+  if (cart.length === 0) {
+    alert('장바구니가 비어있습니다. 제품을 추가해주세요.');
+    return;
+  }
+  var summary = _poBuildConfirmSummary(cart);
+  if (!confirm(summary)) return;
+
+  var btn = document.getElementById('po-btn-confirm');
+  if (btn) { btn.disabled = true; btn.textContent = '확정 중...'; }
+
+  // 1) 장바구니 → products payload
+  var products;
+  try {
+    products = cart.map(function(item) {
+      var gp = _poFindGenProduct(item.productCode);
+      if (!gp) throw new Error('제품 정보 없음: ' + item.productCode);
+      return {
+        brand: getGenBrand(gp) || null,
+        model: gp.model || '',
+        product_name: gp.description || '',
+        spec: '',
+        internal_code: gp.code || '',
+        management_code: gp.manageCode || '',
+        pallet_qty: Number(gp.palletQty) || 0,
+        base_fob_usd: Number(gp.importPrice) || 0,
+        quantity: Number(item.unitCount) || 0
+      };
+    });
+  } catch (err) {
+    alert('발주 확정 실패: ' + err.message);
+    if (btn) { btn.disabled = false; btn.textContent = '✓ 발주확정'; }
+    return;
+  }
+
+  // 2) 기존 items 삭제 → INSERT → status 전환
+  _poClearItems(po.id)
+    .then(function() { return _poInsertItemsFromProducts(po.id, products); })
+    .then(function() { return _poUpdateStatus(po.id, 'confirmed'); })
+    .then(function(updatedPo) {
+      alert('발주가 확정되었습니다.');
+      _poState.currentPo = updatedPo || Object.assign({}, po, { status: 'confirmed' });
+      _poRenderDetail();
+    })
+    .catch(function(err) {
+      console.error('[_poConfirmOrder]', err);
+      alert('발주 확정 실패: ' + err.message);
+      if (btn) { btn.disabled = false; btn.textContent = '✓ 발주확정'; }
+    });
 }
 
 // 헤더 필드 blur 자동 저장 (PUT /api/import-po)
