@@ -24745,13 +24745,19 @@ function _ipinv2RenderCombinedSummary() {
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="' + colS + '"><span style="' + lblS + '">2차 송금</span><span style="' + valS + '">' + _ipinv2Krw(group2Krw) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
-  h += '<div style="' + colS + '"><span style="' + lblS + '">원화 총 지불액</span><span style="' + valSOrange + '">' + _ipinv2Krw(sumKrw) + '</span></div>';
+  // 원화 총 지불액 (주황 박스)
+  h += '<div style="display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:#EF9F27;border-radius:6px;min-width:max-content;">';
+  h += '<span style="font-size:10px;color:#1A1D23;font-weight:500;">원화 총 지불액</span>';
+  h += '<span style="font-size:15px;font-weight:700;color:#1A1D23;">' + _ipinv2Krw(sumKrw) + '</span>';
+  h += '</div>';
   h += '<span style="' + sepS + '"></span>';
-  h += '<div style="' + colS + '"><span style="' + lblS + '">가중평균 환율</span>';
+  // 가중평균 환율 (빨강 박스)
+  h += '<div style="display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:#E24B4A;border-radius:6px;min-width:max-content;">';
+  h += '<span style="font-size:10px;color:#fff;font-weight:500;">가중평균 환율</span>';
   if (weightedAvg != null) {
-    h += '<span style="' + valSOrange + '">₩' + _ipinv2FormatRate(weightedAvg) + '</span>';
+    h += '<span style="font-size:15px;font-weight:700;color:#fff;">₩' + _ipinv2FormatRate(weightedAvg) + '</span>';
   } else {
-    h += '<span style="font-size:13px;color:rgba(255,255,255,0.4);line-height:1.3;">—</span>';
+    h += '<span style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.6);">—</span>';
   }
   h += '</div>';
 
