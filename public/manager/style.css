@@ -2238,7 +2238,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-cart-btn:hover { background:#2a2d33; }
 .po-cart-btn:disabled { background:#DDE1EB; color:#9BA3B2; cursor:not-allowed; }
 .po-row-in-cart { background:#F4F6FA; opacity:0.55; }
-.po-cart-check { display:inline-flex; align-items:center; justify-content:center; width:26px; height:24px; color:#9BA3B2; font-size:13px; font-weight:600; }
+.po-cart-check { display:inline-flex; align-items:center; justify-content:center; width:26px; height:24px; color:#5A6070; font-size:14px; font-weight:700; }
 .po-num { font-variant-numeric:tabular-nums; }
 
 /* 우측 장바구니 패널 */

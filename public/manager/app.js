@@ -20787,7 +20787,7 @@ function _poRenderDetail() {
   var listPlaceholderAlert = "alert('발주서 리스트 모달은 P7에서 구현 예정')";
 
   var h = '';
-  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;margin-bottom:24px;overflow:hidden;">';
+  h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column;">';
 
   // 상단 다크 헤더 (← 목록 버튼 제거, 메타 정보만. 에러 시 오류 배지)
   h += '<div class="pc-main-header">';
@@ -20975,7 +20975,7 @@ function _poRenderProductList() {
     var inputAttr = inCart ? ' disabled' : '';
     var lastCell = inCart
       ? '<span class="po-cart-check" title="이미 장바구니에 있습니다">✓</span>'
-      : '<button class="po-cart-btn" title="장바구니에 추가" onclick="_poOnCartBtnClick(\'' + codeEsc + '\')">🛒</button>';
+      : '<button class="po-cart-btn" title="장바구니에 추가" onclick="_poOnCartBtnClick(\'' + codeEsc + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button>';
     h += '<tr' + rowClass + ' data-code="' + codeEsc + '">';
     h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '"' + cbAttr + '></td>';
     h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + _poEsc(p.code || '') + '</td>';
