@@ -23157,16 +23157,28 @@ function _ipinv2DoRenderDetail(container) {
   // 금액 요약 바 (다크, 제품 관련 합계)
   h += '<div id="ipinv2-summary-bar" style="padding:10px 20px;background:#1A1D23;color:#fff;display:flex;align-items:center;gap:14px;font-family:Pretendard,sans-serif;flex-wrap:wrap;"></div>';
 
-  // 송금 스케줄 섹션
+  // 송금 스케줄 섹션 (B-1d-2: 좌우 50:50 분할, 1차/2차)
   h += '<div id="ipinv2-payments-section" style="padding:0;background:#fff;border-top:0.5px solid #eee;">';
-  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:0.5px solid #eee;">';
-  h += '<div style="display:flex;align-items:center;gap:10px;">';
+  // 섹션 헤더 ([+ 분할 추가] 버튼 제거, 카운터만 유지)
+  h += '<div style="display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:0.5px solid #eee;">';
   h += '<span style="font-size:11px;color:#5A6070;letter-spacing:0.04em;font-weight:600;text-transform:uppercase;">송금 스케줄</span>';
   h += '<span id="ipinv2-pay-count" style="font-size:12px;color:#5A6070;">(0회 완료)</span>';
   h += '</div>';
-  h += '<button onclick="_ipinv2AddPayment()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">+ 분할 추가</button>';
+  // 좌우 50:50 분할 컨테이너
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px 20px;">';
+  // 좌 50%: 1차 송금 (seq 홀수)
+  h += '<div style="display:flex;flex-direction:column;gap:10px;">';
+  h += '<div style="padding:8px 12px;background:#1A1D23;color:#fff;border-radius:6px;font-size:12px;font-weight:600;font-family:Pretendard,sans-serif;">1차 송금</div>';
+  h += '<div data-pay-group="1" style="display:flex;flex-direction:column;gap:8px;"></div>';
+  h += '<button onclick="_ipinv2AddPaymentToGroup(1)" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;align-self:flex-start;">+ 1차 분할 추가</button>';
   h += '</div>';
-  h += '<div id="ipinv2-payments-cards" style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;"></div>';
+  // 우 50%: 2차 송금 (seq 짝수)
+  h += '<div style="display:flex;flex-direction:column;gap:10px;">';
+  h += '<div style="padding:8px 12px;background:#1A1D23;color:#fff;border-radius:6px;font-size:12px;font-weight:600;font-family:Pretendard,sans-serif;">2차 송금</div>';
+  h += '<div data-pay-group="2" style="display:flex;flex-direction:column;gap:8px;"></div>';
+  h += '<button onclick="_ipinv2AddPaymentToGroup(2)" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;align-self:flex-start;">+ 2차 분할 추가</button>';
+  h += '</div>';
+  h += '</div>';
   h += '<div id="ipinv2-payments-summary" style="padding:14px 20px;background:#1A1D23;color:#fff;font-family:Pretendard,sans-serif;"></div>';
   h += '</div>';
 
@@ -24100,33 +24112,41 @@ function _ipinv2LoadPayments(invoiceId) {
 }
 
 function _ipinv2RenderPaymentsSection() {
-  var cards = document.getElementById('ipinv2-payments-cards');
+  // B-1d-2: 좌/우 그룹 컨테이너 (seq 홀수 → 좌, 짝수 → 우)
+  var group1El = document.querySelector('[data-pay-group="1"]');
+  var group2El = document.querySelector('[data-pay-group="2"]');
   var count = document.getElementById('ipinv2-pay-count');
-  if (!cards) return;
+  if (!group1El || !group2El) return;
   var completedCnt = _ipinv2Payments.filter(function(p) { return p.status === 'completed'; }).length;
   if (count) count.textContent = '(' + completedCnt + '회 완료 / ' + _ipinv2Payments.length + '회)';
-  if (_ipinv2Payments.length === 0) {
-    cards.innerHTML = '<div style="padding:40px 20px;text-align:center;color:#9BA3B2;font-size:13px;">송금 스케줄이 없습니다. [+ 분할 추가] 버튼으로 첫 차수를 생성하세요.</div>';
-  } else {
-    // 이전 차수들의 확정된 실제 송금액 누적 → 현재 대기 카드의 placeholder "잔액"
-    var h = '';
-    _ipinv2Payments.forEach(function(p) {
-      var isConfirmed = _ipinv2IsPaymentConfirmed(p);
-      var placeholder = 0;
-      // 1차 카드는 placeholder 없음 (p.seq === 1이거나 첫 번째)
-      if (!isConfirmed && p.seq > 1) {
-        placeholder = _ipinv2CalcRemainingBalance(p.seq);
-      }
-      h += _ipinv2RenderPaymentCard(p, placeholder);
-    });
-    cards.innerHTML = h;
-    // render 후 모든 대기/편집 카드의 저장 버튼 상태 초기화
-    _ipinv2Payments.forEach(function(p) {
-      if (!_ipinv2IsPaymentConfirmed(p) || _ipinv2EditingPayments.has(p.id)) {
-        _ipinv2UpdateSaveButtonState(p.id);
-      }
-    });
-  }
+
+  // 좌/우 그룹 HTML 분리 생성 (잔액 계산은 전체 seq 순서 기반이라 무변경)
+  var g1Html = '';
+  var g2Html = '';
+  _ipinv2Payments.forEach(function(p) {
+    var isConfirmed = _ipinv2IsPaymentConfirmed(p);
+    var placeholder = 0;
+    // 1차 카드는 placeholder 없음 (p.seq === 1이거나 첫 번째)
+    if (!isConfirmed && p.seq > 1) {
+      placeholder = _ipinv2CalcRemainingBalance(p.seq);
+    }
+    var cardHtml = _ipinv2RenderPaymentCard(p, placeholder);
+    if (p.seq % 2 === 1) g1Html += cardHtml;
+    else g2Html += cardHtml;
+  });
+
+  // Empty state (D-1)
+  var emptyS = 'padding:24px 12px;text-align:center;color:#9BA3B2;font-size:12px;background:#F4F6FA;border-radius:6px;';
+  group1El.innerHTML = g1Html || '<div style="' + emptyS + '">1차 송금 없음</div>';
+  group2El.innerHTML = g2Html || '<div style="' + emptyS + '">2차 송금 없음</div>';
+
+  // render 후 모든 대기/편집 카드의 저장 버튼 상태 초기화
+  _ipinv2Payments.forEach(function(p) {
+    if (!_ipinv2IsPaymentConfirmed(p) || _ipinv2EditingPayments.has(p.id)) {
+      _ipinv2UpdateSaveButtonState(p.id);
+    }
+  });
+
   _ipinv2RenderPaymentSummary();
   _ipinv2UpdateHeaderStatusBadge();
 }
@@ -24519,6 +24539,32 @@ function _ipinv2AddPayment() {
     .then(function(json) {
       if (json.success && json.data) {
         _ipinv2Payments.push(json.data);
+        _ipinv2RenderPaymentsSection();
+        _ipinv2RefreshInvoiceStatus();
+      } else alert(json.error || '송금 차수 추가 실패');
+    });
+}
+
+// B-1d-2: 그룹별 분할 추가 (group 1 → 홀수 seq, group 2 → 짝수 seq)
+function _ipinv2AddPaymentToGroup(group) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+  var seqs = _ipinv2Payments.map(function(p) { return p.seq; });
+  var newSeq;
+  if (group === 1) {
+    var odds = seqs.filter(function(s) { return s % 2 === 1; });
+    newSeq = odds.length > 0 ? Math.max.apply(null, odds) + 2 : 1;
+  } else {
+    var evens = seqs.filter(function(s) { return s % 2 === 0; });
+    newSeq = evens.length > 0 ? Math.max.apply(null, evens) + 2 : 2;
+  }
+  var payload = { seq: newSeq, planned_usd: 0, planned_ratio: 0 };
+  fetch('/api/import-invoices/' + inv.id + '/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        _ipinv2Payments.push(json.data);
+        _ipinv2Payments.sort(function(a, b) { return a.seq - b.seq; });
         _ipinv2RenderPaymentsSection();
         _ipinv2RefreshInvoiceStatus();
       } else alert(json.error || '송금 차수 추가 실패');
