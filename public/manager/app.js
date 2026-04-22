@@ -21069,35 +21069,58 @@ function _poCreateAndLoadNewDraft() {
 }
 
 // 🛒 버튼 또는 엔터 키 공통 핸들러 (PO 없으면 자동 draft 생성)
+// 중요: palletCount를 최상단에서 캡처해야 함 — draft 생성 중 _poRenderDetail
+//       재렌더로 기존 input DOM이 새 노드로 교체되면 value가 날아감.
 function _poOnCartBtnClick(code) {
-  var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
-  if (!po || !po.id) {
-    _poCreateAndLoadNewDraft()
-      .then(function() { _poOnCartBtnClick(code); })
-      .catch(function(err) { alert('새 발주서 생성 실패: ' + (err && err.message || err)); });
-    return;
-  }
+  // 1) 값 먼저 캡처 (재렌더 전)
   var row = document.querySelector('#po-product-list-body tr[data-code="' + code + '"]');
   if (!row) return;
   var input = row.querySelector('.po-pallet-input');
   if (!input) return;
   var raw = String(input.value || '').trim();
   var pCount = raw === '' ? 0 : Number(raw);
-  if (!pCount || pCount <= 0 || isNaN(pCount)) { alert('수량을 입력하세요'); input.focus(); return; }
-  var cart = _poLoadCart(po.id);
-  var existIdx = -1;
-  for (var i = 0; i < cart.length; i++) {
-    if (cart[i] && String(cart[i].productCode) === String(code)) { existIdx = i; break; }
+
+  // 2) 값 검증 (PO 유무와 무관)
+  if (!pCount || pCount <= 0 || isNaN(pCount)) {
+    alert('수량을 입력하세요');
+    input.focus();
+    return;
   }
-  if (existIdx >= 0) {
-    if (!confirm('이미 장바구니에 있습니다. 덮어쓸까요?')) return;
+
+  // 3) 실제 장바구니 추가 로직 (재렌더 후 호출 가능하도록 분리)
+  function addWithCaptured() {
+    var po = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+    if (!po || !po.id) return; // 예외 방어
+    var cart = _poLoadCart(po.id);
+    var existIdx = -1;
+    for (var i = 0; i < cart.length; i++) {
+      if (cart[i] && String(cart[i].productCode) === String(code)) { existIdx = i; break; }
+    }
+    if (existIdx >= 0) {
+      if (!confirm('이미 장바구니에 있습니다. 덮어쓸까요?')) return;
+    }
+    _poAddToCart(code, pCount); // ⭐ 캡처한 값 사용 (DOM 재읽기 안 함)
+    // 재렌더 후 fresh input/cell 찾아 초기화
+    var freshRow = document.querySelector('#po-product-list-body tr[data-code="' + code + '"]');
+    if (freshRow) {
+      var freshInput = freshRow.querySelector('.po-pallet-input');
+      if (freshInput) freshInput.value = '';
+      var uc = freshRow.querySelector('[data-unit-cell]');
+      var tc = freshRow.querySelector('[data-total-cell]');
+      if (uc) uc.innerHTML = '<span style="color:#DDE1EB">-</span>';
+      if (tc) tc.innerHTML = '<span style="color:#DDE1EB">-</span>';
+    }
   }
-  _poAddToCart(code, pCount);
-  input.value = '';
-  var uc = row.querySelector('[data-unit-cell]');
-  var tc = row.querySelector('[data-total-cell]');
-  if (uc) uc.innerHTML = '<span style="color:#DDE1EB">-</span>';
-  if (tc) tc.innerHTML = '<span style="color:#DDE1EB">-</span>';
+
+  // 4) PO 없으면 자동 draft 생성 후 캡처한 값으로 추가
+  var curPo = (_poState && _poState.currentPo) ? _poState.currentPo : null;
+  if (!curPo || !curPo.id) {
+    _poCreateAndLoadNewDraft()
+      .then(addWithCaptured)
+      .catch(function(err) { alert('새 발주서 생성 실패: ' + (err && err.message || err)); });
+    return;
+  }
+  addWithCaptured();
 }
 
 function _poFilterProductList(q) {
