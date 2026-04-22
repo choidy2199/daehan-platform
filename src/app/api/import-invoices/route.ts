@@ -143,7 +143,7 @@ export async function PUT(request: NextRequest) {
     const { id, ...fields } = body || {};
     if (!id) return NextResponse.json({ success: false, error: 'id 필수' }, { status: 400 });
 
-    const allowed = ['invoice_no', 'batch_id', 'factory_name', 'factory_code', 'invoice_date', 'payment_terms', 'memo', 'subtotal_usd', 'discount_usd', 'pallets_usd', 'final_amount_usd', 'weighted_avg_rate', 'status', 'discount_rate', 'discount_amount_usd', 'pallet_count', 'pallet_unit_price_usd', 'pallet_total_usd', 'final_total_usd'];
+    const allowed = ['invoice_no', 'batch_id', 'factory_name', 'factory_code', 'invoice_date', 'payment_terms', 'memo', 'subtotal_usd', 'discount_usd', 'pallets_usd', 'final_amount_usd', 'weighted_avg_rate', 'status', 'discount_rate', 'discount_amount_usd', 'pallet_count', 'pallet_unit_price_usd', 'pallet_total_usd', 'final_total_usd', 'customer_code', 'customer_name'];
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
     for (const k of allowed) {
       if (k in fields) {

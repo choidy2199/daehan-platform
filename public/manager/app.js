@@ -19366,33 +19366,93 @@ function _showBackorderForm() {
   overlay.id = 'bo-form-popup';
   overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
   var modal = document.createElement('div');
-  modal.style.cssText = 'background:#fff;border-radius:8px;width:480px;max-width:95vw;overflow:hidden;border:0.5px solid #eee;';
+  modal.style.cssText = 'background:#fff;border-radius:8px;width:620px;max-width:95vw;overflow:hidden;border:0.5px solid #eee;';
   modal.innerHTML =
     '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:14px 20px;background:#1A1D23;color:#fff;cursor:move;"><span style="font-size:16px;font-weight:500;">백오더 등록</span><button onclick="document.getElementById(\'bo-form-popup\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">✕</button></div>' +
     '<div style="padding:20px 24px;">' +
-    '<div style="margin-bottom:14px;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">구분</label><select id="bo-type" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"><option value="milwaukee">밀워키</option><option value="general">일반</option><option value="import">수입</option></select></div>' +
-    '<div style="margin-bottom:14px;position:relative;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">거래처</label><input type="text" id="bo-customer" autocomplete="off" placeholder="거래처명 입력..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"><input type="hidden" id="bo-customer-code"><div id="bo-cust-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE1EB;border-top:none;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div></div>' +
-    '<div style="margin-bottom:14px;position:relative;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">제품</label><input type="text" id="bo-product" autocomplete="off" placeholder="제품명/모델 입력..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"><input type="hidden" id="bo-product-code"><input type="hidden" id="bo-product-name"><input type="hidden" id="bo-model"><div id="bo-prod-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE1EB;border-top:none;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div></div>' +
-    '<div style="display:flex !important;flex-direction:row !important;gap:12px;margin-bottom:14px;"><div style="width:100px;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">수량</label><input type="number" id="bo-qty" value="1" min="1" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"></div><div style="flex:1;"><label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">비고</label><input type="text" id="bo-note" placeholder="메모..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;"></div></div>' +
-    '<div style="display:flex !important;flex-direction:row !important;justify-content:flex-end !important;gap:8px;"><button onclick="document.getElementById(\'bo-form-popup\').remove()" style="font-size:14px;padding:8px 16px;border-radius:6px;border:1px solid #185FA5;background:transparent;color:#185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">취소</button><button onclick="_saveBackorder()" style="font-size:14px;padding:8px 16px;border-radius:6px;border:none;background:#1A1D23;color:#fff;cursor:pointer;font-weight:500;font-family:Pretendard,sans-serif;">등록</button></div></div>';
+    // 거래처 + 제품 2열
+    '<div style="display:grid !important;grid-template-columns:1fr 1.3fr;gap:12px;">' +
+      // 거래처
+      '<div style="margin-bottom:14px;position:relative;">' +
+        '<label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">거래처</label>' +
+        '<input type="text" id="bo-customer" autocomplete="off" placeholder="거래처명 입력..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;">' +
+        '<input type="hidden" id="bo-customer-code">' +
+        '<div id="bo-cust-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE1EB;border-top:none;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div>' +
+      '</div>' +
+      // 제품 영역 (초기 상태)
+      '<div id="bo-product-wrap" style="margin-bottom:14px;position:relative;">' +
+        '<label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">제품</label>' +
+        '<input type="text" id="bo-product" autocomplete="off" placeholder="제품명/모델/코드 입력..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;">' +
+        '<input type="hidden" id="bo-product-code">' +
+        '<input type="hidden" id="bo-product-name">' +
+        '<input type="hidden" id="bo-model">' +
+        '<input type="hidden" id="bo-product-type">' +
+        '<div id="bo-prod-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #DDE1EB;border-top:none;border-radius:0 0 6px 6px;max-height:260px;overflow-y:auto;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.08);"></div>' +
+      '</div>' +
+    '</div>' +
+    // 단가 참고 + 수량 row
+    '<div style="display:grid !important;grid-template-columns:1fr 140px;gap:12px;margin-bottom:14px;">' +
+      // 단가 참고
+      '<div style="background:#FAFBFC;border:1px solid #E9ECF1;border-radius:8px;padding:10px 14px;">' +
+        '<div style="font-size:11px;font-weight:600;color:#9BA3B2;letter-spacing:0.5px;margin-bottom:8px;text-transform:uppercase;">단가 (참고)</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);">' +
+          '<div style="text-align:center;padding:2px 8px;border-right:1px solid #E9ECF1;">' +
+            '<div style="font-size:12px;font-weight:600;color:#5A6070;margin-bottom:2px;">IN</div>' +
+            '<div id="bo-price-in-base" style="font-size:10px;color:#9BA3B2;margin-bottom:2px;">—</div>' +
+            '<div id="bo-price-in" style="font-size:14px;font-weight:600;color:#0C447C;font-variant-numeric:tabular-nums;">—</div>' +
+          '</div>' +
+          '<div style="text-align:center;padding:2px 8px;border-right:1px solid #E9ECF1;">' +
+            '<div style="font-size:12px;font-weight:600;color:#5A6070;margin-bottom:2px;">OUT</div>' +
+            '<div id="bo-price-out-base" style="font-size:10px;color:#9BA3B2;margin-bottom:2px;">—</div>' +
+            '<div id="bo-price-out" style="font-size:14px;font-weight:600;color:#0C447C;font-variant-numeric:tabular-nums;">—</div>' +
+          '</div>' +
+          '<div style="text-align:center;padding:2px 8px;">' +
+            '<div style="font-size:12px;font-weight:600;color:#5A6070;margin-bottom:2px;">파레트</div>' +
+            '<div id="bo-price-pallet-base" style="font-size:10px;color:#9BA3B2;margin-bottom:2px;">—</div>' +
+            '<div id="bo-price-pallet" style="font-size:14px;font-weight:600;color:#0C447C;font-variant-numeric:tabular-nums;">—</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      // 수량 입력
+      '<div style="background:#fff;border:1.5px solid #1A1D23;border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;justify-content:center;">' +
+        '<div style="font-size:11px;font-weight:700;color:#1A1D23;letter-spacing:0.5px;margin-bottom:4px;text-transform:uppercase;text-align:center;">수량</div>' +
+        '<div style="position:relative;display:flex;align-items:center;">' +
+          '<input type="number" id="bo-qty" value="" placeholder="0" style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 28px 0 10px;font-size:18px;font-weight:700;text-align:center;font-family:Pretendard,sans-serif;outline:none;">' +
+          '<span style="position:absolute;right:10px;font-size:12px;color:#9BA3B2;pointer-events:none;">개</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    // 비고
+    '<div style="margin-bottom:14px;">' +
+      '<label style="font-size:13px;font-weight:500;color:#5A6070;display:block;margin-bottom:4px;">비고</label>' +
+      '<input type="text" id="bo-note" placeholder="메모..." style="width:100%;height:36px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:14px;font-family:Pretendard,sans-serif;box-sizing:border-box;">' +
+    '</div>' +
+    // 버튼
+    '<div style="display:flex !important;justify-content:flex-end !important;gap:8px;">' +
+      '<button onclick="document.getElementById(\'bo-form-popup\').remove()" style="font-size:14px;padding:8px 16px;border-radius:6px;border:1px solid #185FA5;background:transparent;color:#185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">취소</button>' +
+      '<button id="bo-submit" onclick="_saveBackorder()" disabled style="font-size:14px;padding:8px 16px;border-radius:6px;border:none;background:#C6CAD3;color:#fff;cursor:not-allowed;font-weight:500;font-family:Pretendard,sans-serif;">등록</button>' +
+    '</div>' +
+    '</div>';
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
   _makeDraggable(modal, modal.firstChild);
 
   var custInput = document.getElementById('bo-customer'), custDd = document.getElementById('bo-cust-dropdown'), custC = false;
   custInput.addEventListener('compositionstart', function() { custC = true; });
-  custInput.addEventListener('compositionend', function() { custC = false; _boSearchCust(custInput.value, custDd); });
-  custInput.addEventListener('input', function() { if (!custC) _boSearchCust(custInput.value, custDd); document.getElementById('bo-customer-code').value = ''; });
+  custInput.addEventListener('compositionend', function() { custC = false; _boSearchCust(custInput.value, custDd); _boUpdateSubmitState(); });
+  custInput.addEventListener('input', function() { if (!custC) _boSearchCust(custInput.value, custDd); document.getElementById('bo-customer-code').value = ''; _boUpdateSubmitState(); });
 
-  var prodInput = document.getElementById('bo-product'), prodDd = document.getElementById('bo-prod-dropdown'), prodC = false;
-  prodInput.addEventListener('compositionstart', function() { prodC = true; });
-  prodInput.addEventListener('compositionend', function() { prodC = false; _boSearchProd(prodInput.value, prodDd); });
-  prodInput.addEventListener('input', function() { if (!prodC) _boSearchProd(prodInput.value, prodDd); document.getElementById('bo-product-code').value = ''; });
+  _boBindProductInput();
+
+  var qtyEl = document.getElementById('bo-qty');
+  if (qtyEl) qtyEl.addEventListener('input', _boUpdateSubmitState);
 
   document.addEventListener('mousedown', function _cdd(e) {
     if (!document.getElementById('bo-form-popup')) { document.removeEventListener('mousedown', _cdd); return; }
     if (!custDd.contains(e.target) && e.target !== custInput) custDd.style.display = 'none';
-    if (!prodDd.contains(e.target) && e.target !== prodInput) prodDd.style.display = 'none';
+    var prodDd = document.getElementById('bo-prod-dropdown');
+    var prodInput = document.getElementById('bo-product');
+    if (prodDd && prodInput && !prodDd.contains(e.target) && e.target !== prodInput) prodDd.style.display = 'none';
   });
   overlay.addEventListener('keydown', function(e) { if (e.key === 'Escape') overlay.remove(); });
   setTimeout(function() { custInput.focus(); }, 100);
@@ -22237,6 +22297,293 @@ function _ipinv2CloseDetail() {
   _ipinv2RenderList();
 }
 
+// ── 거래처 자동완성 (mw_customers DB, 경영박사 매입 거래처) ──
+// 거래명세서의 _tx.customer 패턴을 복제한 독립 네임스페이스
+// localStorage `mw_customers` (2,465건) 직접 필터 (서버 호출 없음, 0ms 응답)
+var _ipinv2Customer = {
+  _cache: null,
+  _dropdown: null,
+  _visibleItems: [],
+  _selectedIndex: -1,
+
+  _load: function() {
+    if (this._cache) return this._cache;
+    try {
+      var raw = localStorage.getItem('mw_customers');
+      this._cache = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      console.error('[_ipinv2Customer] mw_customers 로드 실패:', e);
+      this._cache = [];
+    }
+    return this._cache;
+  },
+
+  _match: function(query, c) {
+    var q = String(query || '').toLowerCase();
+    if (!q) return true;
+    return String(c.name || '').toLowerCase().indexOf(q) !== -1;
+  },
+
+  _esc: function(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  },
+
+  _ensureDropdown: function() {
+    if (this._dropdown && document.body.contains(this._dropdown)) return this._dropdown;
+    var dd = document.createElement('div');
+    dd.className = 'ipinv2-customer-dropdown';
+    dd.style.cssText = 'position:fixed;display:none;background:#fff;border:1px solid #DDE1EB;border-radius:6px;box-shadow:0 4px 12px rgba(26,29,35,0.08);max-height:280px;overflow-y:auto;z-index:9999;font-family:Pretendard,sans-serif;min-width:260px;';
+    document.body.appendChild(dd);
+    this._dropdown = dd;
+
+    // 드롭다운 내부 클릭 (이벤트 위임)
+    dd.addEventListener('mousedown', function(e) {
+      var item = e.target.closest('.ipinv2-customer-dd-item');
+      if (!item) return;
+      e.preventDefault(); // input blur 방지 (select 먼저 실행되도록)
+      var idx = parseInt(item.getAttribute('data-idx'), 10);
+      if (!isNaN(idx)) _ipinv2Customer.onSelect(idx);
+    });
+
+    // 외부 클릭 시 닫기
+    document.addEventListener('mousedown', function(e) {
+      if (!_ipinv2Customer._dropdown || _ipinv2Customer._dropdown.style.display === 'none') return;
+      if (_ipinv2Customer._dropdown.contains(e.target)) return;
+      var inp = document.getElementById('ipinv2-customer-input');
+      if (inp && inp.contains(e.target)) return;
+      _ipinv2Customer.closeDropdown();
+    });
+
+    return dd;
+  },
+
+  _positionDropdown: function() {
+    var input = document.getElementById('ipinv2-customer-input');
+    var dd = this._dropdown;
+    if (!input || !dd) return;
+    var rect = input.getBoundingClientRect();
+    dd.style.left = rect.left + 'px';
+    dd.style.top = (rect.bottom + 2) + 'px';
+    dd.style.width = Math.max(260, rect.width) + 'px';
+  },
+
+  openDropdown: function() {
+    this._ensureDropdown();
+    this._positionDropdown();
+    var input = document.getElementById('ipinv2-customer-input');
+    var query = input ? String(input.value || '').trim() : '';
+    this._renderList(query);
+    if (this._dropdown) this._dropdown.style.display = 'block';
+  },
+
+  closeDropdown: function() {
+    if (this._dropdown) this._dropdown.style.display = 'none';
+    this._visibleItems = [];
+    this._selectedIndex = -1;
+  },
+
+  _renderList: function(query) {
+    if (!this._dropdown) return;
+    var customers = this._load();
+    var filtered = customers
+      .filter(function(c) { return c && c.name && _ipinv2Customer._match(query, c); })
+      .slice(0, 20);
+
+    this._visibleItems = filtered;
+    this._selectedIndex = filtered.length > 0 ? 0 : -1;
+
+    if (filtered.length === 0) {
+      this._dropdown.innerHTML = '<div style="padding:14px;text-align:center;color:#9BA3B2;font-size:12px;">검색 결과 없음</div>';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < filtered.length; i++) {
+      var c = filtered[i];
+      var active = i === 0 ? 'background:#E6F1FB;' : '';
+      var code2 = c.code2 || c.CODE2 || c.code || '';
+      html += '<div class="ipinv2-customer-dd-item" data-idx="' + i + '" style="' + active + 'padding:8px 12px;font-size:13px;color:#1A1D23;cursor:pointer;border-bottom:1px solid #F0F2F7;display:flex;justify-content:space-between;align-items:center;gap:10px;">';
+      html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(c.name) + '</span>';
+      if (code2) html += '<span style="font-size:10px;color:#9BA3B2;flex-shrink:0;">' + this._esc(code2) + '</span>';
+      html += '</div>';
+    }
+    this._dropdown.innerHTML = html;
+  },
+
+  _highlight: function() {
+    if (!this._dropdown) return;
+    var items = this._dropdown.querySelectorAll('.ipinv2-customer-dd-item');
+    for (var i = 0; i < items.length; i++) {
+      items[i].style.background = i === this._selectedIndex ? '#E6F1FB' : '';
+      if (i === this._selectedIndex) items[i].scrollIntoView({ block: 'nearest' });
+    }
+  },
+
+  onInput: function(value) {
+    this._ensureDropdown();
+    this._positionDropdown();
+    this._renderList(String(value || '').trim());
+    if (this._dropdown) this._dropdown.style.display = 'block';
+  },
+
+  onKeydown: function(e) {
+    if (!this._dropdown || this._dropdown.style.display === 'none') return;
+    if (!this._visibleItems || this._visibleItems.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      this._selectedIndex = Math.min(this._selectedIndex + 1, this._visibleItems.length - 1);
+      this._highlight();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._selectedIndex = Math.max(this._selectedIndex - 1, 0);
+      this._highlight();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (this._selectedIndex >= 0) this.onSelect(this._selectedIndex);
+    } else if (e.key === 'Escape') {
+      this.closeDropdown();
+    }
+  },
+
+  onSelect: function(idx) {
+    var item = this._visibleItems[idx];
+    if (!item) return;
+    var code2 = item.code2 || item.CODE2 || item.code || '';
+    this.setValue(code2, item.name);
+    this.closeDropdown();
+    // 저장 트리거 (blur autosave와 동일 경로)
+    this._triggerSave();
+  },
+
+  setValue: function(code, name) {
+    var input = document.getElementById('ipinv2-customer-input');
+    var hiddenCode = document.getElementById('ipinv2-customer-code');
+    var hint = document.getElementById('ipinv2-customer-hint');
+    if (input) input.value = name || '';
+    if (hiddenCode) hiddenCode.value = code || '';
+    if (hint) hint.textContent = code ? 'CODE2: ' + code : '';
+  },
+
+  clear: function() {
+    this.setValue('', '');
+  },
+
+  getValue: function() {
+    var input = document.getElementById('ipinv2-customer-input');
+    var hiddenCode = document.getElementById('ipinv2-customer-code');
+    return {
+      code: hiddenCode ? String(hiddenCode.value || '') : '',
+      name: input ? String(input.value || '') : ''
+    };
+  },
+
+  _triggerSave: function() {
+    if (typeof _ipinv2SaveCustomerFields === 'function') _ipinv2SaveCustomerFields();
+  },
+
+  onBlur: function() {
+    // input blur 시 값이 후보 목록에 없으면 매칭 시도 → 없으면 hidden code 비움
+    var input = document.getElementById('ipinv2-customer-input');
+    if (!input) return;
+    var name = String(input.value || '').trim();
+    if (!name) {
+      // 빈값 → 저장 (null)
+      this.setValue('', '');
+      this._triggerSave();
+      return;
+    }
+    // 이름으로 정확 매칭
+    var customers = this._load();
+    var matched = null;
+    for (var i = 0; i < customers.length; i++) {
+      if (customers[i] && customers[i].name === name) { matched = customers[i]; break; }
+    }
+    if (matched) {
+      var code2 = matched.code2 || matched.CODE2 || matched.code || '';
+      this.setValue(code2, matched.name);
+      this._triggerSave();
+    } else {
+      // 매칭 안 됨 → 타이핑된 이름 유지, code 비움
+      var hiddenCode = document.getElementById('ipinv2-customer-code');
+      if (hiddenCode) hiddenCode.value = '';
+      var hint = document.getElementById('ipinv2-customer-hint');
+      if (hint) hint.textContent = '(매칭 없음)';
+      this._triggerSave();
+    }
+  }
+};
+
+// ── 거래처 필드만 PUT 저장 (blur/select 공통 경로) ──
+function _ipinv2SaveCustomerFields() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv || !inv.id) return;
+  var val = _ipinv2Customer.getValue();
+  var newCode = val.code || null;
+  var newName = val.name || null;
+  var oldCode = inv.customer_code || null;
+  var oldName = inv.customer_name || null;
+  if (newCode === oldCode && newName === oldName) return; // 변경 없음
+
+  var payload = { id: inv.id, customer_code: newCode, customer_name: newName };
+  fetch('/api/import-invoices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        _ipinv2CurrentInvoice = json.data;
+        _ipinv2Toast('거래처 저장됨', 'success');
+      } else {
+        _ipinv2Toast((json && json.error) || '거래처 저장 실패', 'error');
+      }
+    })
+    .catch(function(e) {
+      _ipinv2Toast('네트워크 오류: ' + (e && e.message || e), 'error');
+    });
+}
+
+// 거래처 input 이벤트 바인딩 (상세 렌더 후 호출)
+function _ipinv2BindCustomerInput() {
+  var input = document.getElementById('ipinv2-customer-input');
+  if (!input || input._ipinv2CustBound) return;
+  input._ipinv2CustBound = true;
+
+  var isComposing = false;
+  input.addEventListener('compositionstart', function() { isComposing = true; });
+  input.addEventListener('compositionend', function(e) {
+    isComposing = false;
+    _ipinv2Customer.onInput(e.target.value);
+  });
+  input.addEventListener('input', function(e) {
+    if (isComposing) return;
+    _ipinv2Customer.onInput(e.target.value);
+  });
+  input.addEventListener('focus', function() {
+    _ipinv2Customer.openDropdown();
+  });
+  input.addEventListener('keydown', function(e) {
+    _ipinv2Customer.onKeydown(e);
+  });
+  input.addEventListener('blur', function() {
+    // setTimeout으로 드롭다운 클릭 이벤트 먼저 발생하도록
+    setTimeout(function() {
+      // 드롭다운이 여전히 열려있으면 닫기만 (select가 이미 처리)
+      if (_ipinv2Customer._dropdown && _ipinv2Customer._dropdown.style.display !== 'none') {
+        _ipinv2Customer.closeDropdown();
+      }
+      _ipinv2Customer.onBlur();
+    }, 180);
+  });
+
+  // 스크롤/리사이즈 시 드롭다운 위치 재계산
+  window.addEventListener('scroll', function() {
+    if (_ipinv2Customer._dropdown && _ipinv2Customer._dropdown.style.display !== 'none') {
+      _ipinv2Customer._positionDropdown();
+    }
+  }, true);
+}
+
 // ── 상세 화면 렌더 ──
 function _ipinv2DoRenderDetail(container) {
   var inv = _ipinv2CurrentInvoice;
@@ -22260,14 +22607,23 @@ function _ipinv2DoRenderDetail(container) {
   h += '<button onclick="_ipinv2DeleteInvoice()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
   h += '</div></div>';
 
-  // 기본 정보 섹션 (1줄 6필드)
+  // 기본 정보 섹션 (7필드, 2행 자동 줄바꿈)
   h += '<div style="padding:12px 20px;background:#fff;border-bottom:0.5px solid #eee;">';
   var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:3px;font-weight:500;';
   var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
-  h += '<div style="display:grid;grid-template-columns:repeat(6, minmax(120px, 1fr));gap:10px;">';
+  h += '<div style="display:grid;grid-template-columns:repeat(4, minmax(120px, 1fr));gap:10px 10px;">';
   h += '<div><label style="' + lblS + '">인보이스 번호 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-invno" type="text" value="' + _ipinv2Esc(inv.invoice_no) + '" style="' + inpS + '" placeholder="INV-2026-001" onblur="_ipinv2OnHeaderBlur(\'invoice_no\',this)"></div>';
   h += '<div><label style="' + lblS + '">공장명 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-factory" type="text" value="' + _ipinv2Esc(inv.factory_name) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'factory_name\',this)"></div>';
   h += '<div><label style="' + lblS + '">공장 코드</label><input id="ipinv2-f-code" type="text" value="' + _ipinv2Esc(inv.factory_code || '') + '" style="' + inpS + '" placeholder="CODE2" onblur="_ipinv2OnHeaderBlur(\'factory_code\',this)"></div>';
+  // 거래처 (autocomplete, mw_customers DB)
+  h += '<div>';
+  h += '<label style="' + lblS + '">거래처 <span style="color:#CC2222">*</span></label>';
+  h += '<div style="position:relative;">';
+  h += '<input id="ipinv2-customer-input" type="text" value="' + _ipinv2Esc(inv.customer_name || '') + '" style="' + inpS + '" placeholder="거래처명 검색" autocomplete="off">';
+  h += '<input type="hidden" id="ipinv2-customer-code" value="' + _ipinv2Esc(inv.customer_code || '') + '">';
+  h += '</div>';
+  h += '<div id="ipinv2-customer-hint" style="margin-top:2px;font-size:10px;color:#9BA3B2;line-height:1;min-height:10px;">' + (inv.customer_code ? 'CODE2: ' + _ipinv2Esc(inv.customer_code) : '') + '</div>';
+  h += '</div>';
   h += '<div><label style="' + lblS + '">인보이스 일자 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-date" type="date" value="' + _ipinv2Esc((inv.invoice_date || '').substring(0, 10)) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'invoice_date\',this)"></div>';
   h += '<div><label style="' + lblS + '">할인율 (%)</label><input id="ipinv2-f-discrate" type="number" step="0.01" value="' + (inv.discount_rate || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'discount_rate\',this.value)"></div>';
   h += '<div><label style="' + lblS + '">팔렛 단가 ($)</label><input id="ipinv2-f-palletunit" type="number" step="0.01" value="' + (inv.pallet_unit_price_usd || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'pallet_unit_price_usd\',this.value)"></div>';
@@ -22317,6 +22673,7 @@ function _ipinv2DoRenderDetail(container) {
   _ipinv2RenderItemsTable();
   _ipinv2RenderSummaryBar();
   _ipinv2BindAcOutsideClick();
+  _ipinv2BindCustomerInput();
   _ipinv2LoadPayments(_ipinv2CurrentInvoice.id);
 }
 
@@ -22324,12 +22681,15 @@ function _ipinv2DoRenderDetail(container) {
 function _ipinv2SaveBasicInfo() {
   var inv = _ipinv2CurrentInvoice;
   if (!inv) return;
+  var custVal = _ipinv2Customer.getValue();
   var payload = {
     id: inv.id,
     invoice_no: (document.getElementById('ipinv2-f-invno').value || '').trim(),
     factory_name: (document.getElementById('ipinv2-f-factory').value || '').trim(),
     factory_code: (document.getElementById('ipinv2-f-code').value || '').trim(),
     invoice_date: document.getElementById('ipinv2-f-date').value,
+    customer_code: custVal.code || null,
+    customer_name: custVal.name || null,
     // payment_terms / memo UI 제거 (서버 컬럼은 유지, 기존 값 건드리지 않음)
   };
   if (!payload.invoice_no) return alert('인보이스 번호를 입력하세요.');
