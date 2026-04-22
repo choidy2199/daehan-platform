@@ -19212,6 +19212,7 @@ var _boFilterStatus = 'all';
 var _boSearch = '';
 var _boCustActiveIdx = -1;
 var _boProdActiveIdx = -1;
+var _boFilterStockIn = false;
 
 async function _fetchBackorders() {
   try {
@@ -19224,6 +19225,98 @@ async function _fetchBackorders() {
 
 function _getBackorderStock(code) { return findStock(code) || 0; }
 
+// 제품코드로 일반/밀워키 단가표에서 제품 정보 조회 (VLOOKUP)
+function _boLookupProduct(code) {
+  if (!code) return null;
+  try {
+    var gen = JSON.parse(localStorage.getItem('mw_gen_products') || '[]');
+    for (var i = 0; i < gen.length; i++) {
+      if (gen[i].code === code) {
+        var p = gen[i];
+        var brand = p.brand || '';
+        if (!brand && p.category) {
+          var dashIdx = p.category.indexOf('-');
+          brand = dashIdx > 0 ? p.category.substring(0, dashIdx) : p.category;
+        }
+        return {
+          type: 'general',
+          brand: brand || '일반',
+          model: p.model || '',
+          name: p.description || '',
+          inQty: p.inQty, inPrice: p.inPrice,
+          outQty: p.outQty, outPrice: p.outPrice,
+          palletQty: p.palletQty, palletPrice: p.palletPrice,
+          boxQty: p.boxQty || p.box || '',
+          stock: p.stock !== undefined && p.stock !== null && p.stock !== '' ? p.stock : null
+        };
+      }
+    }
+  } catch(e) {}
+  if (typeof DB !== 'undefined' && DB.products) {
+    for (var j = 0; j < DB.products.length; j++) {
+      if (DB.products[j].code === code) {
+        var m = DB.products[j];
+        return {
+          type: 'milwaukee',
+          brand: '밀워키',
+          model: m.model || '',
+          name: m.detail || '',
+          inQty: null, inPrice: null,
+          outQty: null, outPrice: null,
+          palletQty: null, palletPrice: null,
+          boxQty: m.boxQty || m.box || '',
+          stock: null
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function _boFmtNum(n) {
+  var num = parseInt(n);
+  return (num && num > 0) ? num.toLocaleString() : '—';
+}
+
+function _boFmtBase(n) {
+  var num = parseInt(n);
+  return (num && num > 0) ? num + '개' : '—';
+}
+
+function _boRenderPriceCell(qty, price) {
+  var qtyNum = parseInt(qty);
+  var priceNum = parseInt(price);
+  var hasData = (qtyNum && qtyNum > 0 && priceNum && priceNum > 0);
+  if (!hasData) {
+    return '<div class="bo-price-cell empty"><div class="bo-price-qty">—</div><div class="bo-price-val">—</div></div>';
+  }
+  return '<div class="bo-price-cell">'
+    + '<div class="bo-price-qty">' + qtyNum + '개</div>'
+    + '<div class="bo-price-val">' + priceNum.toLocaleString() + '</div>'
+    + '</div>';
+}
+
+function _boRenderActionCell(d, isStockIn) {
+  var isDone = d.status === 'done';
+  var isCancelled = d.status === 'cancelled';
+  var hasStock = isStockIn;
+  if (isDone) return '<span style="font-size:11px;color:#999;">완료</span>';
+  if (isCancelled) return '<span style="font-size:11px;color:#999;">취소</span>';
+  if (hasStock && d.status === 'waiting') {
+    return '<button onclick="event.stopPropagation();_shipBackorder(' + d.id + ',' + d.quantity + ',' + (d.shipped_qty || 0) + ')" style="font-size:11px;padding:4px 10px;border-radius:5px;border:none;background:#1D9E75;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">출고</button>';
+  }
+  if (hasStock && d.status === 'partial') {
+    return '<button onclick="event.stopPropagation();_shipBackorder(' + d.id + ',' + d.quantity + ',' + (d.shipped_qty || 0) + ')" style="font-size:11px;padding:4px 10px;border-radius:5px;border:none;background:#185FA5;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">추가출고</button>';
+  }
+  return '<span style="font-size:11px;color:#999;">재고없음</span>';
+}
+
+function _boToggleStockInFilter() {
+  _boFilterStockIn = !_boFilterStockIn;
+  var c = document.getElementById('tab-backorder');
+  if (c) _renderBackorderList(c);
+}
+
 function renderBackorderTab() {
   var container = document.getElementById('tab-backorder');
   if (!container) return;
@@ -19233,6 +19326,25 @@ function renderBackorderTab() {
 
 function _renderBackorderList(container) {
   var data = _backordersCache || [];
+
+  // VLOOKUP 기반 메타 계산 (재고/입고여부)
+  function _meta(d) {
+    var info = _boLookupProduct(d.product_code);
+    var stock = null;
+    if (info && info.stock !== null && info.stock !== undefined) {
+      var s = parseInt(info.stock);
+      if (!isNaN(s)) stock = s;
+    }
+    if (stock === null) {
+      // fallback: 기존 findStock
+      var fs = _getBackorderStock(d.product_code);
+      stock = (fs && fs > 0) ? fs : null;
+    }
+    var qty = parseInt(d.quantity) || 0;
+    var isStockIn = (d.status === 'waiting' || d.status === 'partial') && stock !== null && stock >= qty;
+    return { info: info, stock: stock, qty: qty, isStockIn: isStockIn };
+  }
+
   var filtered = data.filter(function(d) {
     if (_boFilterType !== 'all' && d.product_type !== _boFilterType) return false;
     if (_boFilterStatus !== 'all' && d.status !== _boFilterStatus) return false;
@@ -19240,15 +19352,70 @@ function _renderBackorderList(container) {
       var q = _boSearch.toLowerCase();
       if ((d.product_name||'').toLowerCase().indexOf(q) === -1 && (d.customer_name||'').toLowerCase().indexOf(q) === -1 && (d.model||'').toLowerCase().indexOf(q) === -1) return false;
     }
+    if (_boFilterStockIn) {
+      var mm = _meta(d);
+      if (!(d.status === 'waiting' && mm.isStockIn)) return false;
+    }
     return true;
   });
 
   var waitingCount = data.filter(function(d) { return d.status === 'waiting'; }).length;
   var partialCount = data.filter(function(d) { return d.status === 'partial'; }).length;
   var doneCount = data.filter(function(d) { return d.status === 'done'; }).length;
-  var stockInCount = data.filter(function(d) { return (d.status === 'waiting' || d.status === 'partial') && _getBackorderStock(d.product_code) > 0; }).length;
+  var stockInCount = data.filter(function(d) {
+    if (d.status !== 'waiting') return false;
+    var mm = _meta(d);
+    return mm.isStockIn;
+  }).length;
 
-  var h = '<div style="display:block !important;text-align:left !important;">';
+  var h = '<style>'
+    + '#backorders-table { min-width: 1720px; table-layout: fixed; }'
+    + '#backorders-table th.bo-col-check { width: 36px; }'
+    + '#backorders-table th.bo-col-no { width: 40px; }'
+    + '#backorders-table th.bo-col-date { width: 58px; }'
+    + '#backorders-table th.bo-col-cust { width: 130px; }'
+    + '#backorders-table th.bo-col-brand { width: 80px; }'
+    + '#backorders-table th.bo-col-model { width: 130px; }'
+    + '#backorders-table th.bo-col-name { min-width: 200px; }'
+    + '#backorders-table th.bo-col-price { width: 90px; }'
+    + '#backorders-table th.bo-col-stock { width: 65px; }'
+    + '#backorders-table th.bo-col-req { width: 80px; }'
+    + '#backorders-table th.bo-col-box { width: 58px; }'
+    + '#backorders-table th.bo-col-note { width: 100px; }'
+    + '#backorders-table th.bo-col-action { width: 90px; }'
+    + '#backorders-table th.bo-col-done { width: 68px; }'
+    + '#backorders-table th.bo-th-left { text-align: left; padding-left: 12px; }'
+    + '#backorders-table td { vertical-align: middle; padding: 8px; text-align: center; font-size: 13px; }'
+    + '#backorders-table td.bo-td-left { text-align: left; padding-left: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }'
+    + '#backorders-table tr { border-bottom: 1px solid #F0F2F7; }'
+    + '#backorders-table tr.bo-row-stockin { background: rgba(234,243,222,.35); }'
+    + '#backorders-table tr.bo-row-stockin:hover { background: rgba(234,243,222,.55); }'
+    + '#backorders-table tr.bo-row:hover { background: #F4F6FA; }'
+    + '#backorders-table tr.bo-row-done { opacity: 0.5; }'
+    + '#backorders-table tr.bo-row-cancelled { opacity: 0.4; background: #fef5f5; }'
+    + '#backorders-table .bo-type-badge { display:inline-block; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:500; }'
+    + '#backorders-table .bo-type-badge.type-milwaukee { background:#E24B4A; color:#fff; }'
+    + '#backorders-table .bo-type-badge.type-general { background:#E6F1FB; color:#0C447C; }'
+    + '#backorders-table .bo-stockin-marker { display:inline-block; font-size:10px; padding:2px 6px; border-radius:4px; background:#E24B4A; color:#fff; font-weight:500; margin-right:4px; animation: boPulse 2s infinite; }'
+    + '@keyframes boPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }'
+    + '#backorders-table .bo-price-cell { text-align:center; line-height:1.3; }'
+    + '#backorders-table .bo-price-qty { font-size:11px; color:#9BA3B2; margin-bottom:2px; }'
+    + '#backorders-table .bo-price-val { font-size:14px; font-weight:600; color:#0C447C; font-variant-numeric:tabular-nums; }'
+    + '#backorders-table .bo-price-cell.empty .bo-price-qty, #backorders-table .bo-price-cell.empty .bo-price-val { color:#C6CAD3; font-weight:400; }'
+    + '#backorders-table .bo-num-ok { color:#1D9E75; font-weight:500; }'
+    + '#backorders-table .bo-num-lack { color:#CC2222; font-weight:500; }'
+    + '#backorders-table .bo-req-D { display:inline-flex; flex-direction:column; align-items:center; padding:4px 10px; border-radius:6px; min-width:55px; }'
+    + '#backorders-table .bo-req-D .num { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-0.5px; line-height:1; }'
+    + '#backorders-table .bo-req-D .unit { font-size:10px; margin-top:2px; opacity:0.7; }'
+    + '#backorders-table .bo-req-D.met { background:#E1F5EE; color:#085041; }'
+    + '#backorders-table .bo-req-D.over { background:#FCEBEB; color:#791F1F; }'
+    + '#backorders-table .bo-req-D.done { background:#F0F2F7; color:#5A6070; }'
+    + '#backorders-table .bo-note-cell { font-size:11px; color:#666; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }'
+    + '#backorders-table .bo-done-date { font-size:11px; color:#999; }'
+    + '.bo-filter-btn { background:#fff; border:1px solid #DDE1EB; border-radius:6px; padding:4px 12px; font-size:12px; font-weight:500; cursor:pointer; font-family:Pretendard,sans-serif; }'
+    + '</style>';
+
+  h += '<div style="display:block !important;text-align:left !important;">';
   h += '<div style="background:#fff;border:0.5px solid #eee;border-radius:8px;overflow:hidden;">';
 
   // 다크 헤더
@@ -19275,73 +19442,121 @@ function _renderBackorderList(container) {
   ['all','milwaukee','general','import'].forEach(function(t) {
     var label = { all:'전체', milwaukee:'밀워키', general:'일반', 'import':'수입' }[t];
     var isAct = _boFilterType === t;
-    h += '<button onclick="_setBoFilterType(\'' + t + '\')" style="background:' + (isAct?'#1A1D23':'#fff') + ';color:' + (isAct?'#fff':'#5A6070') + ';border:1px solid ' + (isAct?'#1A1D23':'#DDE1EB') + ';border-radius:6px;padding:4px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif;">' + label + '</button>';
+    h += '<button onclick="_setBoFilterType(\'' + t + '\')" class="bo-filter-btn" style="background:' + (isAct?'#1A1D23':'#fff') + ';color:' + (isAct?'#fff':'#5A6070') + ';border-color:' + (isAct?'#1A1D23':'#DDE1EB') + ';">' + label + '</button>';
   });
   h += '<div style="width:1px;height:20px;background:#DDE1EB;margin:0 4px;"></div>';
   ['all','waiting','partial','done'].forEach(function(s) {
     var label = { all:'상태전체', waiting:'대기', partial:'부분', done:'완료' }[s];
     var isAct = _boFilterStatus === s;
-    h += '<button onclick="_setBoFilterStatus(\'' + s + '\')" style="background:' + (isAct?'#1A1D23':'#fff') + ';color:' + (isAct?'#fff':'#5A6070') + ';border:1px solid ' + (isAct?'#1A1D23':'#DDE1EB') + ';border-radius:6px;padding:4px 12px;font-size:12px;font-weight:500;cursor:pointer;font-family:Pretendard,sans-serif;">' + label + '</button>';
+    h += '<button onclick="_setBoFilterStatus(\'' + s + '\')" class="bo-filter-btn" style="background:' + (isAct?'#1A1D23':'#fff') + ';color:' + (isAct?'#fff':'#5A6070') + ';border-color:' + (isAct?'#1A1D23':'#DDE1EB') + ';">' + label + '</button>';
   });
+  h += '<div style="width:1px;height:20px;background:#DDE1EB;margin:0 4px;"></div>';
+  h += '<button id="bo-filter-stockin" class="bo-filter-btn" onclick="_boToggleStockInFilter()" style="background:' + (_boFilterStockIn?'#1D9E75':'#fff') + ';color:' + (_boFilterStockIn?'#fff':'#1D9E75') + ';border-color:#1D9E75;font-weight:600;">🔔 입고 가능만 보기</button>';
   h += '<input type="text" id="bo-search" value="' + (_boSearch||'') + '" placeholder="제품명, 거래처 검색..." autocomplete="off" style="margin-left:auto;width:200px;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;">';
   h += '</div>';
 
   // 테이블
-  h += '<div style="overflow-y:auto;max-height:calc(100vh - 320px);">';
-  h += '<table style="width:100%;border-collapse:collapse;table-layout:fixed;">';
+  h += '<div style="overflow:auto;max-height:calc(100vh - 320px);">';
+  h += '<table id="backorders-table" style="width:100%;border-collapse:collapse;">';
   h += '<thead><tr>';
   var thS = 'padding:10px 8px;font-size:13px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;text-align:center;';
-  h += '<th style="width:36px;'+thS+'"><input type="checkbox" id="bo-check-all" onchange="_boToggleAll(this.checked)"></th>';
-  h += '<th style="width:55px;'+thS+'">상태</th><th style="width:55px;'+thS+'">구분</th>';
-  h += '<th style="width:120px;'+thS+'text-align:left;">모델</th><th style="'+thS+'text-align:left;">제품명</th>';
-  h += '<th style="width:55px;'+thS+'">재고</th><th style="width:90px;'+thS+'">거래처</th>';
-  h += '<th style="width:50px;'+thS+'">요청</th><th style="width:50px;'+thS+'">출고</th>';
-  h += '<th style="width:140px;'+thS+'text-align:left;">비고</th><th style="width:55px;'+thS+'">등록</th>';
-  h += '<th style="width:70px;'+thS+'">처리</th>';
+  h += '<th class="bo-col-check" style="'+thS+'"><input type="checkbox" id="bo-check-all" onchange="_boToggleAll(this.checked)"></th>';
+  h += '<th class="bo-col-no" style="'+thS+'">No</th>';
+  h += '<th class="bo-col-date" style="'+thS+'">날짜</th>';
+  h += '<th class="bo-col-cust bo-th-left" style="'+thS+'text-align:left;">거래처</th>';
+  h += '<th class="bo-col-brand" style="'+thS+'">브랜드</th>';
+  h += '<th class="bo-col-model bo-th-left" style="'+thS+'text-align:left;">모델</th>';
+  h += '<th class="bo-col-name bo-th-left" style="'+thS+'text-align:left;">제품명</th>';
+  h += '<th class="bo-col-price" style="'+thS+'">IN</th>';
+  h += '<th class="bo-col-price" style="'+thS+'">OUT</th>';
+  h += '<th class="bo-col-price" style="'+thS+'">파레트</th>';
+  h += '<th class="bo-col-stock" style="'+thS+'">현재고</th>';
+  h += '<th class="bo-col-req" style="'+thS+'">백오더</th>';
+  h += '<th class="bo-col-box" style="'+thS+'">박스</th>';
+  h += '<th class="bo-col-note bo-th-left" style="'+thS+'text-align:left;">비고</th>';
+  h += '<th class="bo-col-action" style="'+thS+'">처리</th>';
+  h += '<th class="bo-col-done" style="'+thS+'">처리날짜</th>';
   h += '</tr></thead><tbody>';
 
   if (filtered.length === 0) {
-    h += '<tr><td colspan="12" style="padding:40px;text-align:center;color:#9BA3B2;font-size:14px;">백오더 데이터가 없습니다</td></tr>';
+    h += '<tr><td colspan="16" style="padding:40px;text-align:center;color:#9BA3B2;font-size:14px;">백오더 데이터가 없습니다</td></tr>';
   } else {
-    filtered.forEach(function(d) {
-      var stock = _getBackorderStock(d.product_code);
-      var hasStock = stock > 0;
-      var isStockIn = hasStock && (d.status === 'waiting' || d.status === 'partial');
+    filtered.forEach(function(d, idx) {
+      var m = _meta(d);
+      var info = m.info;
+      var stock = m.stock;
+      var qty = m.qty;
+      var isStockIn = m.isStockIn;
       var isDone = d.status === 'done';
       var isCancelled = d.status === 'cancelled';
-      var rowStyle = 'border-bottom:1px solid #F0F2F7;';
-      if (isDone) rowStyle += 'opacity:0.5;';
-      if (isCancelled) rowStyle += 'opacity:0.4;background:#fef5f5;';
-      if (isStockIn) rowStyle += 'background:rgba(234,243,222,0.25);';
-      var stMap = {waiting:{bg:'#FAEEDA',c:'#633806',t:'대기'},partial:{bg:'#E6F1FB',c:'#0C447C',t:'부분'},done:{bg:'#E1F5EE',c:'#085041',t:'완료'},cancelled:{bg:'#F1EFE8',c:'#444441',t:'취소'}};
-      var st = stMap[d.status]||stMap.waiting;
-      var tyMap = {milwaukee:{bg:'#E24B4A',c:'#fff',t:'밀워키'},general:{bg:'#E6F1FB',c:'#0C447C',t:'일반'},'import':{bg:'#EEEDFE',c:'#3C3489',t:'수입'}};
-      var ty = tyMap[d.product_type]||tyMap.milwaukee;
-      var titleStyle = isDone||isCancelled ? 'text-decoration:line-through;color:#999;' : '';
-      var stockInBadge = isStockIn ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#E24B4A;color:#fff;font-weight:500;margin-right:4px;">입고</span>' : '';
-      var stockHtml = hasStock ? '<span style="color:#1D9E75;font-weight:500;">'+stock+'</span>' : '<span style="color:#CC2222;font-size:11px;">없음</span>';
-      var shippedHtml = d.shipped_qty > 0 ? '<span style="color:#0C447C;font-weight:500;">'+d.shipped_qty+'</span>' : '0';
-      var dd = new Date(d.created_at);
-      var dateStr = String(dd.getMonth()+1).padStart(2,'0')+'.'+String(dd.getDate()).padStart(2,'0');
-      var actionHtml = '';
-      if (isDone) { var cd=d.completed_at?new Date(d.completed_at):null; actionHtml=cd?'<span style="font-size:11px;color:#999;">'+String(cd.getMonth()+1).padStart(2,'0')+'.'+String(cd.getDate()).padStart(2,'0')+'</span>':''; }
-      else if (isCancelled) { actionHtml=''; }
-      else if (hasStock && d.status==='waiting') { actionHtml='<button onclick="event.stopPropagation();_shipBackorder('+d.id+','+d.quantity+','+d.shipped_qty+')" style="font-size:11px;padding:4px 10px;border-radius:5px;border:none;background:#1D9E75;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">출고</button>'; }
-      else if (hasStock && d.status==='partial') { actionHtml='<button onclick="event.stopPropagation();_shipBackorder('+d.id+','+d.quantity+','+d.shipped_qty+')" style="font-size:11px;padding:4px 10px;border-radius:5px;border:none;background:#185FA5;color:#fff;cursor:pointer;font-family:Pretendard,sans-serif;">추가출고</button>'; }
-      else { actionHtml='<span style="font-size:11px;color:#999;">재고없음</span>'; }
-      var tdS = 'padding:10px 8px;font-size:13px;';
-      h += '<tr style="'+rowStyle+'" onmouseover="this.style.background=\'#F4F6FA\'" onmouseout="this.style.background=\''+(isStockIn?'rgba(234,243,222,0.25)':isCancelled?'#fef5f5':'#fff')+'\'">';
-      h += '<td style="'+tdS+'text-align:center;"><input type="checkbox" class="bo-check" data-id="'+d.id+'" data-qty="'+d.quantity+'" data-shipped="'+d.shipped_qty+'"'+(isDone||isCancelled?' disabled':'')+' onclick="event.stopPropagation()"></td>';
-      h += '<td style="'+tdS+'text-align:center;"><span style="font-size:11px;padding:2px 7px;border-radius:4px;background:'+st.bg+';color:'+st.c+';font-weight:500;">'+st.t+'</span></td>';
-      h += '<td style="'+tdS+'text-align:center;"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:'+ty.bg+';color:'+ty.c+';font-weight:500;">'+ty.t+'</span></td>';
-      h += '<td style="'+tdS+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.model||d.product_code||'')+'</td>';
-      h += '<td style="'+tdS+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+titleStyle+'">'+stockInBadge+(d.product_name||'')+'</td>';
-      h += '<td style="'+tdS+'text-align:center;">'+stockHtml+'</td>';
-      h += '<td style="'+tdS+'text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(d.customer_name||'')+'</td>';
-      h += '<td style="'+tdS+'text-align:center;">'+d.quantity+'</td><td style="'+tdS+'text-align:center;">'+shippedHtml+'</td>';
-      h += '<td style="'+tdS+'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#666;font-size:12px;">'+(d.note||'')+'</td>';
-      h += '<td style="'+tdS+'text-align:center;font-size:12px;color:#999;">'+dateStr+'</td>';
-      h += '<td style="'+tdS+'text-align:center;">'+actionHtml+'</td></tr>';
+
+      var brand = info ? info.brand : (d.brand || '—');
+      var model = info ? info.model : (d.model || d.product_code || '—');
+      var name = info ? info.name : (d.product_name || '—');
+
+      var rowClass = 'bo-row';
+      if (isDone) rowClass += ' bo-row-done';
+      else if (isCancelled) rowClass += ' bo-row-cancelled';
+      else if (isStockIn) rowClass += ' bo-row-stockin';
+
+      var typeLabel, typeBadgeClass;
+      if (info && info.type === 'milwaukee') { typeLabel = '밀워키'; typeBadgeClass = 'type-milwaukee'; }
+      else if (brand && brand !== '—') { typeLabel = brand; typeBadgeClass = 'type-general'; }
+      else { typeLabel = '—'; typeBadgeClass = 'type-general'; }
+
+      var dateShort = '—';
+      if (d.created_at) {
+        var dd = new Date(d.created_at);
+        if (!isNaN(dd)) dateShort = String(dd.getMonth()+1).padStart(2,'0')+'.'+String(dd.getDate()).padStart(2,'0');
+      }
+      var doneDateShort = '—';
+      if (d.completed_at) {
+        var cd = new Date(d.completed_at);
+        if (!isNaN(cd)) doneDateShort = String(cd.getMonth()+1).padStart(2,'0')+'.'+String(cd.getDate()).padStart(2,'0');
+      }
+
+      var stockDisplay, stockClass;
+      if (stock === null) { stockDisplay = '—'; stockClass = ''; }
+      else if (stock <= 0) { stockDisplay = '0'; stockClass = 'bo-num-lack'; }
+      else if (stock >= qty) { stockDisplay = stock.toLocaleString(); stockClass = 'bo-num-ok'; }
+      else { stockDisplay = stock.toLocaleString(); stockClass = 'bo-num-lack'; }
+
+      var reqClass = 'bo-req-D ';
+      if (isDone) reqClass += 'done';
+      else if (stock !== null && stock >= qty) reqClass += 'met';
+      else reqClass += 'over';
+
+      var escName = String(name).replace(/"/g, '&quot;');
+      var escModel = String(model).replace(/"/g, '&quot;');
+      var escCust = String(d.customer_name || '').replace(/"/g, '&quot;');
+      var escNote = String(d.note || '').replace(/"/g, '&quot;');
+
+      var isMw = info && info.type === 'milwaukee';
+      var inCell = isMw ? _boRenderPriceCell(null, null) : _boRenderPriceCell(info && info.inQty, info && info.inPrice);
+      var outCell = isMw ? _boRenderPriceCell(null, null) : _boRenderPriceCell(info && info.outQty, info && info.outPrice);
+      var palletCell = isMw ? _boRenderPriceCell(null, null) : _boRenderPriceCell(info && info.palletQty, info && info.palletPrice);
+
+      h += '<tr class="' + rowClass + '" data-id="' + d.id + '">';
+      h += '<td><input type="checkbox" class="bo-check" data-id="' + d.id + '" data-qty="' + d.quantity + '" data-shipped="' + (d.shipped_qty || 0) + '"' + (isDone || isCancelled ? ' disabled' : '') + ' onclick="event.stopPropagation()"></td>';
+      h += '<td>' + (idx + 1) + '</td>';
+      h += '<td>' + dateShort + '</td>';
+      h += '<td class="bo-td-left" title="' + escCust + '">' + (d.customer_name || '') + '</td>';
+      h += '<td><span class="bo-type-badge ' + typeBadgeClass + '">' + typeLabel + '</span></td>';
+      h += '<td class="bo-td-left" title="' + escModel + '">' + model + '</td>';
+      h += '<td class="bo-td-left">';
+      if (isStockIn) h += '<span class="bo-stockin-marker">입고</span>';
+      h += '<span title="' + escName + '">' + name + '</span>';
+      h += '</td>';
+      h += '<td>' + inCell + '</td>';
+      h += '<td>' + outCell + '</td>';
+      h += '<td>' + palletCell + '</td>';
+      h += '<td class="' + stockClass + '">' + stockDisplay + '</td>';
+      h += '<td><div class="' + reqClass + '"><div class="num">' + qty.toLocaleString() + '</div><div class="unit">개</div></div></td>';
+      h += '<td>' + (info && info.boxQty ? info.boxQty : '—') + '</td>';
+      h += '<td class="bo-td-left bo-note-cell" title="' + escNote + '">' + (d.note || '—') + '</td>';
+      h += '<td>' + _boRenderActionCell(d, isStockIn) + '</td>';
+      h += '<td class="bo-done-date">' + doneDateShort + '</td>';
+      h += '</tr>';
     });
   }
   h += '</tbody></table></div></div></div>';
