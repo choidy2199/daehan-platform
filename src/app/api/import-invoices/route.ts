@@ -14,10 +14,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '500', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    // 인보이스 목록 + 제품 라인 수 + 배치 번호
+    // 인보이스 목록 + 제품 라인 수 (batch_no는 2nd query로 join)
     let query = supabase
       .from('import_invoices')
-      .select('*, import_invoice_items(count), import_batches(batch_no)', { count: 'exact' })
+      .select('*, import_invoice_items(count)', { count: 'exact' })
       .order('invoice_date', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -28,16 +28,32 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query.range(offset, offset + limit - 1);
     if (error) throw error;
 
+    // batch_no 2nd query — PostgREST 다중 embed 충돌 회피 (d33059d 패턴)
+    const invoiceIds = (data || []).map((d: Record<string, unknown>) => d.id as string).filter(Boolean);
+    const batchMap = new Map<string, string>();
+    if (invoiceIds.length > 0) {
+      const { data: batches } = await supabase
+        .from('import_batches')
+        .select('linked_invoice_id, batch_no')
+        .in('linked_invoice_id', invoiceIds);
+      for (const b of (batches || []) as Array<{ linked_invoice_id: string; batch_no: string }>) {
+        if (b.linked_invoice_id && b.batch_no) batchMap.set(b.linked_invoice_id, b.batch_no);
+      }
+    }
+
     const shaped = (data || []).map((row: Record<string, unknown>) => {
       const itemsArr = row.import_invoice_items as Array<{ count: number }> | null;
       const itemCount = itemsArr && itemsArr.length > 0 ? itemsArr[0].count : 0;
-      const batch = row.import_batches as { batch_no: string } | null;
-      return { ...row, item_count: itemCount, batch_no: batch ? batch.batch_no : null };
+      return { ...row, item_count: itemCount, batch_no: batchMap.get(row.id as string) || null };
     });
 
     return NextResponse.json({ success: true, data: shaped, total: count ?? shaped.length });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = err instanceof Error
+      ? err.message
+      : (err && typeof err === 'object')
+        ? JSON.stringify(err)
+        : String(err);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
