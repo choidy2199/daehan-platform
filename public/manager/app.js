@@ -23106,16 +23106,21 @@ function _ipinv2DoRenderDetail(container) {
   h += '<button onclick="_ipinv2DeleteInvoice()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
   h += '</div></div>';
 
-  // 기본 정보 섹션 (7필드, 2행 자동 줄바꿈)
-  h += '<div style="padding:12px 20px;background:#fff;border-bottom:0.5px solid #eee;">';
-  var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:3px;font-weight:500;';
+  // 상단 2분할 (좌 30%: 기본정보 카드 / 우 70%: 제품 라인 카드)
+  var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:4px;font-weight:500;';
   var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
-  h += '<div style="display:grid;grid-template-columns:repeat(4, minmax(120px, 1fr));gap:10px 10px;">';
-  h += '<div><label style="' + lblS + '">인보이스 번호 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-invno" type="text" value="' + _ipinv2Esc(inv.invoice_no) + '" style="' + inpS + '" placeholder="INV-2026-001" onblur="_ipinv2OnHeaderBlur(\'invoice_no\',this)"></div>';
-  h += '<div><label style="' + lblS + '">공장명 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-factory" type="text" value="' + _ipinv2Esc(inv.factory_name) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'factory_name\',this)"></div>';
-  h += '<div><label style="' + lblS + '">공장 코드</label><input id="ipinv2-f-code" type="text" value="' + _ipinv2Esc(inv.factory_code || '') + '" style="' + inpS + '" placeholder="CODE2" onblur="_ipinv2OnHeaderBlur(\'factory_code\',this)"></div>';
-  // 거래처 (autocomplete, mw_customers DB)
-  h += '<div>';
+  var fieldS = 'margin-bottom:12px;';
+  h += '<div style="display:grid;grid-template-columns:30fr 70fr;gap:12px;padding:12px 20px;background:#F4F6FA;">';
+
+  // 좌 30%: 인보이스 정보 카드
+  h += '<div style="background:#fff;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;">';
+  h += '<div style="background:#1A1D23;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;font-family:Pretendard,sans-serif;">인보이스 정보</div>';
+  h += '<div style="padding:14px;flex:1;">';
+  h += '<div style="' + fieldS + '"><label style="' + lblS + '">인보이스 번호 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-invno" type="text" value="' + _ipinv2Esc(inv.invoice_no) + '" style="' + inpS + '" placeholder="INV-2026-001" onblur="_ipinv2OnHeaderBlur(\'invoice_no\',this)"></div>';
+  h += '<div style="' + fieldS + '"><label style="' + lblS + '">공장명 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-factory" type="text" value="' + _ipinv2Esc(inv.factory_name) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'factory_name\',this)"></div>';
+  h += '<div style="' + fieldS + '"><label style="' + lblS + '">공장 코드</label><input id="ipinv2-f-code" type="text" value="' + _ipinv2Esc(inv.factory_code || '') + '" style="' + inpS + '" placeholder="CODE2" onblur="_ipinv2OnHeaderBlur(\'factory_code\',this)"></div>';
+  // 거래처 (autocomplete, mw_clients DB)
+  h += '<div style="' + fieldS + '">';
   h += '<label style="' + lblS + '">거래처 <span style="color:#CC2222">*</span></label>';
   h += '<div style="position:relative;">';
   h += '<input id="ipinv2-customer-input" type="text" value="' + _ipinv2Esc(inv.customer_name || '') + '" style="' + inpS + '" placeholder="거래처명 검색" autocomplete="off">';
@@ -23123,28 +23128,31 @@ function _ipinv2DoRenderDetail(container) {
   h += '</div>';
   h += '<div id="ipinv2-customer-hint" style="margin-top:2px;font-size:10px;color:#9BA3B2;line-height:1;min-height:10px;">' + (inv.customer_code ? 'CODE2: ' + _ipinv2Esc(inv.customer_code) : '') + '</div>';
   h += '</div>';
-  h += '<div><label style="' + lblS + '">인보이스 일자 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-date" type="date" value="' + _ipinv2Esc((inv.invoice_date || '').substring(0, 10)) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'invoice_date\',this)"></div>';
-  h += '<div><label style="' + lblS + '">할인율 (%)</label><input id="ipinv2-f-discrate" type="number" step="0.01" value="' + (inv.discount_rate || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'discount_rate\',this.value)"></div>';
-  h += '<div><label style="' + lblS + '">팔렛 단가 ($)</label><input id="ipinv2-f-palletunit" type="number" step="0.01" value="' + (inv.pallet_unit_price_usd || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'pallet_unit_price_usd\',this.value)"></div>';
-  h += '</div></div>';
+  h += '<div style="' + fieldS + '"><label style="' + lblS + '">인보이스 일자 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-date" type="date" value="' + _ipinv2Esc((inv.invoice_date || '').substring(0, 10)) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'invoice_date\',this)"></div>';
+  h += '<div style="' + fieldS + '"><label style="' + lblS + '">할인율 (%)</label><input id="ipinv2-f-discrate" type="number" step="0.01" value="' + (inv.discount_rate || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'discount_rate\',this.value)"></div>';
+  h += '<div style="margin-bottom:0;"><label style="' + lblS + '">팔렛 단가 ($)</label><input id="ipinv2-f-palletunit" type="number" step="0.01" value="' + (inv.pallet_unit_price_usd || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'pallet_unit_price_usd\',this.value)"></div>';
+  h += '</div>';
+  h += '</div>';
 
-  // 금액 요약 바 (기본 정보 바로 아래, 다크)
-  h += '<div id="ipinv2-summary-bar" style="padding:10px 20px;background:#1A1D23;color:#fff;display:flex;align-items:center;gap:14px;font-family:Pretendard,sans-serif;flex-wrap:wrap;"></div>';
-
-  // 제품 라인 섹션
-  h += '<div id="ipinv2-items-section" style="padding:0;">';
-  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:0.5px solid #eee;">';
+  // 우 70%: 제품 라인 카드
+  h += '<div id="ipinv2-items-section" style="background:#fff;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1A1D23;color:#fff;">';
   h += '<div style="display:flex;align-items:center;gap:10px;">';
-  h += '<span style="font-size:14px;font-weight:500;color:#1A1D23;">제품 라인</span>';
-  h += '<span id="ipinv2-items-count" style="font-size:12px;color:#5A6070;">(' + _ipinv2CurrentItems.length + '건)</span>';
-  h += '<span id="ipinv2-items-summary" style="font-size:12px;color:#5A6070;"></span>';
+  h += '<span style="font-size:13px;font-weight:600;color:#fff;font-family:Pretendard,sans-serif;">제품 라인</span>';
+  h += '<span id="ipinv2-items-count" style="font-size:11px;color:rgba(255,255,255,0.6);">(' + _ipinv2CurrentItems.length + '건)</span>';
+  h += '<span id="ipinv2-items-summary" style="font-size:11px;color:rgba(255,255,255,0.6);"></span>';
   h += '</div>';
   h += '<div style="display:flex;gap:6px;">';
   h += '<button onclick="_ipinv2OpenPasteModal()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">📋 엑셀 붙여넣기</button>';
   h += '<button onclick="_ipinv2AddItem()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">+ 제품 추가</button>';
   h += '</div></div>';
-  h += '<div id="ipinv2-items-wrap" style="overflow:auto;max-height:calc(100vh - 560px);min-height:160px;"></div>';
+  h += '<div id="ipinv2-items-wrap" style="overflow:auto;max-height:calc(100vh - 480px);min-height:360px;flex:1;"></div>';
   h += '</div>';
+
+  h += '</div>'; // 상단 2분할 끝
+
+  // 금액 요약 바 (다크, 제품 관련 합계)
+  h += '<div id="ipinv2-summary-bar" style="padding:10px 20px;background:#1A1D23;color:#fff;display:flex;align-items:center;gap:14px;font-family:Pretendard,sans-serif;flex-wrap:wrap;"></div>';
 
   // 송금 스케줄 섹션
   h += '<div id="ipinv2-payments-section" style="padding:0;background:#fff;border-top:0.5px solid #eee;">';
