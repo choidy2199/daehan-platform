@@ -69,7 +69,7 @@ export default function AdLabPage() {
       }}
     >
       <SubTabBar active={activeTab} onChange={setActiveTab} />
-      <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 24px' }}>
+      <div style={{ width: '100%', padding: '16px 24px', boxSizing: 'border-box' }}>
         {activeTab === 'budget' && <BudgetTab />}
         {activeTab === 'keyword' && <KeywordTab />}
         {activeTab === 'dashboard' && <DashboardTab />}
