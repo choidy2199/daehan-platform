@@ -25,8 +25,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const linkedInvoiceId = searchParams.get('linked_invoice_id');
     let q = supabase.from('import_po_headers').select('*').order('created_at', { ascending: false });
     if (status && status !== 'all') q = q.eq('status', status);
+    if (linkedInvoiceId) q = q.eq('linked_invoice_id', linkedInvoiceId);
     const { data, error } = await q;
     if (error) throw error;
 

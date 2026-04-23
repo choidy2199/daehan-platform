@@ -21961,20 +21961,13 @@ function _poOpenInvoiceLink(poId) {
           var nextInvNo = prefix + String(maxSeq + 1).padStart(3, '0');
           var today = new Date();
           var dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-          // 공장명 산출: 실제 factory_name 우선 → brand 폴백 → placeholder
-          var brandName = String(po.brand || '').trim();
-          var rawFactoryName = String(po.factory_name || '').trim();
-          var isPlaceholder = !rawFactoryName || rawFactoryName === '(공장명)' || rawFactoryName === '공장명';
-          var factoryName;
-          if (!isPlaceholder) factoryName = rawFactoryName;
-          else if (brandName) factoryName = brandName;
-          else factoryName = '(공장명)';
+          // B-1c-2b: factory_name 대신 customer_* 상속 (공장명 산출 로직 제거)
           return { po: po, invoicePayload: {
             invoice_no: nextInvNo,
-            factory_name: factoryName,
-            factory_code: po.factory_code || null,
             invoice_date: dateStr,
-            memo: '발주서 ' + (po.po_number || '') + '에서 자동 생성'
+            customer_name: po.customer_name || null,
+            customer_code: po.customer_code || null,
+            memo: po.memo || null
           }};
         });
     })
@@ -23350,16 +23343,49 @@ function _ipinv2SaveCustomerFields() {
   var oldName = inv.customer_name || null;
   if (newCode === oldCode && newName === oldName) return; // 변경 없음
 
-  var payload = { id: inv.id, customer_code: newCode, customer_name: newName };
+  var invoiceId = inv.id;
+  var customerName = newName;
+  var customerCode = newCode;
+
+  var payload = { id: invoiceId, customer_code: customerCode, customer_name: customerName };
   fetch('/api/import-invoices', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     .then(function(r) { return r.json(); })
     .then(function(json) {
-      if (json.success && json.data) {
-        _ipinv2CurrentInvoice = json.data;
-        _ipinv2Toast('거래처 저장됨', 'success');
-      } else {
+      if (!json.success || !json.data) {
         _ipinv2Toast((json && json.error) || '거래처 저장 실패', 'error');
+        return;
       }
+      _ipinv2CurrentInvoice = json.data;
+      _ipinv2Toast('거래처 저장됨', 'success');
+
+      // 다크 헤더 갱신 (옵션 B: customer_name 우선)
+      var hdrFc = document.getElementById('ipinv2-hdr-factory');
+      if (hdrFc) hdrFc.textContent = customerName || '';
+
+      // ✨ 역방향 동기화: 연결된 PO 찾아서 업데이트
+      return fetch('/api/import-po?linked_invoice_id=' + encodeURIComponent(invoiceId))
+        .then(function(r) { return r.json(); })
+        .then(function(poData) {
+          if (!poData.success || !poData.data || poData.data.length === 0) return;
+          var promises = poData.data.map(function(po) {
+            return fetch('/api/import-po', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: po.id,
+                customer_name: customerName,
+                customer_code: customerCode
+              })
+            });
+          });
+          return Promise.all(promises);
+        })
+        .then(function() {
+          console.log('[ipinv2] 거래처 역방향 동기화 완료');
+        })
+        .catch(function(err) {
+          console.warn('[ipinv2] 역방향 동기화 실패:', err);
+        });
     })
     .catch(function(e) {
       _ipinv2Toast('네트워크 오류: ' + (e && e.message || e), 'error');
@@ -23415,7 +23441,7 @@ function _ipinv2DoRenderDetail(container) {
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:10px;">';
   h += '<button onclick="_ipinv2CloseDetail()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
   h += '<span id="ipinv2-hdr-invno" style="font-size:14px;font-weight:500;color:#fff;">' + _ipinv2Esc(inv.invoice_no) + '</span>';
-  h += '<span id="ipinv2-hdr-factory" style="font-size:13px;color:rgba(255,255,255,0.7);">' + _ipinv2Esc(inv.factory_name) + '</span>';
+  h += '<span id="ipinv2-hdr-factory" style="font-size:13px;color:rgba(255,255,255,0.7);">' + _ipinv2Esc(inv.customer_name || inv.factory_name || '') + '</span>';
   h += '<span id="ipinv2-hdr-status">' + _ipinv2StatusBadge(inv.status) + '</span>';
   // 수입건 배지 (batch 연결 시만 표시, 클릭 시 수입건V2로 이동)
   if (inv.batch_no || inv.batch_id) {
@@ -23442,8 +23468,6 @@ function _ipinv2DoRenderDetail(container) {
   h += '<div style="background:#1A1D23;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;font-family:Pretendard,sans-serif;">인보이스 정보</div>';
   h += '<div style="padding:14px;flex:1;">';
   h += '<div style="' + fieldS + '"><label style="' + lblS + '">인보이스 번호 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-invno" type="text" value="' + _ipinv2Esc(inv.invoice_no) + '" style="' + inpS + '" placeholder="INV-2026-001" onblur="_ipinv2OnHeaderBlur(\'invoice_no\',this)"></div>';
-  h += '<div style="' + fieldS + '"><label style="' + lblS + '">공장명 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-factory" type="text" value="' + _ipinv2Esc(inv.factory_name) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'factory_name\',this)"></div>';
-  h += '<div style="' + fieldS + '"><label style="' + lblS + '">공장 코드</label><input id="ipinv2-f-code" type="text" value="' + _ipinv2Esc(inv.factory_code || '') + '" style="' + inpS + '" placeholder="CODE2" onblur="_ipinv2OnHeaderBlur(\'factory_code\',this)"></div>';
   // 거래처 (autocomplete, mw_clients DB)
   h += '<div style="' + fieldS + '">';
   h += '<label style="' + lblS + '">거래처 <span style="color:#CC2222">*</span></label>';
@@ -23454,8 +23478,11 @@ function _ipinv2DoRenderDetail(container) {
   h += '<div id="ipinv2-customer-hint" style="margin-top:2px;font-size:10px;color:#9BA3B2;line-height:1;min-height:10px;">' + (inv.customer_code ? 'CODE2: ' + _ipinv2Esc(inv.customer_code) : '') + '</div>';
   h += '</div>';
   h += '<div style="' + fieldS + '"><label style="' + lblS + '">인보이스 일자 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-date" type="date" value="' + _ipinv2Esc((inv.invoice_date || '').substring(0, 10)) + '" style="' + inpS + '" onblur="_ipinv2OnHeaderBlur(\'invoice_date\',this)"></div>';
-  h += '<div style="' + fieldS + '"><label style="' + lblS + '">할인율 (%)</label><input id="ipinv2-f-discrate" type="number" step="0.01" value="' + (inv.discount_rate || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'discount_rate\',this.value)"></div>';
-  h += '<div style="margin-bottom:0;"><label style="' + lblS + '">팔렛 단가 ($)</label><input id="ipinv2-f-palletunit" type="number" step="0.01" value="' + (inv.pallet_unit_price_usd || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'pallet_unit_price_usd\',this.value)"></div>';
+  // 할인율 / 팔렛 단가: 가로 2칸 (B-1c-2b)
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;">';
+  h += '<div><label style="' + lblS + '">할인율 (%)</label><input id="ipinv2-f-discrate" type="number" step="0.01" value="' + (inv.discount_rate || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'discount_rate\',this.value)"></div>';
+  h += '<div><label style="' + lblS + '">팔렛 단가 ($)</label><input id="ipinv2-f-palletunit" type="number" step="0.01" value="' + (inv.pallet_unit_price_usd || 0) + '" style="' + inpS + 'text-align:right;" placeholder="0" onblur="_ipinv2UpdateInvoiceCalcField(\'pallet_unit_price_usd\',this.value)"></div>';
+  h += '</div>';
   h += '</div>';
   h += '</div>';
 
@@ -23525,15 +23552,12 @@ function _ipinv2SaveBasicInfo() {
   var payload = {
     id: inv.id,
     invoice_no: (document.getElementById('ipinv2-f-invno').value || '').trim(),
-    factory_name: (document.getElementById('ipinv2-f-factory').value || '').trim(),
-    factory_code: (document.getElementById('ipinv2-f-code').value || '').trim(),
     invoice_date: document.getElementById('ipinv2-f-date').value,
     customer_code: custVal.code || null,
     customer_name: custVal.name || null,
     // payment_terms / memo UI 제거 (서버 컬럼은 유지, 기존 값 건드리지 않음)
   };
   if (!payload.invoice_no) return alert('인보이스 번호를 입력하세요.');
-  if (!payload.factory_name) return alert('공장명을 입력하세요.');
   if (!payload.invoice_date) return alert('인보이스 일자를 입력하세요.');
 
   var btn = document.getElementById('ipinv2-btn-save');
@@ -23545,7 +23569,7 @@ function _ipinv2SaveBasicInfo() {
       if (res.json.success) {
         _ipinv2CurrentInvoice = res.json.data;
         var hdrNo = document.getElementById('ipinv2-hdr-invno'); if (hdrNo) hdrNo.textContent = res.json.data.invoice_no;
-        var hdrFc = document.getElementById('ipinv2-hdr-factory'); if (hdrFc) hdrFc.textContent = res.json.data.factory_name;
+        var hdrFc = document.getElementById('ipinv2-hdr-factory'); if (hdrFc) hdrFc.textContent = res.json.data.customer_name || res.json.data.factory_name || '';
         _ipinv2Toast('저장되었습니다', 'success');
       } else {
         if (res.json.code === 'DUPLICATE') _ipinv2Toast('이미 등록된 인보이스 번호입니다', 'error');
@@ -23569,9 +23593,9 @@ function _ipinv2OnHeaderBlur(field, el) {
   if (newVal === oldVal) return; // 변경 없음 → 네트워크 요청 스킵
 
   // 필수 필드 공백 방지
-  if ((field === 'invoice_no' || field === 'factory_name' || field === 'invoice_date') && !newVal) {
+  if ((field === 'invoice_no' || field === 'invoice_date') && !newVal) {
     el.style.borderColor = '#CC2222';
-    var label = field === 'invoice_no' ? '인보이스 번호' : field === 'factory_name' ? '공장명' : '인보이스 일자';
+    var label = field === 'invoice_no' ? '인보이스 번호' : '인보이스 일자';
     _ipinv2Toast(label + '는 필수입니다', 'error');
     return;
   }
@@ -23587,7 +23611,6 @@ function _ipinv2OnHeaderBlur(field, el) {
         _ipinv2CurrentInvoice = json.data;
         // 다크 헤더 요소 텍스트 갱신
         if (field === 'invoice_no') { var h1 = document.getElementById('ipinv2-hdr-invno'); if (h1) h1.textContent = newVal; }
-        if (field === 'factory_name') { var h2 = document.getElementById('ipinv2-hdr-factory'); if (h2) h2.textContent = newVal; }
         _ipinv2Toast('저장되었습니다', 'success');
       } else {
         el.style.borderColor = '#CC2222';
