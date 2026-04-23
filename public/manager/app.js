@@ -22943,6 +22943,8 @@ var _ipinv2CostCalc = null;     // /api/import-batches/[id]/cost-calculation 응
 var _ipinv2ErpPreview = null;   // /api/import-batches/[id]/erp-preview 응답 캐시
 var _ipinv2MarginPct = 10;      // 마진율 기본 10% (단일 전역값, 3단계에서 모델별 override 가능)
 var _ipinv2CalcTimer = null;    // FOB 편집 후 원가 재계산 debounce
+// [B-3-2-2c] PO items 캐시 — 관리코드 enrich + 순서 재정렬에 재사용 (할인율 변경 후에도 유지)
+var _ipinv2PoItemsCache = null;
 
 function _ipinv2Esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -23226,88 +23228,118 @@ function _ipinv2CreateNew() {
     .catch(function(e) { alert('인보이스 생성 실패: ' + e.message); });
 }
 
-function _ipinv2OpenDetail(invoiceId) {
+async function _ipinv2OpenDetail(invoiceId) {
   _ipinv2State = { mode: 'detail', currentInvoiceId: invoiceId };
+  _ipinv2PoItemsCache = null; // 인보이스 변경 시 PO 캐시 초기화
   var container = document.getElementById('tab-import-invoice-v2');
   if (!container) return;
   container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
+  var _t0 = performance.now();
 
-  Promise.all([
-    fetch('/api/import-invoices?v=' + Date.now(), { cache: 'no-store' }).then(function(r) { return r.json(); }),
-    fetch('/api/import-invoices/' + invoiceId + '/items', { cache: 'no-store' }).then(function(r) { return r.json(); }),
-  ]).then(async function(results) {
-    var list = (results[0] && results[0].success) ? (results[0].data || []) : [];
-    _ipinv2Invoices = list;
-    _ipinv2CurrentInvoice = list.find(function(x) { return x.id === invoiceId; }) || null;
-    _ipinv2CurrentItems = (results[1] && results[1].success) ? (results[1].data || []) : [];
-    if (!_ipinv2CurrentInvoice) {
-      alert('인보이스를 찾을 수 없습니다.');
-      _ipinv2CloseDetail();
-      return;
-    }
-    // [B-3-2-1] 통관비 로드 + 비었으면 자동 5개 생성 (로드 성공한 경우에만)
-    var customsResult = await _ipinv2LoadCustoms();
-    if (customsResult.loaded && customsResult.count === 0) {
-      await _ipinv2AddDefaultCustomsItems();
-      await _ipinv2LoadCustoms();
-    }
-    // [B-3-2-2] 원가 계산 + 경영박사 미리보기 선로드 (렌더 전)
-    var batchId = _ipinv2GetLinkedBatchId();
-    if (batchId) {
-      try {
-        var calcRes = await Promise.all([
-          fetch('/api/import-batches/' + batchId + '/cost-calculation', { cache: 'no-store' }).then(function(r) { return r.json(); }),
-          fetch('/api/import-batches/' + batchId + '/erp-preview', { cache: 'no-store' }).then(function(r) { return r.json(); }),
-        ]);
-        _ipinv2CostCalc = (calcRes[0] && calcRes[0].success) ? calcRes[0].data : null;
-        _ipinv2ErpPreview = (calcRes[1] && calcRes[1].success) ? calcRes[1].data : null;
-      } catch (e) {
-        console.error('[ipinv2] cost/erp prefetch failed', e);
-        _ipinv2CostCalc = null;
-        _ipinv2ErpPreview = null;
-      }
-    } else {
-      _ipinv2CostCalc = null;
-      _ipinv2ErpPreview = null;
-    }
-    // [B-3-2-2b C] 연결된 PO의 items 순서로 재정렬 (DB line_no가 PO 순서와 다를 때 임시 해결)
-    await _ipinv2ReorderItemsByPo(invoiceId);
-    _ipinv2DoRenderDetail(container);
+  // [B-3-2-2c 로딩 개선 Step 1] invoice list + items 병렬 fetch (기존 유지)
+  var results;
+  try {
+    results = await Promise.all([
+      fetch('/api/import-invoices?v=' + Date.now(), { cache: 'no-store' }).then(function(r) { return r.json(); }),
+      fetch('/api/import-invoices/' + invoiceId + '/items', { cache: 'no-store' }).then(function(r) { return r.json(); }),
+    ]);
+  } catch (e) {
+    alert('인보이스 로드 실패: ' + (e && e.message || e));
+    _ipinv2CloseDetail();
+    return;
+  }
+  var list = (results[0] && results[0].success) ? (results[0].data || []) : [];
+  _ipinv2Invoices = list;
+  _ipinv2CurrentInvoice = list.find(function(x) { return x.id === invoiceId; }) || null;
+  _ipinv2CurrentItems = (results[1] && results[1].success) ? (results[1].data || []) : [];
+  if (!_ipinv2CurrentInvoice) {
+    alert('인보이스를 찾을 수 없습니다.');
+    _ipinv2CloseDetail();
+    return;
+  }
+
+  // [B-3-2-2c 로딩 개선 Step 2] batch_id 획득 후 모든 하위 리소스 병렬
+  var batchId = _ipinv2GetLinkedBatchId();
+  var customsPromise = _ipinv2LoadCustoms();
+  var calcPromise = batchId
+    ? fetch('/api/import-batches/' + batchId + '/cost-calculation', { cache: 'no-store' }).then(function(r) { return r.json(); })
+    : Promise.resolve(null);
+  var erpPromise = batchId
+    ? fetch('/api/import-batches/' + batchId + '/erp-preview', { cache: 'no-store' }).then(function(r) { return r.json(); })
+    : Promise.resolve(null);
+  var poItemsPromise = _ipinv2FetchPoItems(invoiceId);
+
+  var parallel;
+  try {
+    parallel = await Promise.all([customsPromise, calcPromise, erpPromise, poItemsPromise]);
+  } catch (e) {
+    console.error('[ipinv2] parallel fetch failed:', e);
+    parallel = [null, null, null, null];
+  }
+  var customsResult = parallel[0] || { loaded: false };
+  _ipinv2CostCalc = (parallel[1] && parallel[1].success) ? parallel[1].data : null;
+  _ipinv2ErpPreview = (parallel[2] && parallel[2].success) ? parallel[2].data : null;
+  var poItems = parallel[3];
+
+  // Step 3: 통관비 비었으면 기본 5개 생성 (순차 필요)
+  if (customsResult.loaded && customsResult.count === 0) {
+    await _ipinv2AddDefaultCustomsItems();
+    await _ipinv2LoadCustoms();
+  }
+
+  // Step 4: PO items로 enrich (관리코드 + 순서)
+  if (poItems && poItems.length > 0) _ipinv2ApplyPoEnrich(poItems);
+
+  console.log('[PERF] _ipinv2OpenDetail: ' + (performance.now() - _t0).toFixed(0) + 'ms');
+  _ipinv2DoRenderDetail(container);
+}
+
+// [B-3-2-2c] PO items를 _ipinv2PoItemsCache에 저장 + _ipinv2CurrentItems에 관리코드/순서 반영
+// 2-2b의 _ipinv2ReorderItemsByPo 확장: 관리코드 매칭 버그 수정 (PO의 management_code 직접 사용)
+function _ipinv2ApplyPoEnrich(poItems) {
+  if (!Array.isArray(poItems) || poItems.length === 0) return;
+  _ipinv2PoItemsCache = poItems;
+  // model → { sort_order, management_code } 맵 생성
+  var orderMap = {};
+  var mcMap = {};
+  poItems.forEach(function(pi, idx) {
+    var key = String(pi.model || '').trim();
+    if (!key) return;
+    if (orderMap[key] == null) orderMap[key] = (pi.sort_order != null ? Number(pi.sort_order) : idx);
+    if (mcMap[key] == null && pi.management_code) mcMap[key] = String(pi.management_code);
+  });
+  // invoice items에 관리코드 주입 (_po_manage_code)
+  _ipinv2CurrentItems.forEach(function(it) {
+    var key = String(it.model || '').trim();
+    if (key && mcMap[key] && !it._po_manage_code) it._po_manage_code = mcMap[key];
+  });
+  // 순서 재정렬 (매칭 안 되는 건 뒤로)
+  var UNMATCHED = 999999;
+  _ipinv2CurrentItems.sort(function(a, b) {
+    var oa = orderMap[String(a.model || '').trim()];
+    var ob = orderMap[String(b.model || '').trim()];
+    if (oa == null) oa = UNMATCHED + Number(a.line_no || 0);
+    if (ob == null) ob = UNMATCHED + Number(b.line_no || 0);
+    return oa - ob;
   });
 }
 
-// [B-3-2-2b C] 연결 PO의 sort_order 기준으로 _ipinv2CurrentItems 재정렬
-async function _ipinv2ReorderItemsByPo(invoiceId) {
+// [B-3-2-2c] PO items fetch (네트워크 호출). 성공 시 cache + enrich.
+async function _ipinv2FetchPoItems(invoiceId) {
   try {
     var poRes = await fetch('/api/import-po?linked_invoice_id=' + encodeURIComponent(invoiceId), { cache: 'no-store' });
     var poJson = await poRes.json();
-    if (!poJson || !poJson.success) return;
+    if (!poJson || !poJson.success) return null;
     var pos = poJson.data || [];
-    if (pos.length === 0) return; // 연결된 PO 없음 → line_no 순서 유지
-    // 첫 번째 PO의 items 가져오기 (1:1 관계 가정)
+    if (pos.length === 0) return null;
     var po = pos[0];
     var itemsRes = await fetch('/api/import-po/' + po.id + '/items', { cache: 'no-store' });
     var itemsJson = await itemsRes.json();
-    if (!itemsJson || !itemsJson.success) return;
-    var poItems = itemsJson.data || [];
-    if (poItems.length === 0) return;
-    // model → sort_order map 생성 (PO의 model과 invoice의 model이 일치한다고 가정)
-    var orderMap = {};
-    poItems.forEach(function(pi, idx) {
-      var key = String(pi.model || '').trim();
-      if (key && orderMap[key] == null) orderMap[key] = idx;
-    });
-    // _ipinv2CurrentItems 재정렬 (매칭되는 것만; 나머지는 기존 line_no 순서 유지, 뒤로 이동)
-    var UNMATCHED = 999999;
-    _ipinv2CurrentItems.sort(function(a, b) {
-      var oa = orderMap[String(a.model || '').trim()];
-      var ob = orderMap[String(b.model || '').trim()];
-      if (oa == null) oa = UNMATCHED + Number(a.line_no || 0);
-      if (ob == null) ob = UNMATCHED + Number(b.line_no || 0);
-      return oa - ob;
-    });
+    if (!itemsJson || !itemsJson.success) return null;
+    return itemsJson.data || [];
   } catch (e) {
-    console.warn('[ipinv2] PO-based reorder skipped:', e && e.message || e);
+    console.warn('[ipinv2] PO items fetch failed:', e && e.message || e);
+    return null;
   }
 }
 
@@ -23584,21 +23616,47 @@ async function _ipinv2FetchCalcAndErp() {
   _ipinv2RenderErpSection();
 }
 
-// [B-3-2-2b I] 관리코드 획득: 1) item.manage_code → 2) mw_products/mw_gen_products lookup → 3) ''
+// [B-3-2-2c 5] 관리코드 획득 — 매칭 순서:
+// 1) item._po_manage_code (_ipinv2ApplyPoEnrich에서 주입한 PO management_code) ← 가장 정확
+// 2) item.manage_code (DB 직접 저장, 현재는 없음)
+// 3) mw_products lookup — 빈 문자열/null 매칭 방지 강화
+// 4) mw_gen_products lookup
+// 5) '' 반환
+// 이전(2-2b) 버그: p.code/p.model이 undefined일 때 model도 undefined면 undefined===undefined로 매칭 성공 →
+//   전 제품에 첫 번째 제품의 manageCode가 반환되는 경우가 있었음 (model 빈 값 방어 추가).
 function _ipinv2GetManageCode(item) {
-  if (item && item.manage_code) return String(item.manage_code);
+  if (!item) return '';
+  // 1순위: PO enrich
+  if (item._po_manage_code) return String(item._po_manage_code);
+  // 2순위: DB 직접 필드
+  if (item.manage_code) return String(item.manage_code);
+  // 3순위: mw_products / mw_gen_products lookup (빈값 방어 강화)
   try {
-    var model = item && item.model;
-    if (!model) return '';
+    var model = String(item.model || '').trim();
+    if (!model) return ''; // 빈 model은 조기 반환 (undefined 매칭 차단)
     var mw = (typeof loadObj === 'function') ? (loadObj('mw_products', []) || []) : [];
-    if (!Array.isArray(mw)) mw = [];
-    var match = mw.find(function(p) { return p && (p.code === model || p.model === model); });
-    if (match && match.manageCode) return String(match.manageCode);
+    if (Array.isArray(mw)) {
+      var match = mw.find(function(p) {
+        if (!p) return false;
+        if (p.code && String(p.code) === model) return true;
+        if (p.model && String(p.model) === model) return true;
+        return false;
+      });
+      if (match && match.manageCode) return String(match.manageCode);
+    }
     var gen = (typeof loadObj === 'function') ? (loadObj('mw_gen_products', []) || []) : [];
-    if (!Array.isArray(gen)) gen = [];
-    var genMatch = gen.find(function(p) { return p && (p.code === model || p.model === model); });
-    if (genMatch && genMatch.manageCode) return String(genMatch.manageCode);
-  } catch (e) {}
+    if (Array.isArray(gen)) {
+      var genMatch = gen.find(function(p) {
+        if (!p) return false;
+        if (p.code && String(p.code) === model) return true;
+        if (p.model && String(p.model) === model) return true;
+        return false;
+      });
+      if (genMatch && genMatch.manageCode) return String(genMatch.manageCode);
+    }
+  } catch (e) {
+    console.error('[ipinv2] manage code lookup failed:', e);
+  }
   return '';
 }
 
@@ -23657,18 +23715,23 @@ function _ipinv2ExportCostExcel() {
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); return; }
   var calc = _ipinv2CostCalc;
   if (!calc || !calc.items || calc.items.length === 0) return alert('출력할 데이터가 없습니다.');
-  // [B-3-2-2b I] 14컬럼 (관리코드 추가): 모델명 오른쪽에 관리코드 배치
+  // [B-3-2-2c 3] 15컬럼 (할인가 추가): 모델명 오른쪽 관리코드, FOB$ 오른쪽 할인가
   var data = [[
-    'No.', '브랜드', '모델명', '관리코드', '품명', '수량', 'FOB ($)', 'FOB$ 계',
+    'No.', '브랜드', '모델명', '관리코드', '품명', '수량', 'FOB ($)', '할인가 ($)', 'FOB$ 계',
     '배분 (%)', '배분 (₩)', '공급가 (₩)', '공급가계 (₩)', '부가세 (₩)', '마진 (%)', '예상판매 (₩)'
   ]];
   var items = _ipinv2CurrentItems.filter(function(it) { return !it.is_pallet_line; });
   var costMap = _ipinv2BuildCostMap();
+  var discRate = Number((_ipinv2CurrentInvoice && _ipinv2CurrentInvoice.discount_rate) || 0);
+  var discMult = 1 - (discRate / 100);
   items.forEach(function(it, i) {
     var cost = costMap[it.id] || {};
     var qty = Number(it.qty || 0);
     var fobUsd = Number(it.fob_usd || 0);
-    var fobSum = Number((qty * fobUsd).toFixed(2));
+    // [B-3-2-2c 4] FOB$계 = 할인가 × 수량
+    var discountedFob = fobUsd * discMult;
+    var fobSum = Number((discountedFob * qty).toFixed(2));
+    var discCellVal = discRate > 0 && fobUsd > 0 ? Number(discountedFob.toFixed(2)) : '';
     var ratioPct = cost.ratio != null ? Number((cost.ratio * 100).toFixed(2)) : '';
     var allocAmt = cost.cost_alloc != null ? Number(cost.cost_alloc) : '';
     var unitCost = cost.unit_cost != null ? Number(cost.unit_cost) : null;
@@ -23677,7 +23740,7 @@ function _ipinv2ExportCostExcel() {
     var expected = unitCost != null ? Math.round(unitCost * (1 + _ipinv2MarginPct / 100)) : '';
     data.push([
       i + 1, _ipinv2GetBrand(it), it.model || '', _ipinv2GetManageCode(it), it.name || '',
-      qty, fobUsd, fobSum,
+      qty, fobUsd, discCellVal, fobSum,
       ratioPct, allocAmt, unitCost == null ? '' : unitCost, supplyTotal, vat,
       _ipinv2MarginPct, expected,
     ]);
@@ -23722,18 +23785,29 @@ function _ipinv2SendErp() {
   alert('경영박사 전송은 3단계(Phase 3)에서 구현 예정입니다.');
 }
 
-// [B-3-2-2b E] 리사이즈 시작 시 모든 col의 현재 렌더 너비를 고정값으로 박제
-// (table-layout:fixed가 auto-distribute하지 않도록 모든 col에 절대값 부여)
+// [B-3-2-2b E] → [B-3-2-2c 1] 리사이즈 시작 시 모든 col + 테이블 전체 width 박제
+// 2-2b 한계: col width만 박제해도 CSS의 min-width:100%가 테이블을 늘려 다른 col이 재분배됨.
+// 2-2c 수정: (a) CSS min-width:100% 제거 + (b) getBoundingClientRect로 정확한 렌더 폭 측정 +
+// (c) 테이블 전체 width도 sum으로 명시 고정 → 드래그 중 테이블이 늘어나도 다른 col 불변.
 function _ipinv2FreezeAllColWidths(table) {
   if (!table) return;
   var cols = table.querySelectorAll('colgroup col');
   var ths = table.querySelectorAll('thead th');
+  var totalW = 0;
   cols.forEach(function(col, idx) {
-    if (ths[idx]) {
-      var w = ths[idx].offsetWidth;
-      if (w > 0) col.style.width = w + 'px';
-    }
+    if (!ths[idx]) return;
+    // offsetWidth보다 정확한 getBoundingClientRect 사용
+    var rect = ths[idx].getBoundingClientRect();
+    var w = Math.round(rect.width);
+    if (w <= 0) w = parseInt(col.style.width, 10) || 80;
+    col.style.width = w + 'px';
+    totalW += w;
   });
+  // 테이블 전체 width 명시 고정 — 드래그 중 총 폭이 변해도 auto-distribute 방지
+  if (totalW > 0) {
+    table.style.width = totalW + 'px';
+    table.style.minWidth = totalW + 'px';
+  }
 }
 
 // 컬럼 리사이즈 바인딩 (colgroup col 기반)
@@ -23754,9 +23828,17 @@ function _ipinv2BindCostTableEvents() {
       var startWidth = col.offsetWidth || parseInt(col.style.width, 10) || 80;
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
+      // 드래그 시작 시점의 테이블 총 폭 저장
+      var startTableW = parseInt((table.style.width || '0'), 10) || table.offsetWidth;
       function onMove(ev) {
-        var newWidth = Math.max(36, startWidth + (ev.clientX - startX));
+        var delta = ev.clientX - startX;
+        var newWidth = Math.max(36, startWidth + delta);
+        var realDelta = newWidth - startWidth;
         col.style.width = newWidth + 'px';
+        // [B-3-2-2c 1] 테이블 전체 width도 delta만큼 증가 → 다른 col은 고정값 그대로 유지됨
+        var newTableW = Math.max(100, startTableW + realDelta);
+        table.style.width = newTableW + 'px';
+        table.style.minWidth = newTableW + 'px';
       }
       function onUp() {
         document.removeEventListener('mousemove', onMove);
@@ -24293,8 +24375,9 @@ function _ipinv2DeleteInvoice() {
 
 // ── 제품 라인 ──
 // [B-3-2-2] 제품 최종 원가 테이블 (기존 제품 라인 편집기 대체, 수입건V2 _ipbat2RenderCostSection 이관)
-// [B-3-2-2b I] 관리코드 컬럼 추가 (모델명 오른쪽): 13컬럼 → 14컬럼
-// 14컬럼: No | 브랜드 | 모델명 | 관리코드 | 품명 | 수량 | FOB($) | FOB$계 | 배분(%/₩) | 공급가 | 공급가계 | 부가세 | 마진% | 예상판매
+// [B-3-2-2b I] 관리코드 컬럼 추가 → 14컬럼
+// [B-3-2-2c 3+4] 할인가($) 컬럼 추가 (FOB$ 오른쪽) → 15컬럼. FOB$계 = 할인가 × 수량.
+// 15컬럼: No | 브랜드 | 모델명 | 관리코드 | 품명 | 수량 | FOB($) | 할인가($) | FOB$계 | 배분(%/₩) | 공급가 | 공급가계 | 부가세 | 마진% | 예상판매
 function _ipinv2RenderItemsTable() {
   var section = document.getElementById('ipinv2-items-section');
   if (!section) return;
@@ -24330,6 +24413,7 @@ function _ipinv2RenderItemsTable() {
   h += '<col style="width:240px">';  // 품명
   h += '<col style="width:60px">';   // 수량
   h += '<col style="width:72px">';   // FOB$
+  h += '<col style="width:85px">';   // 할인가($) [B-3-2-2c 3]
   h += '<col style="width:95px">';   // FOB$계
   h += '<col style="width:108px">';  // 배분
   h += '<col style="width:95px">';   // 공급가
@@ -24346,6 +24430,7 @@ function _ipinv2RenderItemsTable() {
   h += '<th>품명<div class="col-resize-handle"></div></th>';
   h += '<th>수량<div class="col-resize-handle"></div></th>';
   h += '<th>FOB ($)<div class="col-resize-handle"></div></th>';
+  h += '<th>할인가 ($)<div class="col-resize-handle"></div></th>';
   h += '<th>FOB$ 계<div class="col-resize-handle"></div></th>';
   h += '<th>배분 (%/₩)<div class="col-resize-handle"></div></th>';
   h += '<th class="ipinv2-col-supply">공급가<div class="col-resize-handle"></div></th>';
@@ -24358,8 +24443,12 @@ function _ipinv2RenderItemsTable() {
   // [B-3-2-2b B] 합계바 누적값 (tfoot에서 사용)
   var totQty = 0, totFobSum = 0, totAllocAmt = 0, totSupplyTotal = 0, totVat = 0;
 
+  // [B-3-2-2c 3+4] 할인율 (인보이스 정보의 discount_rate) — 할인가/FOB$계 계산에 사용
+  var discountRate = Number((_ipinv2CurrentInvoice && _ipinv2CurrentInvoice.discount_rate) || 0);
+  var discountMult = 1 - (discountRate / 100); // 예: 6% → 0.94
+
   if (items.length === 0) {
-    h += '<tr><td colspan="14" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다.</td></tr>';
+    h += '<tr><td colspan="15" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다.</td></tr>';
   } else {
     items.forEach(function(it, i) {
       var cost = costMap[it.id] || {};
@@ -24367,8 +24456,13 @@ function _ipinv2RenderItemsTable() {
       var rowCls = isOverflow ? ' class="ipinv2-overflow-row"' : '';
       var qty = Number(it.qty || 0);
       var fobUsd = Number(it.fob_usd || 0);
-      var fobSum = qty * fobUsd;
+      // [B-3-2-2c 3+4] 할인가 = FOB × (1 - discountRate/100), FOB$계 = 할인가 × 수량
+      var discountedFob = fobUsd * discountMult;
+      var fobSum = discountedFob * qty;
       var fobUsdTxt = fobUsd > 0 ? fobUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      var discountedFobTxt = discountRate > 0 && fobUsd > 0
+        ? '$' + discountedFob.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : '-';
       var unitCost = cost.unit_cost != null ? Number(cost.unit_cost) : null;
       // [B-3-2-2b D] 원화는 ₩ 없이 숫자만 (_ipinv2Num 사용)
       var supplyUnitTxt = unitCost != null ? _ipinv2Num(unitCost) : '';
@@ -24398,7 +24492,10 @@ function _ipinv2RenderItemsTable() {
       h += '<td class="left">' + _ipinv2Esc(it.name || '') + '</td>';
       h += '<td>' + _ipinv2Int(qty) + '</td>';
       // [B-3-2-2b F] FOB 단가: readonly (수입가격 고정값, input → 텍스트 셀)
-      h += '<td>' + fobUsdTxt + '</td>';
+      h += '<td>' + (fobUsd > 0 ? '$' + fobUsdTxt : '') + '</td>';
+      // [B-3-2-2c 3] 할인가($) — 할인율 0이면 '-', 그 외 $65.80 형태
+      h += '<td>' + discountedFobTxt + '</td>';
+      // [B-3-2-2c 4] FOB$계 — 할인가 × 수량
       h += '<td>' + (fobSum > 0 ? _ipinv2Money(fobSum) : '') + '</td>';
       // 배분 (%/₩) 통합 셀 — [B-3-2-2b D] 금액은 ₩ 없이 숫자만
       h += '<td class="ipinv2-alloc">';
@@ -24420,7 +24517,7 @@ function _ipinv2RenderItemsTable() {
   }
   h += '</tbody>';
 
-  // [B-3-2-2b B] 합계바 <tfoot> — 14컬럼 정렬
+  // [B-3-2-2b B] 합계바 <tfoot> — [B-3-2-2c] 15컬럼 정렬 (할인가 컬럼 추가)
   // [B-3-2-2b H] 달러 합계는 Math.floor() 절삭 → _ipinv2UsdFloor
   if (items.length > 0) {
     var grandTotal = totSupplyTotal + totVat;
@@ -24429,7 +24526,8 @@ function _ipinv2RenderItemsTable() {
     h += '<td colspan="5" class="tot-label">합계</td>';                          // No~품명 5개 통합
     h += '<td class="tot-cell">' + _ipinv2Int(totQty) + '</td>';                 // 수량
     h += '<td class="tot-cell">-</td>';                                           // FOB($) 단가 — 개별값
-    h += '<td class="tot-cell">' + _ipinv2UsdFloor(totFobSum) + '</td>';          // FOB$계 (달러 절삭)
+    h += '<td class="tot-cell">-</td>';                                           // 할인가($) — 개별값 [B-3-2-2c 3]
+    h += '<td class="tot-cell">' + _ipinv2UsdFloor(totFobSum) + '</td>';          // FOB$계 (달러 절삭, 할인 반영)
     h += '<td class="tot-cell">' + _ipinv2Num(totAllocAmt) + '</td>';             // 배분액
     h += '<td class="tot-cell">-</td>';                                           // 공급가 (단가) — 개별값
     h += '<td class="tot-cell">' + _ipinv2Num(totSupplyTotal) + '</td>';          // 공급가계
@@ -24480,7 +24578,8 @@ function _ipinv2RenderSummaryBar() {
   h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">할인(' + discountRate + '%)</span><span style="' + valS + 'color:#FCA5A5;">-' + _ipinv2Money(discountAmount) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">팔렛(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valS + 'color:#BAE6FD;">+' + _ipinv2Money(palletTotal) + '</span></div>';
-  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:4px 12px;background:rgba(255,255,255,0.08);border-radius:6px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:17px;color:#fff;font-weight:700;">' + _ipinv2Money(finalTotal) + '</span></div>';
+  // [B-3-2-2c 2] 최종 금액 소수점 절삭
+  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:4px 12px;background:rgba(255,255,255,0.08);border-radius:6px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:17px;color:#fff;font-weight:700;">' + _ipinv2UsdFloor(finalTotal) + '</span></div>';
   bar.innerHTML = h;
 }
 
@@ -25841,10 +25940,10 @@ function _ipinv2RenderCombinedSummary() {
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="' + colS + '"><span style="' + lblS + '">팔렛비용(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valSBlue + '">+' + _ipinv2Money(palletTotal) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
-  // 최종 금액 박스 (제품 그룹 마지막)
+  // 최종 금액 박스 (제품 그룹 마지막) — [B-3-2-2c 2] 소수점 절삭 ($72,177.20 → $72,177)
   h += '<div style="display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:#EF9F27;border-radius:6px;">';
   h += '<span style="font-size:10px;color:#1A1D23;font-weight:500;">최종 금액</span>';
-  h += '<span style="font-size:15px;font-weight:700;color:#1A1D23;">' + _ipinv2Money(finalTotal) + '</span>';
+  h += '<span style="font-size:15px;font-weight:700;color:#1A1D23;">' + _ipinv2UsdFloor(finalTotal) + '</span>';
   h += '</div>';
   // === 그룹 구분선 (두꺼운 3px) ===
   h += '<span style="' + sepGroupS + '"></span>';

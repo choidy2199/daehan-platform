@@ -2798,7 +2798,9 @@ body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
 #tab-import-invoice-v2 .ipinv2-cost-table {
   border-collapse: collapse;
   table-layout: fixed;
-  min-width: 100%;
+  /* [B-3-2-2c 1] min-width:100% 제거: 컬럼 드래그 시 다른 col 자동 재분배 방지.
+     wrap에 overflow-x:auto 있으므로 가로 스크롤로 대응 */
+  width: auto;
   font-size: 11.5px;
   font-family: Pretendard, sans-serif;
 }
