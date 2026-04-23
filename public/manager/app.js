@@ -23250,27 +23250,27 @@ async function _ipinv2OpenDetail(invoiceId) {
   container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
   var _t0 = performance.now();
 
-  // [B-3-2-2d 4 최적화] 단계 통합: invoice-list는 batch_id/list 용도만.
-  // invoice-items를 먼저 단독 fetch 후 batch_id 획득 없이 바로 병렬 fetch 구성 시도 —
-  // 하지만 batch_id는 invoice-list 응답에 포함되므로 병렬 2단계 유지 필요.
+  // [B-3-2-2e] 로딩 최적화: invoice-list (전체 1,723ms) → invoice-single (~200ms).
+  // 단건 엔드포인트 /api/import-invoices/{id}는 2-2e에서 신규 생성.
+  // 목록 GET과 동일 응답 스키마 ({ success, data }) 유지하여 find(id) 로직 제거 가능.
   // 제거: erp-preview fetch (2-2에서 섹션 빈 div로 변경됨. 전송 버튼에서 필요 시 지연 로드 가능).
 
-  // Step 1: invoice list + items + PO headers(+items) 병렬 — 3 resource 동시 (batch_id 독립)
-  var invListPromise = _ipinv2MeasuredFetch('/api/import-invoices?v=' + Date.now(), 'invoice-list');
+  // Step 1: invoice-single + items + PO headers(+items) 병렬 — 3 resource 동시
+  var invSinglePromise = _ipinv2MeasuredFetch('/api/import-invoices/' + invoiceId, 'invoice-single');
   var itemsPromise = _ipinv2MeasuredFetch('/api/import-invoices/' + invoiceId + '/items', 'invoice-items');
   var poItemsPromise = _ipinv2FetchPoItems(invoiceId); // 내부에서도 네트워크 2단계지만 invoice와 병렬
 
   var step1;
   try {
-    step1 = await Promise.all([invListPromise, itemsPromise, poItemsPromise]);
+    step1 = await Promise.all([invSinglePromise, itemsPromise, poItemsPromise]);
   } catch (e) {
     alert('인보이스 로드 실패: ' + (e && e.message || e));
     _ipinv2CloseDetail();
     return;
   }
-  var list = (step1[0] && step1[0].success) ? (step1[0].data || []) : [];
-  _ipinv2Invoices = list;
-  _ipinv2CurrentInvoice = list.find(function(x) { return x.id === invoiceId; }) || null;
+  _ipinv2CurrentInvoice = (step1[0] && step1[0].success && step1[0].data) ? step1[0].data : null;
+  // 인보이스V2 목록 화면은 /api/import-invoices 전체 조회를 별도 사용 (이 경로는 영향 없음)
+  // _ipinv2Invoices 캐시는 단건 조회 시 업데이트 안 함 (상세 진입 후 목록 재진입 시 기존 캐시 유지)
   _ipinv2CurrentItems = (step1[1] && step1[1].success) ? (step1[1].data || []) : [];
   var poItems = step1[2];
   if (!_ipinv2CurrentInvoice) {
@@ -23627,57 +23627,67 @@ async function _ipinv2FetchCalcAndErp() {
   _ipinv2RenderErpSection();
 }
 
-// [B-3-2-2d 3] 관리코드 획득 — dual-candidate 매칭 (IMP-2026-01 데이터 구조 대응)
-// 발견: invoice_items.model이 "콜라보" 같은 브랜드/공장명이고, 실제 모델명은 name 필드 첫 토큰에 있음
-// (예: model="콜라보", name="DC660 2HP-통없는모델" → 진짜 모델은 "DC660")
-// 2-2c 버그: 모든 item의 model이 "콜라보"로 동일 → mw_products.find가 첫 매칭(manageCode=2019000001374) 반환 → 전 행 동일 표시
-// 해결: model + name 첫 토큰 2가지 후보로 매칭 시도, 첫 성공값 사용
+// [B-3-2-2e 2] 관리코드 획득 — 임시 개선 (근본 수정은 제품·발주 로직 변경 커밋에서)
+// 배경: IMP-2026-01의 invoice_items.model이 "콜라보" 동일값 → 2-2d 매칭 로직이 첫 제품 반환 반복.
+// 이번 수정:
+// 1) unreliableModels (브랜드/공장명 수준 일반 단어) 제외 — 매칭 시도 안 함
+// 2) name에서 실제 모델 코드 추출 (예: "DC660 2HP-통없는모델" → "DC660") 정규식 개선
+// 3) 매칭 결과가 정확히 1개일 때만 신뢰 — 다수 매칭 시 빈값 반환 (잘못된 동일 코드 반복 방지)
 //
 // 매칭 순서:
-// 1) item._po_manage_code (PO enrich, PO 있을 때만)
+// 1) PO enrich (_po_manage_code) — 가장 정확
 // 2) item.manage_code (DB 직접)
-// 3) mw_products lookup: candidates = [model, name 첫 토큰] 순회, 중복 제거
-// 4) mw_gen_products lookup: 동일
-// 5) '' 반환
+// 3) mw_products + mw_gen_products concat 한 번만 lookup, 신뢰 가능한 candidates 순회
+
+var _IPINV2_UNRELIABLE_MODELS = ['콜라보', '테스트', 'test', 'TEST', '공통', '기타', 'brand', 'BRAND'];
+
 function _ipinv2GetManageCode(item) {
   if (!item) return '';
+  // 1순위: PO enrich
   if (item._po_manage_code) return String(item._po_manage_code);
+  // 2순위: DB 직접 필드
   if (item.manage_code) return String(item.manage_code);
 
-  // 후보 키 리스트 구성 (빈값/중복 제외)
-  var candidates = [];
   var model = String(item.model || '').trim();
   var name = String(item.name || '').trim();
-  if (model) candidates.push(model);
-  if (name) {
-    // name 첫 토큰 ("DC660 2HP-..." → "DC660")
-    var firstTok = name.split(/\s+/)[0];
-    if (firstTok && candidates.indexOf(firstTok) < 0) candidates.push(firstTok);
-  }
-  if (candidates.length === 0) return '';
 
-  function matchIn(list) {
-    if (!Array.isArray(list)) return '';
-    for (var i = 0; i < candidates.length; i++) {
-      var c = candidates[i];
-      var match = list.find(function(p) {
-        if (!p) return false;
-        if (p.code && String(p.code) === c) return true;
-        if (p.model && String(p.model) === c) return true;
-        return false;
-      });
-      if (match && match.manageCode) return String(match.manageCode);
-    }
-    return '';
+  // model 신뢰도 판정: unreliableModels에 포함되면 모델명으로 매칭 시도 안 함
+  var modelIsReliable = !!model && _IPINV2_UNRELIABLE_MODELS.indexOf(model) < 0;
+
+  // name에서 실제 모델 코드 추출 ("DC660 2HP-..." → "DC660")
+  // 규칙: 대문자/숫자로 시작하여 대문자/숫자/하이픈으로 이어지는 첫 토큰
+  var nameToken = '';
+  if (name) {
+    var m = name.match(/^([A-Z0-9][A-Z0-9-]*)/);
+    if (m) nameToken = m[1];
   }
+
+  // 매칭 후보 구성 (신뢰 가능한 것만, 중복 제거)
+  var candidates = [];
+  if (modelIsReliable) candidates.push(model);
+  if (nameToken && candidates.indexOf(nameToken) < 0) candidates.push(nameToken);
+  if (candidates.length === 0) return ''; // 모델/이름 둘 다 신뢰 불가 → 빈값 (⚠ 없음 표시)
 
   try {
     var mw = (typeof loadObj === 'function') ? (loadObj('mw_products', []) || []) : [];
-    var r1 = matchIn(mw);
-    if (r1) return r1;
+    if (!Array.isArray(mw)) mw = [];
     var gen = (typeof loadObj === 'function') ? (loadObj('mw_gen_products', []) || []) : [];
-    var r2 = matchIn(gen);
-    if (r2) return r2;
+    if (!Array.isArray(gen)) gen = [];
+    var all = mw.concat(gen);
+
+    for (var i = 0; i < candidates.length; i++) {
+      var cand = candidates[i];
+      var matches = all.filter(function(p) {
+        if (!p) return false;
+        if (p.code && String(p.code) === cand) return true;
+        if (p.model && String(p.model) === cand) return true;
+        return false;
+      });
+      // [핵심] 정확히 1개 매칭일 때만 신뢰 — 다수 매칭은 애매하므로 다음 candidate로
+      if (matches.length === 1 && matches[0].manageCode) {
+        return String(matches[0].manageCode);
+      }
+    }
   } catch (e) {
     console.error('[ipinv2] manage code lookup failed:', e);
   }
