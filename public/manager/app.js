@@ -23615,17 +23615,13 @@ async function _ipinv2FetchCalcAndErp() {
     _ipinv2RenderErpSection();
     return;
   }
+  // [B-3-2-2d 4] erp-preview 제거 — 섹션이 빈 div로 렌더됨. cost-calc만 fetch.
   try {
-    var results = await Promise.all([
-      fetch('/api/import-batches/' + batchId + '/cost-calculation', { cache: 'no-store' }).then(function(r) { return r.json(); }),
-      fetch('/api/import-batches/' + batchId + '/erp-preview', { cache: 'no-store' }).then(function(r) { return r.json(); }),
-    ]);
-    _ipinv2CostCalc = (results[0] && results[0].success) ? results[0].data : null;
-    _ipinv2ErpPreview = (results[1] && results[1].success) ? results[1].data : null;
+    var calcJson = await fetch('/api/import-batches/' + batchId + '/cost-calculation', { cache: 'no-store' }).then(function(r) { return r.json(); });
+    _ipinv2CostCalc = (calcJson && calcJson.success) ? calcJson.data : null;
   } catch (e) {
-    console.error('[ipinv2] cost/erp fetch failed', e);
+    console.error('[ipinv2] cost fetch failed', e);
     _ipinv2CostCalc = null;
-    _ipinv2ErpPreview = null;
   }
   _ipinv2RenderItemsTable();
   _ipinv2RenderErpSection();
