@@ -118,11 +118,11 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 
 /* 홈 탭 — 다크 라운드 */
 .chrome-tab-home {
-  width: 42px;
-  min-width: 42px;
-  max-width: 42px;
+  width: 24px;
+  min-width: 24px;
+  max-width: 24px;
   border: none;
-  height: 32px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -131,11 +131,15 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
   border-radius: 6px;
   cursor: pointer;
   flex-shrink: 0;
-  margin: 6px 0;
+  margin: 0 0 10px 0;
   transition: background 0.12s;
 }
 .chrome-tab-home:hover { background: #2C2C2A; }
 .chrome-tab-home.active { background: #2C2C2A; }
+.chrome-tab-home svg {
+  width: 14px;
+  height: 14px;
+}
 
 /* 개별 탭 — 독립 카드 */
 .chrome-tab {
