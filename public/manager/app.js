@@ -27563,3 +27563,24 @@ window._tx = _tx;
     tryRender();
   }
 })();
+
+// ============================================================
+// v5.3 Hotfix #4: 편집모드 body class 토글 (CSS 노출 트리거)
+// _enterMwEditMode / _exitMwEditMode 함수 내부 수정 없이 wrapping
+// ============================================================
+(function() {
+  var origEnter = window._enterMwEditMode;
+  var origExit  = window._exitMwEditMode;
+  if (origEnter) {
+    window._enterMwEditMode = function() {
+      document.body.classList.add('mw-edit-active');
+      return origEnter.apply(this, arguments);
+    };
+  }
+  if (origExit) {
+    window._exitMwEditMode = function() {
+      document.body.classList.remove('mw-edit-active');
+      return origExit.apply(this, arguments);
+    };
+  }
+})();

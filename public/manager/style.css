@@ -2591,8 +2591,16 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   flex-wrap: nowrap !important;
 }
 
-/* v5.3 Hotfix #3: .btn-u 와 specificity 충돌 해결 (같은 클래스 2번으로 0,0,2,0) */
-.mw-btn-edit.mw-btn-edit { display: none; }
+/* v5.3 Hotfix #4: 일반모드 숨김 !important + 편집모드 body class로 노출 */
+.mw-btn-edit.mw-btn-edit { display: none !important; }
+
+body.mw-edit-active .mw-btn-edit.mw-btn-edit {
+  display: inline-flex !important;
+}
+body.mw-edit-active div.mw-btn-edit.mw-btn-edit,
+body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
+  display: inline-block !important;
+}
 
 /* 흰색바 입력요소 */
 .lb-search {
