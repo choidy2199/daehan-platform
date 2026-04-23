@@ -8859,8 +8859,28 @@ function mwEditAction(action) {
   }
 
   if (action === 'priceSync') {
-    if (indices.length === 0) { alert('제품을 선택해주세요'); return; }
-    _showPriceSyncModal(indices);
+    // v5.3 Phase 4: 마켓 분기 + 헬퍼 기반 confirm + 모달 1단계 폐기
+    var marketLabels = { naver: '스토어팜', gmarket: '오픈마켓', ssg: 'SSG' };
+    var selectedMarket = window._selectedPriceMarket || 'naver';
+    var marketLabel = marketLabels[selectedMarket] || selectedMarket;
+
+    if (selectedMarket === 'gmarket') {
+      alert('오픈마켓 가격 전송은 아직 지원되지 않습니다.');
+      return;
+    }
+    if (selectedMarket === 'ssg') {
+      alert('SSG 가격 전송은 아직 지원되지 않습니다.');
+      return;
+    }
+
+    // 네이버: 헬퍼로 대상 결정 + confirm (requireSelection: true)
+    var resolved = _resolvePriceActionTargets({
+      actionLabel: '전송',
+      marketLabel: marketLabel,
+      requireSelection: true,
+    });
+    if (!resolved) return;
+    _startPriceSync(resolved.products);
     return;
   }
 }
@@ -8909,7 +8929,30 @@ function _closePriceSyncModal() {
   if (el) el.remove();
 }
 
-async function _startPriceSync() {
+async function _startPriceSync(productsParam) {
+  // v5.3 Phase 4: 외부에서 products 직접 받으면 1단계 모달 우회 — 빈 모달 동적 생성
+  if (productsParam && Array.isArray(productsParam) && productsParam.length > 0) {
+    var oldEl = document.getElementById('price-sync-modal');
+    if (oldEl) oldEl.remove();
+    var html =
+      '<div class="modal-bg show" id="price-sync-modal" style="display:flex;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);z-index:300;justify-content:center;align-items:flex-start;padding-top:60px">' +
+        '<div class="modal" id="price-sync-inner" style="max-width:520px;width:92%;border-radius:10px;background:white;overflow:hidden">' +
+          '<div class="modal-header" style="padding:14px 20px;border-bottom:1px solid #DDE1EB;display:flex;justify-content:space-between;align-items:center">' +
+            '<h3 style="font-size:16px;font-weight:600;margin:0">가격 전송 — ' + productsParam.length + '개 제품</h3>' +
+            '<button onclick="_closePriceSyncModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9BA3B2">&times;</button>' +
+          '</div>' +
+          '<div id="price-sync-body" style="padding:20px"></div>' +
+          // 1단계 마켓 선택 UI 폐기 — 호환성 위해 ps-naver 히든 + checked로 보존
+          '<input type="checkbox" id="ps-naver" checked style="display:none">' +
+        '</div>' +
+      '</div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+    document.getElementById('price-sync-modal')._products = productsParam;
+    var modalElNew = document.getElementById('price-sync-inner');
+    var handleElNew = modalElNew ? modalElNew.querySelector('.modal-header') : null;
+    if (modalElNew && handleElNew && typeof _makeDraggable === 'function') _makeDraggable(modalElNew, handleElNew);
+  }
+
   var modal = document.getElementById('price-sync-modal');
   if (!modal) return;
   var products = modal._products || [];
@@ -23227,8 +23270,45 @@ function _ipinv2OpenDetail(invoiceId) {
       _ipinv2CostCalc = null;
       _ipinv2ErpPreview = null;
     }
+    // [B-3-2-2b C] 연결된 PO의 items 순서로 재정렬 (DB line_no가 PO 순서와 다를 때 임시 해결)
+    await _ipinv2ReorderItemsByPo(invoiceId);
     _ipinv2DoRenderDetail(container);
   });
+}
+
+// [B-3-2-2b C] 연결 PO의 sort_order 기준으로 _ipinv2CurrentItems 재정렬
+async function _ipinv2ReorderItemsByPo(invoiceId) {
+  try {
+    var poRes = await fetch('/api/import-po?linked_invoice_id=' + encodeURIComponent(invoiceId), { cache: 'no-store' });
+    var poJson = await poRes.json();
+    if (!poJson || !poJson.success) return;
+    var pos = poJson.data || [];
+    if (pos.length === 0) return; // 연결된 PO 없음 → line_no 순서 유지
+    // 첫 번째 PO의 items 가져오기 (1:1 관계 가정)
+    var po = pos[0];
+    var itemsRes = await fetch('/api/import-po/' + po.id + '/items', { cache: 'no-store' });
+    var itemsJson = await itemsRes.json();
+    if (!itemsJson || !itemsJson.success) return;
+    var poItems = itemsJson.data || [];
+    if (poItems.length === 0) return;
+    // model → sort_order map 생성 (PO의 model과 invoice의 model이 일치한다고 가정)
+    var orderMap = {};
+    poItems.forEach(function(pi, idx) {
+      var key = String(pi.model || '').trim();
+      if (key && orderMap[key] == null) orderMap[key] = idx;
+    });
+    // _ipinv2CurrentItems 재정렬 (매칭되는 것만; 나머지는 기존 line_no 순서 유지, 뒤로 이동)
+    var UNMATCHED = 999999;
+    _ipinv2CurrentItems.sort(function(a, b) {
+      var oa = orderMap[String(a.model || '').trim()];
+      var ob = orderMap[String(b.model || '').trim()];
+      if (oa == null) oa = UNMATCHED + Number(a.line_no || 0);
+      if (ob == null) ob = UNMATCHED + Number(b.line_no || 0);
+      return oa - ob;
+    });
+  } catch (e) {
+    console.warn('[ipinv2] PO-based reorder skipped:', e && e.message || e);
+  }
 }
 
 function _ipinv2CloseDetail() {
@@ -23467,6 +23547,18 @@ function _ipinv2ScheduleCalc() {
   _ipinv2CalcTimer = setTimeout(function() { _ipinv2FetchCalcAndErp(); }, 200);
 }
 
+// [B-3-2-2b D] 원화 숫자만 (₩ 없이) — 제품 최종 원가 테이블 전용
+function _ipinv2Num(value) {
+  var n = Math.round(Number(value) || 0);
+  return n.toLocaleString('en-US');
+}
+
+// [B-3-2-2b H] 달러 합계 소수점 절삭 (개별 제품은 원본 유지, 합계/총계에만 사용)
+function _ipinv2UsdFloor(value) {
+  var n = Math.floor(Number(value) || 0);
+  return '$' + n.toLocaleString('en-US');
+}
+
 async function _ipinv2FetchCalcAndErp() {
   var batchId = _ipinv2GetLinkedBatchId();
   if (!batchId) {
@@ -23490,6 +23582,24 @@ async function _ipinv2FetchCalcAndErp() {
   }
   _ipinv2RenderItemsTable();
   _ipinv2RenderErpSection();
+}
+
+// [B-3-2-2b I] 관리코드 획득: 1) item.manage_code → 2) mw_products/mw_gen_products lookup → 3) ''
+function _ipinv2GetManageCode(item) {
+  if (item && item.manage_code) return String(item.manage_code);
+  try {
+    var model = item && item.model;
+    if (!model) return '';
+    var mw = (typeof loadObj === 'function') ? (loadObj('mw_products', []) || []) : [];
+    if (!Array.isArray(mw)) mw = [];
+    var match = mw.find(function(p) { return p && (p.code === model || p.model === model); });
+    if (match && match.manageCode) return String(match.manageCode);
+    var gen = (typeof loadObj === 'function') ? (loadObj('mw_gen_products', []) || []) : [];
+    if (!Array.isArray(gen)) gen = [];
+    var genMatch = gen.find(function(p) { return p && (p.code === model || p.model === model); });
+    if (genMatch && genMatch.manageCode) return String(genMatch.manageCode);
+  } catch (e) {}
+  return '';
 }
 
 // 브랜드 획득: 1) item.brand → 2) mw_products lookup → 3) Milwaukee
@@ -23579,52 +23689,13 @@ function _ipinv2ExportCostExcel() {
 }
 
 // ── 경영박사 전송 섹션 ──
+// [B-3-2-2b A] 하단 다크 프리뷰 블록 삭제. 함수/컨테이너는 _ipinv2CopyErpPreview/_ipinv2SendErp 연동 위해 유지.
+// 경영박사 전송 버튼은 섹션 헤더 우측에 있으므로 이 섹션은 빈 div로 렌더.
 function _ipinv2RenderErpSection() {
   var root = document.getElementById('ipinv2-erp-section');
   if (!root) return;
-  var erp = _ipinv2ErpPreview;
-  var h = '';
-  h += '<div style="padding:12px 20px;border-bottom:0.5px solid #eee;background:#fff;">';
-  h += '<span style="font-size:11px;color:#5A6070;letter-spacing:0.04em;font-weight:600;text-transform:uppercase;">경영박사 매입 전표 전송 데이터</span>';
-  h += '</div>';
-
-  h += '<div style="padding:14px 20px;background:#fff;">';
-  if (!erp) {
-    h += '<div style="padding:24px;text-align:center;color:#9BA3B2;font-size:13px;">불러오는 중...</div>';
-  } else {
-    if (!erp.can_send && erp.warnings && erp.warnings.length > 0) {
-      h += '<div style="padding:10px 14px;background:#FAEEDA;color:#633806;border-radius:6px;font-size:12px;margin-bottom:12px;">';
-      h += '<div style="font-weight:500;margin-bottom:4px;">⚠ 전송 불가</div>';
-      erp.warnings.forEach(function(w) { h += '<div>· ' + _ipinv2Esc(w) + '</div>'; });
-      h += '</div>';
-    }
-    if (erp.invoices_erp && erp.invoices_erp.length > 0) {
-      h += '<div style="background:#0F1419;color:#E0E6ED;border-radius:6px;padding:14px;font-family:Menlo,Monaco,monospace;font-size:11px;max-height:320px;overflow-y:auto;">';
-      erp.invoices_erp.forEach(function(inv, i) {
-        h += '<div style="margin-bottom:12px;">';
-        h += '<div style="color:#93C5FD;font-weight:500;">[매입전표 ' + (i + 1) + '] ' + _ipinv2Esc(inv.factory_name) + (inv.factory_code ? ' (' + _ipinv2Esc(inv.factory_code) + ')' : '') + '</div>';
-        h += '<div style="margin-top:4px;color:#9BA3B2;">memo: ' + _ipinv2Esc(inv.memo) + '</div>';
-        h += '<div style="margin-top:4px;color:#E0E6ED;">items: ' + _ipinv2Esc(inv.items) + '</div>';
-        h += '<div style="margin-top:4px;color:#6EE7B7;">공급가 ' + _ipinv2Krw(inv.total_supply) + ' · 부가세 ' + _ipinv2Krw(inv.total_vat) + '</div>';
-        h += '</div>';
-      });
-      h += '</div>';
-    } else if (erp.can_send) {
-      h += '<div style="padding:24px;text-align:center;color:#9BA3B2;font-size:13px;">전송할 데이터가 없습니다.</div>';
-    }
-
-    var totalSupply = (erp.invoices_erp || []).reduce(function(s, i) { return s + Number(i.total_supply || 0); }, 0);
-    var totalVat = (erp.invoices_erp || []).reduce(function(s, i) { return s + Number(i.total_vat || 0); }, 0);
-    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding:12px 14px;background:#F9FAFB;border-radius:6px;">';
-    h += '<div style="font-size:12px;color:#5A6070;">';
-    h += '공급가 합계 <b style="color:#1A1D23;">' + _ipinv2Krw(totalSupply) + '</b> · 부가세 합계 <b style="color:#1A1D23;">' + _ipinv2Krw(totalVat) + '</b>';
-    if (erp.can_send) h += ' <span style="color:#1D9E75;margin-left:8px;">✓ 전송 가능</span>';
-    h += '</div>';
-    h += '<button onclick="_ipinv2CopyErpPreview()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">미리보기 복사</button>';
-    h += '</div>';
-  }
-  h += '</div>';
-  root.innerHTML = h;
+  root.innerHTML = ''; // 내부 다크 블록 전부 제거
+  root.style.display = 'none'; // 공간도 차지하지 않도록 숨김
 }
 
 function _ipinv2CopyErpPreview() {
@@ -23649,6 +23720,20 @@ function _ipinv2SendErp() {
   alert('경영박사 전송은 3단계(Phase 3)에서 구현 예정입니다.');
 }
 
+// [B-3-2-2b E] 리사이즈 시작 시 모든 col의 현재 렌더 너비를 고정값으로 박제
+// (table-layout:fixed가 auto-distribute하지 않도록 모든 col에 절대값 부여)
+function _ipinv2FreezeAllColWidths(table) {
+  if (!table) return;
+  var cols = table.querySelectorAll('colgroup col');
+  var ths = table.querySelectorAll('thead th');
+  cols.forEach(function(col, idx) {
+    if (ths[idx]) {
+      var w = ths[idx].offsetWidth;
+      if (w > 0) col.style.width = w + 'px';
+    }
+  });
+}
+
 // 컬럼 리사이즈 바인딩 (colgroup col 기반)
 function _ipinv2BindCostTableEvents() {
   document.querySelectorAll('#ipinv2-cost-table .col-resize-handle').forEach(function(handle) {
@@ -23658,6 +23743,8 @@ function _ipinv2BindCostTableEvents() {
       var th = handle.parentElement;
       var table = th.closest('table');
       if (!table) return;
+      // [B-3-2-2b E] 드래그 시작 시 모든 col 너비 박제 → 개별 조정 가능
+      _ipinv2FreezeAllColWidths(table);
       var idx = Array.prototype.indexOf.call(th.parentElement.children, th);
       var col = table.querySelectorAll('colgroup col')[idx];
       if (!col) return;
@@ -25040,12 +25127,14 @@ function _ipinv2IsPaymentConfirmed(p) {
   return !!(p && p.status === 'completed');
 }
 
-// DOM 기준 6필드 모두 채워졌는지 (저장 가능 여부 판정)
+// DOM 기준 5필드 모두 채워졌는지 (저장 가능 여부 판정)
+// [B-3-2-2b G] 2-1b 회귀 수정: telegram_fee_krw input이 은행수수료로 통합 제거됨
+// → numFields에서 제거. 이전 배열은 항상 null 반환하여 저장 버튼 영구 비활성 버그 유발.
 function _ipinv2IsPaymentCompleteFromDom(card) {
   if (!card) return false;
   var dateEl = card.querySelector('[data-pay-field="actual_date"]');
   if (!dateEl || !dateEl.value) return false;
-  var numFields = ['actual_usd', 'remittance_krw', 'fee_krw', 'telegram_fee_krw', 'exchange_rate'];
+  var numFields = ['actual_usd', 'remittance_krw', 'fee_krw', 'exchange_rate'];
   for (var i = 0; i < numFields.length; i++) {
     var el = card.querySelector('[data-pay-field="' + numFields[i] + '"]');
     if (!el) return false;
