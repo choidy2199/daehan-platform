@@ -93,6 +93,7 @@ function _renderChromeTabBar() {
     var tab = document.createElement('div');
     tab.className = 'chrome-tab' + (isActive ? ' active' : '');
     tab.setAttribute('data-window', name);
+    tab.setAttribute('data-color', (cfg && cfg.color) ? cfg.color : 'gray');
     tab.setAttribute('title', name);
     tab.setAttribute('draggable', 'true');
     tab.onclick = function() { _chromeActivateTab(name); };
