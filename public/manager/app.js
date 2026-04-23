@@ -8653,18 +8653,15 @@ function _computeStatsForChannel(channel, products, channelMap, failedFlag) {
   return s;
 }
 
+/* === Phase 3 이전 원본 백업 (2026-04-24) ===
 async function _mwPriceCollect() {
-  // v5.3: 선택된 마켓만 수집
   var marketLabels = { naver: '스토어팜', gmarket: '오픈마켓', ssg: 'SSG' };
   var selectedMarket = window._selectedPriceMarket || 'naver';
   var marketLabel = marketLabels[selectedMarket] || selectedMarket;
-
-  // 오픈마켓 미구현 — 안내 후 중단
   if (selectedMarket === 'gmarket') {
     alert('오픈마켓 가격 수집은 아직 지원되지 않습니다.');
     return;
   }
-
   var btn = document.getElementById('mw-edit-pricecollect-btn');
   if (!btn) return;
   alert(marketLabel + ' 가격 수집을 시작합니다.\n약 15~30초 소요됩니다.');
@@ -8675,18 +8672,15 @@ async function _mwPriceCollect() {
     var res = await fetch('/api/price-collect?channels=' + selectedMarket);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var data = await res.json();
-    // 기존 _priceCollectMap 보존하면서 선택 마켓만 갱신 (다른 마켓 셀 색칠 유지)
     if (!_priceCollectMap) _priceCollectMap = {};
     if (data[selectedMarket] && data[selectedMarket].results) {
       _priceCollectMap[selectedMarket] = data[selectedMarket].results;
     }
     var marketFailed = !data[selectedMarket] || !!data[selectedMarket].error;
     var products = (DB && DB.products) ? DB.products : [];
-    // 선택 마켓만 stats 재계산 — 나머지 마켓 stats는 보존
     _priceCollectStatsByMarket[selectedMarket] = _computeStatsForChannel(selectedMarket, products, _priceCollectMap[selectedMarket], marketFailed);
     var stats = _priceCollectStatsByMarket[selectedMarket];
     _priceCollectStats = stats;
-    // 테이블 리렌더링 — 뱃지에 도트/태그 반영 (편집모드 체크박스 보존)
     var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
     if (typeof renderCatalog === 'function') renderCatalog();
     if (_mwEditMode) {
@@ -8701,6 +8695,89 @@ async function _mwPriceCollect() {
     }
     _updatePriceStatusBar();
     alert('가격 수집 완료 (' + marketLabel + ')\n전체: ' + stats.total + '건\n일치: ' + stats.match + ' | 차이: ' + stats.diff + ' | 품절: ' + stats.soldout + ' | 없음: ' + stats.notreg + ' | 실패: ' + stats.fail);
+  } catch (err) {
+    console.error('[가격수집] 오류:', err);
+    alert('가격 수집 실패: ' + (err.message || err));
+  } finally {
+    btn.textContent = origText;
+    btn.disabled = false;
+  }
+}
+=== 백업 끝 === */
+
+async function _mwPriceCollect() {
+  // v5.3 Phase 3: 헬퍼 기반 — 선택/전체 자동 결정 + ?codes= 파라미터 활용
+  var marketLabels = { naver: '스토어팜', gmarket: '오픈마켓', ssg: 'SSG' };
+  var selectedMarket = window._selectedPriceMarket || 'naver';
+  var marketLabel = marketLabels[selectedMarket] || selectedMarket;
+
+  // 오픈마켓 미구현 안내 후 중단
+  if (selectedMarket === 'gmarket') {
+    alert('오픈마켓 가격 수집은 아직 지원되지 않습니다.');
+    return;
+  }
+
+  // 헬퍼: 대상 결정 + 미리보기 confirm (수집은 selection 강제 안 함)
+  var resolved = _resolvePriceActionTargets({
+    actionLabel: '수집',
+    marketLabel: marketLabel,
+    requireSelection: false,
+  });
+  if (!resolved) return;
+  var targetProducts = resolved.products;
+  var targetCodes = resolved.codes;
+  var isSelection = resolved.isSelection;
+
+  var btn = document.getElementById('mw-edit-pricecollect-btn');
+  if (!btn) return;
+  var origText = btn.textContent;
+  btn.textContent = '수집 중...';
+  btn.disabled = true;
+  try {
+    // fetch URL: 선택 시 ?codes=, 전체 시 codes 생략
+    var url = '/api/price-collect?channels=' + selectedMarket;
+    if (isSelection && targetCodes.length > 0) {
+      url += '&codes=' + encodeURIComponent(targetCodes.join(','));
+    }
+    var res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+
+    // _priceCollectMap 갱신 — 선택은 병합, 전체는 덮어쓰기
+    if (!_priceCollectMap) _priceCollectMap = {};
+    var newResults = (data[selectedMarket] && data[selectedMarket].results) || {};
+    if (isSelection) {
+      if (!_priceCollectMap[selectedMarket]) _priceCollectMap[selectedMarket] = {};
+      Object.assign(_priceCollectMap[selectedMarket], newResults);
+    } else {
+      _priceCollectMap[selectedMarket] = newResults;
+    }
+
+    var marketFailed = !data[selectedMarket] || !!data[selectedMarket].error;
+    var allProducts = (DB && DB.products) ? DB.products : [];
+    // alert용 stats: 수집 대상(targetProducts) 기준
+    var stats = _computeStatsForChannel(selectedMarket, targetProducts, _priceCollectMap[selectedMarket], marketFailed);
+    // 뱃지 카운트용: 전체 products 기준
+    _priceCollectStatsByMarket[selectedMarket] = _computeStatsForChannel(selectedMarket, allProducts, _priceCollectMap[selectedMarket], marketFailed);
+    _priceCollectStats = _priceCollectStatsByMarket[selectedMarket];
+
+    // 편집모드 체크박스 보존
+    var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
+    if (typeof renderCatalog === 'function') renderCatalog();
+    if (_mwEditMode) {
+      _enterMwEditMode();
+      if (_savedChecked && _savedChecked.length) {
+        _savedChecked.forEach(function(idx) {
+          var cb = document.querySelector('.mw-edit-cb[value="' + idx + '"]');
+          if (cb) cb.checked = true;
+        });
+        updateMwEditSelection();
+      }
+    }
+    _updatePriceStatusBar();
+    alert('가격 수집 완료 (' + marketLabel + ')\n\n' +
+      '수집: ' + targetProducts.length.toLocaleString() + '건\n' +
+      '일치: ' + stats.match + ' | 차이: ' + stats.diff + ' | 품절: ' + stats.soldout + ' | 없음: ' + stats.notreg + ' | 실패: ' + stats.fail);
   } catch (err) {
     console.error('[가격수집] 오류:', err);
     alert('가격 수집 실패: ' + (err.message || err));
