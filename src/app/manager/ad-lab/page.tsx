@@ -238,7 +238,7 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{ marginBottom: 20, width: '100%' }}>
       <div
         style={{
           background: C.dark,
@@ -249,6 +249,8 @@ function Section({
           alignItems: 'center',
           justifyContent: 'space-between',
           borderRadius: '6px 6px 0 0',
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
@@ -266,6 +268,8 @@ function Section({
           borderTop: 'none',
           borderRadius: '0 0 6px 6px',
           padding: 16,
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         {children}
@@ -550,6 +554,7 @@ function BudgetTab() {
           gridTemplateColumns: '1fr 1fr 1fr',
           gap: 12,
           marginBottom: 20,
+          width: '100%',
         }}
       >
         <KpiCard
@@ -813,6 +818,7 @@ function KwActive() {
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 12,
           marginBottom: 20,
+          width: '100%',
         }}
       >
         <KpiCard label="운영 중" value="23개" sub="현재 광고가 돌고 있는 키워드" />
@@ -1097,6 +1103,7 @@ function DashboardTab() {
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: 12,
           marginBottom: 20,
+          width: '100%',
         }}
       >
         <KpiCard
@@ -1141,20 +1148,33 @@ function Heatmap() {
     return C.danger;
   };
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ borderCollapse: 'separate', borderSpacing: 2, margin: '0 auto' }}>
+    <div style={{ width: '100%' }}>
+      <table
+        style={{
+          width: '100%',
+          tableLayout: 'fixed',
+          borderCollapse: 'separate',
+          borderSpacing: 3,
+        }}
+      >
+        <colgroup>
+          <col style={{ width: 28 }} />
+          {Array.from({ length: 24 }).map((_, h) => (
+            <col key={h} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
-            <th style={{ width: 28 }} />
+            <th />
             {Array.from({ length: 24 }).map((_, h) => (
               <th
                 key={h}
                 style={{
-                  width: 18,
                   fontSize: 10,
                   color: C.textHint,
                   fontWeight: 500,
                   paddingBottom: 4,
+                  textAlign: 'center',
                 }}
               >
                 {h}
@@ -1180,8 +1200,7 @@ function Heatmap() {
                 <td
                   key={h}
                   style={{
-                    width: 18,
-                    height: 18,
+                    height: 24,
                     background: colorOf(di, h),
                     borderRadius: 2,
                   }}
@@ -1269,10 +1288,11 @@ function CompetitorBars() {
           <div
             style={{
               display: 'flex',
-              height: 28,
+              height: 32,
               borderRadius: 4,
               overflow: 'hidden',
               border: `1px solid ${C.border}`,
+              width: '100%',
             }}
           >
             <div
@@ -1533,6 +1553,7 @@ function SettingTab() {
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
             gap: 14,
+            width: '100%',
           }}
         >
           {guards.map((g) => (
