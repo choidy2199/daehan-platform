@@ -68,6 +68,7 @@ export default function AdLabPage() {
         fontFeatureSettings: "'tnum' 1",
       }}
     >
+      <style>{`.content { width: 100% !important; }`}</style>
       <SubTabBar active={activeTab} onChange={setActiveTab} />
       <div style={{ width: '100%' }}>
         {activeTab === 'budget' && <BudgetTab />}
