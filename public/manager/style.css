@@ -2718,3 +2718,23 @@ body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
 /* 카운트 텍스트 */
 .count-text { font-size: 11.5px; color: #9BA3B2; margin-right: 4px; }
 .count-text.selected { color: #EF9F27; font-weight: 700; font-size: 12px; }
+
+/* ================================================================
+   [B-3-2-1] 인보이스V2 중단 4분할 그리드 (인보이스 20 : 1차 30 : 2차 30 : 통관비 20)
+   ================================================================ */
+#tab-import-invoice-v2 .ipinv2-mid-grid {
+  display: grid;
+  grid-template-columns: 2fr 3fr 3fr 2fr;
+  gap: 14px;
+  padding: 14px 20px;
+  background: #F4F6FA;
+}
+#tab-import-invoice-v2 .ipinv2-panel-card {
+  min-height: 0; /* grid 내부 flex 체인에서 overflow 정상 작동 */
+  min-width: 0; /* 좁은 컬럼에서 input/content 오버플로 방지 */
+}
+@media (max-width: 1280px) {
+  #tab-import-invoice-v2 .ipinv2-mid-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

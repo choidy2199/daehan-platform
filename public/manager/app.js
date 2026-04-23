@@ -23110,7 +23110,7 @@ function _ipinv2OpenDetail(invoiceId) {
   Promise.all([
     fetch('/api/import-invoices?v=' + Date.now(), { cache: 'no-store' }).then(function(r) { return r.json(); }),
     fetch('/api/import-invoices/' + invoiceId + '/items', { cache: 'no-store' }).then(function(r) { return r.json(); }),
-  ]).then(function(results) {
+  ]).then(async function(results) {
     var list = (results[0] && results[0].success) ? (results[0].data || []) : [];
     _ipinv2Invoices = list;
     _ipinv2CurrentInvoice = list.find(function(x) { return x.id === invoiceId; }) || null;
@@ -23120,6 +23120,12 @@ function _ipinv2OpenDetail(invoiceId) {
       _ipinv2CloseDetail();
       return;
     }
+    // [B-3-2-1] 통관비 로드 + 비었으면 자동 5개 생성 (로드 성공한 경우에만)
+    var customsResult = await _ipinv2LoadCustoms();
+    if (customsResult.loaded && customsResult.count === 0) {
+      await _ipinv2AddDefaultCustomsItems();
+      await _ipinv2LoadCustoms();
+    }
     _ipinv2DoRenderDetail(container);
   });
 }
@@ -23128,7 +23134,214 @@ function _ipinv2CloseDetail() {
   _ipinv2State = { mode: 'list', currentInvoiceId: null };
   _ipinv2CurrentInvoice = null;
   _ipinv2CurrentItems = [];
+  _ipinv2Customs = []; // [B-3-2-1]
   _ipinv2RenderList();
+}
+
+// ========================================
+// [B-3-2-1] 통관비 관련 함수 (수입건V2 _ipbat2* 복제, 3단계에서 invoice 기반으로 전환)
+// ========================================
+
+function _ipinv2GetLinkedBatchId() {
+  var inv = _ipinv2CurrentInvoice;
+  return (inv && inv.batch_id) || null;
+}
+
+async function _ipinv2LoadCustoms() {
+  var batchId = _ipinv2GetLinkedBatchId();
+  if (!batchId) {
+    _ipinv2Customs = [];
+    return { loaded: false, reason: 'no-batch' };
+  }
+  try {
+    var res = await fetch('/api/import-batches/' + batchId + '/customs-costs', { cache: 'no-store' });
+    var j = await res.json();
+    _ipinv2Customs = (j && j.data) || [];
+    return { loaded: true, count: _ipinv2Customs.length };
+  } catch (e) {
+    console.error('[ipinv2] customs load failed', e);
+    _ipinv2Customs = [];
+    return { loaded: false, reason: 'network-error' };
+  }
+}
+
+async function _ipinv2AddDefaultCustomsItems() {
+  var batchId = _ipinv2GetLinkedBatchId();
+  if (!batchId) return;
+  for (var i = 0; i < _IPINV2_DEFAULT_CUSTOMS.length; i++) {
+    var d = _IPINV2_DEFAULT_CUSTOMS[i];
+    try {
+      await fetch('/api/import-batches/' + batchId + '/customs-costs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item_order: i + 1,
+          item_name: d.item_name,
+          amount_krw: 0,
+          classification: 'cost',
+        }),
+      });
+    } catch (e) {
+      console.error('[ipinv2] default customs insert failed', e);
+    }
+  }
+}
+
+function _ipinv2RenderCustomsSection() {
+  var root = document.getElementById('ipinv2-customs-section');
+  if (!root) return;
+  var list = _ipinv2Customs;
+  var total = list.reduce(function(s, c) { return s + Number(c.amount_krw || 0); }, 0);
+  var countEl = document.getElementById('ipinv2-customs-count');
+  if (countEl) countEl.textContent = '(' + list.length + '건)';
+
+  var h = '';
+  h += '<div style="flex:1;overflow-y:auto;">';
+  h += '<table style="width:100%;border-collapse:collapse;font-family:Pretendard,sans-serif;">';
+  var thS = 'padding:6px 8px;font-size:11px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:1;';
+  h += '<thead><tr>';
+  h += '<th style="' + thS + 'width:28px;text-align:center;">No.</th>';
+  h += '<th style="' + thS + 'text-align:center;">비용 항목</th>';
+  h += '<th style="' + thS + 'width:100px;text-align:center;">금액 (₩)</th>';
+  h += '<th style="' + thS + 'width:30px;text-align:center;"></th>';
+  h += '</tr></thead><tbody>';
+  if (list.length === 0) {
+    h += '<tr><td colspan="4" style="padding:24px 12px;text-align:center;color:#9BA3B2;font-size:12px;">통관 비용이 없습니다.</td></tr>';
+  } else {
+    var tdS = 'padding:4px 6px;font-size:12px;color:#1A1D23;border-bottom:1px solid #F0F2F7;';
+    var inpS = 'width:100%;height:26px;border:1px solid transparent;border-radius:4px;padding:0 6px;font-size:12px;font-family:Pretendard,sans-serif;background:transparent;box-sizing:border-box;';
+    list.forEach(function(c, i) {
+      var isVat = c.classification === 'vat';
+      var rowBg = isVat ? 'background:#FCEBEB;' : '';
+      h += '<tr data-cust-id="' + c.id + '" style="' + rowBg + '">';
+      h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
+      h += '<td style="' + tdS + 'text-align:center;"><input data-field="item_name" value="' + _ipinv2Esc(c.item_name) + '" style="' + inpS + '" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2UpdateCustomsBlur(event,\'' + c.id + '\')"></td>';
+      var amtFormatted = c.amount_krw > 0 ? Number(c.amount_krw).toLocaleString('en-US') : '';
+      h += '<td style="' + tdS + 'text-align:center;"><input type="text" inputmode="numeric" data-field="amount_krw" value="' + amtFormatted + '" placeholder="0" style="' + inpS + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipinv2UpdateCustomsBlur(event,\'' + c.id + '\')" oninput="_ipinv2FormatCustomsAmount(this)" onkeydown="_ipinv2CustomsAmountKeydown(event,\'' + c.id + '\')"></td>';
+      h += '<td style="' + tdS + 'text-align:center;"><button onclick="_ipinv2DeleteCustomsCost(\'' + c.id + '\')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid #F0D2D2;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">✕</button></td>';
+      h += '</tr>';
+    });
+  }
+  h += '</tbody></table>';
+  h += '</div>';
+
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:10px;border-top:0.5px solid #F0F2F7;margin-top:10px;">';
+  h += '<button onclick="_ipinv2AddCustomsCost()" style="font-size:12px;padding:5px 10px;border-radius:4px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">+ 항목 추가</button>';
+  h += '<div style="padding:6px 12px;background:#1A1D23;color:#fff;border-radius:4px;display:flex;align-items:center;gap:8px;">';
+  h += '<span style="font-size:10px;color:rgba(255,255,255,0.7);">합계</span>';
+  h += '<span data-customs-sum style="font-size:13px;font-weight:600;">' + _ipinv2Krw(total) + '</span>';
+  h += '</div>';
+  h += '</div>';
+
+  root.innerHTML = h;
+}
+
+function _ipinv2AddCustomsCost() {
+  var batchId = _ipinv2GetLinkedBatchId();
+  if (!batchId) return;
+  var nextOrder = _ipinv2Customs.length > 0
+    ? Math.max.apply(null, _ipinv2Customs.map(function(c) { return c.item_order || 0; })) + 1
+    : 1;
+  fetch('/api/import-batches/' + batchId + '/customs-costs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_order: nextOrder, item_name: '(비용 항목)', amount_krw: 0, classification: 'cost' }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json && json.success && json.data) {
+        _ipinv2Customs.push(json.data);
+        _ipinv2RenderCustomsSection();
+        _ipinv2ScheduleCustomsCalc();
+      } else {
+        alert((json && json.error) || '추가 실패');
+      }
+    });
+}
+
+function _ipinv2UpdateCustomsBlur(ev, id) {
+  var inp = ev.target;
+  inp.style.border = '1px solid transparent';
+  var field = inp.getAttribute('data-field');
+  var val = field === 'amount_krw'
+    ? (Number((inp.value || '').replace(/,/g, '')) || 0)
+    : (inp.value || '').trim();
+  var old = _ipinv2Customs.find(function(c) { return c.id === id; });
+  if (!old) return;
+  if (String(val) === String(old[field] == null ? '' : old[field])) return;
+  var batchId = _ipinv2GetLinkedBatchId();
+  if (!batchId) return;
+  var payload = { id: id };
+  payload[field] = val;
+  fetch('/api/import-batches/' + batchId + '/customs-costs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json && json.success) {
+        var idx = _ipinv2Customs.findIndex(function(c) { return c.id === id; });
+        if (idx >= 0) _ipinv2Customs[idx] = json.data;
+        // [B-2b-ux-fix2 패턴] 재렌더 생략 (focus 유실 방지). 합계 span만 직접 업데이트.
+        var root = document.getElementById('ipinv2-customs-section');
+        if (root) {
+          var total = _ipinv2Customs.reduce(function(s, c) { return s + Number(c.amount_krw || 0); }, 0);
+          var sumEl = root.querySelector('[data-customs-sum]');
+          if (sumEl) sumEl.textContent = _ipinv2Krw(total);
+        }
+        _ipinv2ScheduleCustomsCalc();
+      } else {
+        alert((json && json.error) || '수정 실패');
+      }
+    });
+}
+
+function _ipinv2FormatCustomsAmount(inp) {
+  var raw = (inp.value || '').replace(/[^0-9]/g, '');
+  if (!raw) { inp.value = ''; return; }
+  inp.value = Number(raw).toLocaleString('en-US');
+}
+
+function _ipinv2CustomsAmountKeydown(ev, id) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  var allAmountInputs = document.querySelectorAll('#ipinv2-customs-section input[data-field="amount_krw"]');
+  var currentIdx = -1;
+  for (var i = 0; i < allAmountInputs.length; i++) {
+    if (allAmountInputs[i] === ev.target) { currentIdx = i; break; }
+  }
+  ev.target.blur();
+  if (currentIdx >= 0) {
+    setTimeout(function() {
+      var freshInputs = document.querySelectorAll('#ipinv2-customs-section input[data-field="amount_krw"]');
+      var nextInput = freshInputs[currentIdx + 1];
+      if (nextInput) { nextInput.focus(); nextInput.select(); }
+    }, 100);
+  }
+}
+
+function _ipinv2DeleteCustomsCost(id) {
+  if (!confirm('이 통관 비용 항목을 삭제하시겠습니까?')) return;
+  var batchId = _ipinv2GetLinkedBatchId();
+  if (!batchId) return;
+  fetch('/api/import-batches/' + batchId + '/customs-costs?id=' + encodeURIComponent(id), { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json && json.success) {
+        _ipinv2Customs = _ipinv2Customs.filter(function(c) { return c.id !== id; });
+        _ipinv2RenderCustomsSection();
+        _ipinv2ScheduleCustomsCalc();
+      } else {
+        alert((json && json.error) || '삭제 실패');
+      }
+    });
+}
+
+function _ipinv2ScheduleCustomsCalc() {
+  // [B-3-2-1] 3단계에서 원가 계산 API 트리거 예정. 이번 커밋에선 no-op.
+  if (_ipinv2CustomsCalcTimer) clearTimeout(_ipinv2CustomsCalcTimer);
+  _ipinv2CustomsCalcTimer = setTimeout(function() { /* Phase 3: _ipinv2FetchCostCalc(); */ }, 200);
 }
 
 // ── 거래처 자동완성 (mw_customers DB, 경영박사 매입 거래처) ──
@@ -23475,16 +23688,19 @@ function _ipinv2DoRenderDetail(container) {
   // 상단 통합 다크 표시바 (B-1d-3 v2: 최상단 이동, 제품/송금 2그룹)
   h += '<div id="ipinv2-combined-summary" style="padding:14px 20px;background:#1A1D23;color:#fff;border-radius:8px;margin:10px 20px;font-family:Pretendard,sans-serif;display:flex;align-items:center;gap:20px;flex-wrap:wrap;"></div>';
 
-  // 상단 2분할 (좌 30%: 기본정보 카드 / 우 70%: 제품 라인 카드)
+  // [B-3-2-1] 중단 4분할 (인보이스 20 : 1차 30 : 2차 30 : 통관비 20) + 하단 제품 라인
   var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:4px;font-weight:500;';
   var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
   var fieldS = 'margin-bottom:12px;';
-  h += '<div style="display:grid;grid-template-columns:30fr 70fr;gap:12px;padding:12px 20px;background:#F4F6FA;">';
+  var panelHeadS = 'background:#1A1D23;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;font-family:Pretendard,sans-serif;display:flex;align-items:center;justify-content:space-between;';
+  var panelCardS = 'background:#fff;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-height:0;';
 
-  // 좌 30%: 인보이스 정보 카드
-  h += '<div style="background:#fff;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;">';
-  h += '<div style="background:#1A1D23;color:#fff;padding:10px 14px;font-size:13px;font-weight:600;font-family:Pretendard,sans-serif;">인보이스 정보</div>';
-  h += '<div style="padding:14px;flex:1;">';
+  h += '<div class="ipinv2-mid-grid">';
+
+  // [1/4] 인보이스 정보 카드 (20%)
+  h += '<div id="ipinv2-invoice-info" class="ipinv2-panel-card" style="' + panelCardS + '">';
+  h += '<div style="' + panelHeadS + '"><span>인보이스 정보</span></div>';
+  h += '<div style="padding:14px;flex:1;overflow-y:auto;">';
   h += '<div style="' + fieldS + '"><label style="' + lblS + '">인보이스 번호 <span style="color:#CC2222">*</span></label><input id="ipinv2-f-invno" type="text" value="' + _ipinv2Esc(inv.invoice_no) + '" style="' + inpS + '" placeholder="INV-2026-001" onblur="_ipinv2OnHeaderBlur(\'invoice_no\',this)"></div>';
   // 거래처 (autocomplete, mw_clients DB)
   h += '<div style="' + fieldS + '">';
@@ -23504,8 +23720,34 @@ function _ipinv2DoRenderDetail(container) {
   h += '</div>';
   h += '</div>';
 
-  // 우 70%: 제품 라인 카드
-  h += '<div id="ipinv2-items-section" style="background:#fff;border:1px solid #DDE1EB;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;">';
+  // [2/4] 1차 송금 카드 (30%)
+  h += '<div id="ipinv2-payment-1" class="ipinv2-panel-card" style="' + panelCardS + '">';
+  h += '<div style="' + panelHeadS + '"><span>1차 송금</span><span id="ipinv2-pay-count" style="font-size:11px;color:rgba(255,255,255,0.6);font-weight:400;">(0회 완료)</span></div>';
+  h += '<div style="padding:14px;flex:1;display:flex;flex-direction:column;gap:8px;overflow-y:auto;">';
+  h += '<div data-pay-group="1" style="display:flex;flex-direction:column;gap:8px;"></div>';
+  h += '<button onclick="_ipinv2AddPaymentToGroup(1)" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;align-self:flex-start;">+ 1차 분할 추가</button>';
+  h += '</div>';
+  h += '</div>';
+
+  // [3/4] 2차 송금 카드 (30%)
+  h += '<div id="ipinv2-payment-2" class="ipinv2-panel-card" style="' + panelCardS + '">';
+  h += '<div style="' + panelHeadS + '"><span>2차 송금</span></div>';
+  h += '<div style="padding:14px;flex:1;display:flex;flex-direction:column;gap:8px;overflow-y:auto;">';
+  h += '<div data-pay-group="2" style="display:flex;flex-direction:column;gap:8px;"></div>';
+  h += '<button onclick="_ipinv2AddPaymentToGroup(2)" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;align-self:flex-start;">+ 2차 분할 추가</button>';
+  h += '</div>';
+  h += '</div>';
+
+  // [4/4] 통관비 카드 (20%) — NEW
+  h += '<div id="ipinv2-customs" class="ipinv2-panel-card" style="' + panelCardS + '">';
+  h += '<div style="' + panelHeadS + '"><span>통관 비용</span><span id="ipinv2-customs-count" style="font-size:11px;color:rgba(255,255,255,0.6);font-weight:400;">(0건)</span></div>';
+  h += '<div id="ipinv2-customs-section" style="padding:12px;flex:1;display:flex;flex-direction:column;min-height:0;"></div>';
+  h += '</div>';
+
+  h += '</div>'; // end ipinv2-mid-grid
+
+  // 하단: 제품 라인 테이블 (기존 _ipinv2RenderItemsTable이 ipinv2-items-wrap에 렌더. 2-2에서 제품 최종 원가로 교체 예정)
+  h += '<div id="ipinv2-items-section" style="background:#fff;border-top:0.5px solid #eee;display:flex;flex-direction:column;">';
   h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1A1D23;color:#fff;">';
   h += '<div style="display:flex;align-items:center;gap:10px;">';
   h += '<span style="font-size:13px;font-weight:600;color:#fff;font-family:Pretendard,sans-serif;">제품 라인</span>';
@@ -23516,36 +23758,10 @@ function _ipinv2DoRenderDetail(container) {
   h += '<button onclick="_ipinv2OpenPasteModal()" style="font-size:12px;padding:6px 10px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;">📋 엑셀 붙여넣기</button>';
   h += '<button onclick="_ipinv2AddItem()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#378ADD;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">+ 제품 추가</button>';
   h += '</div></div>';
-  h += '<div id="ipinv2-items-wrap" style="overflow:auto;max-height:calc(100vh - 480px);min-height:360px;flex:1;"></div>';
-  h += '</div>';
+  h += '<div id="ipinv2-items-wrap" style="overflow:auto;min-height:280px;"></div>';
+  h += '</div>'; // end ipinv2-items-section
 
-  h += '</div>'; // 상단 2분할 끝
-
-  // 송금 스케줄 섹션 (B-1d-2: 좌우 50:50 분할, 1차/2차)
-  h += '<div id="ipinv2-payments-section" style="padding:0;background:#fff;border-top:0.5px solid #eee;">';
-  // 섹션 헤더 ([+ 분할 추가] 버튼 제거, 카운터만 유지)
-  h += '<div style="display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:0.5px solid #eee;">';
-  h += '<span style="font-size:11px;color:#5A6070;letter-spacing:0.04em;font-weight:600;text-transform:uppercase;">송금 스케줄</span>';
-  h += '<span id="ipinv2-pay-count" style="font-size:12px;color:#5A6070;">(0회 완료)</span>';
-  h += '</div>';
-  // 좌우 50:50 분할 컨테이너
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px 20px;">';
-  // 좌 50%: 1차 송금 (seq 홀수)
-  h += '<div style="display:flex;flex-direction:column;gap:10px;">';
-  h += '<div style="padding:8px 12px;background:#1A1D23;color:#fff;border-radius:6px;font-size:12px;font-weight:600;font-family:Pretendard,sans-serif;">1차 송금</div>';
-  h += '<div data-pay-group="1" style="display:flex;flex-direction:column;gap:8px;"></div>';
-  h += '<button onclick="_ipinv2AddPaymentToGroup(1)" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;align-self:flex-start;">+ 1차 분할 추가</button>';
-  h += '</div>';
-  // 우 50%: 2차 송금 (seq 짝수)
-  h += '<div style="display:flex;flex-direction:column;gap:10px;">';
-  h += '<div style="padding:8px 12px;background:#1A1D23;color:#fff;border-radius:6px;font-size:12px;font-weight:600;font-family:Pretendard,sans-serif;">2차 송금</div>';
-  h += '<div data-pay-group="2" style="display:flex;flex-direction:column;gap:8px;"></div>';
-  h += '<button onclick="_ipinv2AddPaymentToGroup(2)" style="font-size:12px;padding:6px 12px;border-radius:6px;background:#fff;color:#185FA5;border:1px solid #185FA5;cursor:pointer;font-family:Pretendard,sans-serif;align-self:flex-start;">+ 2차 분할 추가</button>';
-  h += '</div>';
-  h += '</div>';
-  h += '</div>';
-
-  h += '</div>';
+  h += '</div>'; // end outer wrapper (line 23668 open)
 
   // 모달 자리
   h += '<div id="ipinv2-modal-root"></div>';
@@ -23557,6 +23773,7 @@ function _ipinv2DoRenderDetail(container) {
 
   _ipinv2RenderItemsTable();
   _ipinv2RenderSummaryBar();
+  _ipinv2RenderCustomsSection(); // [B-3-2-1]
   _ipinv2BindAcOutsideClick();
   _ipinv2BindCustomerInput();
   _ipinv2LoadPayments(_ipinv2CurrentInvoice.id);
