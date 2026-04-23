@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAllNaverProductsMap } from '@/lib/naver';
 import { getSsgProductList, getSsgPrice } from '@/lib/ssg';
 
-// GET /api/price-collect?channels=naver,ssg
+// GET /api/price-collect?channels=naver,ssg&codes=C1,C2  (codes 옵션, 미지정 시 전체)
 // 응답: { naver: { total, results: { [code]: { price, status } } }, ssg: {...}, timestamp }
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const channelsParam = searchParams.get('channels') || 'naver,ssg';
     const channels = channelsParam.split(',').map(s => s.trim()).filter(Boolean);
+
+    // v5.3: 선택 코드만 수집 (없으면 전체 — 하위 호환)
+    const codesParam = searchParams.get('codes') || '';
+    const codeFilter: Set<string> | null = codesParam
+      ? new Set(codesParam.split(',').map(s => s.trim()).filter(Boolean))
+      : null;
 
     const tasks: Array<{ name: string; promise: Promise<any> }> = [];
 
@@ -19,13 +25,14 @@ export async function GET(request: NextRequest) {
           const map = await getAllNaverProductsMap();
           const results: Record<string, { price: number; status: string }> = {};
           for (const [code, p] of map) {
+            if (codeFilter && !codeFilter.has(code)) continue;
             const cp = p?.channelProducts?.[0];
             if (!cp) continue;
             const price = Number(cp.salePrice) || 0;
             const status = String(cp.statusType || '');
             results[code] = { price, status };
           }
-          return { total: map.size, results };
+          return { total: codeFilter ? codeFilter.size : map.size, results };
         })(),
       });
     }
@@ -43,10 +50,12 @@ export async function GET(request: NextRequest) {
             if (!code || !itemId) continue;
             ssgMap[code] = { itemId, status: String(p.sellStatCd ?? '') };
           }
-          // 2) 배치 단위 getSsgPrice 병렬 조회
+          // 2) 배치 단위 getSsgPrice 병렬 조회 (codeFilter 적용 시 호출 건수 감소)
           const BATCH_SIZE = 20;
           const BATCH_DELAY = 200; // ms
-          const codes = Object.keys(ssgMap);
+          const codes = codeFilter
+            ? Object.keys(ssgMap).filter(c => codeFilter.has(c))
+            : Object.keys(ssgMap);
           const results: Record<string, { price: number | null; status: string }> = {};
           const tBatch0 = Date.now();
           for (let i = 0; i < codes.length; i += BATCH_SIZE) {
@@ -74,7 +83,7 @@ export async function GET(request: NextRequest) {
             }
           }
           console.log(`[SSG price batch] ${codes.length}건 조회 완료 ${Date.now() - tBatch0}ms`);
-          return { total: products.length, results };
+          return { total: codeFilter ? codes.length : products.length, results };
         })(),
       });
     }
