@@ -2738,3 +2738,188 @@ body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* ================================================================
+   [B-3-2-2] 인보이스V2 제품 최종 원가 13컬럼 테이블
+   ================================================================ */
+#tab-import-invoice-v2 .ipinv2-cost-header {
+  background: #1A1D23;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#tab-import-invoice-v2 .ipinv2-cost-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: Pretendard, sans-serif;
+}
+#tab-import-invoice-v2 .ipinv2-cost-title .count {
+  color: rgba(255,255,255,0.6);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+#tab-import-invoice-v2 .ipinv2-cost-actions {
+  display: flex;
+  gap: 8px;
+}
+#tab-import-invoice-v2 .ipinv2-cost-actions button {
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 5px;
+  border: 1px solid #1D9E75;
+  background: #fff;
+  color: #1D9E75;
+  cursor: pointer;
+  font-family: Pretendard, sans-serif;
+  font-weight: 500;
+}
+#tab-import-invoice-v2 .ipinv2-cost-actions .ipinv2-btn-erp {
+  background: #1D9E75;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+}
+#tab-import-invoice-v2 .ipinv2-cost-actions .ipinv2-btn-erp:disabled {
+  background: #6B7280;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 13컬럼 테이블 */
+#tab-import-invoice-v2 .ipinv2-cost-table-wrap {
+  overflow-x: auto;
+  background: #fff;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 100%;
+  font-size: 11.5px;
+  font-family: Pretendard, sans-serif;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table th {
+  padding: 8px 6px;
+  background: #EAECF2;
+  color: #1A1D23;
+  font-weight: 700;
+  font-size: 10.5px;
+  text-align: center;
+  white-space: nowrap;
+  position: relative;
+  border-right: 1px solid #D5D9E3;
+  user-select: none;
+  overflow: hidden;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #F0F2F7;
+  border-right: 1px solid #F5F6F9;
+  text-align: right;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #1A1D23;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table td.center { text-align: center; }
+#tab-import-invoice-v2 .ipinv2-cost-table td.left { text-align: left; padding-left: 10px; }
+#tab-import-invoice-v2 .ipinv2-cost-table td.model { font-weight: 600; }
+
+/* 컬럼 리사이즈 핸들 */
+#tab-import-invoice-v2 .ipinv2-cost-table .col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table .col-resize-handle:hover { background: rgba(24,95,165,0.15); }
+#tab-import-invoice-v2 .ipinv2-cost-table .col-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  right: 2px;
+  width: 2px;
+  height: 60%;
+  background: #B5BCCA;
+  transition: background 0.15s;
+  border-radius: 1px;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table .col-resize-handle:hover::after { background: #185FA5; width: 3px; }
+
+/* 3컬럼 동일 연주황 (공급가/공급가계/부가세) */
+#tab-import-invoice-v2 .ipinv2-cost-table th.ipinv2-col-supply,
+#tab-import-invoice-v2 .ipinv2-cost-table td.ipinv2-col-supply {
+  background: #FDF4E8;
+  color: #6B3A0E;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table td.ipinv2-col-supply { font-weight: 600; }
+
+/* 마진 / 예상판매 */
+#tab-import-invoice-v2 .ipinv2-cost-table th.ipinv2-col-margin { background: #E8F1FC; color: #0C447C; }
+#tab-import-invoice-v2 .ipinv2-cost-table th.ipinv2-col-sell { background: #E1F5EE; color: #085041; }
+#tab-import-invoice-v2 .ipinv2-cost-table td.ipinv2-col-sell { color: #085041; font-weight: 700; }
+
+/* 배분 통합 셀 */
+#tab-import-invoice-v2 .ipinv2-cost-table td.ipinv2-alloc {
+  text-align: center;
+  padding: 4px 6px;
+}
+#tab-import-invoice-v2 .ipinv2-alloc-pct {
+  font-size: 13px;
+  font-weight: 800;
+  color: #1A1D23;
+  line-height: 1.15;
+  letter-spacing: -0.2px;
+}
+#tab-import-invoice-v2 .ipinv2-alloc-amt {
+  font-size: 10px;
+  color: #5A6070;
+  margin-top: 1px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* 오차 흡수 행 */
+#tab-import-invoice-v2 .ipinv2-cost-table tr.ipinv2-overflow-row {
+  background: rgba(29,158,117,0.05);
+}
+
+/* FOB 입력 */
+#tab-import-invoice-v2 .ipinv2-cost-table input.ipinv2-fob-input {
+  width: 100%;
+  border: 1px solid transparent;
+  padding: 3px 5px;
+  font-size: 11.5px;
+  text-align: right;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  border-radius: 3px;
+  background: transparent;
+  box-sizing: border-box;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table input.ipinv2-fob-input:hover { border-color: #DDE1EB; }
+#tab-import-invoice-v2 .ipinv2-cost-table input.ipinv2-fob-input:focus { border-color: #185FA5; outline: none; }
+
+/* 마진 input */
+#tab-import-invoice-v2 .ipinv2-cost-table input.ipinv2-margin-input {
+  width: 44px;
+  height: 24px;
+  border: 1px solid #185FA5;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  text-align: right;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
