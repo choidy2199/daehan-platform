@@ -2659,6 +2659,22 @@ body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
   background: #EAEDF3;
   color: #1A1D23;
 }
+
+/* v5.3 Hotfix #6: 편집 도구 그룹 (마켓탭 + 가격수집/전송) — 편집모드 전용 */
+.lb-edit-tools {
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: #FFF9E6;
+  border: 1px dashed #EF9F27;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+/* Hotfix #4의 div.mw-btn-edit.mw-btn-edit { display:inline-block !important } 덮어쓰기 */
+body.mw-edit-active .lb-edit-tools.mw-btn-edit {
+  display: flex !important;
+}
+
 /* v5.3 Hotfix #5: ps-mt-active + data-market 기반 (app.js와 클래스 동기화) */
 .lb-market .lb-market-btn.ps-mt-active {
   color: white;

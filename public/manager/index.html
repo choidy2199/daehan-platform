@@ -295,22 +295,22 @@ document.head.appendChild(s);
         </div>
       </div>
       <div class="dark-right" style="display:flex;gap:6px;align-items:center">
+        <!-- 좌측: 라벨/카운트 -->
         <span class="sector-badge mw-btn-normal">제품</span>
-
-        <!-- 일반모드 -->
         <span class="count-text mw-btn-normal" id="catalog-count">0건</span>
-        <div class="sep mw-btn-normal"></div>
-        <button class="btn-u d-primary mw-btn-normal" onclick="showProductManageModal()">+ 제품 등록</button>
-        <button id="mw-edit-toggle-btn" class="btn-u d-success mw-btn-normal" onclick="toggleMwEditMode()">✎ 수정</button>
-
-        <!-- 편집모드 (초기 숨김) -->
         <span id="catalog-count-edit" class="count-text selected mw-btn-edit" style="display:none">0개 선택</span>
+
+        <!-- 편집모드 — 일괄 액션 -->
         <div class="sep mw-btn-edit" style="display:none"></div>
-        <button class="btn-u d-primary mw-btn-edit" style="display:none" onclick="mwEditAction('modify')">✎ 일괄 수정</button>
+        <button class="btn-u d-primary mw-btn-edit" style="display:none" onclick="mwEditAction('modify')">✎ 수정</button>
         <button class="btn-u d-danger mw-btn-edit" style="display:none" onclick="mwEditAction('delete')">🗑 삭제</button>
         <button class="btn-u d-base mw-btn-edit" style="display:none" onclick="mwEditAction('discontinue')">◼ 단종</button>
         <div class="sep mw-btn-edit" style="display:none"></div>
-        <button class="btn-u d-danger mw-btn-edit" style="display:none" onclick="toggleMwEditMode()">✕ 편집종료</button>
+
+        <!-- 우측: 항상 표시되는 [+ 제품 등록] + 모드별 [✎ 수정] / [✓ 확인] -->
+        <button class="btn-u d-primary" onclick="showProductManageModal()">+ 제품 등록</button>
+        <button id="mw-edit-toggle-btn" class="btn-u d-success mw-btn-normal" onclick="toggleMwEditMode()">✎ 수정</button>
+        <button class="btn-u d-success mw-btn-edit" style="display:none" onclick="toggleMwEditMode()">✓ 확인</button>
 
         <!-- 호환성: updateDeleteBtn() null 참조 방지용 영구 숨김 (DOM 유지) -->
         <button id="btn-delete-selected" onclick="deleteSelectedProducts()" style="display:none !important">선택 삭제</button>
@@ -328,15 +328,6 @@ document.head.appendChild(s);
         <select class="select lb-select" id="catalog-sub" onchange="renderCatalog()">
           <option value="">전체 중분류</option>
         </select>
-
-        <div class="sep-light"></div>
-
-        <!-- [그룹2] 마켓 선택 -->
-        <div class="lb-market">
-          <button class="lb-market-btn ps-market-tab ps-mt-active" data-market="naver">스토어팜</button>
-          <button class="lb-market-btn ps-market-tab" data-market="gmarket">오픈마켓</button>
-          <button class="lb-market-btn ps-market-tab" data-market="ssg">SSG</button>
-        </div>
 
         <div class="sep-light"></div>
 
@@ -375,14 +366,16 @@ document.head.appendChild(s);
         <div class="lb-spacer"></div>
         <div class="sep-light"></div>
 
-        <!-- [그룹4] 액션 -->
-        <div class="lb-action-group">
-          <div class="market-ctx">
-            <span id="mw-ctx-market" class="ctx-market" style="background:#E1F5EE;color:#085041">스토어팜</span>
-            <span id="mw-ctx-suffix">기준</span>
+        <!-- [그룹4] 편집 도구 — 편집모드 전용 (마켓탭 + 가격수집/전송) -->
+        <div class="lb-edit-tools mw-btn-edit" style="display:none">
+          <!-- 마켓 선택 (이벤트 위임 #mw-price-status-bar .ps-market-tab 매칭 유지) -->
+          <div class="lb-market">
+            <button class="lb-market-btn ps-market-tab ps-mt-active" data-market="naver">스토어팜</button>
+            <button class="lb-market-btn ps-market-tab" data-market="gmarket">오픈마켓</button>
+            <button class="lb-market-btn ps-market-tab" data-market="ssg">SSG</button>
           </div>
-          <button id="mw-edit-pricecollect-btn" class="btn-u l-outline" onclick="mwEditAction('priceCollect')">▼ 가격 수집</button>
-          <button id="mw-edit-pricesync-btn" class="btn-u l-danger mw-btn-edit" style="display:none" onclick="mwEditAction('priceSync')">▲ 가격 전송</button>
+          <button id="mw-edit-pricecollect-btn" class="btn-u l-outline mw-btn-edit" onclick="mwEditAction('priceCollect')">▼ 가격 수집</button>
+          <button id="mw-edit-pricesync-btn" class="btn-u l-danger mw-btn-edit" onclick="mwEditAction('priceSync')">▲ 가격 전송</button>
         </div>
       </div>
       <div class="table-scroll" style="flex:1;overflow-y:auto;overflow-x:auto;min-height:0">
