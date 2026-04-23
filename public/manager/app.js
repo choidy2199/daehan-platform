@@ -25325,7 +25325,7 @@ function _ipbat2DoRenderDetail(container) {
   h += '<div style="display:flex;align-items:center;gap:10px;">';
   h += '<button onclick="_ipbat2CloseDetail()" style="font-size:12px;padding:5px 12px;border-radius:6px;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">← 목록</button>';
   h += '<span style="font-size:14px;font-weight:500;color:#fff;">' + _ipbat2Esc(b.batch_no) + '</span>';
-  h += '<span style="font-size:13px;color:rgba(255,255,255,0.7);">' + _ipbat2Esc(b.batch_name || '-') + '</span>';
+  h += '<span style="font-size:13px;color:rgba(255,255,255,0.7);">' + _ipbat2Esc(b.linked_invoice && b.linked_invoice.customer_name || b.batch_name || '-') + '</span>';
   h += '<span id="ipbat2-hdr-status">' + _ipbat2StatusBadge(b.status) + '</span>';
   h += '</div>';
   h += '<div style="display:flex;gap:6px;">';
@@ -25333,17 +25333,21 @@ function _ipbat2DoRenderDetail(container) {
   h += '<button onclick="_ipbat2DeleteBatch()" style="font-size:12px;padding:6px 12px;border-radius:6px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.4);cursor:pointer;font-family:Pretendard,sans-serif;">삭제</button>';
   h += '</div></div>';
 
-  // 섹션 1: 기본 정보
-  h += '<div style="padding:16px 20px;border-bottom:0.5px solid #eee;">';
-  h += '<div style="font-size:11px;color:#5A6070;letter-spacing:0.04em;font-weight:600;text-transform:uppercase;margin-bottom:10px;">기본 정보</div>';
+  // B-2a: 상단 3분할 (기본정보 2.5 / 연결인보이스 2.5 / 통관비 5)
   var lblS = 'display:block;font-size:11px;color:#5A6070;margin-bottom:4px;font-weight:500;';
   var inpS = 'width:100%;height:32px;border:1px solid #DDE1EB;border-radius:6px;padding:0 10px;font-size:13px;font-family:Pretendard,sans-serif;box-sizing:border-box;';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;">';
-  h += '<div><label style="' + lblS + '">수입 건 번호 <span style="color:#CC2222">*</span></label><input id="ipbat2-f-no" type="text" value="' + _ipbat2Esc(b.batch_no) + '" style="' + inpS + '"></div>';
-  h += '<div><label style="' + lblS + '">건명</label><input id="ipbat2-f-name" type="text" value="' + _ipbat2Esc(b.batch_name || '') + '" style="' + inpS + '" placeholder="4월 컨테이너"></div>';
-  h += '<div><label style="' + lblS + '">컨테이너 번호</label><input id="ipbat2-f-container" type="text" value="' + _ipbat2Esc(b.container_no || '') + '" style="' + inpS + '"></div>';
-  h += '<div><label style="' + lblS + '">통관일</label><input id="ipbat2-f-date" type="date" value="' + _ipbat2Esc((b.customs_date || '').substring(0, 10)) + '" style="' + inpS + '"></div>';
-  h += '<div><label style="' + lblS + '">상태</label><select id="ipbat2-f-status" style="' + inpS + '">';
+  var inheritName = b.linked_invoice && b.linked_invoice.customer_name || b.batch_name || '';
+  h += '<div style="display:grid;grid-template-columns:2.5fr 2.5fr 5fr;gap:12px;padding:12px 20px;background:#F4F6FA;">';
+
+  // [좌 25%] 기본정보 카드
+  h += '<div style="background:#fff;border:0.5px solid #DDE1EB;border-radius:6px;overflow:hidden;">';
+  h += '<div style="background:#1A1D23;color:#fff;padding:8px 12px;font-size:12px;font-weight:600;font-family:Pretendard,sans-serif;">기본 정보</div>';
+  h += '<div style="padding:12px;">';
+  h += '<div style="margin-bottom:10px;"><label style="' + lblS + '">수입 건 번호 <span style="color:#CC2222">*</span></label><input id="ipbat2-f-no" type="text" value="' + _ipbat2Esc(b.batch_no) + '" style="' + inpS + '"></div>';
+  h += '<div style="margin-bottom:10px;"><label style="' + lblS + '">건명 <span style="font-size:10px;color:#5A6070;font-weight:400;">(인보이스 거래처 자동)</span></label><input id="ipbat2-f-name" type="text" readonly value="' + _ipbat2Esc(inheritName) + '" style="' + inpS + 'background:#F4F6FA;color:#5A6070;cursor:not-allowed;"></div>';
+  h += '<div style="margin-bottom:10px;"><label style="' + lblS + '">컨테이너 번호</label><input id="ipbat2-f-container" type="text" value="' + _ipbat2Esc(b.container_no || '') + '" style="' + inpS + '"></div>';
+  h += '<div style="margin-bottom:10px;"><label style="' + lblS + '">통관일</label><input id="ipbat2-f-date" type="date" value="' + _ipbat2Esc((b.customs_date || '').substring(0, 10)) + '" style="' + inpS + '"></div>';
+  h += '<div style="margin-bottom:0;"><label style="' + lblS + '">상태</label><select id="ipbat2-f-status" style="' + inpS + '">';
   ['draft', 'in_progress', 'customs_done', 'erp_sent'].forEach(function(s) {
     var l = { draft: '초안', in_progress: '진행중', customs_done: '통관완료', erp_sent: 'ERP전송' }[s];
     h += '<option value="' + s + '"' + (b.status === s ? ' selected' : '') + '>' + l + '</option>';
@@ -25351,11 +25355,19 @@ function _ipbat2DoRenderDetail(container) {
   h += '</select></div>';
   h += '</div></div>';
 
-  // 섹션 2: 연결 인보이스
-  h += '<div id="ipbat2-invoices-section" style="padding:0;border-bottom:0.5px solid #eee;"></div>';
+  // [중 25%] 연결 인보이스 카드
+  h += '<div style="background:#fff;border:0.5px solid #DDE1EB;border-radius:6px;overflow:hidden;">';
+  h += '<div style="background:#1A1D23;color:#fff;padding:8px 12px;font-size:12px;font-weight:600;font-family:Pretendard,sans-serif;">연결 인보이스</div>';
+  h += '<div id="ipbat2-invoices-section" style="padding:0;"></div>';
+  h += '</div>';
 
-  // 섹션 3: 통관 비용
-  h += '<div id="ipbat2-customs-section" style="padding:0;border-bottom:0.5px solid #eee;"></div>';
+  // [우 50%] 통관비 카드
+  h += '<div style="background:#fff;border:0.5px solid #DDE1EB;border-radius:6px;overflow:hidden;">';
+  h += '<div style="background:#1A1D23;color:#fff;padding:8px 12px;font-size:12px;font-weight:600;font-family:Pretendard,sans-serif;">통관비</div>';
+  h += '<div id="ipbat2-customs-section" style="padding:0;"></div>';
+  h += '</div>';
+
+  h += '</div>'; // end 3분할 wrapper
 
   // 섹션 4: 제품별 최종 원가
   h += '<div id="ipbat2-cost-section" style="padding:0;border-bottom:0.5px solid #eee;"></div>';
@@ -25382,7 +25394,7 @@ function _ipbat2SaveBasicInfo() {
   var payload = {
     id: b.id,
     batch_no: (document.getElementById('ipbat2-f-no').value || '').trim(),
-    batch_name: (document.getElementById('ipbat2-f-name').value || '').trim(),
+    // batch_name 제거: readonly로 변경됨, 인보이스 customer_name 자동 상속 (B-2a)
     container_no: (document.getElementById('ipbat2-f-container').value || '').trim(),
     customs_date: document.getElementById('ipbat2-f-date').value || null,
     status: document.getElementById('ipbat2-f-status').value,
