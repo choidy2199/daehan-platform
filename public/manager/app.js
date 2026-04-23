@@ -25593,7 +25593,7 @@ function _ipbat2RenderCustomsSection() {
       h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
       h += '<td style="' + tdS + '"><input data-field="item_name" value="' + _ipbat2Esc(c.item_name) + '" style="' + inpS2 + '" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipbat2UpdateCustomsBlur(event,\'' + c.id + '\')"></td>';
       var amtFormatted = c.amount_krw > 0 ? Number(c.amount_krw).toLocaleString('en-US') : '';
-      h += '<td style="' + tdS + 'text-align:right;"><input type="text" inputmode="numeric" data-field="amount_krw" value="' + amtFormatted + '" placeholder="0" style="' + inpS2 + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipbat2UpdateCustomsBlur(event,\'' + c.id + '\')" oninput="_ipbat2FormatCustomsAmount(this);_ipbat2ScheduleCalc()" onkeydown="_ipbat2CustomsAmountKeydown(event,\'' + c.id + '\')"></td>';
+      h += '<td style="' + tdS + 'text-align:right;"><input type="text" inputmode="numeric" data-field="amount_krw" value="' + amtFormatted + '" placeholder="0" style="' + inpS2 + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipbat2UpdateCustomsBlur(event,\'' + c.id + '\')" oninput="_ipbat2FormatCustomsAmount(this)" onkeydown="_ipbat2CustomsAmountKeydown(event,\'' + c.id + '\')"></td>';
       h += '<td style="' + tdS + 'text-align:center;"><button onclick="_ipbat2DeleteCustomsCost(\'' + c.id + '\')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #F0D2D2;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">✕</button></td>';
       h += '</tr>';
     });
