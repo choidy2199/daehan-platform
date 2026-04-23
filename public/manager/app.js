@@ -25652,7 +25652,7 @@ function _ipbat2UpdateCustomsBlur(ev, id) {
       if (json.success) {
         var idx = _ipbat2Customs.findIndex(function(c) { return c.id === id; });
         if (idx >= 0) _ipbat2Customs[idx] = json.data;
-        _ipbat2RenderCustomsSection();
+        // [B-2b-ux-fix2] 재렌더 제거: Enter 이동 후 focus 유실 방지. state는 위 _ipbat2Customs[idx]로 이미 최신화됨.
         _ipbat2ScheduleCalc();
       } else alert(json.error || '수정 실패');
     });
