@@ -2720,11 +2720,11 @@ body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
 .count-text.selected { color: #EF9F27; font-weight: 700; font-size: 12px; }
 
 /* ================================================================
-   [B-3-2-1] 인보이스V2 중단 4분할 그리드 (인보이스 20 : 1차 30 : 2차 30 : 통관비 20)
+   [B-3-2-1b] 인보이스V2 중단 4분할 그리드 (인보이스 10 : 1차 35 : 2차 35 : 통관비 20)
    ================================================================ */
 #tab-import-invoice-v2 .ipinv2-mid-grid {
   display: grid;
-  grid-template-columns: 2fr 3fr 3fr 2fr;
+  grid-template-columns: 1fr 3.5fr 3.5fr 2fr;
   gap: 14px;
   padding: 14px 20px;
   background: #F4F6FA;
