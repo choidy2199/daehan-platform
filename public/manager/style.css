@@ -2580,6 +2580,17 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   min-height: 52px;
 }
 
+/* v5.3 Hotfix: 기존 #mw-price-status-bar 의 margin-left:auto 덮어쓰기 */
+.light-bar#mw-price-status-bar {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-bottom: 0 !important;
+  width: 100% !important;
+  gap: 8px !important;
+  justify-content: flex-start !important;
+  flex-wrap: nowrap !important;
+}
+
 /* 흰색바 입력요소 */
 .lb-search {
   border: 1px solid #DDE1EB;
