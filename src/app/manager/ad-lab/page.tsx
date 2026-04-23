@@ -132,6 +132,8 @@ function PageTitle({ children, right }: { children: ReactNode; right?: ReactNode
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 16,
+        width: '100%',
+        boxSizing: 'border-box',
       }}
     >
       <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: C.text }}>{children}</h1>
@@ -151,6 +153,8 @@ function HelpBox({ children }: { children: ReactNode }) {
         display: 'flex',
         alignItems: 'flex-start',
         gap: 10,
+        width: '100%',
+        boxSizing: 'border-box',
       }}
     >
       <span
@@ -541,7 +545,7 @@ function BudgetTab() {
   ];
 
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <PageTitle>예산 설정</PageTitle>
       <HelpBox>
         <strong>예산 설정이란?</strong> 각 제품마다 광고비를 얼마까지 쓸 건지 정하는 화면입니다.
@@ -644,7 +648,7 @@ function BudgetTab() {
           </tbody>
         </table>
       </Section>
-    </>
+    </div>
   );
 }
 
@@ -662,7 +666,7 @@ function KeywordTab() {
   ];
 
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <PageTitle right={<Btn>키워드 등록</Btn>}>키워드 관리</PageTitle>
       <HelpBox>
         <strong>키워드란?</strong> 고객이 네이버에서 검색하는 단어입니다. 예를 들어 누군가
@@ -697,7 +701,7 @@ function KeywordTab() {
       {sub === 'active' && <KwActive />}
       {sub === 'new' && <KwNew />}
       {sub === 'blocked' && <KwBlocked />}
-    </>
+    </div>
   );
 }
 
@@ -811,7 +815,7 @@ function KwActive() {
     v >= 400 ? C.success : v >= 250 ? C.primary : v >= 150 ? C.warning : C.danger;
 
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <div
         style={{
           display: 'grid',
@@ -880,7 +884,7 @@ function KwActive() {
           </tbody>
         </table>
       </Section>
-    </>
+    </div>
   );
 }
 
@@ -936,7 +940,7 @@ function KwNew() {
   ];
 
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <HelpBox>
         <strong>새로 찾은 키워드</strong>는 AD-LAB이 매일 새벽 3시에 자동으로 좋은 키워드를
         찾아옵니다. 점수가 높을수록 우리 제품에 잘 맞는 키워드예요.
@@ -1002,7 +1006,7 @@ function KwNew() {
           ))}
         </div>
       </Section>
-    </>
+    </div>
   );
 }
 
@@ -1045,7 +1049,7 @@ function KwBlocked() {
   ];
 
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <HelpBox>
         <strong>차단 키워드란?</strong> 클릭은 일어나지만 절대 안 사는 검색어들입니다. 이런
         키워드는 광고를 안 보이게 차단해서 광고비 낭비를 막습니다.
@@ -1079,7 +1083,7 @@ function KwBlocked() {
           </tbody>
         </table>
       </Section>
-    </>
+    </div>
   );
 }
 
@@ -1088,7 +1092,7 @@ function KwBlocked() {
 // ═════════════════════════════════════════════════════════════
 function DashboardTab() {
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <PageTitle right={<Btn variant="danger">전체 자동화 중지</Btn>}>
         자동화 대시보드
       </PageTitle>
@@ -1134,7 +1138,7 @@ function DashboardTab() {
       <Section title="경쟁사 광고비 소진 시간">
         <CompetitorBars />
       </Section>
-    </>
+    </div>
   );
 }
 
@@ -1391,7 +1395,7 @@ function LogTab() {
   ];
 
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <PageTitle right={<Btn variant="secondary">내보내기</Btn>}>실행 로그</PageTitle>
       <HelpBox>
         AD-LAB이 자동으로 한 일을 시간순으로 보여줍니다. 사람이 일일이 확인하지 않아도 어떤 결정을
@@ -1402,7 +1406,7 @@ function LogTab() {
         title="오늘 AD-LAB이 한 일"
         right={<span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>총 47건</span>}
       >
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
           {logs.map((l, idx) => (
             <div
               key={idx}
@@ -1438,7 +1442,7 @@ function LogTab() {
           ))}
         </div>
       </Section>
-    </>
+    </div>
   );
 }
 
@@ -1520,14 +1524,14 @@ function SettingTab() {
   ];
 
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <PageTitle>설정</PageTitle>
 
       <Section title="네이버 검색광고 API 연결 상태">
-        <p style={{ fontSize: 13, color: C.textSec, margin: '0 0 12px' }}>
+        <p style={{ fontSize: 13, color: C.textSec, margin: '0 0 12px', width: '100%' }}>
           API 키는 <strong>설정 &gt; API 관리</strong>에서 등록합니다.
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
           <span
             style={{
               width: 10,
@@ -1637,6 +1641,6 @@ function SettingTab() {
           </tbody>
         </table>
       </Section>
-    </>
+    </div>
   );
 }
