@@ -20620,7 +20620,22 @@ function _poRenderDetail() {
   h += '<button class="btn-mini btn-mini-p" onclick="_poOpenProductPicker()"' + disabledAttr + '>+ 제품등록</button>';
   h += '<button class="btn-mini btn-mini-danger" onclick="_poDeleteSelectedProducts()"' + disabledAttr + '>삭제</button>';
   h += '</div></div>';
-  h += '<div class="pc-search-bar">';
+  // 검색줄 3:7 분할 (B-1c-1): 좌 거래처 / 우 제품 검색
+  var poCustName = (po && po.factory_name) || '';
+  var poCustCode = (po && po.factory_code) || '';
+  var poCustSelected = !!(poCustName && poCustCode);
+  var poCustBorderColor = poCustSelected ? '#1D9E75' : '#E24B4A';
+  var poCustLabelColor = poCustSelected ? '#1D9E75' : '#E24B4A';
+  var poCustBg = poCustSelected ? '#fff' : '#FFF9F9';
+  var poCustDisabled = (hasError || noPo) ? ' disabled' : '';
+  h += '<div class="pc-search-bar" style="display:grid;grid-template-columns:3fr 7fr;gap:10px;align-items:center;">';
+  // 좌 30%: 거래처 검색
+  h += '<div class="po-customer-search-wrap" style="position:relative;">';
+  h += '<span class="po-customer-label" style="position:absolute;top:-7px;left:10px;background:#FAFAF7;padding:0 6px;font-size:10px;color:' + poCustLabelColor + ';font-weight:700;z-index:1;">거래처 ' + (poCustSelected ? '✓' : '*') + '</span>';
+  h += '<input type="hidden" id="po-customer-code" value="' + _poEsc(poCustCode) + '">';
+  h += '<input type="text" id="po-customer-input" class="po-customer-input" placeholder="거래처명 검색 (예: 장구)" value="' + _poEsc(poCustName) + '" autocomplete="off"' + poCustDisabled + ' style="width:100%;height:34px;padding:0 12px;border:2px solid ' + poCustBorderColor + ';border-radius:6px;font-size:13px;font-family:Pretendard,sans-serif;background:' + poCustBg + ';box-sizing:border-box;" oninput="_poCustomerOnInput(event)" onblur="_poCustomerOnBlur(event)" onkeydown="_poCustomerOnKeydown(event)" onfocus="_poCustomer.openDropdown()">';
+  h += '</div>';
+  // 우 70%: 제품 검색 (기존 유지)
   h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" oninput="_poFilterProductList(this.value)" autocomplete="off"' + (hasError ? ' disabled' : '') + '>';
   h += '</div>';
   if (hasError) {
@@ -20642,7 +20657,11 @@ function _poRenderDetail() {
   if (isReadOnly) {
     h += '<button class="btn-mini" id="po-btn-confirm" disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;">✓ 확정됨</button>';
   } else {
-    h += '<button class="btn-mini btn-mini-confirm" id="po-btn-confirm" onclick="_poConfirmOrder()"' + disabledAttr + '>✓ 발주확정</button>';
+    // B-1c-1: 거래처 없으면 발주확정 disabled
+    var hasCustomer = !!(po && po.factory_name && po.factory_code);
+    var confirmDisabledAttr = (hasError || noPo || !hasCustomer) ? ' disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;"' : '';
+    var confirmLabel = (!hasError && !noPo && !hasCustomer) ? '✓ 발주확정 (거래처 필요)' : '✓ 발주확정';
+    h += '<button class="btn-mini btn-mini-confirm" id="po-btn-confirm" onclick="_poConfirmOrder()"' + confirmDisabledAttr + '>' + confirmLabel + '</button>';
   }
   h += '</div></div>';
   if (hasError) {
@@ -20664,6 +20683,7 @@ function _poRenderDetail() {
     _poRenderCart(po.id);
   }
   _poBindDetailEvents();
+  if (typeof _poCustomerBindInput === 'function') _poCustomerBindInput();
 }
 
 
@@ -20944,6 +20964,284 @@ function _poCartMap(poId) {
   var cart = _poLoadCart(poId);
   cart.forEach(function(c) { if (c && c.productCode != null) m[String(c.productCode)] = c; });
   return m;
+}
+
+// =====================================================
+// B-1c-1: 제품·발주 거래처 자동완성 (_ipinv2Customer 패턴 복제)
+// =====================================================
+var _poCustomer = {
+  _cache: null,
+  _dropdown: null,
+  _visibleItems: [],
+  _selectedIndex: -1,
+  _inputTimer: null,
+
+  _load: function() {
+    if (this._cache) return this._cache;
+    try {
+      var raw = localStorage.getItem('mw_clients');
+      this._cache = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      console.error('[_poCustomer] mw_clients 로드 실패:', e);
+      this._cache = [];
+    }
+    return this._cache;
+  },
+
+  _match: function(query, c) {
+    var q = String(query || '').toLowerCase();
+    if (!q) return true;
+    return String(c.name || '').toLowerCase().indexOf(q) !== -1;
+  },
+
+  _esc: function(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  },
+
+  _ensureDropdown: function() {
+    if (this._dropdown && document.body.contains(this._dropdown)) return this._dropdown;
+    var dd = document.createElement('div');
+    dd.className = 'po-customer-dropdown';
+    dd.style.cssText = 'position:fixed;display:none;background:#fff;border:1px solid #DDE1EB;border-radius:6px;box-shadow:0 4px 12px rgba(26,29,35,0.08);max-height:280px;overflow-y:auto;z-index:9999;font-family:Pretendard,sans-serif;min-width:260px;';
+    document.body.appendChild(dd);
+    this._dropdown = dd;
+
+    // 드롭다운 내부 클릭 (이벤트 위임)
+    dd.addEventListener('mousedown', function(e) {
+      var item = e.target.closest('.po-customer-dd-item');
+      if (!item) return;
+      e.preventDefault();
+      var idx = parseInt(item.getAttribute('data-idx'), 10);
+      if (!isNaN(idx)) _poCustomer.onSelect(idx);
+    });
+
+    // 외부 클릭 시 닫기
+    document.addEventListener('mousedown', function(e) {
+      if (!_poCustomer._dropdown || _poCustomer._dropdown.style.display === 'none') return;
+      if (_poCustomer._dropdown.contains(e.target)) return;
+      var inp = document.getElementById('po-customer-input');
+      if (inp && inp.contains(e.target)) return;
+      _poCustomer.closeDropdown();
+    });
+
+    return dd;
+  },
+
+  _positionDropdown: function() {
+    var input = document.getElementById('po-customer-input');
+    var dd = this._dropdown;
+    if (!input || !dd) return;
+    var rect = input.getBoundingClientRect();
+    dd.style.left = rect.left + 'px';
+    dd.style.top = (rect.bottom + 2) + 'px';
+    dd.style.width = Math.max(260, rect.width) + 'px';
+  },
+
+  openDropdown: function() {
+    this._ensureDropdown();
+    this._positionDropdown();
+    var input = document.getElementById('po-customer-input');
+    var query = input ? String(input.value || '').trim() : '';
+    this._renderList(query);
+    if (this._dropdown) this._dropdown.style.display = 'block';
+  },
+
+  closeDropdown: function() {
+    if (this._dropdown) this._dropdown.style.display = 'none';
+    this._visibleItems = [];
+    this._selectedIndex = -1;
+  },
+
+  _renderList: function(query) {
+    if (!this._dropdown) return;
+    var customers = this._load();
+    var filtered = customers
+      .filter(function(c) { return c && c.name && _poCustomer._match(query, c); })
+      .slice(0, 20);
+
+    this._visibleItems = filtered;
+    this._selectedIndex = filtered.length > 0 ? 0 : -1;
+
+    if (filtered.length === 0) {
+      this._dropdown.innerHTML = '<div style="padding:14px;text-align:center;color:#9BA3B2;font-size:12px;">검색 결과 없음</div>';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < filtered.length; i++) {
+      var c = filtered[i];
+      var active = i === 0 ? 'background:#E6F1FB;' : '';
+      var code2 = c.manageCode || c.code || '';
+      html += '<div class="po-customer-dd-item" data-idx="' + i + '" style="' + active + 'padding:8px 12px;font-size:13px;color:#1A1D23;cursor:pointer;border-bottom:1px solid #F0F2F7;display:flex;justify-content:space-between;align-items:center;gap:10px;">';
+      html += '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + this._esc(c.name) + '</span>';
+      if (code2) html += '<span style="font-size:10px;color:#9BA3B2;flex-shrink:0;">' + this._esc(code2) + '</span>';
+      html += '</div>';
+    }
+    this._dropdown.innerHTML = html;
+  },
+
+  _highlight: function() {
+    if (!this._dropdown) return;
+    var items = this._dropdown.querySelectorAll('.po-customer-dd-item');
+    for (var i = 0; i < items.length; i++) {
+      items[i].style.background = i === this._selectedIndex ? '#E6F1FB' : '';
+      if (i === this._selectedIndex) items[i].scrollIntoView({ block: 'nearest' });
+    }
+  },
+
+  onInput: function(value) {
+    this._ensureDropdown();
+    this._positionDropdown();
+    this._renderList(String(value || '').trim());
+    if (this._dropdown) this._dropdown.style.display = 'block';
+  },
+
+  onKeydown: function(e) {
+    if (!this._dropdown || this._dropdown.style.display === 'none') return;
+    if (!this._visibleItems || this._visibleItems.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      this._selectedIndex = Math.min(this._selectedIndex + 1, this._visibleItems.length - 1);
+      this._highlight();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._selectedIndex = Math.max(this._selectedIndex - 1, 0);
+      this._highlight();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (this._selectedIndex >= 0) this.onSelect(this._selectedIndex);
+    } else if (e.key === 'Escape') {
+      this.closeDropdown();
+    }
+  },
+
+  onSelect: function(idx) {
+    var item = this._visibleItems[idx];
+    if (!item) return;
+    var code2 = item.manageCode || item.code || '';
+    this.setValue(code2, item.name);
+    this.closeDropdown();
+    this._triggerSave();
+  },
+
+  setValue: function(code, name) {
+    var input = document.getElementById('po-customer-input');
+    var hiddenCode = document.getElementById('po-customer-code');
+    if (input) input.value = name || '';
+    if (hiddenCode) hiddenCode.value = code || '';
+  },
+
+  clear: function() {
+    this.setValue('', '');
+  },
+
+  getValue: function() {
+    var input = document.getElementById('po-customer-input');
+    var hiddenCode = document.getElementById('po-customer-code');
+    return {
+      code: hiddenCode ? String(hiddenCode.value || '') : '',
+      name: input ? String(input.value || '') : ''
+    };
+  },
+
+  _triggerSave: function() {
+    if (typeof _poCustomerSaveFields === 'function') _poCustomerSaveFields();
+  },
+
+  onBlur: function() {
+    var input = document.getElementById('po-customer-input');
+    if (!input) return;
+    var name = String(input.value || '').trim();
+    if (!name) {
+      this.setValue('', '');
+      this._triggerSave();
+      return;
+    }
+    var customers = this._load();
+    var matched = null;
+    for (var i = 0; i < customers.length; i++) {
+      if (customers[i] && customers[i].name === name) { matched = customers[i]; break; }
+    }
+    if (matched) {
+      var code2 = matched.manageCode || matched.code || '';
+      this.setValue(code2, matched.name);
+      this._triggerSave();
+    } else {
+      var hiddenCode = document.getElementById('po-customer-code');
+      if (hiddenCode) hiddenCode.value = '';
+      this._triggerSave();
+    }
+  }
+};
+
+// ── 거래처 저장 (장바구니 있을 때 confirm, _poState 갱신) ──
+function _poCustomerSaveFields() {
+  if (!_poState || !_poState.currentPo || !_poState.currentPo.id) return;
+  var po = _poState.currentPo;
+  var val = _poCustomer.getValue();
+  var newCode = val.code || null;
+  var newName = val.name || null;
+  var oldCode = po.factory_code || null;
+  var oldName = po.factory_name || null;
+  if (newCode === oldCode && newName === oldName) return; // 변경 없음
+
+  // 장바구니 있으면 confirm
+  var cartCnt = _poLoadCart(po.id).length;
+  if (cartCnt > 0) {
+    var ok = confirm('장바구니에 ' + cartCnt + '건이 담겨있습니다.\n거래처를 변경하시겠습니까?\n\n(장바구니는 유지됩니다)');
+    if (!ok) {
+      _poCustomer.setValue(oldCode || '', oldName || '');
+      return;
+    }
+  }
+
+  var payload = { id: po.id, factory_code: newCode, factory_name: newName };
+  fetch('/api/import-po', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json.success && json.data) {
+        _poState.currentPo = json.data;
+        if (typeof _poCacheCurrentPo === 'function') _poCacheCurrentPo();
+        _poRenderDetail(); // 버튼 상태/테두리 갱신
+      } else {
+        alert((json && json.error) || '거래처 저장 실패');
+        _poCustomer.setValue(oldCode || '', oldName || '');
+      }
+    })
+    .catch(function(e) {
+      alert('네트워크 오류: ' + (e && e.message || e));
+      _poCustomer.setValue(oldCode || '', oldName || '');
+    });
+}
+
+// ── inline on* 핸들러용 wrapper (IME 150ms 디바운스 포함) ──
+function _poCustomerOnInput(e) {
+  if (_poCustomer._inputTimer) clearTimeout(_poCustomer._inputTimer);
+  var val = e.target.value;
+  _poCustomer._inputTimer = setTimeout(function() { _poCustomer.onInput(val); }, 150);
+}
+function _poCustomerOnKeydown(e) { _poCustomer.onKeydown(e); }
+function _poCustomerOnBlur(e) {
+  setTimeout(function() {
+    if (_poCustomer._dropdown && _poCustomer._dropdown.style.display !== 'none') {
+      _poCustomer.closeDropdown();
+    }
+    _poCustomer.onBlur();
+  }, 180);
+}
+
+// ── 스크롤 시 드롭다운 위치 재계산 (window 전역, singleton) ──
+function _poCustomerBindInput() {
+  if (window._poCustScrollBound) return;
+  window._poCustScrollBound = true;
+  window.addEventListener('scroll', function() {
+    if (_poCustomer._dropdown && _poCustomer._dropdown.style.display !== 'none') {
+      _poCustomer._positionDropdown();
+    }
+  }, true);
 }
 
 // 상단 다크바 메타 갱신
