@@ -242,7 +242,16 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <div style={{ marginBottom: 20, width: '100%' }}>
+    <div
+      style={{
+        marginBottom: 20,
+        width: '100%',
+        minWidth: '100%',
+        maxWidth: '100%',
+        display: 'block',
+        boxSizing: 'border-box',
+      }}
+    >
       <div
         style={{
           background: C.dark,
@@ -1395,7 +1404,15 @@ function LogTab() {
   ];
 
   return (
-    <div style={{ width: '100%' }}>
+    <div
+      style={{
+        width: '100%',
+        minWidth: '100%',
+        maxWidth: '100%',
+        display: 'block',
+        boxSizing: 'border-box',
+      }}
+    >
       <PageTitle right={<Btn variant="secondary">내보내기</Btn>}>실행 로그</PageTitle>
       <HelpBox>
         AD-LAB이 자동으로 한 일을 시간순으로 보여줍니다. 사람이 일일이 확인하지 않아도 어떤 결정을
@@ -1406,43 +1423,41 @@ function LogTab() {
         title="오늘 AD-LAB이 한 일"
         right={<span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>총 47건</span>}
       >
-        <div style={{ width: '100%', border: '3px solid red' }}>
-          {logs.map((l, idx) => (
+        {logs.map((l, idx) => (
+          <div
+            key={idx}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '12px 4px',
+              borderBottom:
+                idx === logs.length - 1 ? 'none' : `1px solid ${C.borderRow}`,
+              width: '100%',
+              boxSizing: 'border-box',
+            }}
+          >
             <div
-              key={idx}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 14,
-                padding: '12px 4px',
-                borderBottom:
-                  idx === logs.length - 1 ? 'none' : `1px solid ${C.borderRow}`,
-                width: '100%',
-                boxSizing: 'border-box',
+                width: 48,
+                fontSize: 13,
+                fontWeight: 600,
+                color: C.primary,
+                flexShrink: 0,
+                fontFeatureSettings: "'tnum' 1",
               }}
             >
-              <div
-                style={{
-                  width: 48,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: C.primary,
-                  flexShrink: 0,
-                  fontFeatureSettings: "'tnum' 1",
-                }}
-              >
-                {l.time}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: C.text, marginBottom: 2 }}>
-                  {l.title}
-                </div>
-                <div style={{ fontSize: 12, color: C.textHint }}>{l.detail}</div>
-              </div>
-              <Badge tone={l.tag.tone}>{l.tag.label}</Badge>
+              {l.time}
             </div>
-          ))}
-        </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 500, color: C.text, marginBottom: 2 }}>
+                {l.title}
+              </div>
+              <div style={{ fontSize: 12, color: C.textHint }}>{l.detail}</div>
+            </div>
+            <Badge tone={l.tag.tone}>{l.tag.label}</Badge>
+          </div>
+        ))}
       </Section>
     </div>
   );
