@@ -1395,7 +1395,7 @@ function LogTab() {
   ];
 
   return (
-    <div style={{ width: '100%' }}>
+    <div style={{ width: '100%', display: 'block', boxSizing: 'border-box' }}>
       <PageTitle right={<Btn variant="secondary">내보내기</Btn>}>실행 로그</PageTitle>
       <HelpBox>
         AD-LAB이 자동으로 한 일을 시간순으로 보여줍니다. 사람이 일일이 확인하지 않아도 어떤 결정을
@@ -1406,7 +1406,7 @@ function LogTab() {
         title="오늘 AD-LAB이 한 일"
         right={<span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>총 47건</span>}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+        <div style={{ width: '100%', display: 'block' }}>
           {logs.map((l, idx) => (
             <div
               key={idx}
@@ -1417,6 +1417,8 @@ function LogTab() {
                 padding: '12px 4px',
                 borderBottom:
                   idx === logs.length - 1 ? 'none' : `1px solid ${C.borderRow}`,
+                width: '100%',
+                boxSizing: 'border-box',
               }}
             >
               <div
