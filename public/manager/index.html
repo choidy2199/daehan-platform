@@ -294,43 +294,95 @@ document.head.appendChild(s);
           <button class="mw-filter-tab" onclick="setCatalogFilter('nosku')">코드없음</button>
         </div>
       </div>
-      <div style="display:flex;gap:0;align-items:center">
-        <span class="mw-btn-normal" style="font-size:12px;font-weight:400;opacity:0.7;margin-right:12px" id="catalog-count">0건</span>
-        <span id="catalog-count-edit" class="dm-info mw-btn-edit" style="display:none">0개 선택</span>
-        <button class="btn-danger btn-sm" onclick="deleteSelectedProducts()" id="btn-delete-selected" style="display:none">선택 삭제</button>
-        <button class="mw-btn-normal" onclick="showProductManageModal()" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:0 16px;height:30px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Pretendard',sans-serif">제품등록및수정</button>
-        <button class="mw-btn-edit db db-edit" onclick="mwEditAction('modify')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#2a2d33;color:#ccc;border:1px solid #444;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap;margin-right:6px">수정</button>
-        <button class="mw-btn-edit db db-edit" onclick="mwEditAction('delete')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#2a2d33;color:#ccc;border:1px solid #444;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap;margin-right:6px">삭제</button>
-        <button class="mw-btn-edit db db-edit" onclick="mwEditAction('discontinue')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#2a2d33;color:#ccc;border:1px solid #444;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap;margin-right:6px">단종</button>
-        <div class="mw-btn-edit mw-dark-sep" style="display:none"></div>
-        <button class="mw-btn-edit" id="mw-edit-pricecollect-btn" onclick="mwEditAction('priceCollect')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;border:1px solid #666;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap;margin-right:6px">▼ 가격 수집</button>
-        <button class="mw-btn-edit" id="mw-edit-pricesync-btn" onclick="mwEditAction('priceSync')" style="display:none;padding:0 14px;height:30px;border-radius:6px;font-size:12px;font-weight:600;background:#E24B4A;color:#fff;border:none;cursor:pointer;font-family:'Pretendard',sans-serif;white-space:nowrap">▲ 가격 전송</button>
-        <div style="width:1px;height:20px;background:rgba(255,255,255,0.2);margin:0 10px"></div>
-        <button onclick="showSettingsModal()" style="background:#5A6070;color:#fff;border:none;border-radius:6px;padding:0 16px;height:30px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Pretendard',sans-serif;margin-right:6px">⚙ 설정</button>
-        <button id="mw-edit-toggle-btn" onclick="toggleMwEditMode()" style="background:#1D9E75;color:#fff;border:none;border-radius:6px;padding:0 16px;height:30px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Pretendard',sans-serif">✎ 수정</button>
+      <div class="dark-right" style="display:flex;gap:6px;align-items:center">
+        <span class="sector-badge mw-btn-normal">제품</span>
+
+        <!-- 일반모드 -->
+        <span class="count-text mw-btn-normal" id="catalog-count">0건</span>
+        <div class="sep mw-btn-normal"></div>
+        <button class="btn-u d-primary mw-btn-normal" onclick="showProductManageModal()">+ 제품 등록</button>
+        <button id="mw-edit-toggle-btn" class="btn-u d-success mw-btn-normal" onclick="toggleMwEditMode()">✎ 수정</button>
+
+        <!-- 편집모드 (초기 숨김) -->
+        <span id="catalog-count-edit" class="count-text selected mw-btn-edit" style="display:none">0개 선택</span>
+        <div class="sep mw-btn-edit" style="display:none"></div>
+        <button class="btn-u d-primary mw-btn-edit" style="display:none" onclick="mwEditAction('modify')">✎ 일괄 수정</button>
+        <button class="btn-u d-danger mw-btn-edit" style="display:none" onclick="mwEditAction('delete')">🗑 삭제</button>
+        <button class="btn-u d-base mw-btn-edit" style="display:none" onclick="mwEditAction('discontinue')">◼ 단종</button>
+        <div class="sep mw-btn-edit" style="display:none"></div>
+        <button class="btn-u d-danger mw-btn-edit" style="display:none" onclick="toggleMwEditMode()">✕ 편집종료</button>
+
+        <!-- 호환성: updateDeleteBtn() null 참조 방지용 영구 숨김 (DOM 유지) -->
+        <button id="btn-delete-selected" onclick="deleteSelectedProducts()" style="display:none !important">선택 삭제</button>
       </div>
     </div>
     <div class="section-body" style="padding:12px;flex:1;display:flex;flex-direction:column;min-height:0">
-      <div class="search-bar" style="flex-shrink:0;display:flex;align-items:center;gap:8px">
-        <input class="input" id="catalog-search" type="search" name="search_naf_catalog" placeholder="코드, 모델명 검색..." autocomplete="nope" data-form-type="other" data-lpignore="true" oninput="renderCatalog()" style="flex:0 0 auto;width:240px">
-        <select class="select" id="catalog-cat" onchange="renderCatalog()" style="flex:0 0 auto;width:130px">
+      <div class="search-bar light-bar" id="mw-price-status-bar" style="flex-shrink:0">
+        <span class="light-sector-tag">온라인</span>
+
+        <!-- [그룹1] 검색/분류 -->
+        <input class="input lb-search" id="catalog-search" type="search" name="search_naf_catalog" placeholder="코드, 모델명 검색..." autocomplete="nope" data-form-type="other" data-lpignore="true" oninput="renderCatalog()">
+        <select class="select lb-select" id="catalog-cat" onchange="renderCatalog()">
           <option value="">전체 대분류</option>
         </select>
-        <select class="select" id="catalog-sub" onchange="renderCatalog()" style="flex:0 0 auto;width:130px">
+        <select class="select lb-select" id="catalog-sub" onchange="renderCatalog()">
           <option value="">전체 중분류</option>
         </select>
-        <div id="mw-price-status-bar">
-          <span class="ps-market-tab ps-mt-active" data-market="naver">스토어팜</span>
-          <span class="ps-market-tab" data-market="gmarket">오픈마켓</span>
-          <span class="ps-market-tab" data-market="ssg">SSG</span>
-          <div class="ps-sep"></div>
-          <div class="ps-item active" data-status="all">전체 <span class="ps-count">0</span></div>
-          <div class="ps-item" data-status="match">일치 <span class="ps-count">0</span></div>
-          <div class="ps-item" data-status="diff">차이 <span class="ps-count">0</span></div>
-          <div class="ps-item" data-status="soldout">품절 <span class="ps-count">0</span></div>
-          <div class="ps-item" data-status="sent">전송 <span class="ps-count">0</span></div>
-          <div class="ps-item" data-status="notreg">없음 <span class="ps-count">0</span></div>
-          <div class="ps-item" data-status="fail">실패 <span class="ps-count">0</span></div>
+
+        <div class="sep-light"></div>
+
+        <!-- [그룹2] 마켓 선택 -->
+        <div class="lb-market">
+          <button class="lb-market-btn ps-market-tab active-nv ps-mt-active" data-market="naver">스토어팜</button>
+          <button class="lb-market-btn ps-market-tab" data-market="gmarket">오픈마켓</button>
+          <button class="lb-market-btn ps-market-tab" data-market="ssg">SSG</button>
+        </div>
+
+        <div class="sep-light"></div>
+
+        <!-- [그룹3] 상태 필터 뱃지 -->
+        <div class="lb-status">
+          <div class="ps-pill ps-item total on active" data-status="all">
+            <div class="ps-bar"></div>
+            <div class="ps-content"><span class="ps-label">전체</span><span class="ps-num ps-count">0</span></div>
+          </div>
+          <div class="ps-pill ps-item" data-status="match">
+            <div class="ps-bar" style="background:#639922"></div>
+            <div class="ps-content"><span class="ps-label">일치</span><span class="ps-num ps-count">0</span></div>
+          </div>
+          <div class="ps-pill ps-item" data-status="diff">
+            <div class="ps-bar" style="background:#378ADD"></div>
+            <div class="ps-content"><span class="ps-label">차이</span><span class="ps-num ps-count">0</span></div>
+          </div>
+          <div class="ps-pill ps-item" data-status="soldout">
+            <div class="ps-bar" style="background:#E24B4A"></div>
+            <div class="ps-content"><span class="ps-label">품절</span><span class="ps-num ps-count">0</span></div>
+          </div>
+          <div class="ps-pill ps-item" data-status="sent">
+            <div class="ps-bar" style="background:#EF9F27"></div>
+            <div class="ps-content"><span class="ps-label">전송</span><span class="ps-num ps-count">0</span></div>
+          </div>
+          <div class="ps-pill ps-item" data-status="notreg">
+            <div class="ps-bar" style="background:#888780"></div>
+            <div class="ps-content"><span class="ps-label">없음</span><span class="ps-num ps-count">0</span></div>
+          </div>
+          <div class="ps-pill ps-item" data-status="fail">
+            <div class="ps-bar" style="background:#D85A30"></div>
+            <div class="ps-content"><span class="ps-label">실패</span><span class="ps-num ps-count">0</span></div>
+          </div>
+        </div>
+
+        <div class="lb-spacer"></div>
+        <div class="sep-light"></div>
+
+        <!-- [그룹4] 액션 -->
+        <div class="lb-action-group">
+          <div class="market-ctx">
+            <span id="mw-ctx-market" class="ctx-market" style="background:#E1F5EE;color:#085041">스토어팜</span>
+            <span id="mw-ctx-suffix">기준</span>
+          </div>
+          <button id="mw-edit-pricecollect-btn" class="btn-u l-outline" onclick="mwEditAction('priceCollect')">▼ 가격 수집</button>
+          <button id="mw-edit-pricesync-btn" class="btn-u l-danger mw-btn-edit" style="display:none" onclick="mwEditAction('priceSync')">▲ 가격 전송</button>
         </div>
       </div>
       <div class="table-scroll" style="flex:1;overflow-y:auto;overflow-x:auto;min-height:0">
