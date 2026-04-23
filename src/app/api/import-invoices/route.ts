@@ -28,23 +28,31 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query.range(offset, offset + limit - 1);
     if (error) throw error;
 
-    // batch_no 2nd query — PostgREST 다중 embed 충돌 회피 (d33059d 패턴)
+    // batch_no + batch_id 2nd query — PostgREST 다중 embed 충돌 회피 (d33059d 패턴)
+    // [B-3-2-1] batch_id 추가: 인보이스V2 통관비 UI가 linked batch의 id로 API 호출
     const invoiceIds = (data || []).map((d: Record<string, unknown>) => d.id as string).filter(Boolean);
-    const batchMap = new Map<string, string>();
+    const batchMap = new Map<string, { id: string; batch_no: string }>();
     if (invoiceIds.length > 0) {
       const { data: batches } = await supabase
         .from('import_batches')
-        .select('linked_invoice_id, batch_no')
+        .select('id, linked_invoice_id, batch_no')
         .in('linked_invoice_id', invoiceIds);
-      for (const b of (batches || []) as Array<{ linked_invoice_id: string; batch_no: string }>) {
-        if (b.linked_invoice_id && b.batch_no) batchMap.set(b.linked_invoice_id, b.batch_no);
+      for (const b of (batches || []) as Array<{ id: string; linked_invoice_id: string; batch_no: string }>) {
+        if (b.linked_invoice_id) batchMap.set(b.linked_invoice_id, { id: b.id, batch_no: b.batch_no });
       }
     }
 
     const shaped = (data || []).map((row: Record<string, unknown>) => {
       const itemsArr = row.import_invoice_items as Array<{ count: number }> | null;
       const itemCount = itemsArr && itemsArr.length > 0 ? itemsArr[0].count : 0;
-      return { ...row, item_count: itemCount, batch_no: batchMap.get(row.id as string) || null };
+      const linked = batchMap.get(row.id as string);
+      return {
+        ...row,
+        item_count: itemCount,
+        batch_no: linked?.batch_no || null,
+        // linked 우선, 없으면 legacy row.batch_id (nullable) 폴백
+        batch_id: linked?.id || (row.batch_id as string | null) || null,
+      };
     });
 
     return NextResponse.json({ success: true, data: shaped, total: count ?? shaped.length });

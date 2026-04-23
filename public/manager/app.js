@@ -8654,29 +8654,37 @@ function _computeStatsForChannel(channel, products, channelMap, failedFlag) {
 }
 
 async function _mwPriceCollect() {
+  // v5.3: 선택된 마켓만 수집
+  var marketLabels = { naver: '스토어팜', gmarket: '오픈마켓', ssg: 'SSG' };
+  var selectedMarket = window._selectedPriceMarket || 'naver';
+  var marketLabel = marketLabels[selectedMarket] || selectedMarket;
+
+  // 오픈마켓 미구현 — 안내 후 중단
+  if (selectedMarket === 'gmarket') {
+    alert('오픈마켓 가격 수집은 아직 지원되지 않습니다.');
+    return;
+  }
+
   var btn = document.getElementById('mw-edit-pricecollect-btn');
   if (!btn) return;
-  alert('네이버 + SSG 가격 수집을 시작합니다.\n약 30초 소요됩니다.');
+  alert(marketLabel + ' 가격 수집을 시작합니다.\n약 15~30초 소요됩니다.');
   var origText = btn.textContent;
   btn.textContent = '수집 중...';
   btn.disabled = true;
   try {
-    var res = await fetch('/api/price-collect?channels=naver,ssg');
+    var res = await fetch('/api/price-collect?channels=' + selectedMarket);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     var data = await res.json();
-    _priceCollectMap = {
-      naver: (data.naver && data.naver.results) || {},
-      ssg: (data.ssg && data.ssg.results) || {},
-    };
-    var naverFailed = !data.naver || !!data.naver.error;
-    var ssgFailed = !data.ssg || !!data.ssg.error;
+    // 기존 _priceCollectMap 보존하면서 선택 마켓만 갱신 (다른 마켓 셀 색칠 유지)
+    if (!_priceCollectMap) _priceCollectMap = {};
+    if (data[selectedMarket] && data[selectedMarket].results) {
+      _priceCollectMap[selectedMarket] = data[selectedMarket].results;
+    }
+    var marketFailed = !data[selectedMarket] || !!data[selectedMarket].error;
     var products = (DB && DB.products) ? DB.products : [];
-    // 마켓별 stats 집계
-    _priceCollectStatsByMarket.naver = _computeStatsForChannel('naver', products, _priceCollectMap.naver, naverFailed);
-    _priceCollectStatsByMarket.ssg = _computeStatsForChannel('ssg', products, _priceCollectMap.ssg, ssgFailed);
-    _priceCollectStatsByMarket.gmarket = _computeStatsForChannel('gmarket', products, null, false);
-    // 합계 (alert용)
-    var stats = _priceCollectStatsByMarket[_selectedPriceMarket] || _priceCollectStatsByMarket.naver;
+    // 선택 마켓만 stats 재계산 — 나머지 마켓 stats는 보존
+    _priceCollectStatsByMarket[selectedMarket] = _computeStatsForChannel(selectedMarket, products, _priceCollectMap[selectedMarket], marketFailed);
+    var stats = _priceCollectStatsByMarket[selectedMarket];
     _priceCollectStats = stats;
     // 테이블 리렌더링 — 뱃지에 도트/태그 반영 (편집모드 체크박스 보존)
     var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
@@ -8692,7 +8700,7 @@ async function _mwPriceCollect() {
       }
     }
     _updatePriceStatusBar();
-    alert('가격 수집 완료 (' + _selectedPriceMarket + ')\n전체: ' + stats.total + '건\n일치: ' + stats.match + ' | 차이: ' + stats.diff + ' | 품절: ' + stats.soldout + ' | 없음: ' + stats.notreg + ' | 실패: ' + stats.fail);
+    alert('가격 수집 완료 (' + marketLabel + ')\n전체: ' + stats.total + '건\n일치: ' + stats.match + ' | 차이: ' + stats.diff + ' | 품절: ' + stats.soldout + ' | 없음: ' + stats.notreg + ' | 실패: ' + stats.fail);
   } catch (err) {
     console.error('[가격수집] 오류:', err);
     alert('가격 수집 실패: ' + (err.message || err));
@@ -22800,6 +22808,16 @@ var _ipinv2CurrentItems = [];
 var _ipinv2AcTimer = null;
 var _ipinv2AcResults = [];
 var _ipinv2AcActiveInput = null;
+// [B-3-2-1] 통관비 상태 (수입건V2 _ipbat2Customs 복제, 3단계에서 invoice 기반으로 전환)
+var _ipinv2Customs = [];
+var _ipinv2CustomsCalcTimer = null;
+var _IPINV2_DEFAULT_CUSTOMS = [
+  { item_name: '통관수수료' },
+  { item_name: '선임' },
+  { item_name: '컨테이너 운송료' },
+  { item_name: '보세 운송료' },
+  { item_name: '공항 보험료' },
+];
 
 function _ipinv2Esc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
