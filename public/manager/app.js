@@ -28163,3 +28163,82 @@ window._tx = _tx;
     };
   }
 })();
+
+// ============================================================
+// v5.3: 가격 액션(수집/전송) 공통 헬퍼
+// ============================================================
+
+// 예상 시간 산출 (초 단위)
+function _estimatePriceActionSeconds(action, market, count, isSelection) {
+  if (action === '수집') {
+    if (market === 'naver') return isSelection ? 20 : 30;
+    if (market === 'ssg') {
+      if (!isSelection) return 60;
+      return Math.max(3, Math.ceil(count / 20) * 2);
+    }
+    return 30;
+  }
+  if (action === '전송') return Math.max(3, count * 2);
+  return 10;
+}
+
+function _formatPriceActionTime(seconds) {
+  if (seconds < 60) return seconds + '초';
+  var min = Math.floor(seconds / 60);
+  var sec = seconds % 60;
+  return sec > 0 ? (min + '분 ' + sec + '초') : (min + '분');
+}
+
+// 대상 결정 + 미리보기 confirm
+// 시그니처: ({ actionLabel, marketLabel, requireSelection }) => { products, codes, isSelection } | null
+function _resolvePriceActionTargets(opts) {
+  var actionLabel = opts.actionLabel;
+  var marketLabel = opts.marketLabel;
+  var requireSelection = !!opts.requireSelection;
+
+  var allProducts = (typeof DB !== 'undefined' && DB && DB.products) ? DB.products : [];
+  var indices = (typeof _mwEditMode !== 'undefined' && _mwEditMode && typeof _getCheckedProductIndices === 'function')
+    ? _getCheckedProductIndices()
+    : [];
+
+  // requireSelection: true이고 선택 0개 → alert 후 null
+  if (requireSelection && indices.length === 0) {
+    alert(actionLabel + '할 제품을 먼저 선택해주세요.');
+    return null;
+  }
+
+  var isSelection = indices.length > 0;
+  var products = isSelection
+    ? indices.map(function(i) { return allProducts[i]; }).filter(Boolean)
+    : allProducts.slice();
+
+  var codes = products
+    .map(function(p) { return String(p.code || '').trim(); })
+    .filter(function(c) { return c; });
+
+  // 미리보기 모델명: 3개 이하 전체, 4개 이상 3개 + "외 N건"
+  var previewModels;
+  if (products.length === 0) {
+    previewModels = '(없음)';
+  } else if (products.length <= 3) {
+    previewModels = products.map(function(p) { return p.model || p.code || '?'; }).join(', ');
+  } else {
+    var first3 = products.slice(0, 3).map(function(p) { return p.model || p.code || '?'; }).join(', ');
+    previewModels = first3 + ' 외 ' + (products.length - 3) + '건';
+  }
+
+  var market = (typeof window !== 'undefined' && window._selectedPriceMarket) || 'naver';
+  var seconds = _estimatePriceActionSeconds(actionLabel, market, products.length, isSelection);
+  var timeText = _formatPriceActionTime(seconds);
+  var modeLabel = isSelection ? '선택' : '전체';
+
+  var msg = marketLabel + ' 가격 ' + actionLabel + '\n\n' +
+    '대상: ' + previewModels + '\n' +
+    '총 ' + products.length.toLocaleString() + '건 (' + modeLabel + ')\n' +
+    '예상 시간: 약 ' + timeText + '\n\n' +
+    '진행하시겠습니까?';
+
+  if (!confirm(msg)) return null;
+
+  return { products: products, codes: codes, isSelection: isSelection };
+}
