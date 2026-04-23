@@ -25580,9 +25580,9 @@ function _ipbat2RenderCustomsSection() {
   h += '<div style="padding:14px 20px;">';
   h += '<table style="width:100%;border-collapse:collapse;font-family:Pretendard,sans-serif;">';
   var thS = 'padding:8px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;';
-  h += '<thead><tr><th style="' + thS + 'width:40px;text-align:center;">No.</th><th style="' + thS + 'text-align:left;">비용 항목</th><th style="' + thS + 'width:180px;text-align:right;">금액 (₩)</th><th style="' + thS + 'width:150px;text-align:center;">분류</th><th style="' + thS + 'width:60px;"></th></tr></thead><tbody>';
+  h += '<thead><tr><th style="' + thS + 'width:40px;text-align:center;">No.</th><th style="' + thS + 'text-align:left;">비용 항목</th><th style="' + thS + 'width:200px;text-align:right;">금액 (₩)</th><th style="' + thS + 'width:60px;"></th></tr></thead><tbody>';
   if (list.length === 0) {
-    h += '<tr><td colspan="5" style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;">통관 비용이 없습니다. [기본 항목 추가] 버튼으로 6개 기본 항목을 한번에 추가할 수 있습니다.</td></tr>';
+    h += '<tr><td colspan="4" style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;">통관 비용이 없습니다. [기본 항목 추가] 버튼으로 6개 기본 항목을 한번에 추가할 수 있습니다.</td></tr>';
   } else {
     var tdS = 'padding:6px 8px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;';
     var inpS2 = 'width:100%;height:28px;border:1px solid transparent;border-radius:4px;padding:0 6px;font-size:13px;font-family:Pretendard,sans-serif;background:transparent;box-sizing:border-box;';
@@ -25593,25 +25593,17 @@ function _ipbat2RenderCustomsSection() {
       h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
       h += '<td style="' + tdS + '"><input data-field="item_name" value="' + _ipbat2Esc(c.item_name) + '" style="' + inpS2 + '" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipbat2UpdateCustomsBlur(event,\'' + c.id + '\')"></td>';
       h += '<td style="' + tdS + 'text-align:right;"><input type="number" data-field="amount_krw" value="' + (c.amount_krw || 0) + '" style="' + inpS2 + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipbat2UpdateCustomsBlur(event,\'' + c.id + '\')" oninput="_ipbat2ScheduleCalc()"></td>';
-      h += '<td style="' + tdS + 'text-align:center;"><select data-field="classification" onchange="_ipbat2UpdateCustomsClassification(\'' + c.id + '\',this.value)" style="' + inpS2 + '"><option value="cost"' + (!isVat ? ' selected' : '') + '>원가 반영</option><option value="vat"' + (isVat ? ' selected' : '') + '>부가세 매입세액</option></select></td>';
       h += '<td style="' + tdS + 'text-align:center;"><button onclick="_ipbat2DeleteCustomsCost(\'' + c.id + '\')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #F0D2D2;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">✕</button></td>';
       h += '</tr>';
     });
   }
   h += '</tbody></table>';
 
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:12px;">';
-  h += '<div style="padding:10px 14px;background:#E6F1FB;border-radius:6px;">';
-  h += '<div style="font-size:11px;color:#185FA5;margin-bottom:2px;">원가성 통관비 합계</div>';
-  h += '<div style="font-size:15px;font-weight:500;color:#0C447C;">' + _ipbat2Krw(costSum) + '</div>';
-  h += '</div>';
-  h += '<div style="padding:10px 14px;background:#FCEBEB;border-radius:6px;">';
-  h += '<div style="font-size:11px;color:#CC2222;margin-bottom:2px;">부가세 합계</div>';
-  h += '<div style="font-size:15px;font-weight:500;color:#791F1F;">' + _ipbat2Krw(vatSum) + '</div>';
-  h += '</div>';
-  h += '<div style="padding:10px 14px;background:#1A1D23;color:#fff;border-radius:6px;">';
-  h += '<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:2px;">통관 비용 합계</div>';
-  h += '<div style="font-size:15px;font-weight:500;">' + _ipbat2Krw(total) + '</div>';
+  // B-2b: 단일 다크 박스 (우측 정렬, VAT 포함 총합)
+  h += '<div style="display:flex;justify-content:flex-end;margin-top:12px;">';
+  h += '<div style="padding:12px 20px;background:#1A1D23;color:#fff;border-radius:6px;min-width:320px;display:flex;align-items:center;justify-content:space-between;gap:20px;">';
+  h += '<div style="font-size:12px;color:rgba(255,255,255,0.7);font-weight:500;">통관 비용 총합 (VAT 포함)</div>';
+  h += '<div style="font-size:16px;font-weight:600;">' + _ipbat2Krw(total) + '</div>';
   h += '</div>';
   h += '</div>';
   h += '</div>';
@@ -25665,6 +25657,7 @@ function _ipbat2UpdateCustomsBlur(ev, id) {
     });
 }
 
+// [LEGACY] 분류 드롭다운 제거됨 (B-2b 커밋). 호출처 없음. B-3에서 재사용 가능성 위해 유지.
 function _ipbat2UpdateCustomsClassification(id, val) {
   fetch('/api/import-batches/' + _ipbat2State.currentBatchId + '/customs-costs', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, classification: val }) })
     .then(function(r) { return r.json(); })
