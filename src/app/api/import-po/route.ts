@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { brand, factory_code, factory_name, po_date, memo } = body || {};
+    const { brand, factory_code, factory_name, customer_code, customer_name, po_date, memo } = body || {};
 
     const year = new Date().getFullYear();
     // 동시성 대비: UNIQUE 충돌 시 최대 3회 재시도
@@ -93,6 +93,8 @@ export async function POST(request: NextRequest) {
         brand: brand ? String(brand).trim() || null : null,
         factory_code: factory_code ? String(factory_code).trim() || null : null,
         factory_name: factory_name ? String(factory_name).trim() || null : null,
+        customer_code: customer_code ? String(customer_code).trim() || null : null,
+        customer_name: customer_name ? String(customer_name).trim() || null : null,
         status: 'draft',
         total_quantity: 0,
         total_fob_usd: 0,
@@ -118,13 +120,15 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, po_date, brand, factory_code, factory_name, status, linked_invoice_id, memo, total_fob_usd, total_quantity } = body || {};
+    const { id, po_date, brand, factory_code, factory_name, customer_code, customer_name, status, linked_invoice_id, memo, total_fob_usd, total_quantity } = body || {};
     if (!id) return NextResponse.json({ success: false, error: 'id 필수' }, { status: 400 });
     const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (po_date !== undefined) payload.po_date = po_date;
     if (brand !== undefined) payload.brand = brand ? String(brand).trim() || null : null;
     if (factory_code !== undefined) payload.factory_code = factory_code ? String(factory_code).trim() || null : null;
     if (factory_name !== undefined) payload.factory_name = factory_name ? String(factory_name).trim() || null : null;
+    if (customer_code !== undefined) payload.customer_code = customer_code ? String(customer_code).trim() || null : null;
+    if (customer_name !== undefined) payload.customer_name = customer_name ? String(customer_name).trim() || null : null;
     if (status !== undefined) {
       if (!['draft', 'confirmed', 'linked', 'completed'].includes(status)) {
         return NextResponse.json({ success: false, error: 'status 값 오류' }, { status: 400 });

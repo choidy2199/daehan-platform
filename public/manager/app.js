@@ -20621,8 +20621,8 @@ function _poRenderDetail() {
   h += '<button class="btn-mini btn-mini-danger" onclick="_poDeleteSelectedProducts()"' + disabledAttr + '>삭제</button>';
   h += '</div></div>';
   // 검색줄 3:7 분할 (B-1c-1): 좌 거래처 / 우 제품 검색
-  var poCustName = (po && po.factory_name) || '';
-  var poCustCode = (po && po.factory_code) || '';
+  var poCustName = (po && po.customer_name) || '';
+  var poCustCode = (po && po.customer_code) || '';
   var poCustSelected = !!(poCustName && poCustCode);
   var poCustBorderColor = poCustSelected ? '#1D9E75' : '#E24B4A';
   var poCustLabelColor = poCustSelected ? '#1D9E75' : '#E24B4A';
@@ -20658,7 +20658,7 @@ function _poRenderDetail() {
     h += '<button class="btn-mini" id="po-btn-confirm" disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;">✓ 확정됨</button>';
   } else {
     // B-1c-1: 거래처 없으면 발주확정 disabled
-    var hasCustomer = !!(po && po.factory_name && po.factory_code);
+    var hasCustomer = !!(po && po.customer_name && po.customer_code);
     var confirmDisabledAttr = (hasError || noPo || !hasCustomer) ? ' disabled style="background:#DDE1EB;color:#5A6070;border-color:#DDE1EB;cursor:not-allowed;"' : '';
     var confirmLabel = (!hasError && !noPo && !hasCustomer) ? '✓ 발주확정 (거래처 필요)' : '✓ 발주확정';
     h += '<button class="btn-mini btn-mini-confirm" id="po-btn-confirm" onclick="_poConfirmOrder()"' + confirmDisabledAttr + '>' + confirmLabel + '</button>';
@@ -21184,8 +21184,8 @@ function _poCustomerSaveFields() {
   var val = _poCustomer.getValue();
   var newCode = val.code || null;
   var newName = val.name || null;
-  var oldCode = po.factory_code || null;
-  var oldName = po.factory_name || null;
+  var oldCode = po.customer_code || null;
+  var oldName = po.customer_name || null;
   if (newCode === oldCode && newName === oldName) return; // 변경 없음
 
   // 장바구니 있으면 confirm
@@ -21198,7 +21198,7 @@ function _poCustomerSaveFields() {
     }
   }
 
-  var payload = { id: po.id, factory_code: newCode, factory_name: newName };
+  var payload = { id: po.id, customer_code: newCode, customer_name: newName };
   fetch('/api/import-po', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     .then(function(r) { return r.json(); })
     .then(function(json) {
@@ -22212,7 +22212,7 @@ function _poBuildPdfHtml(po, items) {
   h += '<tr><th>발주번호</th><td>' + _poEsc(po.po_number || '-') + '</td></tr>';
   h += '<tr><th>발주일</th><td>' + poDateFmt + '</td></tr>';
   h += '<tr><th>브랜드</th><td>' + brandTxt + '</td></tr>';
-  h += '<tr><th>공장</th><td>' + _poEsc(po.factory_name || '-') + '</td></tr>';
+  h += '<tr><th>공장</th><td>' + _poEsc(po.customer_name || po.factory_name || '-') + '</td></tr>';
   h += '<tr><th>상태</th><td>' + statusLabel + '</td></tr>';
   h += '</table>';
   h += '</div>';
