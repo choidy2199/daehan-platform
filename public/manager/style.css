@@ -2923,3 +2923,39 @@ body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
   font-variant-numeric: tabular-nums;
   box-sizing: border-box;
 }
+
+/* ================================================================
+   [B-3-2-2b B] 제품 최종 원가 합계바 (<tfoot>)
+   ================================================================ */
+#tab-import-invoice-v2 .ipinv2-cost-table tfoot tr.ipinv2-cost-total-row {
+  background: #1A1D23;
+  color: #fff;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table tfoot td {
+  padding: 10px 6px;
+  color: #fff;
+  background: #1A1D23;
+  border-bottom: none;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table tfoot td.tot-label {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.75);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table tfoot td.tot-cell.total {
+  background: #1A1D23;
+}
+#tab-import-invoice-v2 .ipinv2-cost-table tfoot td.tot-cell.total .tot-value {
+  color: #FBBF24;
+  font-weight: 800;
+  font-size: 13px;
+}
