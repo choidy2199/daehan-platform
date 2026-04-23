@@ -131,6 +131,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
   border-radius: 6px;
   cursor: pointer;
   flex-shrink: 0;
+  margin: 6px 0;
   transition: background 0.12s;
 }
 .chrome-tab-home:hover { background: #2C2C2A; }
