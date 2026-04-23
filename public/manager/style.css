@@ -2591,8 +2591,8 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
   flex-wrap: nowrap !important;
 }
 
-/* v5.3 Hotfix #2: .mw-btn-edit 초기 숨김 강제 (일반모드에서 편집 버튼 노출 방지) */
-.mw-btn-edit { display: none; }
+/* v5.3 Hotfix #3: .btn-u 와 specificity 충돌 해결 (같은 클래스 2번으로 0,0,2,0) */
+.mw-btn-edit.mw-btn-edit { display: none; }
 
 /* 흰색바 입력요소 */
 .lb-search {
