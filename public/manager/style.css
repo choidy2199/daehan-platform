@@ -2670,9 +2670,21 @@ body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
   border-radius: 6px;
   flex-shrink: 0;
 }
-/* Hotfix #4의 div.mw-btn-edit.mw-btn-edit { display:inline-block !important } 덮어쓰기 */
-body.mw-edit-active .lb-edit-tools.mw-btn-edit {
+/* Hotfix #4의 div.mw-btn-edit.mw-btn-edit { display:inline-block !important } 덮어쓰기 — div. prefix로 specificity 0,0,3,1 매칭 후 후행 정의 우선 */
+body.mw-edit-active div.lb-edit-tools.mw-btn-edit {
   display: flex !important;
+}
+
+/* v5.3 Hotfix #7: mw-btn-normal CSS body class 토글 (inline style 의존 제거) */
+.mw-btn-normal.mw-btn-normal {
+  display: inline-flex !important;  /* 기본: 일반모드에서 보임 */
+}
+body.mw-edit-active .mw-btn-normal.mw-btn-normal {
+  display: none !important;  /* 편집모드: 숨김 */
+}
+/* sep 구분선은 flex 아닌 block */
+body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
+  display: none !important;
 }
 
 /* v5.3 Hotfix #5: ps-mt-active + data-market 기반 (app.js와 클래스 동기화) */
