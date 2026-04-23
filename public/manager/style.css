@@ -2659,9 +2659,14 @@ body.mw-edit-active .mw-btn-edit.mw-btn-edit.mw-dark-sep {
   background: #EAEDF3;
   color: #1A1D23;
 }
-.lb-market .lb-market-btn.active-nv { background: #1D9E75; color: white; font-weight: 600; border-right-color: #14764E; }
-.lb-market .lb-market-btn.active-op { background: #185FA5; color: white; font-weight: 600; border-right-color: #0C447C; }
-.lb-market .lb-market-btn.active-ssg { background: #B8860B; color: white; font-weight: 600; border-right-color: #7A5C00; }
+/* v5.3 Hotfix #5: ps-mt-active + data-market 기반 (app.js와 클래스 동기화) */
+.lb-market .lb-market-btn.ps-mt-active {
+  color: white;
+  font-weight: 600;
+}
+.lb-market .lb-market-btn.ps-mt-active[data-market="naver"]   { background: #1D9E75; border-right-color: #14764E; }
+.lb-market .lb-market-btn.ps-mt-active[data-market="gmarket"] { background: #185FA5; border-right-color: #0C447C; }
+.lb-market .lb-market-btn.ps-mt-active[data-market="ssg"]     { background: #B8860B; border-right-color: #7A5C00; }
 
 /* 상태 뱃지 (신규 — ps-pill) */
 /* 기존 #mw-price-status-bar .ps-item(0,1,1,0) 덮으려 #mw-price-status-bar prefix */
