@@ -25592,7 +25592,8 @@ function _ipbat2RenderCustomsSection() {
       h += '<tr data-cust-id="' + c.id + '" style="' + rowBg + '">';
       h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
       h += '<td style="' + tdS + '"><input data-field="item_name" value="' + _ipbat2Esc(c.item_name) + '" style="' + inpS2 + '" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipbat2UpdateCustomsBlur(event,\'' + c.id + '\')"></td>';
-      h += '<td style="' + tdS + 'text-align:right;"><input type="number" data-field="amount_krw" value="' + (c.amount_krw || 0) + '" style="' + inpS2 + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipbat2UpdateCustomsBlur(event,\'' + c.id + '\')" oninput="_ipbat2ScheduleCalc()"></td>';
+      var amtFormatted = c.amount_krw > 0 ? Number(c.amount_krw).toLocaleString('en-US') : '';
+      h += '<td style="' + tdS + 'text-align:right;"><input type="text" inputmode="numeric" data-field="amount_krw" value="' + amtFormatted + '" placeholder="0" style="' + inpS2 + 'text-align:right;" onfocus="this.style.border=\'1px solid #185FA5\'" onblur="_ipbat2UpdateCustomsBlur(event,\'' + c.id + '\')" oninput="_ipbat2FormatCustomsAmount(this);_ipbat2ScheduleCalc()" onkeydown="_ipbat2CustomsAmountKeydown(event,\'' + c.id + '\')"></td>';
       h += '<td style="' + tdS + 'text-align:center;"><button onclick="_ipbat2DeleteCustomsCost(\'' + c.id + '\')" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #F0D2D2;background:#FCEBEB;color:#791F1F;cursor:pointer;font-family:Pretendard,sans-serif;">✕</button></td>';
       h += '</tr>';
     });
@@ -25639,7 +25640,7 @@ function _ipbat2UpdateCustomsBlur(ev, id) {
   var inp = ev.target;
   inp.style.border = '1px solid transparent';
   var field = inp.getAttribute('data-field');
-  var val = field === 'amount_krw' ? (Number(inp.value) || 0) : (inp.value || '').trim();
+  var val = field === 'amount_krw' ? (Number((inp.value || '').replace(/,/g, '')) || 0) : (inp.value || '').trim();
   var old = _ipbat2Customs.find(function(c) { return c.id === id; });
   if (!old) return;
   if (String(val) === String(old[field] == null ? '' : old[field])) return;
@@ -25655,6 +25656,43 @@ function _ipbat2UpdateCustomsBlur(ev, id) {
         _ipbat2ScheduleCalc();
       } else alert(json.error || '수정 실패');
     });
+}
+
+// [B-2b-ux] 실시간 천단위 콤마 포맷팅
+function _ipbat2FormatCustomsAmount(inp) {
+  var raw = (inp.value || '').replace(/[^0-9]/g, '');
+  if (!raw) {
+    inp.value = '';
+    return;
+  }
+  inp.value = Number(raw).toLocaleString('en-US');
+}
+
+// [B-2b-ux] Enter 키로 다음 금액 input 포커스 이동 (마지막 행은 멈춤)
+// 주의: setTimeout 내부에서 DOM 재조회 — blur → 재렌더 후 stale DOM 방지
+function _ipbat2CustomsAmountKeydown(ev, id) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  // 현재 인덱스를 blur 전에 캡처
+  var allAmountInputs = document.querySelectorAll('#ipbat2-customs-section input[data-field="amount_krw"]');
+  var currentIdx = -1;
+  for (var i = 0; i < allAmountInputs.length; i++) {
+    if (allAmountInputs[i] === ev.target) { currentIdx = i; break; }
+  }
+  // blur → 저장 → 재렌더 트리거
+  ev.target.blur();
+  // setTimeout 내부에서 DOM 재조회 (재렌더 후 fresh DOM)
+  if (currentIdx >= 0) {
+    setTimeout(function() {
+      var freshInputs = document.querySelectorAll('#ipbat2-customs-section input[data-field="amount_krw"]');
+      var nextInput = freshInputs[currentIdx + 1];
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.select();
+      }
+      // 마지막 행이면 nextInput이 undefined → 포커스 유지 (아무것도 안 함)
+    }, 100);
+  }
 }
 
 // [LEGACY] 분류 드롭다운 제거됨 (B-2b 커밋). 호출처 없음. B-3에서 재사용 가능성 위해 유지.
