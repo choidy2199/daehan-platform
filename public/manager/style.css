@@ -869,12 +869,32 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-mc-empty { color: var(--color-text-tertiary, #9CA3AF); }
 
 /* 제품·발주 좌측 제품 목록 — 컬럼 리사이즈 핸들 */
+#po-product-table thead th { position: relative; }
 #po-product-table th .col-resize {
   position: absolute; right: -1px; top: 0; width: 7px; height: 100%;
   cursor: col-resize; user-select: none; z-index: 11;
 }
 #po-product-table th .col-resize:hover,
 #po-product-table th .col-resize.active { background: var(--tl-primary, #185FA5); opacity: 0.6; }
+
+/* 좌측 제품 목록 컬럼 구분바 (옵션1: 세로 실선, 다크 헤더 위) */
+/* 첫 번째 th는 '+ th' 셀렉터 특성상 자동 제외 */
+#po-product-table thead th + th::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+  z-index: 1;
+}
+/* 호버 시 파란색 강조 (col-resize 핸들 z-index: 11 > 1 이라 핸들 클릭 영향 없음) */
+#po-product-table thead th:hover::before {
+  background: rgba(130, 180, 255, 0.7);
+  width: 2px;
+}
 
 /* 제품·발주 좌측 제품 목록 — 컬럼초기화 텍스트 링크 */
 .po-col-reset-link {
