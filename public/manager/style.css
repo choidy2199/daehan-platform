@@ -2555,8 +2555,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-row-btn:hover:not(:disabled) { background:#F4F6FA; border-color:#B0B8CC; }
 .po-row-btn-pdf { color:#185FA5; border-color:#185FA5; }
 .po-row-btn-pdf:hover { background:#E6F1FB; }
-.po-row-btn-invoice-pending { background:#CC2222; color:#fff; border-color:#CC2222; }
-.po-row-btn-invoice-pending:hover { background:#A81A1A; border-color:#A81A1A; }
+/* 2026-04-24 Stage 3: 인보이스 연결 대기 버튼 — 빨강 → 파랑 (비파괴 액션) + 호버 블루 틴트 */
+.po-row-btn-invoice-pending { background:#fff; color:#378ADD; border-color:#378ADD; }
+.po-row-btn-invoice-pending:hover { background: rgba(55, 138, 221, 0.08); color:#378ADD; border-color:#378ADD; }
 .po-row-btn-invoice-linked { background:#DDE1EB; color:#5A6070; border-color:#DDE1EB; cursor:default; }
 .po-row-btn-invoice-linked:hover { background:#DDE1EB; }
 .po-list-current-label { color:#9BA3B2; font-size:12px; font-style:italic; }
@@ -2574,7 +2575,13 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-list-empty-row td { height:37px; padding:0 !important; border-bottom:1px solid #F0F2F7; background:#fff !important; cursor:default !important; pointer-events:none; }
 
 /* 리스트 모달 body 최소 높이 — 0건일 때도 동일 높이 유지 */
-#po-list-modal .po-picker-body { min-height:440px; }
+/* 2026-04-24 Stage 3: 팝업 본문 내부 여백 (디자인 시스템 16px 24px 8px 규약 반영) */
+#po-list-modal .po-picker-body { min-height:440px; padding: 16px 24px; }
+/* 자식 요소의 기존 16px 들여쓰기 상쇄 — body padding 24px로 단일화 */
+#po-list-modal .po-picker-body .po-filter-row { margin-left: 0; margin-right: 0; }
+#po-list-modal .po-picker-body .po-pagination-wrapper { padding-left: 0; padding-right: 0; }
+/* 액션 컬럼 우측 여백 — PDF/🔗 인보이스 버튼이 테이블 우측에 딱 붙지 않도록 */
+#po-list-modal .po-list-table td.po-list-td-actions { padding-right: 16px; }
 
 /* 필터 레이아웃 (상태 탭 + 날짜 필터) */
 .po-filter-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:10px 16px 0 16px; flex-wrap:wrap; position:relative; }
