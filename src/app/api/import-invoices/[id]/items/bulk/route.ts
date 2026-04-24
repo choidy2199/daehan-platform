@@ -17,6 +17,7 @@ type ItemInput = {
   pallet_qty?: number;
   is_pallet_line?: boolean;
   memo?: string | null;
+  management_code?: string | null;
 };
 
 async function recalcInvoiceTotals(invoiceId: string): Promise<void> {
@@ -59,6 +60,7 @@ export async function POST(
           pallets: Number(r.pallets) || 0,
           is_pallet_line: !!r.is_pallet_line,
           memo: r.memo ? String(r.memo).trim() || null : null,
+          management_code: r.management_code ? String(r.management_code).trim() || null : null,
         };
       });
 

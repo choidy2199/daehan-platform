@@ -70,15 +70,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { invoice_no, batch_id, factory_name, factory_code, invoice_date, payment_terms, memo, customer_code, customer_name } = body || {};
-    if (!invoice_no || !factory_name || !invoice_date) {
-      return NextResponse.json({ success: false, error: '인보이스 번호, 공장명, 인보이스 일자는 필수입니다' }, { status: 400 });
+    if (!invoice_no || !invoice_date) {
+      return NextResponse.json({ success: false, error: '인보이스 번호, 인보이스 일자는 필수입니다' }, { status: 400 });
     }
     const { data, error } = await supabase
       .from('import_invoices')
       .insert({
         invoice_no: String(invoice_no).trim(),
         batch_id: batch_id || null,
-        factory_name: String(factory_name).trim(),
+        factory_name: factory_name ? String(factory_name).trim() : null,
         factory_code: factory_code?.trim() || null,
         invoice_date,
         payment_terms: payment_terms?.trim() || null,

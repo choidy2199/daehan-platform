@@ -22163,7 +22163,8 @@ function _poOpenInvoiceLink(poId) {
           name: it.product_name || null,
           qty: poQty,
           fob_usd: Number(it.fob_usd) || 0,
-          pallet_qty: invPalletCount
+          pallet_qty: invPalletCount,
+          management_code: it.management_code || null
         };
       });
       return fetch('/api/import-invoices/' + ctx.invoice.id + '/items/bulk', {

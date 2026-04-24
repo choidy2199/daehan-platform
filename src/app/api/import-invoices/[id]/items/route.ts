@@ -37,7 +37,7 @@ export async function POST(
   try {
     const { id: invoiceId } = await context.params;
     const body = await request.json();
-    const { line_no, model, name, qty, fob_usd, pallet_qty, pallets, is_pallet_line, memo } = body || {};
+    const { line_no, model, name, qty, fob_usd, pallet_qty, pallets, is_pallet_line, memo, management_code } = body || {};
     if (!model) return NextResponse.json({ success: false, error: '모델은 필수입니다' }, { status: 400 });
     const qtyN = Number(qty) || 0;
     const fobN = Number(fob_usd) || 0;
@@ -56,6 +56,7 @@ export async function POST(
         pallets: Number(pallets) || 0,
         is_pallet_line: !!is_pallet_line,
         memo: memo?.trim() || null,
+        management_code: management_code?.trim() || null,
       })
       .select('*')
       .single();
@@ -79,7 +80,7 @@ export async function PUT(
     if (!id) return NextResponse.json({ success: false, error: 'id 필수' }, { status: 400 });
 
     const payload: Record<string, unknown> = {};
-    const allowed = ['line_no', 'model', 'name', 'qty', 'fob_usd', 'pallet_qty', 'pallets', 'is_pallet_line', 'memo'];
+    const allowed = ['line_no', 'model', 'name', 'qty', 'fob_usd', 'pallet_qty', 'pallets', 'is_pallet_line', 'memo', 'management_code'];
     for (const k of allowed) {
       if (k in fields) {
         const v = (fields as Record<string, unknown>)[k];
