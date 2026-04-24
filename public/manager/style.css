@@ -885,6 +885,14 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .iv-validation-badge-error   { background: #FEE2E2; color: #991B1B; }
 .iv-validation-badge-pending { background: #E5E7EB; color: #374151; }
 
+/* Stage 5: 다크바 내부 검증 뱃지 3상태 (data-status 기반, 다크 배경용 고대비 색상) */
+.iv-cell.iv-validation-badge[data-status="ok"]      { background: #10B981; color: #FFFFFF; border-radius: 6px; }
+.iv-cell.iv-validation-badge[data-status="error"]   { background: #DC2626; color: #FFFFFF; border-radius: 6px; }
+.iv-cell.iv-validation-badge[data-status="pending"] { background: #6B7280; color: #FFFFFF; border-radius: 6px; }
+
+/* Stage 5: 다크바 통관비용 셀 (연한 주황 배경) */
+.iv-cell-customs { background: rgba(245, 158, 11, 0.18); border-radius: 6px; }
+
 /* 제품·발주 좌측 제품 목록 — 컬럼 리사이즈 핸들 */
 #po-product-table thead th { position: relative; }
 #po-product-table th .col-resize {

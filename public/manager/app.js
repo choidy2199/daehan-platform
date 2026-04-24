@@ -24902,41 +24902,10 @@ function _ipinv2RenderSummaryBar() {
   h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">할인(' + discountRate + '%)</span><span style="' + valS + 'color:#FCA5A5;">-' + _ipinv2Money(discountAmount) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">팔렛(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valS + 'color:#BAE6FD;">+' + _ipinv2Money(palletTotal) + '</span></div>';
-  // [Stage 4 Phase B-2 V-F] 우측 그룹: 검증 뱃지 + 최종 금액
-  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:10px;">';
-  h += _ipinv2RenderValidationBadge();
-  // [B-3-2-2c 2] 최종 금액 소수점 절삭
-  h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 12px;background:rgba(255,255,255,0.08);border-radius:6px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:17px;color:#fff;font-weight:700;">' + _ipinv2UsdFloor(finalTotal) + '</span></div>';
-  h += '</div>';
+  // [Stage 5] Stage 4 B-2의 검증 뱃지 제거 — 실제 다크바(_ipinv2RenderCombinedSummary) 내부로 통합됨.
+  // 최종 금액 박스만 유지.
+  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:4px 12px;background:rgba(255,255,255,0.08);border-radius:6px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:17px;color:#fff;font-weight:700;">' + _ipinv2UsdFloor(finalTotal) + '</span></div>';
   bar.innerHTML = h;
-}
-
-// [Stage 4 Phase B-2 V-F] 검증 뱃지 렌더 HTML 반환
-// 공식: (송금합계 + 통관비) = 공급가합계 + 부가세합계 → 오차 0원 필수
-// 구현 기준: totals.total_paid vs (totals.supply_price + totals.vat_alloc)
-// total_paid = sum(completed payments) + costTotal + vatTotal
-// supply_price_sum + vat_alloc = (totalFobKrw + costTotal) + vatTotal
-// 이론상 차이 = totalFobKrw - payment_sum (정상이면 0)
-function _ipinv2RenderValidationBadge() {
-  var calc = _ipinv2CostCalcLocal;
-  var badgeBase = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;font-family:Pretendard,sans-serif;white-space:nowrap;';
-  // 계산 불가 또는 데이터 없음 → 중립
-  if (!calc || !calc.can_calculate) {
-    return '<span class="iv-validation-badge iv-validation-badge-pending" style="' + badgeBase + 'background:#E5E7EB;color:#374151;">— 송금 대기</span>';
-  }
-  var totals = calc.totals || {};
-  var totalPaid = Number(totals.total_paid || 0);
-  var supplySum = Number(totals.supply_price || 0);
-  var vatSum = Number(totals.vat_alloc || 0);
-  var expected = supplySum + vatSum;
-  var diff = totalPaid - expected;
-  var absDiff = Math.abs(diff);
-  if (absDiff < 1) {
-    return '<span class="iv-validation-badge iv-validation-badge-ok" style="' + badgeBase + 'background:#D1FAE5;color:#065F46;">✓ 이상없음</span>';
-  }
-  var sign = diff > 0 ? '+' : '-';
-  var diffTxt = sign + Math.round(absDiff).toLocaleString('en-US');
-  return '<span class="iv-validation-badge iv-validation-badge-error" style="' + badgeBase + 'background:#FEE2E2;color:#991B1B;" title="총 지불: ' + _ipinv2Num(totalPaid) + ' / 공급가+부가세: ' + _ipinv2Num(expected) + '">⚠ 오차 ' + diffTxt + '원</span>';
 }
 
 // 수입건V2로 이동
@@ -26277,6 +26246,34 @@ function _ipinv2RenderCombinedSummary() {
   var group1Krw = confirmed.filter(function(p) { return p.seq % 2 === 1; }).reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
   var group2Krw = confirmed.filter(function(p) { return p.seq % 2 === 0; }).reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
 
+  // [Stage 5] 통관비용 합계 + 원화 총 지불액 재계산 (송금 + 통관비용)
+  var customsTotal = (_ipinv2Customs || []).reduce(function(s, c) { return s + (Number(c && c.amount_krw) || 0); }, 0);
+  var sumKrwWithCustoms = sumKrw + customsTotal;
+
+  // [Stage 5] 검증 뱃지 상태 계산
+  // 공식: (1차송금 + 2차송금 + 통관비용) = 공급가합계 × 1.1 → 오차 0원 필수
+  var calc = _ipinv2CostCalcLocal;
+  var canCalc = calc && calc.can_calculate === true;
+  var supplyTotal = (calc && calc.totals) ? Number(calc.totals.supply_price || 0) : 0;
+  var expected = canCalc ? Math.round(supplyTotal * 1.1) : 0;
+  var diff = canCalc ? (sumKrwWithCustoms - expected) : 0;
+  var absDiff = Math.abs(diff);
+  var vStatus, vLabel;
+  if (!canCalc) {
+    vStatus = 'pending';
+    vLabel = '— 송금 대기';
+  } else if (absDiff >= 1) {
+    vStatus = 'error';
+    vLabel = '⚠ ' + (diff > 0 ? '+' : '-') + Math.round(absDiff).toLocaleString('en-US') + '원';
+  } else {
+    vStatus = 'ok';
+    vLabel = '✓ 이상없음';
+  }
+  var vBg = (vStatus === 'ok') ? '#10B981' : (vStatus === 'error' ? '#DC2626' : '#6B7280');
+  var vTitle = canCalc
+    ? ('공급가합계×1.1: ₩' + expected.toLocaleString('en-US') + ' / 실지출(송금+통관): ₩' + sumKrwWithCustoms.toLocaleString('en-US'))
+    : '송금 미완료로 배분 불가';
+
   // 스타일
   var lblS = 'font-size:10px;color:rgba(255,255,255,0.5);';
   var valS = 'font-size:13px;color:#fff;font-weight:500;line-height:1.3;';
@@ -26309,10 +26306,16 @@ function _ipinv2RenderCombinedSummary() {
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="' + colS + '"><span style="' + lblS + '">2차 송금</span><span style="' + valS + '">' + _ipinv2Krw(group2Krw) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
-  // 원화 총 지불액 (주황 박스)
-  h += '<div style="display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:#EF9F27;border-radius:6px;min-width:max-content;">';
+  // [Stage 5] 통관비용 셀 (연한 주황 배경)
+  h += '<div class="iv-cell-customs" style="display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:rgba(245,158,11,0.18);border-radius:6px;min-width:max-content;">';
+  h += '<span style="font-size:10px;color:#FCD34D;font-weight:500;">통관비용</span>';
+  h += '<span style="font-size:15px;font-weight:700;color:#FCD34D;">' + _ipinv2Krw(customsTotal) + '</span>';
+  h += '</div>';
+  h += '<span style="' + sepS + '"></span>';
+  // 원화 총 지불액 (주황 박스) — [Stage 5] 통관비용 포함된 합계로 변경
+  h += '<div style="display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:#EF9F27;border-radius:6px;min-width:max-content;" title="1차송금 + 2차송금 + 통관비용">';
   h += '<span style="font-size:10px;color:#1A1D23;font-weight:500;">원화 총 지불액</span>';
-  h += '<span style="font-size:15px;font-weight:700;color:#1A1D23;">' + _ipinv2Krw(sumKrw) + '</span>';
+  h += '<span style="font-size:15px;font-weight:700;color:#1A1D23;">' + _ipinv2Krw(sumKrwWithCustoms) + '</span>';
   h += '</div>';
   h += '<span style="' + sepS + '"></span>';
   // 가중평균 환율 (빨강 박스)
@@ -26323,6 +26326,12 @@ function _ipinv2RenderCombinedSummary() {
   } else {
     h += '<span style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.6);">—</span>';
   }
+  h += '</div>';
+  h += '<span style="' + sepS + '"></span>';
+  // [Stage 5] 검증 뱃지 (마지막 셀) — 다른 박스와 동일 구조, data-status 3상태
+  h += '<div class="iv-cell iv-validation-badge" data-status="' + vStatus + '" style="display:flex;flex-direction:column;gap:2px;padding:6px 14px;background:' + vBg + ';color:#fff;border-radius:6px;min-width:max-content;" title="' + vTitle + '">';
+  h += '<span style="font-size:10px;color:#fff;opacity:0.85;font-weight:500;">검증</span>';
+  h += '<span style="font-size:13px;font-weight:700;color:#fff;">' + vLabel + '</span>';
   h += '</div>';
 
   bar.innerHTML = h;
