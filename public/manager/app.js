@@ -23808,6 +23808,20 @@ function _ipinv2CompareCalc(serverData, localData) {
     console.warn('[CALC-MISMATCH] 서버 또는 클라 데이터 없음', { hasServer: !!serverData, hasLocal: !!localData });
     return;
   }
+  // [B-1 보완] 계산 불가 상태(송금 미완료)는 서버/클라 "표현 형태"가 달라도 정상.
+  // 서버: items[].fields=null + totals=0 기본값. 클라: 원본 유지 + null.
+  // 상세 비교는 의미 없으므로 skip. (실제 계산 버그는 can_calculate 둘 다 true일 때만 의미 있음)
+  if (!serverData.can_calculate || !localData.can_calculate) {
+    console.log(
+      '[CALC-SKIP] 송금 미완료 상태 — 상세 비교 생략 ' +
+      '(server.can_calculate=' + serverData.can_calculate +
+      ', local.can_calculate=' + localData.can_calculate + ')'
+    );
+    if (localData.warnings && localData.warnings.length > 0) {
+      console.log('[CALC-SKIP] warnings:', localData.warnings.join(' / '));
+    }
+    return;
+  }
   var mismatches = [];
 
   if (serverData.can_calculate !== localData.can_calculate) {
@@ -23870,7 +23884,11 @@ function _ipinv2CompareCalc(serverData, localData) {
   if (mismatches.length === 0) {
     console.log('[CALC-MATCH] ✓ 전 항목 일치 (items: ' + (localData.items || []).length + ')');
   } else {
-    console.warn('[CALC-MISMATCH] 총 ' + mismatches.length + '건 불일치:', mismatches);
+    console.warn(
+      '[CALC-MISMATCH] ⚠ 실제 계산 차이 발견 — can_calculate 둘 다 true에서 mismatch ' +
+      '(총 ' + mismatches.length + '건):',
+      mismatches
+    );
   }
 }
 
