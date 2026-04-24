@@ -26250,17 +26250,21 @@ function _ipinv2RenderCombinedSummary() {
   var customsTotal = (_ipinv2Customs || []).reduce(function(s, c) { return s + (Number(c && c.amount_krw) || 0); }, 0);
   var sumKrwWithCustoms = sumKrw + customsTotal;
 
-  // [Stage 5-2] 검증 뱃지 4상태 확장 + 호버 툴팁 다줄
-  // 공식: (1차송금 + 2차송금 + 통관비용) = 공급가합계 × 1.1 → 오차 0원 필수
+  // [Stage 5-3] 검증 뱃지 — 공식 수정 (부가세 이중 계산 버그 해결)
+  // 이전(5-2): supply_price × 1.1 → 공급가 안에 이미 cost_alloc 포함이므로 VAT 이중가산
+  // 현재(5-3): supply_price + vat_alloc (둘 다 totals에 분리 배분된 정확한 값)
+  // 공식: (1차송금 + 2차송금 + 통관비용) = 공급가합계 + 부가세합계
+  // 허용 오차: 10원 (Math.round + overflow_absorber 보정 누적으로 수원 단위 오차는 정상)
   // 상태:
-  //   ok              — 정상 (오차 < 1원)
-  //   error           — 실제 회계 오차 (오차 ≥ 1원, 통관비용 입력된 상태)
-  //   pending_customs — 신규: 송금 완료 + 통관 항목은 있지만 전부 0원 (통관 절차 대기)
+  //   ok              — 정상 (오차 < 10원)
+  //   error           — 실제 회계 오차 (오차 ≥ 10원, 통관비용 입력된 상태)
+  //   pending_customs — 송금 완료 + 통관 항목은 있지만 전부 0원 (통관 절차 대기)
   //   pending_payment — 송금 미완료 (can_calculate=false)
   var calc = _ipinv2CostCalcLocal;
   var canCalc = calc && calc.can_calculate === true;
   var supplyTotal = (calc && calc.totals) ? Number(calc.totals.supply_price || 0) : 0;
-  var expected = canCalc ? Math.round(supplyTotal * 1.1) : 0;
+  var vatTotal = (calc && calc.totals) ? Number(calc.totals.vat_alloc || 0) : 0;
+  var expected = canCalc ? (supplyTotal + vatTotal) : 0;
   var diff = canCalc ? (sumKrwWithCustoms - expected) : 0;
   var absDiff = Math.abs(diff);
   var customsLen = (_ipinv2Customs || []).length;
@@ -26270,10 +26274,11 @@ function _ipinv2RenderCombinedSummary() {
     vStatus = 'pending_payment';
     vLabel = '— 송금 대기';
   } else if (customsLen > 0 && customsTotal === 0) {
-    // [Stage 5-2 신규] 송금은 완료됐으나 통관비용이 아직 전부 0원 — 통관 절차 대기 중
+    // 송금은 완료됐으나 통관비용이 아직 전부 0원 — 통관 절차 대기 중
     vStatus = 'pending_customs';
     vLabel = '🟡 통관 대기';
-  } else if (absDiff >= 1) {
+  } else if (absDiff >= 10) {
+    // [Stage 5-3] 허용 오차 1 → 10 (round 노이즈 허용)
     vStatus = 'error';
     vLabel = '⚠ ' + (diff > 0 ? '+' : '-') + Math.round(absDiff).toLocaleString('en-US') + '원';
   } else {
@@ -26294,15 +26299,15 @@ function _ipinv2RenderCombinedSummary() {
     vTitleLines = [
       '송금 미완료로 배분 불가',
       '',
-      '공식: (1차송금 + 2차송금 + 통관비용) = 공급가 × 1.1'
+      '공식: (1차송금 + 2차송금 + 통관비용) = 공급가합계 + 부가세합계'
     ];
   } else {
     vTitleLines = [
       '좌변: 1차+2차송금 ' + sumKrw.toLocaleString('en-US') + '원 + 통관비용 ' + customsTotal.toLocaleString('en-US') + '원 = ' + sumKrwWithCustoms.toLocaleString('en-US') + '원',
-      '우변: 공급가합계 ' + supplyTotal.toLocaleString('en-US') + '원 × 1.1 = ' + expected.toLocaleString('en-US') + '원',
+      '우변: 공급가합계 ' + supplyTotal.toLocaleString('en-US') + '원 + 부가세 ' + vatTotal.toLocaleString('en-US') + '원 = ' + expected.toLocaleString('en-US') + '원',
       '차이: ' + (diff >= 0 ? '+' : '') + diff.toLocaleString('en-US') + '원',
       '',
-      '공식: (1차송금 + 2차송금 + 통관비용) = 공급가 × 1.1'
+      '공식: (1차송금 + 2차송금 + 통관비용) = 공급가합계 + 부가세합계'
     ];
   }
   var vTitle = vTitleLines.join('\n').replace(/"/g, '&quot;');
