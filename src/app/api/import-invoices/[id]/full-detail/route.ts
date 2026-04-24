@@ -21,10 +21,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// [Stage 4-3] Node → Edge 전환. Cold start 1,000~1,500ms → ~50ms 기대.
-// 롤백: runtime = 'nodejs' 복구 후 재배포.
-// 호환성: @supabase/supabase-js v2 = fetch 기반 (edge OK), next/server = edge 지원.
-export const runtime = 'edge';
+// [Stage 4-3 롤백, 2026-04-24] Edge runtime 전환 실패 → nodejs 복구.
+// 실측: Stage 4-2 1,990ms → Stage 4-3 Edge 8,063ms (4배 악화)
+// 원인: Supabase ap-southeast-2 (Sydney) + Vercel Edge 전 세계 분산 조합에서
+//       TLS 재핸드셰이크 + 7 쿼리 병렬 직렬화 오버헤드 누적. Edge의 cold start 이점이
+//       네트워크 지연으로 상쇄됨. 현 리전 구성에선 nodejs runtime이 최적.
+// 교훈: Supabase + Vercel Edge 전환 시 반드시 리전 일치 여부 + 실측 A/B 확인.
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';  // invoice는 실시간 데이터 — 캐시 방지
 
 const supabase = createClient(
