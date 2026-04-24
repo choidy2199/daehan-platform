@@ -885,10 +885,15 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .iv-validation-badge-error   { background: #FEE2E2; color: #991B1B; }
 .iv-validation-badge-pending { background: #E5E7EB; color: #374151; }
 
-/* Stage 5: 다크바 내부 검증 뱃지 3상태 (data-status 기반, 다크 배경용 고대비 색상) */
-.iv-cell.iv-validation-badge[data-status="ok"]      { background: #10B981; color: #FFFFFF; border-radius: 6px; }
-.iv-cell.iv-validation-badge[data-status="error"]   { background: #DC2626; color: #FFFFFF; border-radius: 6px; }
-.iv-cell.iv-validation-badge[data-status="pending"] { background: #6B7280; color: #FFFFFF; border-radius: 6px; }
+/* Stage 5: 다크바 내부 검증 뱃지 (data-status 기반, 다크 배경용 고대비 색상) */
+/* Stage 5-2: pending → pending_payment 리네이밍 + pending_customs 4번째 상태 추가 */
+.iv-cell.iv-validation-badge                         { cursor: help; }
+.iv-cell.iv-validation-badge[data-status="ok"]              { background: #10B981; color: #FFFFFF; border-radius: 6px; }
+.iv-cell.iv-validation-badge[data-status="error"]           { background: #DC2626; color: #FFFFFF; border-radius: 6px; }
+.iv-cell.iv-validation-badge[data-status="pending_customs"] { background: #F59E0B; color: #FFFFFF; border-radius: 6px; }
+.iv-cell.iv-validation-badge[data-status="pending_payment"] { background: #6B7280; color: #FFFFFF; border-radius: 6px; }
+/* 하위 호환: Stage 5의 'pending' 값이 남아있어도 회색 처리 (fallback) */
+.iv-cell.iv-validation-badge[data-status="pending"]         { background: #6B7280; color: #FFFFFF; border-radius: 6px; }
 
 /* Stage 5: 다크바 통관비용 셀 (연한 주황 배경) */
 .iv-cell-customs { background: rgba(245, 158, 11, 0.18); border-radius: 6px; }
