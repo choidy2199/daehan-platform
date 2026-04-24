@@ -92,7 +92,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 .main-area { flex:1; display:flex; flex-direction:column; min-width:0; overflow:hidden; }
 
 /* ===== CHROME TAB BAR ===== */
-.chrome-tab-bar { height:38px; display:flex; align-items:flex-end; background:#e8e4df; padding:0 8px; flex-shrink:0; gap:0; user-select:none; }
+.chrome-tab-bar { height:44px; display:flex; align-items:center; background:#e8e4df; padding:0 8px; flex-shrink:0; gap:0; user-select:none; }
 /* ==================== CHROME TAB BAR (V1 필터 뱃지 스타일) ==================== */
 
 /* 탭 목록 컨테이너 — 가로 스크롤 */
@@ -100,7 +100,7 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px;
+  padding: 0 6px;
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1;
@@ -118,11 +118,11 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 
 /* 홈 탭 — 다크 라운드 */
 .chrome-tab-home {
-  width: 24px;
-  min-width: 24px;
-  max-width: 24px;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
   border: none;
-  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -131,14 +131,13 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
   border-radius: 6px;
   cursor: pointer;
   flex-shrink: 0;
-  margin: 0 0 10px 0;
   transition: background 0.12s;
 }
 .chrome-tab-home:hover { background: #2C2C2A; }
 .chrome-tab-home.active { background: #2C2C2A; }
 .chrome-tab-home svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 /* 개별 탭 — 독립 카드 */
