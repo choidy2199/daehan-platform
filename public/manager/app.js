@@ -20743,6 +20743,7 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-header">';
   h += '<div class="pc-panel-title">제품목록 <span class="pc-panel-count" id="po-product-list-count">' + registeredCount + '건</span></div>';
   h += '<div class="pc-panel-actions">';
+  h += '<a href="#" class="po-col-reset-link" onclick="_poResetColWidths(event)">컬럼초기화</a>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>템플릿</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>백업</button>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>복원</button>';
@@ -20864,12 +20865,12 @@ function _poRenderProductList() {
   var thS = 'padding:9px 6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
   var tdS = 'padding:6px 6px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
 
-  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  var h = '<table id="po-product-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
   // ☐ / 코드 / 관리코드 / 브랜드 / 품명(가변) / 모델명 / 1P / 가격$ / 재고 / 발주P / 낱개 / 합계 / 🛒
   h += '<col style="width:32px">';
   h += '<col style="width:70px">';
-  h += '<col style="width:72px">';
+  h += '<col style="width:110px">';
   h += '<col style="width:54px">';
   h += '<col style="">';
   h += '<col style="width:90px">';
@@ -20954,6 +20955,14 @@ function _poRenderProductList() {
 
   h += '</tbody></table>';
   body.innerHTML = h;
+  if (typeof initColumnResize === 'function') initColumnResize('po-product-table');
+}
+
+// 컬럼 너비 초기화 — 저장된 값 제거 후 재렌더
+function _poResetColWidths(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  try { localStorage.removeItem('mw_colwidths_po-product-table'); } catch(_) {}
+  _poRenderProductList();
 }
 
 // 발주 P input → 낱개/합계 실시간 갱신
