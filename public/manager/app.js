@@ -22959,6 +22959,7 @@ var _IPINV2_DEFAULT_CUSTOMS = [
 ];
 // [B-3-2-2] 제품 최종 원가 13컬럼 상태 (수입건V2 _ipbat2* 복제, 3단계에서 invoice 기반 재계산으로 전환)
 var _ipinv2CostCalc = null;     // /api/import-batches/[id]/cost-calculation 응답 캐시
+var _ipinv2CostCalcLocal = null; // [B-1 Phase B-1] 클라 계산 엔진 결과 (서버와 동일 스키마). 내부 저장만, 화면 렌더는 _ipinv2CostCalc 사용 유지.
 var _ipinv2ErpPreview = null;   // /api/import-batches/[id]/erp-preview 응답 캐시
 var _ipinv2MarginPct = 10;      // 마진율 기본 10% (단일 전역값, 3단계에서 모델별 override 가능)
 var _ipinv2CalcTimer = null;    // FOB 편집 후 원가 재계산 debounce
@@ -23314,6 +23315,7 @@ async function _ipinv2OpenDetail(invoiceId) {
   }
   var customsResult = step2[0] || { loaded: false };
   _ipinv2CostCalc = (step2[1] && step2[1].success) ? step2[1].data : null;
+  _ipinv2RunLocalCalcAndCompare(); // [B-1 Phase B-1] 초기 진입 시 서버/클라 1차 비교 (payments 로드 전 → total_paid는 mismatch 가능, payments 로드 완료 후 재비교됨)
   _ipinv2ErpPreview = null; // [B-3-2-2d 4] erp-preview 지연 로드 (_ipinv2SendErp 클릭 시점에 fetch 가능)
 
   // Step 3: 통관비 비었으면 기본 5개 생성 (순차 필요)
@@ -23638,12 +23640,255 @@ async function _ipinv2FetchCalcAndErp() {
   try {
     var calcJson = await fetch('/api/import-batches/' + batchId + '/cost-calculation', { cache: 'no-store' }).then(function(r) { return r.json(); });
     _ipinv2CostCalc = (calcJson && calcJson.success) ? calcJson.data : null;
+    _ipinv2RunLocalCalcAndCompare(); // [B-1 Phase B-1] 서버 결과 확보 즉시 클라 계산 + 비교
   } catch (e) {
     console.error('[ipinv2] cost fetch failed', e);
     _ipinv2CostCalc = null;
   }
   _ipinv2RenderItemsTable();
   _ipinv2RenderErpSection();
+}
+
+// ========================================
+// [B-1 Phase B-1] 클라이언트 계산 엔진 (서버와 병행 검증용)
+// 서버 소스: src/app/api/import-batches/[id]/cost-calculation/route.ts
+// 이식 범위: ratio / cost_alloc / vat_alloc / supply_price / unit_cost + overflow_absorber
+// 주의: 서버는 batch 전체 invoices 조회. 이 함수는 current invoice 단건 기준.
+//       multi-invoice batch에서는 서버/클라 items 배열 길이·합계가 다를 수 있음.
+//       Phase B-2에서 batch 전체 수집 + 서버 API 제거 예정.
+// ========================================
+
+// 서버 route.ts 1:1 포팅. 입력: { items, customs, payments, invoice }
+function _ipinv2CalcCostLocal(input) {
+  input = input || {};
+  var invoice = input.invoice || {};
+  var rawItems = input.items || [];
+  var customs = input.customs || [];
+  var payments = input.payments || [];
+
+  var warnings = [];
+  var unpaidInvoices = [];
+
+  // route.ts:67-73 — 미납 체크 (status='paid' + weighted_avg_rate 있어야 배분 가능)
+  var weightedAvg = invoice.weighted_avg_rate != null ? Number(invoice.weighted_avg_rate) : null;
+  if (invoice.status !== 'paid' || weightedAvg == null) {
+    unpaidInvoices.push((invoice.invoice_no || '') + ' (' + (invoice.factory_name || '') + ')');
+  }
+
+  // route.ts:75-96 — is_pallet_line 제외 + fob_krw 계산 (net_fob_usd 우선, 0이면 amount_usd)
+  var items = rawItems
+    .filter(function(it) { return !it.is_pallet_line; })
+    .map(function(it) {
+      var fobUsd = Number(it.fob_usd || 0);
+      var netFobUsd = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
+      var fobKrw = weightedAvg != null ? Math.round(netFobUsd * weightedAvg) : null;
+      return {
+        id: it.id,
+        invoice_id: it.invoice_id,
+        invoice_no: invoice.invoice_no || '',
+        factory_name: invoice.factory_name || '',
+        factory_code: invoice.factory_code || null,
+        model: String(it.model || ''),
+        name: it.name || null,
+        qty: Number(it.qty || 0),
+        fob_usd: fobUsd,
+        fob_krw: fobKrw,
+        is_pallet_line: false,
+        weighted_avg_rate: weightedAvg,
+      };
+    });
+
+  // route.ts:99-104 — customs 집계 (classification별)
+  var costTotal = customs
+    .filter(function(c) { return c.classification === 'cost'; })
+    .reduce(function(s, c) { return s + Number(c.amount_krw || 0); }, 0);
+  var vatTotal = customs
+    .filter(function(c) { return c.classification === 'vat'; })
+    .reduce(function(s, c) { return s + Number(c.amount_krw || 0); }, 0);
+
+  // route.ts:107-135 — 미납 시 원시 데이터만 반환 (can_calculate=false)
+  if (unpaidInvoices.length > 0) {
+    warnings.push('연결된 인보이스 중 송금 미완료 건이 있습니다: ' + unpaidInvoices.join(', '));
+    var unpaidItems = items.map(function(it) {
+      return Object.assign({}, it, {
+        ratio: null, cost_alloc: null, vat_alloc: null,
+        supply_price: null, unit_cost: null, is_overflow_absorber: false,
+      });
+    });
+    var totalFobUsdU = items.reduce(function(s, it) { return s + it.fob_usd; }, 0);
+    return {
+      items: unpaidItems,
+      totals: {
+        fob_usd: Number(totalFobUsdU.toFixed(2)),
+        fob_krw: null,
+        cost_alloc: costTotal,
+        vat_alloc: vatTotal,
+        supply_price: null,
+        total_paid: null,
+      },
+      can_calculate: false,
+      warnings: warnings,
+    };
+  }
+
+  // route.ts:137-148 — items 비어있을 때
+  var totalFobKrw = items.reduce(function(s, it) { return s + Number(it.fob_krw || 0); }, 0);
+  if (items.length === 0) {
+    return {
+      items: [],
+      totals: { fob_usd: 0, fob_krw: 0, cost_alloc: costTotal, vat_alloc: vatTotal, supply_price: 0, total_paid: costTotal + vatTotal },
+      can_calculate: true,
+      warnings: ['배분할 제품이 없습니다'],
+    };
+  }
+
+  // route.ts:151-155 — 가장 큰 fob_krw (overflow absorber, 동률 시 첫 번째)
+  var maxIdx = 0;
+  for (var i = 1; i < items.length; i++) {
+    if ((items[i].fob_krw || 0) > (items[maxIdx].fob_krw || 0)) maxIdx = i;
+  }
+
+  // route.ts:157-168 — ratio + 배분 (maxIdx는 임시 null)
+  var calcItems = items.map(function(it, idx) {
+    var ratio = totalFobKrw > 0 ? Number(it.fob_krw || 0) / totalFobKrw : 0;
+    return Object.assign({}, it, {
+      ratio: ratio,
+      cost_alloc: idx === maxIdx ? null : Math.round(costTotal * ratio),
+      vat_alloc: idx === maxIdx ? null : Math.round(vatTotal * ratio),
+      supply_price: null,
+      unit_cost: null,
+      is_overflow_absorber: idx === maxIdx,
+    });
+  });
+
+  // route.ts:170-173 — overflow_absorber가 round 오차 흡수 (costTotal - 나머지 합)
+  var otherCostSum = 0, otherVatSum = 0;
+  for (var k = 0; k < calcItems.length; k++) {
+    if (k === maxIdx) continue;
+    otherCostSum += Number(calcItems[k].cost_alloc || 0);
+    otherVatSum += Number(calcItems[k].vat_alloc || 0);
+  }
+  calcItems[maxIdx].cost_alloc = costTotal - otherCostSum;
+  calcItems[maxIdx].vat_alloc = vatTotal - otherVatSum;
+
+  // route.ts:175-180 — supply_price / unit_cost (Math.round for unit_cost)
+  calcItems.forEach(function(it) {
+    var fobKrw = Number(it.fob_krw || 0);
+    var cost = Number(it.cost_alloc || 0);
+    it.supply_price = fobKrw + cost;
+    it.unit_cost = it.qty > 0 ? Math.round(it.supply_price / it.qty) : 0;
+  });
+
+  // route.ts:182-188 — totals
+  var totalFobUsd = items.reduce(function(s, it) { return s + it.fob_usd; }, 0);
+  var totalSupplyPrice = calcItems.reduce(function(s, it) { return s + Number(it.supply_price || 0); }, 0);
+  var totalPaymentKrw = payments
+    .filter(function(p) { return p.status === 'completed'; })
+    .reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
+  var totalPaid = totalPaymentKrw + costTotal + vatTotal;
+
+  return {
+    items: calcItems,
+    totals: {
+      fob_usd: Number(totalFobUsd.toFixed(2)),
+      fob_krw: totalFobKrw,
+      cost_alloc: costTotal,
+      vat_alloc: vatTotal,
+      supply_price: totalSupplyPrice,
+      total_paid: totalPaid,
+    },
+    can_calculate: true,
+    warnings: warnings,
+  };
+}
+
+// 서버/클라 결과 비교 (허용 오차: ratio<0.0001, unit_cost<1, 정수KRW=정확일치)
+function _ipinv2CompareCalc(serverData, localData) {
+  if (!serverData || !localData) {
+    console.warn('[CALC-MISMATCH] 서버 또는 클라 데이터 없음', { hasServer: !!serverData, hasLocal: !!localData });
+    return;
+  }
+  var mismatches = [];
+
+  if (serverData.can_calculate !== localData.can_calculate) {
+    mismatches.push({ field: 'can_calculate', server: serverData.can_calculate, local: localData.can_calculate });
+  }
+
+  // totals 비교
+  ['fob_usd', 'fob_krw', 'cost_alloc', 'vat_alloc', 'supply_price', 'total_paid'].forEach(function(f) {
+    var s = serverData.totals && serverData.totals[f];
+    var l = localData.totals && localData.totals[f];
+    if (s == null && l == null) return;
+    if (s == null || l == null) {
+      mismatches.push({ field: 'totals.' + f, server: s, local: l });
+      return;
+    }
+    if (Math.abs(Number(s) - Number(l)) >= 1) {
+      mismatches.push({ field: 'totals.' + f, server: s, local: l, diff: Number(s) - Number(l) });
+    }
+  });
+
+  // items 비교 — id 매핑. 서버가 batch 전체이면 local.items는 부분집합이어야 함 (missing-in-server 경고).
+  var serverById = {};
+  (serverData.items || []).forEach(function(it) { if (it.id) serverById[it.id] = it; });
+
+  (localData.items || []).forEach(function(lit) {
+    var sit = serverById[lit.id];
+    var tag = lit.model || lit.id;
+    if (!sit) {
+      mismatches.push({ field: 'item.' + tag + '.missing-in-server', local: lit });
+      return;
+    }
+    // ratio (소수점 허용 오차 0.0001)
+    if ((sit.ratio == null) !== (lit.ratio == null)) {
+      mismatches.push({ field: 'item.' + tag + '.ratio.null', server: sit.ratio, local: lit.ratio });
+    } else if (sit.ratio != null && lit.ratio != null && Math.abs(Number(sit.ratio) - Number(lit.ratio)) >= 0.0001) {
+      mismatches.push({ field: 'item.' + tag + '.ratio', server: sit.ratio, local: lit.ratio });
+    }
+    // unit_cost (허용 오차 1원)
+    if (sit.unit_cost != null && lit.unit_cost != null && Math.abs(Number(sit.unit_cost) - Number(lit.unit_cost)) >= 1) {
+      mismatches.push({ field: 'item.' + tag + '.unit_cost', server: sit.unit_cost, local: lit.unit_cost });
+    }
+    // 정수 KRW — 1원 이상 차이면 불일치
+    ['fob_krw', 'cost_alloc', 'vat_alloc', 'supply_price'].forEach(function(k) {
+      var s = sit[k], l = lit[k];
+      if (s == null && l == null) return;
+      if (s == null || l == null) {
+        mismatches.push({ field: 'item.' + tag + '.' + k, server: s, local: l });
+        return;
+      }
+      if (Math.abs(Number(s) - Number(l)) >= 1) {
+        mismatches.push({ field: 'item.' + tag + '.' + k, server: s, local: l, diff: Number(s) - Number(l) });
+      }
+    });
+    // is_overflow_absorber
+    if (!!sit.is_overflow_absorber !== !!lit.is_overflow_absorber) {
+      mismatches.push({ field: 'item.' + tag + '.is_overflow_absorber', server: sit.is_overflow_absorber, local: lit.is_overflow_absorber });
+    }
+  });
+
+  if (mismatches.length === 0) {
+    console.log('[CALC-MATCH] ✓ 전 항목 일치 (items: ' + (localData.items || []).length + ')');
+  } else {
+    console.warn('[CALC-MISMATCH] 총 ' + mismatches.length + '건 불일치:', mismatches);
+  }
+}
+
+// 헬퍼 — 현재 클라 상태로 로컬 계산 + 서버 결과와 비교
+function _ipinv2RunLocalCalcAndCompare() {
+  if (!_ipinv2CostCalc) return;
+  try {
+    var local = _ipinv2CalcCostLocal({
+      items: _ipinv2CurrentItems || [],
+      customs: _ipinv2Customs || [],
+      payments: _ipinv2Payments || [],
+      invoice: _ipinv2CurrentInvoice || {},
+    });
+    _ipinv2CostCalcLocal = local;
+    _ipinv2CompareCalc(_ipinv2CostCalc, local);
+  } catch (e) {
+    console.error('[CALC-LOCAL] exception', e);
+  }
 }
 
 // [B-3-2-2e 2] 관리코드 획득 — 임시 개선 (근본 수정은 제품·발주 로직 변경 커밋에서)
@@ -25408,6 +25653,7 @@ function _ipinv2LoadPayments(invoiceId) {
     .then(function(json) {
       _ipinv2Payments = (json && json.success) ? (json.data || []) : [];
       _ipinv2RenderPaymentsSection();
+      _ipinv2RunLocalCalcAndCompare(); // [B-1 Phase B-1] payments 로드 후 재비교 (initial load 시 totals.total_paid까지 일치)
     })
     .catch(function(e) { console.error('[ipinv2] payments fetch', e); _ipinv2Payments = []; _ipinv2RenderPaymentsSection(); });
 }
