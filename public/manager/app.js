@@ -20866,9 +20866,10 @@ function _poRenderProductList() {
 
   var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  // ☐ / 코드 / 브랜드 / 품명(가변) / 모델명 / 1P / 가격$ / 재고 / 발주P / 낱개 / 합계 / 🛒
+  // ☐ / 코드 / 관리코드 / 브랜드 / 품명(가변) / 모델명 / 1P / 가격$ / 재고 / 발주P / 낱개 / 합계 / 🛒
   h += '<col style="width:32px">';
   h += '<col style="width:70px">';
+  h += '<col style="width:72px">';
   h += '<col style="width:54px">';
   h += '<col style="">';
   h += '<col style="width:90px">';
@@ -20883,6 +20884,7 @@ function _poRenderProductList() {
   h += '<thead><tr>';
   h += '<th style="' + thS + '"><input type="checkbox" disabled></th>';
   h += '<th style="' + thS + '">코드</th>';
+  h += '<th style="' + thS + '">관리코드</th>';
   h += '<th style="' + thS + '">브랜드</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:8px;">품명</th>';
   h += '<th style="' + thS + '">모델명</th>';
@@ -20903,6 +20905,7 @@ function _poRenderProductList() {
       h += '<tr style="background:#FAFBFC;">';
       h += '<td style="' + tdS + '"></td>';
       h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;color:#9BA3B2;">' + codeEsc + '</td>';
+      h += '<td style="' + tdS + 'text-align:left;"><span class="po-mc-empty">—</span></td>';
       h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
       h += '<td style="' + tdS + 'text-align:left;padding-left:8px;color:#9BA3B2;font-style:italic;" colspan="8">원본 삭제됨 — × 로 제거하세요</td>';
       h += '<td style="' + tdS + '"><button class="po-cart-remove-btn" onclick="_poRemoveProductFromList(\'' + codeEsc + '\')" title="제거">×</button></td>';
@@ -20928,9 +20931,14 @@ function _poRenderProductList() {
     var lastCell = inCart
       ? '<span class="po-cart-check" title="이미 장바구니에 있습니다">✓</span>'
       : '<button class="po-cart-btn" title="장바구니에 추가" onclick="_poOnCartBtnClick(\'' + codeEsc + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button>';
+    var mcRaw = (p.manageCode != null) ? String(p.manageCode).trim() : '';
+    var mcCell = mcRaw
+      ? '<span style="font-family:var(--font-mono, ui-monospace, \'SF Mono\', Menlo, monospace);font-size:11px;">' + _poEsc(mcRaw) + '</span>'
+      : '<span class="po-mc-empty">—</span>';
     h += '<tr' + rowClass + ' data-code="' + codeEsc + '">';
     h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '"' + cbAttr + '></td>';
     h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + _poEsc(p.code || '') + '</td>';
+    h += '<td style="' + tdS + 'text-align:left;padding-left:8px;">' + mcCell + '</td>';
     h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + descTxt + '</td>';
     h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';

@@ -865,6 +865,9 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 /* po-table-lg: 기본 po-table과 동일 (확장용 예비) */
 .po-promo-tag { display:inline-block; font-size:9px; font-weight:600; padding:1px 5px; border-radius:3px; margin-left:4px; }
 
+/* 제품·발주 좌측 제품 목록 — 관리코드 빈 셀 */
+.po-mc-empty { color: var(--color-text-tertiary, #9CA3AF); }
+
 /* 주문 목록 하단 합계 */
 .po-summary { border-top:2px solid #DDE1EB; padding:12px 14px; background:#FAFBFC; flex-shrink:0; }
 .po-summary-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
