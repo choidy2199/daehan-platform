@@ -22958,8 +22958,8 @@ var _IPINV2_DEFAULT_CUSTOMS = [
   { item_name: '공항 보험료' },
 ];
 // [B-3-2-2] 제품 최종 원가 13컬럼 상태 (수입건V2 _ipbat2* 복제, 3단계에서 invoice 기반 재계산으로 전환)
-var _ipinv2CostCalc = null;     // /api/import-batches/[id]/cost-calculation 응답 캐시
-var _ipinv2CostCalcLocal = null; // [B-1 Phase B-1] 클라 계산 엔진 결과 (서버와 동일 스키마). 내부 저장만, 화면 렌더는 _ipinv2CostCalc 사용 유지.
+// [Stage 4 Phase B-2] _ipinv2CostCalc (서버 응답 캐시) 제거. 렌더 소스는 _ipinv2CostCalcLocal로 단일화.
+var _ipinv2CostCalcLocal = null; // 클라 계산 엔진 결과. 렌더·엑셀·비교 모두 이 값 사용.
 var _ipinv2ErpPreview = null;   // /api/import-batches/[id]/erp-preview 응답 캐시
 var _ipinv2MarginPct = 10;      // 마진율 기본 10% (단일 전역값, 3단계에서 모델별 override 가능)
 var _ipinv2CalcTimer = null;    // FOB 편집 후 원가 재계산 debounce
@@ -23270,62 +23270,66 @@ async function _ipinv2OpenDetail(invoiceId) {
   container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
   var _t0 = performance.now();
 
-  // [B-3-2-2e] 로딩 최적화: invoice-list (전체 1,723ms) → invoice-single (~200ms).
-  // 단건 엔드포인트 /api/import-invoices/{id}는 2-2e에서 신규 생성.
-  // 목록 GET과 동일 응답 스키마 ({ success, data }) 유지하여 find(id) 로직 제거 가능.
-  // 제거: erp-preview fetch (2-2에서 섹션 빈 div로 변경됨. 전송 버튼에서 필요 시 지연 로드 가능).
+  // [Stage 4 Phase B-2] 최대 병렬화 + 서버 cost-calculation 제거:
+  //   - invoice-single / invoice-items / po-by-invoice: 즉시 병렬 시작 (batchId 불필요)
+  //   - customs: invoice-single 완료 후 batchId 확보되면 자동 dispatch (then 체인)
+  //   - cost-calculation: 제거 (클라 _ipinv2CalcCostLocal로 대체, B-1에서 검증 완료)
+  //   - erp-preview: 전송 버튼 클릭 시 지연 로드 (기존 유지)
 
-  // Step 1: invoice-single + items + PO headers(+items) 병렬 — 3 resource 동시
   var invSinglePromise = _ipinv2MeasuredFetch('/api/import-invoices/' + invoiceId, 'invoice-single');
   var itemsPromise = _ipinv2MeasuredFetch('/api/import-invoices/' + invoiceId + '/items', 'invoice-items');
-  var poItemsPromise = _ipinv2FetchPoItems(invoiceId); // 내부에서도 네트워크 2단계지만 invoice와 병렬
+  var poItemsPromise = _ipinv2FetchPoItems(invoiceId);
 
-  var step1;
+  // customs: invoice-single 응답으로부터 batchId 확보 뒤 dispatch
+  var customsPromise = invSinglePromise.then(function(invJson) {
+    var inv = (invJson && invJson.success && invJson.data) ? invJson.data : null;
+    if (!inv || !inv.batch_id) return { loaded: false, reason: 'no-batch' };
+    var t0 = performance.now();
+    return fetch('/api/import-batches/' + inv.batch_id + '/customs-costs', { cache: 'no-store' })
+      .then(function(r) { return r.json(); })
+      .then(function(j) {
+        console.log('[PERF] customs-costs ' + Math.round(performance.now() - t0) + 'ms');
+        _ipinv2Customs = (j && j.data) || [];
+        return { loaded: true, count: _ipinv2Customs.length };
+      })
+      .catch(function(e) {
+        console.error('[ipinv2] customs load failed', e);
+        _ipinv2Customs = [];
+        return { loaded: false, reason: 'network-error' };
+      });
+  });
+
+  var results;
   try {
-    step1 = await Promise.all([invSinglePromise, itemsPromise, poItemsPromise]);
+    results = await Promise.all([invSinglePromise, itemsPromise, poItemsPromise, customsPromise]);
   } catch (e) {
     alert('인보이스 로드 실패: ' + (e && e.message || e));
     _ipinv2CloseDetail();
     return;
   }
-  _ipinv2CurrentInvoice = (step1[0] && step1[0].success && step1[0].data) ? step1[0].data : null;
-  // 인보이스V2 목록 화면은 /api/import-invoices 전체 조회를 별도 사용 (이 경로는 영향 없음)
-  // _ipinv2Invoices 캐시는 단건 조회 시 업데이트 안 함 (상세 진입 후 목록 재진입 시 기존 캐시 유지)
-  _ipinv2CurrentItems = (step1[1] && step1[1].success) ? (step1[1].data || []) : [];
-  var poItems = step1[2];
+  _ipinv2CurrentInvoice = (results[0] && results[0].success && results[0].data) ? results[0].data : null;
+  _ipinv2CurrentItems = (results[1] && results[1].success) ? (results[1].data || []) : [];
+  var poItems = results[2];
+  var customsResult = results[3] || { loaded: false };
+  _ipinv2ErpPreview = null;
+
   if (!_ipinv2CurrentInvoice) {
     alert('인보이스를 찾을 수 없습니다.');
     _ipinv2CloseDetail();
     return;
   }
 
-  // Step 2: batch 의존 리소스 병렬 — customs + cost-calc만 (erp-preview 제거)
-  var batchId = _ipinv2GetLinkedBatchId();
-  var customsPromise = _ipinv2LoadCustoms();
-  var calcPromise = batchId
-    ? _ipinv2MeasuredFetch('/api/import-batches/' + batchId + '/cost-calculation', 'cost-calc')
-    : Promise.resolve(null);
-
-  var step2;
-  try {
-    step2 = await Promise.all([customsPromise, calcPromise]);
-  } catch (e) {
-    console.error('[ipinv2] step2 parallel fetch failed:', e);
-    step2 = [null, null];
-  }
-  var customsResult = step2[0] || { loaded: false };
-  _ipinv2CostCalc = (step2[1] && step2[1].success) ? step2[1].data : null;
-  _ipinv2RunLocalCalcAndCompare(); // [B-1 Phase B-1] 초기 진입 시 서버/클라 1차 비교 (payments 로드 전 → total_paid는 mismatch 가능, payments 로드 완료 후 재비교됨)
-  _ipinv2ErpPreview = null; // [B-3-2-2d 4] erp-preview 지연 로드 (_ipinv2SendErp 클릭 시점에 fetch 가능)
-
-  // Step 3: 통관비 비었으면 기본 5개 생성 (순차 필요)
+  // 통관비 비었으면 기본 5개 생성 (순차 필요)
   if (customsResult.loaded && customsResult.count === 0) {
     await _ipinv2AddDefaultCustomsItems();
     await _ipinv2LoadCustoms();
   }
 
-  // Step 4: PO items로 enrich (관리코드 + 순서) — Step 1에서 받은 데이터 사용
+  // PO items로 enrich (관리코드 + 순서)
   if (poItems && poItems.length > 0) _ipinv2ApplyPoEnrich(poItems);
+
+  // [B-2] 클라 계산 실행 — 서버 fetch 없이 즉시 결과 확보
+  _ipinv2RunLocalCalcAndCompare();
 
   console.log('[PERF] _ipinv2OpenDetail TOTAL: ' + (performance.now() - _t0).toFixed(0) + 'ms');
   _ipinv2DoRenderDetail(container);
@@ -23364,15 +23368,12 @@ function _ipinv2ApplyPoEnrich(poItems) {
 // [B-3-2-2c] PO items fetch (네트워크 호출). 성공 시 cache + enrich.
 // [B-3-2-2d 4] 측정 로그 추가 + 조기 반환으로 불필요한 items fetch 회피
 async function _ipinv2FetchPoItems(invoiceId) {
+  // [Stage 4 Phase B-2] 통합 엔드포인트 1회 호출 (기존 2단계 직렬 → 1단계)
   try {
-    var poJson = await _ipinv2MeasuredFetch('/api/import-po?linked_invoice_id=' + encodeURIComponent(invoiceId), 'po-headers');
-    if (!poJson || !poJson.success) return null;
-    var pos = poJson.data || [];
-    if (pos.length === 0) return null; // 연결 PO 없음 → items fetch skip
-    var po = pos[0];
-    var itemsJson = await _ipinv2MeasuredFetch('/api/import-po/' + po.id + '/items', 'po-items');
-    if (!itemsJson || !itemsJson.success) return null;
-    return itemsJson.data || [];
+    var json = await _ipinv2MeasuredFetch('/api/import-po/by-invoice/' + encodeURIComponent(invoiceId) + '/items', 'po-by-invoice');
+    if (!json || !json.success || !json.data) return null;
+    var items = json.data.items || [];
+    return items.length > 0 ? items : null;
   } catch (e) {
     console.warn('[ipinv2] PO items fetch failed:', e && e.message || e);
     return null;
@@ -23628,25 +23629,12 @@ function _ipinv2UsdFloor(value) {
 }
 
 async function _ipinv2FetchCalcAndErp() {
-  var batchId = _ipinv2GetLinkedBatchId();
-  if (!batchId) {
-    _ipinv2CostCalc = null;
-    _ipinv2ErpPreview = null;
-    _ipinv2RenderItemsTable();
-    _ipinv2RenderErpSection();
-    return;
-  }
-  // [B-3-2-2d 4] erp-preview 제거 — 섹션이 빈 div로 렌더됨. cost-calc만 fetch.
-  try {
-    var calcJson = await fetch('/api/import-batches/' + batchId + '/cost-calculation', { cache: 'no-store' }).then(function(r) { return r.json(); });
-    _ipinv2CostCalc = (calcJson && calcJson.success) ? calcJson.data : null;
-    _ipinv2RunLocalCalcAndCompare(); // [B-1 Phase B-1] 서버 결과 확보 즉시 클라 계산 + 비교
-  } catch (e) {
-    console.error('[ipinv2] cost fetch failed', e);
-    _ipinv2CostCalc = null;
-  }
+  // [Stage 4 Phase B-2] 서버 cost-calculation 호출 제거 — 클라 로컬 재계산 + 렌더만.
+  // FOB/할인/통관비 편집 후 debounce 200ms → 이 함수 → 즉시 재렌더 (API 왕복 없음)
+  _ipinv2RunLocalCalcAndCompare();
   _ipinv2RenderItemsTable();
   _ipinv2RenderErpSection();
+  _ipinv2RenderSummaryBar(); // [B-2 V-F] 검증 뱃지 갱신
 }
 
 // ========================================
@@ -23892,9 +23880,10 @@ function _ipinv2CompareCalc(serverData, localData) {
   }
 }
 
-// 헬퍼 — 현재 클라 상태로 로컬 계산 + 서버 결과와 비교
+// 헬퍼 — 현재 클라 상태로 로컬 계산 + 캐시 저장 + 로그
+// [Stage 4 Phase B-2] 서버 cost-calc API 제거. _ipinv2CompareCalc 호출 중단 (함수 정의는 유지).
+// 2주 후 완전 제거 판단은 별도 Stage에서.
 function _ipinv2RunLocalCalcAndCompare() {
-  if (!_ipinv2CostCalc) return;
   try {
     var local = _ipinv2CalcCostLocal({
       items: _ipinv2CurrentItems || [],
@@ -23903,7 +23892,11 @@ function _ipinv2RunLocalCalcAndCompare() {
       invoice: _ipinv2CurrentInvoice || {},
     });
     _ipinv2CostCalcLocal = local;
-    _ipinv2CompareCalc(_ipinv2CostCalc, local);
+    if (local.can_calculate) {
+      console.log('[CALC-LOCAL] ✓ 클라 계산 완료 (items: ' + (local.items || []).length + ')');
+    } else {
+      console.log('[CALC-LOCAL] — 송금 미완료: 배분 skip (items: ' + (local.items || []).length + ')');
+    }
   } catch (e) {
     console.error('[CALC-LOCAL] exception', e);
   }
@@ -23994,10 +23987,11 @@ function _ipinv2GetBrand(item) {
 }
 
 // cost-calculation items를 item.id 기준 map으로 변환
+// [Stage 4 Phase B-2] 소스: _ipinv2CostCalcLocal (서버 대신 클라 계산 결과)
 function _ipinv2BuildCostMap() {
   var map = {};
-  if (_ipinv2CostCalc && Array.isArray(_ipinv2CostCalc.items)) {
-    _ipinv2CostCalc.items.forEach(function(it) { if (it && it.id) map[it.id] = it; });
+  if (_ipinv2CostCalcLocal && Array.isArray(_ipinv2CostCalcLocal.items)) {
+    _ipinv2CostCalcLocal.items.forEach(function(it) { if (it && it.id) map[it.id] = it; });
   }
   return map;
 }
@@ -24029,7 +24023,8 @@ function _ipinv2UpdateMarginRate(val) {
 
 function _ipinv2ExportCostExcel() {
   if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); return; }
-  var calc = _ipinv2CostCalc;
+  // [Stage 4 Phase B-2] 소스 전환: _ipinv2CostCalc → _ipinv2CostCalcLocal
+  var calc = _ipinv2CostCalcLocal;
   if (!calc || !calc.items || calc.items.length === 0) return alert('출력할 데이터가 없습니다.');
   // [B-3-2-2d 2] 16컬럼 (최종환율 추가): 부가세 오른쪽, 마진% 왼쪽
   var data = [[
@@ -24715,7 +24710,8 @@ function _ipinv2RenderItemsTable() {
   if (!section) return;
   var items = (_ipinv2CurrentItems || []).filter(function(it) { return !it.is_pallet_line; });
   var costMap = _ipinv2BuildCostMap();
-  var calc = _ipinv2CostCalc;
+  // [Stage 4 Phase B-2] 소스 전환: _ipinv2CostCalc → _ipinv2CostCalcLocal
+  var calc = _ipinv2CostCalcLocal;
   var canCalc = calc && calc.can_calculate === true;
 
   var h = '';
@@ -24923,9 +24919,41 @@ function _ipinv2RenderSummaryBar() {
   h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">할인(' + discountRate + '%)</span><span style="' + valS + 'color:#FCA5A5;">-' + _ipinv2Money(discountAmount) + '</span></div>';
   h += '<span style="' + sepS + '"></span>';
   h += '<div style="display:flex;align-items:center;gap:5px;"><span style="' + labelS + '">팔렛(' + palletCount + '×$' + palletUnit + ')</span><span style="' + valS + 'color:#BAE6FD;">+' + _ipinv2Money(palletTotal) + '</span></div>';
+  // [Stage 4 Phase B-2 V-F] 우측 그룹: 검증 뱃지 + 최종 금액
+  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:10px;">';
+  h += _ipinv2RenderValidationBadge();
   // [B-3-2-2c 2] 최종 금액 소수점 절삭
-  h += '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:4px 12px;background:rgba(255,255,255,0.08);border-radius:6px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:17px;color:#fff;font-weight:700;">' + _ipinv2UsdFloor(finalTotal) + '</span></div>';
+  h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 12px;background:rgba(255,255,255,0.08);border-radius:6px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:17px;color:#fff;font-weight:700;">' + _ipinv2UsdFloor(finalTotal) + '</span></div>';
+  h += '</div>';
   bar.innerHTML = h;
+}
+
+// [Stage 4 Phase B-2 V-F] 검증 뱃지 렌더 HTML 반환
+// 공식: (송금합계 + 통관비) = 공급가합계 + 부가세합계 → 오차 0원 필수
+// 구현 기준: totals.total_paid vs (totals.supply_price + totals.vat_alloc)
+// total_paid = sum(completed payments) + costTotal + vatTotal
+// supply_price_sum + vat_alloc = (totalFobKrw + costTotal) + vatTotal
+// 이론상 차이 = totalFobKrw - payment_sum (정상이면 0)
+function _ipinv2RenderValidationBadge() {
+  var calc = _ipinv2CostCalcLocal;
+  var badgeBase = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;font-family:Pretendard,sans-serif;white-space:nowrap;';
+  // 계산 불가 또는 데이터 없음 → 중립
+  if (!calc || !calc.can_calculate) {
+    return '<span class="iv-validation-badge iv-validation-badge-pending" style="' + badgeBase + 'background:#E5E7EB;color:#374151;">— 송금 대기</span>';
+  }
+  var totals = calc.totals || {};
+  var totalPaid = Number(totals.total_paid || 0);
+  var supplySum = Number(totals.supply_price || 0);
+  var vatSum = Number(totals.vat_alloc || 0);
+  var expected = supplySum + vatSum;
+  var diff = totalPaid - expected;
+  var absDiff = Math.abs(diff);
+  if (absDiff < 1) {
+    return '<span class="iv-validation-badge iv-validation-badge-ok" style="' + badgeBase + 'background:#D1FAE5;color:#065F46;">✓ 이상없음</span>';
+  }
+  var sign = diff > 0 ? '+' : '-';
+  var diffTxt = sign + Math.round(absDiff).toLocaleString('en-US');
+  return '<span class="iv-validation-badge iv-validation-badge-error" style="' + badgeBase + 'background:#FEE2E2;color:#991B1B;" title="총 지불: ' + _ipinv2Num(totalPaid) + ' / 공급가+부가세: ' + _ipinv2Num(expected) + '">⚠ 오차 ' + diffTxt + '원</span>';
 }
 
 // 수입건V2로 이동

@@ -1,3 +1,15 @@
+/**
+ * @deprecated 2026-04-24 (Stage 4 Phase B-2) — 인보이스V2에서 더 이상 호출되지 않음.
+ *
+ * 클라이언트 계산 엔진으로 전환됨. 동일 로직(1:1 포팅) 참조:
+ *   public/manager/app.js의 _ipinv2CalcCostLocal
+ *
+ * 인보이스V2 진입 시 TOTAL 로딩 속도 개선(2,917~5,525ms → 목표 1,000ms 이내) 목적.
+ * cost-calculation API의 Supabase 4 RTT 호출을 제거하여 가장 큰 병목 해소.
+ *
+ * 즉시 삭제 금지 — 수입건V2(_ipbat2*) 등 다른 화면에서 사용 중일 가능성 있음.
+ * 사용처 grep 확인 후 완전 제거는 별도 Stage에서 결정.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 

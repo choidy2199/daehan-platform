@@ -868,6 +868,23 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 /* 제품·발주 좌측 제품 목록 — 관리코드 빈 셀 */
 .po-mc-empty { color: var(--color-text-tertiary, #9CA3AF); }
 
+/* 인보이스V2 상단 다크바 검증 뱃지 (Stage 4 Phase B-2 V-F) */
+/* 공식: (송금합계 + 통관비) = 공급가합계 + 부가세합계 → 오차 0원 확인 */
+.iv-validation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Pretendard', -apple-system, sans-serif;
+  white-space: nowrap;
+}
+.iv-validation-badge-ok      { background: #D1FAE5; color: #065F46; }
+.iv-validation-badge-error   { background: #FEE2E2; color: #991B1B; }
+.iv-validation-badge-pending { background: #E5E7EB; color: #374151; }
+
 /* 제품·발주 좌측 제품 목록 — 컬럼 리사이즈 핸들 */
 #po-product-table thead th { position: relative; }
 #po-product-table th .col-resize {
