@@ -21,7 +21,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-export const runtime = 'nodejs';         // Edge 전환은 별도 Stage에서 판단
+// [Stage 4-3] Node → Edge 전환. Cold start 1,000~1,500ms → ~50ms 기대.
+// 롤백: runtime = 'nodejs' 복구 후 재배포.
+// 호환성: @supabase/supabase-js v2 = fetch 기반 (edge OK), next/server = edge 지원.
+export const runtime = 'edge';
 export const dynamic = 'force-dynamic';  // invoice는 실시간 데이터 — 캐시 방지
 
 const supabase = createClient(
