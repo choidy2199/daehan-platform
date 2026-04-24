@@ -23270,48 +23270,29 @@ async function _ipinv2OpenDetail(invoiceId) {
   container.innerHTML = '<div style="padding:40px;text-align:center;color:#9BA3B2;font-size:13px;font-family:Pretendard,sans-serif;">불러오는 중...</div>';
   var _t0 = performance.now();
 
-  // [Stage 4 Phase B-2] 최대 병렬화 + 서버 cost-calculation 제거:
-  //   - invoice-single / invoice-items / po-by-invoice: 즉시 병렬 시작 (batchId 불필요)
-  //   - customs: invoice-single 완료 후 batchId 확보되면 자동 dispatch (then 체인)
-  //   - cost-calculation: 제거 (클라 _ipinv2CalcCostLocal로 대체, B-1에서 검증 완료)
-  //   - erp-preview: 전송 버튼 클릭 시 지연 로드 (기존 유지)
-
-  var invSinglePromise = _ipinv2MeasuredFetch('/api/import-invoices/' + invoiceId, 'invoice-single');
-  var itemsPromise = _ipinv2MeasuredFetch('/api/import-invoices/' + invoiceId + '/items', 'invoice-items');
-  var poItemsPromise = _ipinv2FetchPoItems(invoiceId);
-
-  // customs: invoice-single 응답으로부터 batchId 확보 뒤 dispatch
-  var customsPromise = invSinglePromise.then(function(invJson) {
-    var inv = (invJson && invJson.success && invJson.data) ? invJson.data : null;
-    if (!inv || !inv.batch_id) return { loaded: false, reason: 'no-batch' };
-    var t0 = performance.now();
-    return fetch('/api/import-batches/' + inv.batch_id + '/customs-costs', { cache: 'no-store' })
-      .then(function(r) { return r.json(); })
-      .then(function(j) {
-        console.log('[PERF] customs-costs ' + Math.round(performance.now() - t0) + 'ms');
-        _ipinv2Customs = (j && j.data) || [];
-        return { loaded: true, count: _ipinv2Customs.length };
-      })
-      .catch(function(e) {
-        console.error('[ipinv2] customs load failed', e);
-        _ipinv2Customs = [];
-        return { loaded: false, reason: 'network-error' };
-      });
-  });
-
-  var results;
+  // [Stage 4-2 Phase B] 단일 통합 fetch — 기존 4+1 RTT → 1 RTT
+  //   /api/import-invoices/<id>/full-detail: invoice + items + po + customs + payments 일괄
+  //   기존 4개 API는 CRUD/재조회용으로 그대로 유지 (FOB 편집·송금 CRUD 등)
+  var full;
   try {
-    results = await Promise.all([invSinglePromise, itemsPromise, poItemsPromise, customsPromise]);
+    full = await _ipinv2MeasuredFetch('/api/import-invoices/' + invoiceId + '/full-detail', 'full-detail');
   } catch (e) {
     alert('인보이스 로드 실패: ' + (e && e.message || e));
     _ipinv2CloseDetail();
     return;
   }
-  _ipinv2CurrentInvoice = (results[0] && results[0].success && results[0].data) ? results[0].data : null;
-  _ipinv2CurrentItems = (results[1] && results[1].success) ? (results[1].data || []) : [];
-  var poItems = results[2];
-  var customsResult = results[3] || { loaded: false };
+  if (!full || !full.success || !full.data) {
+    alert('인보이스를 찾을 수 없습니다.');
+    _ipinv2CloseDetail();
+    return;
+  }
+  var d = full.data;
+  _ipinv2CurrentInvoice = d.invoice || null;
+  _ipinv2CurrentItems = d.items || [];
+  _ipinv2Customs = d.customs || [];
+  _ipinv2Payments = d.payments || [];
   _ipinv2ErpPreview = null;
+  var poItems = (d.po && Array.isArray(d.po.items) && d.po.items.length > 0) ? d.po.items : null;
 
   if (!_ipinv2CurrentInvoice) {
     alert('인보이스를 찾을 수 없습니다.');
@@ -23319,8 +23300,8 @@ async function _ipinv2OpenDetail(invoiceId) {
     return;
   }
 
-  // 통관비 비었으면 기본 5개 생성 (순차 필요)
-  if (customsResult.loaded && customsResult.count === 0) {
+  // 통관비 비었으면 기본 5개 생성 (순차 필요). 생성 후 재로드(_ipinv2LoadCustoms)는 batchId 기반 기존 API 사용.
+  if ((_ipinv2Customs.length === 0) && _ipinv2GetLinkedBatchId()) {
     await _ipinv2AddDefaultCustomsItems();
     await _ipinv2LoadCustoms();
   }
@@ -23328,7 +23309,7 @@ async function _ipinv2OpenDetail(invoiceId) {
   // PO items로 enrich (관리코드 + 순서)
   if (poItems && poItems.length > 0) _ipinv2ApplyPoEnrich(poItems);
 
-  // [B-2] 클라 계산 실행 — 서버 fetch 없이 즉시 결과 확보
+  // 클라 계산 실행 — 1회만 (payments 이미 통합 fetch에 포함됨, B-1 2차 비교 타이밍 갭 해소)
   _ipinv2RunLocalCalcAndCompare();
 
   console.log('[PERF] _ipinv2OpenDetail TOTAL: ' + (performance.now() - _t0).toFixed(0) + 'ms');
@@ -24591,7 +24572,9 @@ function _ipinv2DoRenderDetail(container) {
   _ipinv2RenderErpSection(); // [B-3-2-2]
   _ipinv2BindAcOutsideClick();
   _ipinv2BindCustomerInput();
-  _ipinv2LoadPayments(_ipinv2CurrentInvoice.id);
+  // [Stage 4-2 Phase B] 초기 payments는 full-detail 통합 응답에 포함됨 — 별도 fetch 제거.
+  // _ipinv2LoadPayments 함수는 송금 CRUD 후 재조회에 계속 사용됨.
+  _ipinv2RenderPaymentsSection();
 }
 
 // ── 기본 정보 저장 ──
