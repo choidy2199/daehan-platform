@@ -23645,12 +23645,23 @@ function _ipinv2CalcCostLocal(input) {
   }
 
   // route.ts:75-96 — is_pallet_line 제외 + fob_krw 계산 (net_fob_usd 우선, 0이면 amount_usd)
-  var items = rawItems
-    .filter(function(it) { return !it.is_pallet_line; })
-    .map(function(it) {
+  // [Stage 5-4 Phase B] 인보이스 단위 fob_krw 정규화 — Σ fob_krw ≈ paymentsTotal 보장
+  // 정규화 비율: fobNormalizeRatio = sumActualUsd / sumNetFobUsd (status='completed' 송금만)
+  var filteredRaw = rawItems.filter(function(it) { return !it.is_pallet_line; });
+  var sumNetFobUsd = filteredRaw.reduce(function(s, it) {
+    var n = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
+    return s + n;
+  }, 0);
+  var sumActualUsd = payments
+    .filter(function(p) { return p.status === 'completed'; })
+    .reduce(function(s, p) { return s + Number(p.actual_usd || 0); }, 0);
+  var fobNormalizeRatio = (sumActualUsd > 0 && sumNetFobUsd > 0) ? sumActualUsd / sumNetFobUsd : 1;
+
+  var items = filteredRaw.map(function(it) {
       var fobUsd = Number(it.fob_usd || 0);
       var netFobUsd = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
-      var fobKrw = weightedAvg != null ? Math.round(netFobUsd * weightedAvg) : null;
+      // [Stage 5-4 Phase B] fob_krw 산출 시 정규화 적용
+      var fobKrw = weightedAvg != null ? Math.round(netFobUsd * fobNormalizeRatio * weightedAvg) : null;
       return {
         id: it.id,
         invoice_id: it.invoice_id,
@@ -23701,7 +23712,6 @@ function _ipinv2CalcCostLocal(input) {
   }
 
   // route.ts:137-148 — items 비어있을 때
-  var totalFobKrw = items.reduce(function(s, it) { return s + Number(it.fob_krw || 0); }, 0);
   if (items.length === 0) {
     return {
       items: [],
@@ -23716,6 +23726,18 @@ function _ipinv2CalcCostLocal(input) {
   for (var i = 1; i < items.length; i++) {
     if ((items[i].fob_krw || 0) > (items[maxIdx].fob_krw || 0)) maxIdx = i;
   }
+
+  // [Stage 5-4 Phase B] fob_krw round 잔차도 maxIdx 항목에 흡수 — Σ fob_krw = paymentsTotal 정확 일치 보장
+  var totalPaymentKrwForFobAbsorb = payments
+    .filter(function(p) { return p.status === 'completed'; })
+    .reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
+  var sumFobKrwNormalized = items.reduce(function(s, it) { return s + Number(it.fob_krw || 0); }, 0);
+  var fobRoundDelta = totalPaymentKrwForFobAbsorb - sumFobKrwNormalized;
+  if (fobRoundDelta !== 0 && totalPaymentKrwForFobAbsorb > 0) {
+    items[maxIdx].fob_krw = Number(items[maxIdx].fob_krw || 0) + fobRoundDelta;
+  }
+  // 잔차 흡수 후 totalFobKrw 재계산 (ratio 산출 기준)
+  var totalFobKrw = items.reduce(function(s, it) { return s + Number(it.fob_krw || 0); }, 0);
 
   // route.ts:157-168 — ratio + 배분 (maxIdx는 임시 null)
   var calcItems = items.map(function(it, idx) {

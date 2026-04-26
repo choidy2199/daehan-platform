@@ -62,7 +62,7 @@ export async function GET(
         .order('item_order', { ascending: true }),
       supabase
         .from('import_payments')
-        .select('invoice_id, total_paid_krw, status')
+        .select('invoice_id, total_paid_krw, status, actual_usd')
         .in('invoice_id',
           ((await supabase.from('import_invoices').select('id').eq('batch_id', batchId)).data || []).map((x: { id: string }) => x.id)
         ),
@@ -74,6 +74,16 @@ export async function GET(
     const warnings: string[] = [];
     const unpaidInvoices: string[] = [];
 
+    // [Stage 5-4 Phase B] 인보이스별 sumActualUsd 맵 산출 (status='completed' 필터)
+    // 정규화 비율: fobNormalizeRatio = sumActualUsd / sumNetFobUsd (인보이스 단위)
+    const actualUsdByInvoice = new Map<string, number>();
+    (payments || []).forEach((p: Record<string, unknown>) => {
+      if ((p.status as string) !== 'completed') return;
+      const invId = p.invoice_id as string;
+      const cur = actualUsdByInvoice.get(invId) || 0;
+      actualUsdByInvoice.set(invId, cur + Number(p.actual_usd || 0));
+    });
+
     // 모든 item 수집 (is_pallet_line=false만 배분 대상)
     const items: Item[] = [];
     (invoices || []).forEach((inv: Record<string, unknown>) => {
@@ -84,28 +94,37 @@ export async function GET(
         unpaidInvoices.push(`${invNo} (${inv.factory_name})`);
       }
       const rawItems = (inv.import_invoice_items as Array<Record<string, unknown>>) || [];
-      rawItems
-        .filter(it => !it.is_pallet_line)
-        .forEach(it => {
-          const fobUsd = Number(it.fob_usd || 0);
-          // 할인·팔렛 반영된 순 FOB (Phase 2 개편). 비어있으면(구데이터) amount_usd 사용
-          const netFobUsd = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
-          const fobKrw = weightedAvg != null ? Math.round(netFobUsd * Number(weightedAvg)) : null;
-          items.push({
-            id: it.id as string,
-            invoice_id: inv.id as string,
-            invoice_no: invNo,
-            factory_name: inv.factory_name as string,
-            factory_code: inv.factory_code as string | null,
-            model: String(it.model || ''),
-            name: (it.name as string) || null,
-            qty: Number(it.qty || 0),
-            fob_usd: fobUsd,
-            fob_krw: fobKrw,
-            is_pallet_line: false,
-            weighted_avg_rate: weightedAvg,
-          });
+      const filteredRaw = rawItems.filter(it => !it.is_pallet_line);
+
+      // [Stage 5-4 Phase B] 인보이스별 fob_krw 정규화 비율 산출
+      const sumNetFobUsd = filteredRaw.reduce((s, it) => {
+        const n = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
+        return s + n;
+      }, 0);
+      const sumActualUsd = actualUsdByInvoice.get(inv.id as string) || 0;
+      const fobNormalizeRatio = (sumActualUsd > 0 && sumNetFobUsd > 0) ? sumActualUsd / sumNetFobUsd : 1;
+
+      filteredRaw.forEach(it => {
+        const fobUsd = Number(it.fob_usd || 0);
+        // 할인·팔렛 반영된 순 FOB (Phase 2 개편). 비어있으면(구데이터) amount_usd 사용
+        const netFobUsd = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
+        // [Stage 5-4 Phase B] fob_krw 산출 시 정규화 적용 — Σ fob_krw ≈ paymentsTotal 보장
+        const fobKrw = weightedAvg != null ? Math.round(netFobUsd * fobNormalizeRatio * Number(weightedAvg)) : null;
+        items.push({
+          id: it.id as string,
+          invoice_id: inv.id as string,
+          invoice_no: invNo,
+          factory_name: inv.factory_name as string,
+          factory_code: inv.factory_code as string | null,
+          model: String(it.model || ''),
+          name: (it.name as string) || null,
+          qty: Number(it.qty || 0),
+          fob_usd: fobUsd,
+          fob_krw: fobKrw,
+          is_pallet_line: false,
+          weighted_avg_rate: weightedAvg,
         });
+      });
     });
 
     const costTotal = (customs || [])
@@ -147,7 +166,6 @@ export async function GET(
     }
 
     // 전부 paid — 배분 계산
-    const totalFobKrw = items.reduce((s, it) => s + Number(it.fob_krw || 0), 0);
     if (items.length === 0) {
       return NextResponse.json({
         success: true,
@@ -165,6 +183,18 @@ export async function GET(
     for (let i = 1; i < items.length; i++) {
       if ((items[i].fob_krw || 0) > (items[maxIdx].fob_krw || 0)) maxIdx = i;
     }
+
+    // [Stage 5-4 Phase B] fob_krw round 잔차도 maxIdx 항목에 흡수 — Σ fob_krw = paymentsTotal 정확 일치 보장
+    const totalPaymentKrwForFobAbsorb = (payments || [])
+      .filter((p: { status: string }) => p.status === 'completed')
+      .reduce((s: number, p: { total_paid_krw: number }) => s + Number(p.total_paid_krw || 0), 0);
+    const sumFobKrwNormalized = items.reduce((s, it) => s + Number(it.fob_krw || 0), 0);
+    const fobRoundDelta = totalPaymentKrwForFobAbsorb - sumFobKrwNormalized;
+    if (fobRoundDelta !== 0 && totalPaymentKrwForFobAbsorb > 0) {
+      items[maxIdx].fob_krw = Number(items[maxIdx].fob_krw || 0) + fobRoundDelta;
+    }
+    // 잔차 흡수 후 totalFobKrw 재계산 (ratio 산출 기준)
+    const totalFobKrw = items.reduce((s, it) => s + Number(it.fob_krw || 0), 0);
 
     const calcItems: CalcItem[] = items.map((it, i) => {
       const ratio = totalFobKrw > 0 ? Number(it.fob_krw || 0) / totalFobKrw : 0;

@@ -74,6 +74,153 @@ SUPABASE_SERVICE_ROLE_KEY, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET,
 ERP_USER_KEY, ERP_URL, TTI_LOGIN_ID, TTI_LOGIN_PW, TTI_LOGIN_URL
 ```
 
+## ⚠️ 서버 런타임 — 절대 규칙 (2026-04-26 확정)
+
+- 모든 API 라우트: `runtime: 'nodejs'` (기본값 포함)
+- **Edge runtime 사용 금지**
+- 이유: Supabase가 `ap-southeast-2`(Sydney) 리전이라 Vercel Edge 분산 네트워크에서 4배 악화 (Stage 4-3 실측: 1,990ms → 8,063ms)
+- 새 API 작성 시 명시 권장:
+  ```ts
+  export const runtime = 'nodejs';
+  export const dynamic = 'force-dynamic';
+  ```
+- 참고: `~/.claude/projects/-Users-choi-1---------daehan-platform/memory/supabase_edge_region_lesson.md`
+
+## 인보이스V2 시스템 (Stage 4-5 확정 — 2026-04-26)
+
+### 데이터 로딩 (Stage 4-2)
+
+- **진입 전용 통합 API**: `GET /api/import-invoices/[id]/full-detail`
+  - Promise.all 2 phase 병렬 (5쿼리)
+  - Phase 1: invoice + items + po_headers + payments + customs
+  - Phase 2: po_headers 결과로 po_items 추가 쿼리
+  - 응답: `{ success, data: { invoice, items, po: {header, items}, customs, payments } }`
+- 이 API는 **인보이스V2 진입 전용**. 다른 곳에서 호출 금지
+- 기존 4개 API는 그대로 유지 (CRUD/재조회/수입건V2 사용 중):
+  - `GET /api/import-invoices/[id]`
+  - `GET/POST/PUT/DELETE /api/import-invoices/[id]/items`
+  - `GET /api/import-po/by-invoice/[invoiceId]/items`
+  - `GET/POST/PUT/DELETE /api/import-batches/[id]/customs-costs`
+
+### 클라 계산 (Stage 4 B-2)
+
+- 서버 cost-calculation API는 **인보이스V2에서 호출 금지** (deprecated)
+  - 파일은 여전히 존재 (수입건V2 `_ipbat2*`에서 사용 중이라 삭제 X)
+- 클라 계산 함수: `_ipinv2CalcCostLocal(input)`
+  - 서버 route.ts 1:1 포팅 (확인됨)
+  - 입력: `{ items, customs, payments, invoice }`
+  - 출력 변수: `_ipinv2CostCalcLocal` (전역)
+  - 구조: `{ totals: {...}, items: [...], can_calculate, warnings }`
+  - totals: `{ supply_price, cost_alloc, vat_alloc, fob_krw, ... }`
+- FOB 편집 시: **로컬 재계산만** (200ms debounce), API 호출 없음
+- 배분 정합성 (Stage 5-4 Phase A 검증됨):
+  - cost_alloc overflow_absorber 적용 ✓
+  - vat_alloc overflow_absorber 적용 ✓
+  - cost items 합 = customs cost (오차 0)
+  - vat items 합 = customs vat (오차 0)
+
+### 검증 공식 (Stage 5-3 — 절대 규칙)
+
+**올바른 공식:**
+```js
+leftSide  = paymentsTotal + customsTotal;
+rightSide = cost.totals.supply_price + cost.totals.vat_alloc;
+diff      = leftSide - rightSide;
+```
+
+**절대 쓰지 말 것 (부가세 이중 계산 버그):**
+```js
+rightSide = supply_price * 1.1;  // ❌
+```
+
+이유: `supply_price`는 이미 `fob_krw + cost_alloc` 합산 상태. × 1.1 하면 VAT가 두 번 포함됨. 실제 VAT는 `vat_alloc`에 별도 배분.
+
+좌변/우변 차이의 본질:
+- `leftSide - rightSide = paymentsTotal - totalFobKrw`
+- 즉 차이는 "실제 송금 KRW" - "환율 변환 KRW" = 환차 (Stage 5-4 미해결)
+
+### 검증 뱃지 4상태 (Stage 5-2)
+
+판정 순서 (상위 우선):
+1. `!can_calculate` → `pending_payment` (회색 `#6B7280`, '— 송금 대기')
+2. `customs.length > 0 && customsTotal === 0` → `pending_customs` (주황 `#F59E0B`, '🟡 통관 대기')
+3. `Math.abs(diff) >= 10` → `error` (빨강 `#DC2626`, '⚠ ±N원')
+4. else → `ok` (녹색 `#10B981`, '✓ 이상없음')
+
+- CSS `data-status` 속성으로 분기
+- 호버 툴팁: HTML `title` 속성 사용 (`\n` 자동 줄바꿈), `cursor: help`
+- 10원 허용 오차는 Stage 5-4 결과에 따라 조정 가능
+- 실제로는 USD 정수 결제 vs 인보이스 소수점 정밀 차이로 수백원 환차 발생
+
+### 관리코드(CODE2) 처리 규약
+
+**DB:**
+- `import_invoice_items.management_code TEXT` (Stage 1 추가)
+- `import_invoices.factory_name/factory_code` nullable
+- 인덱스: `idx_import_invoice_items_management_code`
+
+**API 수용:**
+- `POST /api/import-invoices`: `factory_name` 필수 체크 없음 (`invoice_no + invoice_date`만 필수)
+- `POST/PUT /api/import-invoices/[id]/items`: `management_code` 수용
+- `POST /api/import-invoices/[id]/items/bulk`: `management_code` 수용
+
+**PO → 인보이스 자동 생성** (`_poOpenInvoiceLink`):
+- 7단계: PO GET → INV 자동증번 → invoice POST → payments → 콜라보 팔렛 → items bulk → PO linked
+- 재실행 guard: `po.status === 'linked' || po.linked_invoice_id`
+
+**UI:**
+- 관리코드 없는 제품: `<span class="po-mc-empty">—</span>` 회색 대시
+- 폰트: `ui-monospace, "SF Mono", Menlo, monospace`; 11~12px
+- R4 "파란 동그라미" 규약 예외 (모노스페이스 식별자 컬럼)
+
+## 컬럼 리사이즈 공통 함수
+
+- 모든 리사이즈 가능한 테이블: `initColumnResize(tableId)` 호출
+- 저장 키: `mw_colwidths_<tableId>` (자동)
+- 테이블 구조: `<table id="..."><colgroup><col>...</colgroup>...</table>`
+- 더블클릭 → auto-fit (내장)
+- 구분바 CSS (다크 헤더):
+  - `thead th + th::before` 가상요소로 세로선 (`rgba(255,255,255,0.18)`)
+  - hover 시 파란색 (`rgba(130,180,255,0.7)`) 2px
+  - `pointer-events: none` (드래그 핸들 z-index 우선)
+- 컬럼 초기화: `localStorage.removeItem('mw_colwidths_<id>')` → 재렌더
+
+## 외부 시스템 호출 금지 규칙
+
+### 경영박사 ERP
+- **실호출 금지** (실 데이터 훼손 위험)
+- 문서: `docs/경영박사_API_매뉴얼.md`, `docs/경영박사_자동화_가이드.md`
+- 라이브러리: `src/lib/erp.ts`
+- ENV: `ERP_USER_KEY`, `ERP_URL` (drws20.softcity.co.kr:1448)
+- 전표조회 API 없음 → 조회는 엑셀 업로드 대안
+
+### 네이버 커머스
+- NAS 프록시 경유: `115.136.19.83:3080`
+- API Key: `daehan-proxy-secret-2026`
+
+### TTI B2B
+- 프레임셋 구조, ENV `TTI_LOGIN_*`
+
+### SSG
+- `eapi.ssgadm.com`, Authorization 헤더 직접
+
+## 작업 워크플로우 원칙 (2026-04-26 재확인)
+
+- 프롬프트는 **파일로** 전달 (채팅에 안 풀어놓기)
+- 메뉴/필드는 **한글로** 지칭, 영어 식별자는 코드블록 한정
+- Phase A 조사 + Phase B 실행 **분리** (백엔드/외부 시스템 시)
+- 자동 검증 Claude Code 수행 (curl + grep)
+- V-4 사용자 브라우저 검증만 수동
+- **수입건V2(`_ipbat2*`) 별도 Stage까지 건드리지 말 것**
+- UI 수정은 app.js 유지 (Next.js 재작성 금지)
+- 회계 숫자 1원 오차도 안 됨 → 서버/클라 병행 비교 검증
+
+### Dead-code 검증 교훈
+
+함수 정의만 보고 "작동 중"이라 가정 금지. **호출 경로 + DOM 존재 확인 필수**.
+- 예: `_ipinv2RenderValidationBadge()` 함수는 정의되어 있었으나 `#ipinv2-summary-bar` DOM이 어디에도 생성되지 않아 화면 미표시 (실제 렌더는 `_ipinv2RenderCombinedSummary` fallback)
+- grep으로 호출 위치 + DOM ID **둘 다** 조회
+
 ## 🆕 새 메뉴 개발 원칙 (2026-04-22 확정)
 
 ### 기본 원칙
@@ -602,6 +749,31 @@ Next.js 이전의 첫 사례로 채택됨 — 이는 **예외적 마이그레이
   - app.js ↔ Next.js 연결: iframe 삽입 방식
   - 첫 테스트 메뉴: 공지사항 관리 (제품·발주 커밋6 완료 후 진행)
   - CLAUDE.md 오류 2곳 수정: 작업 폴더 경로(0. 제거), app.js 줄수(7,100→27,000)
+
+- [2026-04-26] 인보이스V2 Stage 4-5 운영 규칙 CLAUDE.md 반영
+  - **서버 런타임 절대 규칙**: Edge runtime 금지 (Supabase Sydney 리전, Stage 4-3 실측 4배 악화)
+  - **데이터 로딩 (Stage 4-2)**: `GET /api/import-invoices/[id]/full-detail` 진입 전용 통합 API (Promise.all 5쿼리)
+  - **클라 계산 (Stage 4 B-2)**: `_ipinv2CalcCostLocal` (서버 1:1 포팅), 서버 cost-calculation API 인보이스V2 호출 금지 (deprecated)
+  - **검증 공식 (Stage 5-3)**: `paymentsTotal + customsTotal` vs `supply_price + vat_alloc` (× 1.1 절대 금지 — 부가세 이중 계산 버그)
+  - **검증 뱃지 4상태 (Stage 5-2)**: pending_payment / pending_customs / error / ok (10원 허용 오차)
+  - **관리코드(CODE2) 규약**: `import_invoice_items.management_code` + `factory_name` nullable + R4 모노스페이스 예외
+  - 컬럼 리사이즈 공통 함수 / 외부 시스템 호출 금지 규칙 / 작업 워크플로우 원칙 / Dead-code 검증 교훈 추가
+  - **미해결**: Stage 5-4 환차 처리 (사용자 결정 대기)
+
+## 미해결 사항 (TODO)
+
+### Stage 5-4: 환차 처리 미정 (사용자 결정 대기)
+
+- 295원 환차 처리 미정
+- 원인: USD 결제 정수 단위(72,177) vs 인보이스 소수점 정밀(72,177.20)
+  - 0.2 USD × 1486 KRW ≈ 295원 환차
+  - 환율 `toFixed(4)` 정밀도 기여는 약 3원
+- 해결 후보:
+  - (A) 우변 = `paymentsTotal + customsAll` (실 입금 기준, 자동 0원)
+  - (B) 좌변 = `totalFobKrw + customsAll` (배분 기준)
+  - (C) ⭐ 환차손익 별도 셀 + 검증 뱃지 USD 0.5 × 환율 이내 허용
+  - (D) 기타
+- claude.ai 새 채팅에서 사용자 결정 후 Phase B 프롬프트 받을 예정
 
 ## 시작 루틴 (사용자가 "시작"이라고 입력하면 실행)
 1. 현재 프로젝트 폴더 확인 및 출력
