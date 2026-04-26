@@ -20816,7 +20816,7 @@ function _poRenderDetail() {
   h += '<div class="po-customer-search-wrap" style="position:relative;">';
   h += '<span class="po-customer-label" style="position:absolute;top:-7px;left:10px;background:#FAFAF7;padding:0 6px;font-size:10px;color:' + poCustLabelColor + ';font-weight:700;z-index:1;">거래처 ' + (poCustSelected ? '✓' : '*') + '</span>';
   h += '<input type="hidden" id="po-customer-code" value="' + _poEsc(poCustCode) + '">';
-  h += '<input type="text" id="po-customer-input" class="po-customer-input" placeholder="거래처명 검색 (예: 장구)" value="' + _poEsc(poCustName) + '" autocomplete="off"' + poCustDisabled + ' style="width:100%;height:34px;padding:0 12px;border:2px solid ' + poCustBorderColor + ';border-radius:6px;font-size:13px;font-family:Pretendard,sans-serif;background:' + poCustBg + ';box-sizing:border-box;" oninput="_poCustomerOnInput(event)" onblur="_poCustomerOnBlur(event)" onkeydown="_poCustomerOnKeydown(event)" onfocus="_poCustomer.openDropdown()">';
+  h += '<input type="text" id="po-customer-input" class="po-customer-input" placeholder="거래처명 검색 (예: 장구)" value="' + _poEsc(poCustName) + '" autocomplete="off"' + poCustDisabled + ' style="width:100%;height:34px;padding:0 12px;border:2px solid ' + poCustBorderColor + ';border-radius:6px;font-size:13px;font-family:Pretendard,sans-serif;background:' + poCustBg + ';box-sizing:border-box;" onblur="_poCustomerOnBlur(event)" onkeydown="_poCustomerOnKeydown(event)" onfocus="_poCustomer.openDropdown()">';
   h += '</div>';
   // 우 70%: 제품 검색 (기존 유지)
   h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" autocomplete="off"' + (hasError ? ' disabled' : '') + '>';
@@ -20875,6 +20875,9 @@ function _poBindDetailEvents() {
   // [Phase B-1] pc-search-input debounce + IME 바인딩
   var _pcEl = document.querySelector('.pc-search-input');
   if (_pcEl) bindSearchInput(_pcEl, function() { _poFilterProductList(_pcEl.value); }, { mode: 'search' });
+  // [Phase B-2 D] po-customer-input debounce + IME 바인딩 (autocomplete=150ms, _ipinv2Customer 패턴 통일)
+  var _poCustEl = document.getElementById('po-customer-input');
+  if (_poCustEl) bindSearchInput(_poCustEl, function() { _poCustomer.onInput(_poCustEl.value); }, { mode: 'autocomplete' });
 }
 
 // 좌측 제품 목록 — mw_import_po_products 원본 실시간 참조 렌더링 (12컬럼)
@@ -24516,14 +24519,8 @@ function _ipinv2BindCustomerInput() {
   if (!input || input._ipinv2CustBound) return;
   input._ipinv2CustBound = true;
 
-  var inputTimer = null;
-  input.addEventListener('input', function(e) {
-    if (inputTimer) clearTimeout(inputTimer);
-    var val = e.target.value;
-    inputTimer = setTimeout(function() {
-      _ipinv2Customer.onInput(val);
-    }, 150);
-  });
+  // [Phase B-2 A] bindSearchInput 헬퍼로 통일 (autocomplete=150ms + IME 처리)
+  bindSearchInput(input, function() { _ipinv2Customer.onInput(input.value); }, { mode: 'autocomplete' });
   input.addEventListener('focus', function() {
     _ipinv2Customer.openDropdown();
   });
@@ -27880,7 +27877,7 @@ const _tx = {
     },
 
     onInput(queryText) {
-      if (this._debounceTimer) clearTimeout(this._debounceTimer);
+      // [Phase B-2 C] _debounceTimer 제거 — bindSearchInput 헬퍼가 300ms debounce 담당 (이중 debounce 방지)
       const q = String(queryText || '').trim();
       if (q.length === 0) {
         // 빈 검색창: 기본 4개 즉시 표시 (디바운스 없음)
@@ -27889,7 +27886,7 @@ const _tx = {
         this.render(defaults);
         return;
       }
-      this._debounceTimer = setTimeout(function() { _tx.search._run(q); }, 150);
+      _tx.search._run(q);
     },
 
     // Phase 3B-2: 빈 검색창에서 기본 제품 4개 (mw_products 배열 끝 역순)
@@ -28267,16 +28264,8 @@ const _tx = {
   _bindSearchInput() {
     const input = document.getElementById('tx-search-input');
     if (!input) return;
-    let isComposing = false;
-    input.addEventListener('compositionstart', function() { isComposing = true; });
-    input.addEventListener('compositionend', function(e) {
-      isComposing = false;
-      _tx.search.onInput(e.target.value);
-    });
-    input.addEventListener('input', function(e) {
-      if (isComposing) return;
-      _tx.search.onInput(e.target.value);
-    });
+    // [Phase B-2 C] bindSearchInput 헬퍼로 통일 (search=300ms + IME 처리)
+    bindSearchInput(input, function() { _tx.search.onInput(input.value); }, { mode: 'search' });
   },
 
   // ================================================================
@@ -28315,7 +28304,8 @@ const _tx = {
       this._dropdown = dd;
 
       const searchInput = dd.querySelector('.tx-customer-search-input');
-      searchInput.addEventListener('input', function(e) { _tx.customer.onSearch(e.target.value); });
+      // [Phase B-2 B] bindSearchInput 헬퍼로 통일 (search=300ms + IME 처리, clientData 2,471건)
+      bindSearchInput(searchInput, function() { _tx.customer.onSearch(searchInput.value); }, { mode: 'search' });
       searchInput.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') _tx.customer.closeDropdown();
       });
