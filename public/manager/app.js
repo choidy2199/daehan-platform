@@ -23025,7 +23025,9 @@ var _IPINV2_DEFAULT_CUSTOMS = [
 // [B-3-2-2] 제품 최종 원가 13컬럼 상태 (수입건V2 _ipbat2* 복제, 3단계에서 invoice 기반 재계산으로 전환)
 // [Stage 4 Phase B-2] _ipinv2CostCalc (서버 응답 캐시) 제거. 렌더 소스는 _ipinv2CostCalcLocal로 단일화.
 var _ipinv2CostCalcLocal = null; // 클라 계산 엔진 결과. 렌더·엑셀·비교 모두 이 값 사용.
-var _ipinv2ErpPreview = null;   // /api/import-batches/[id]/erp-preview 응답 캐시
+// [Stage 6 Phase B-1] 신규 invoice 단위 erp-preview API 응답 캐시
+// 기존 batch erp-preview는 호출 안 함 (정규화 미반영). 모달 진입 시 신규 API 호출 → 채움.
+var _ipinv2ErpPreview = null;
 var _ipinv2MarginPct = 10;      // 마진율 기본 10% (단일 전역값, 3단계에서 모델별 override 가능)
 var _ipinv2CalcTimer = null;    // FOB 편집 후 원가 재계산 debounce
 // [B-3-2-2c] PO items 캐시 — 관리코드 enrich + 순서 재정렬에 재사용 (할인율 변경 후에도 유지)
@@ -24145,26 +24147,225 @@ function _ipinv2RenderErpSection() {
   root.style.display = 'none'; // 공간도 차지하지 않도록 숨김
 }
 
+// [Stage 6 Phase B-1] 검증 뱃지 상태 산출 헬퍼 — _ipinv2RenderSummaryBar의 4상태 로직 1:1 복제
+// 산출만 하고 렌더는 안 함 (disabled 조건 + 모달 등에서 재사용)
+function _ipinv2ComputeValidationStatus() {
+  var calc = _ipinv2CostCalcLocal;
+  var canCalc = calc && calc.can_calculate === true;
+  if (!canCalc) return 'pending_payment';
+  var customs = _ipinv2Customs || [];
+  var customsTotal = customs.reduce(function(s, c) { return s + Number((c && c.amount_krw) || 0); }, 0);
+  if (customs.length > 0 && customsTotal === 0) return 'pending_customs';
+  var sumKrw = (_ipinv2Payments || [])
+    .filter(function(p) { return p.status === 'completed'; })
+    .reduce(function(s, p) { return s + Number(p.total_paid_krw || 0); }, 0);
+  var supplyTotal = Number(calc.totals.supply_price || 0);
+  var vatTotal = Number(calc.totals.vat_alloc || 0);
+  var leftSide = sumKrw + customsTotal;
+  var rightSide = supplyTotal + vatTotal;
+  if (Math.abs(leftSide - rightSide) >= 10) return 'error';
+  return 'ok';
+}
+
+// [Stage 6 Phase B-1] 인보이스V2 매입전표 미리보기 모달 표시
+function _ipinv2OpenErpPreviewModal() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv || !inv.id) {
+    alert('인보이스를 먼저 선택하세요.');
+    return;
+  }
+
+  // 모달 컨테이너 (오버레이 + 모달)
+  var existing = document.getElementById('ipinv2-erp-modal-overlay');
+  if (existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'ipinv2-erp-modal-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) _ipinv2CloseErpPreviewModal(); });
+
+  var modal = document.createElement('div');
+  modal.id = 'ipinv2-erp-modal';
+  modal.style.cssText = 'background:#fff;border-radius:8px;width:760px;max-width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);';
+  modal.innerHTML =
+    '<div id="ipinv2-erp-modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#1A1D23;color:#fff;cursor:move;">' +
+      '<span style="font-size:14px;font-weight:600;">경영박사 매입전표 미리보기 — ' + _ipinv2Esc(inv.invoice_no || '') + '</span>' +
+      '<button onclick="_ipinv2CloseErpPreviewModal()" style="background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;">&times;</button>' +
+    '</div>' +
+    '<div id="ipinv2-erp-modal-body" style="flex:1;overflow-y:auto;padding:18px 20px;font-size:13px;color:#1A1D23;">' +
+      '<div style="text-align:center;color:#9BA3B2;padding:40px 0;">미리보기 데이터 불러오는 중...</div>' +
+    '</div>' +
+    '<div id="ipinv2-erp-modal-footer" style="display:flex;gap:8px;padding:12px 20px;border-top:1px solid #EEF0F4;justify-content:flex-end;background:#FAFAF7;">' +
+      '<button onclick="_ipinv2CloseErpPreviewModal()" style="padding:8px 18px;border:1px solid #DDE1EB;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;">취소</button>' +
+    '</div>';
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  if (typeof _makeDraggable === 'function') {
+    _makeDraggable(modal, document.getElementById('ipinv2-erp-modal-header'));
+  }
+
+  // 신규 API 호출
+  fetch('/api/import-invoices/' + encodeURIComponent(inv.id) + '/erp-preview', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.success) {
+        var err = (json && json.error) || '알 수 없는 오류';
+        document.getElementById('ipinv2-erp-modal-body').innerHTML =
+          '<div style="padding:24px;color:#CC2222;">미리보기 로드 실패: ' + _ipinv2Esc(err) + '</div>';
+        return;
+      }
+      _ipinv2ErpPreview = json;
+      _ipinv2RenderErpPreviewModalBody(json);
+    })
+    .catch(function(e) {
+      document.getElementById('ipinv2-erp-modal-body').innerHTML =
+        '<div style="padding:24px;color:#CC2222;">네트워크 오류: ' + _ipinv2Esc(String(e && e.message || e)) + '</div>';
+    });
+}
+
+function _ipinv2CloseErpPreviewModal() {
+  var ov = document.getElementById('ipinv2-erp-modal-overlay');
+  if (ov) ov.remove();
+}
+
+function _ipinv2RenderErpPreviewModalBody(data) {
+  var body = document.getElementById('ipinv2-erp-modal-body');
+  var footer = document.getElementById('ipinv2-erp-modal-footer');
+  if (!body || !footer) return;
+
+  var header = data.header || {};
+  var items = data.items || [];
+  var totals = data.totals || { qty_sum: 0, amount_sum: 0 };
+  var blockers = data.blockers || [];
+  var alreadySent = data.already_sent || { sent: false };
+
+  // 전표일자 = 전송 시점 today (Q4)
+  var now = new Date();
+  var yy = String(now.getFullYear()).slice(2);
+  var mm = String(now.getMonth() + 1).padStart(2, '0');
+  var dd = String(now.getDate()).padStart(2, '0');
+  var todayYYMMDD = yy + '.' + mm + '.' + dd;
+
+  var fmt = function(n) { return Number(n || 0).toLocaleString('en-US'); };
+
+  var h = '';
+  // 헤더 정보
+  h += '<div style="background:#F4F6FA;border-radius:6px;padding:14px 16px;margin-bottom:14px;">';
+  h += '<div style="font-size:11px;color:#6B7280;font-weight:600;margin-bottom:6px;">▼ 헤더 정보</div>';
+  h += '<div style="display:grid;grid-template-columns:90px 1fr;row-gap:6px;column-gap:10px;font-size:12px;">';
+  h += '<div style="color:#6B7280;">거래처</div><div>' + _ipinv2Esc(header.customer_name || '-') + ' <span style="color:#9BA3B2;font-family:monospace;">(CODE2 ' + _ipinv2Esc(header.customer_code || '없음') + ')</span></div>';
+  h += '<div style="color:#6B7280;">송장번호</div><div>' + _ipinv2Esc(header.invoice_number || '-') + '</div>';
+  h += '<div style="color:#6B7280;">전표일자</div><div>' + todayYYMMDD + ' <span style="color:#9BA3B2;">(전송 시점 today)</span></div>';
+  h += '<div style="color:#6B7280;">비고</div><div style="font-family:monospace;font-size:11px;">' + _ipinv2Esc(header.memo || '') + '</div>';
+  h += '</div></div>';
+
+  // 라인 테이블
+  h += '<div style="font-size:11px;color:#6B7280;font-weight:600;margin-bottom:6px;">▼ 매입전표 라인 (' + items.length + '건)</div>';
+  h += '<div style="border:1px solid #EEF0F4;border-radius:6px;overflow:hidden;">';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  h += '<thead><tr style="background:#1A1D23;color:#fff;">';
+  h += '<th style="padding:8px 10px;text-align:right;width:40px;">#</th>';
+  h += '<th style="padding:8px 10px;text-align:left;width:120px;">관리코드</th>';
+  h += '<th style="padding:8px 10px;text-align:left;">모델명</th>';
+  h += '<th style="padding:8px 10px;text-align:right;width:60px;">수량</th>';
+  h += '<th style="padding:8px 10px;text-align:right;width:90px;">단가</th>';
+  h += '<th style="padding:8px 10px;text-align:right;width:110px;">금액</th>';
+  h += '</tr></thead><tbody>';
+  items.forEach(function(it) {
+    var rowBg = it.has_code ? '#fff' : '#FEEFEF';
+    var codeCell = it.has_code
+      ? '<span style="font-family:ui-monospace,Menlo,monospace;">' + _ipinv2Esc(it.code) + '</span>'
+      : '<span style="color:#CC2222;font-weight:600;">⚠️ 없음</span>';
+    h += '<tr style="background:' + rowBg + ';border-bottom:1px solid #EEF0F4;">';
+    h += '<td style="padding:6px 10px;text-align:right;color:#6B7280;">' + it.no + '</td>';
+    h += '<td style="padding:6px 10px;">' + codeCell + '</td>';
+    h += '<td style="padding:6px 10px;">' + _ipinv2Esc(it.model || '') + '</td>';
+    h += '<td style="padding:6px 10px;text-align:right;">' + fmt(it.qty) + '</td>';
+    h += '<td style="padding:6px 10px;text-align:right;">' + fmt(it.price) + '</td>';
+    h += '<td style="padding:6px 10px;text-align:right;font-weight:500;">' + fmt(it.amount) + '</td>';
+    h += '</tr>';
+  });
+  // 합계 행
+  h += '<tr style="background:#F4F6FA;font-weight:600;">';
+  h += '<td colspan="3" style="padding:8px 10px;text-align:right;">합계</td>';
+  h += '<td style="padding:8px 10px;text-align:right;">' + fmt(totals.qty_sum) + ' EA</td>';
+  h += '<td style="padding:8px 10px;"></td>';
+  h += '<td style="padding:8px 10px;text-align:right;">' + fmt(totals.amount_sum) + '원</td>';
+  h += '</tr>';
+  h += '</tbody></table></div>';
+
+  // 이미 전송됨 알림
+  if (alreadySent.sent) {
+    h += '<div style="margin-top:12px;padding:10px 14px;background:#E1F5EE;color:#085041;border-radius:6px;font-size:12px;">';
+    h += 'ℹ 이미 전송됨 (전표번호: ' + _ipinv2Esc(alreadySent.order_no || '-');
+    if (alreadySent.sent_at) {
+      h += ' · ' + _ipinv2Esc(String(alreadySent.sent_at).substring(0, 10));
+    }
+    h += ')';
+    h += '</div>';
+  }
+
+  // blockers
+  if (blockers.length > 0) {
+    h += '<div style="margin-top:12px;padding:10px 14px;background:#FEEFEF;color:#791F1F;border-radius:6px;font-size:12px;">';
+    h += '<div style="font-weight:600;margin-bottom:4px;">⚠️ 전송 불가 사유</div>';
+    h += '<ul style="margin:0;padding-left:18px;">';
+    blockers.forEach(function(b) { h += '<li>' + _ipinv2Esc(b) + '</li>'; });
+    h += '</ul></div>';
+  }
+
+  body.innerHTML = h;
+
+  // 푸터 — [전송 확정] / [클립보드 복사] / [취소]
+  var canSend = !!data.can_send;
+  var sendBtnDisabled = canSend ? '' : ' disabled';
+  var sendBtnStyle = canSend
+    ? 'padding:8px 18px;border:none;border-radius:6px;background:#10B981;color:#fff;font-size:13px;font-weight:600;cursor:pointer;'
+    : 'padding:8px 18px;border:none;border-radius:6px;background:#D1D5DB;color:#6B7280;font-size:13px;font-weight:600;cursor:not-allowed;';
+
+  var fh = '';
+  fh += '<button onclick="_ipinv2CopyErpPreview()" style="padding:8px 14px;border:1px solid #DDE1EB;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;">📋 클립보드 복사</button>';
+  fh += '<div style="flex:1;"></div>';
+  fh += '<button onclick="_ipinv2CloseErpPreviewModal()" style="padding:8px 18px;border:1px solid #DDE1EB;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;">취소</button>';
+  fh += '<button onclick="_ipinv2ConfirmSendErp()" style="' + sendBtnStyle + '"' + sendBtnDisabled + '>✅ 전송 확정</button>';
+  footer.innerHTML = fh;
+  // footer를 flex로 (헤더/푸터 통일)
+  footer.style.justifyContent = 'flex-start';
+}
+
+// [Stage 6 Phase B-1] 클립보드 복사 — 신규 API 응답 구조 사용
 function _ipinv2CopyErpPreview() {
   var erp = _ipinv2ErpPreview;
-  if (!erp || !erp.invoices_erp) return;
-  var lines = [];
-  erp.invoices_erp.forEach(function(inv, i) {
-    lines.push('[매입전표 ' + (i + 1) + '] ' + inv.factory_name + (inv.factory_code ? ' (' + inv.factory_code + ')' : ''));
-    lines.push('memo: ' + inv.memo);
-    lines.push('items: ' + inv.items);
-    lines.push('');
-  });
-  var text = lines.join('\n');
+  if (!erp || !erp.header || !erp.items) {
+    alert('미리보기 데이터가 없습니다.');
+    return;
+  }
+  var now = new Date();
+  var yy = String(now.getFullYear()).slice(2);
+  var mm = String(now.getMonth() + 1).padStart(2, '0');
+  var dd = String(now.getDate()).padStart(2, '0');
+  var todayYYMMDD = yy + '.' + mm + '.' + dd;
+  var info = (erp.header.customer_code || '') + '|' + (erp.header.memo || '') + '|' + todayYYMMDD + '|';
+  // Q6: 부가세 0
+  var itemsStr = erp.items.map(function(it) {
+    return [it.code || '', it.qty, it.price, it.amount, 0, it.model || ''].join('$');
+  }).join('|');
+  var text = 'info:\n' + info + '\n\nitems:\n' + itemsStr + '\n\nibgum:\n(빈값)';
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(function() { alert('미리보기가 클립보드에 복사되었습니다.'); });
+    navigator.clipboard.writeText(text).then(function() { alert('매입전표 데이터가 클립보드에 복사되었습니다.'); });
   } else {
     alert(text);
   }
 }
 
+// [Stage 6 Phase B-1] [전송 확정] 버튼 — Phase B-2에서 실 호출 구현 예정
+function _ipinv2ConfirmSendErp() {
+  alert('Phase B-2에서 실 전송 구현 예정 (경영박사 NewOrderIn 호출 + erp_invoice_send_logs 기록).');
+}
+
+// [Stage 6 Phase B-1] [경영박사 전송] 버튼 클릭 → 미리보기 모달 진입
 function _ipinv2SendErp() {
-  alert('경영박사 전송은 3단계(Phase 3)에서 구현 예정입니다.');
+  _ipinv2OpenErpPreviewModal();
 }
 
 // [B-3-2-2b E] → [B-3-2-2c 1] 리사이즈 시작 시 모든 col + 테이블 전체 width 박제
@@ -24784,7 +24985,9 @@ function _ipinv2RenderItemsTable() {
   h += '<div class="ipinv2-cost-title"><span>제품 최종 원가</span><span class="count">(' + items.length + '건)</span></div>';
   h += '<div class="ipinv2-cost-actions">';
   h += '<button type="button" onclick="_ipinv2ExportCostExcel()">📊 엑셀 출력</button>';
-  var erpDisabled = !(_ipinv2ErpPreview && _ipinv2ErpPreview.can_send) ? ' disabled' : '';
+  // [Stage 6 Phase B-1] 활성화 조건: 검증 뱃지 = ok (이미 전송된 경우도 활성화 — 재전송은 모달에서 처리)
+  var _ipinv2VStatus = _ipinv2ComputeValidationStatus();
+  var erpDisabled = (_ipinv2VStatus !== 'ok') ? ' disabled' : '';
   h += '<button type="button" onclick="_ipinv2SendErp()" class="ipinv2-btn-erp"' + erpDisabled + '>✅ 경영박사 전송</button>';
   h += '</div>';
   h += '</div>';
