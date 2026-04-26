@@ -345,16 +345,37 @@ function save(key, data) {
   if (key === KEYS.products) {
     if (typeof _renderedTabs !== 'undefined') { _renderedTabs['catalog'] = false; }
   }
+  // [STEP 3-A] 회계 키만 pending 마크 (새로고침 후 _bgSync 덮어쓰기 차단용)
+  // 마크는 autoSync fetch 성공 시 제거됨
+  if (typeof _isAccountingKey === 'function' && _isAccountingKey(key)) {
+    try { localStorage.setItem('_pendingSync_' + key, String(Date.now())); } catch (e) {}
+  }
   // 자동 Supabase 동기화
   autoSyncToSupabase(key);
 }
 function loadObj(key, def) { try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; } }
 
 // ======================== SUPABASE SYNC ========================
-// 자동 동기화 (5초 디바운스)
+// [STEP 3-A] 회계 데이터 키 — 100ms 즉시 동기화 (race 차단)
+// 일반 운영 데이터는 기존 5초 debounce 유지 (mw_products/mw_clients 등)
+var ACCOUNTING_KEYS = [
+  'mw_import_po_products', 'mw_orders', 'mw_po_history', 'mw_po_draft_list', 'mw_po_cart',
+  'mw_sales_items', 'mw_setbun_items', 'mw_parts_prices',
+  'mw_cumulative_promos', 'mw_commercial_promos', 'mw_promotions',
+  'mw_rebate', 'mw_action_history', 'mw_price_history', 'mw_inventory'
+];
+function _isAccountingKey(key) {
+  if (ACCOUNTING_KEYS.indexOf(key) >= 0) return true;
+  if (key && key.indexOf('mw_import_po_cart_') === 0) return true;
+  return false;
+}
+
+// 자동 동기화 (회계 키 100ms / 기타 5초 디바운스)
 var _syncTimers = {};
 function autoSyncToSupabase(key) {
   if (_syncTimers[key]) clearTimeout(_syncTimers[key]);
+  // [STEP 3-A] 회계 키는 100ms 즉시 sync, 그 외 5초 유지
+  var delay = _isAccountingKey(key) ? 100 : 5000;
   _syncTimers[key] = setTimeout(function() {
     var raw = localStorage.getItem(key);
     if (!raw) return;
@@ -366,13 +387,41 @@ function autoSyncToSupabase(key) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: key, value: raw })
     }).then(function(r) { return r.json(); }).then(function(d) {
-      if (d.success) { updateSyncStatus('동기화 완료'); console.log('[Supabase] 자동 동기화:', key); }
+      if (d.success) {
+        updateSyncStatus('동기화 완료'); console.log('[Supabase] 자동 동기화:', key);
+        // [STEP 3-A] fetch 성공 시 pending 마크 제거 (새로고침 후 보호 해제)
+        try { localStorage.removeItem('_pendingSync_' + key); } catch (e) {}
+      }
     }).catch(function(e) {
       console.log('[Supabase] 동기화 실패:', key, e.message);
       updateSyncStatus('동기화 실패');
     });
-  }, 5000);
+  }, delay);
 }
+
+// [STEP 3-A] beforeunload 안전망 — 페이지 떠날 때 pending 키를 sendBeacon으로 즉시 전송
+// sendBeacon은 페이지 unload 중에도 전송 보장 (fetch는 cancel 위험)
+(function _dhBindBeforeUnloadSync() {
+  if (typeof window === 'undefined' || window._dhBeforeunloadBound) return;
+  window._dhBeforeunloadBound = true;
+  window.addEventListener('beforeunload', function() {
+    try {
+      var keys = Object.keys(_syncTimers);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var raw = localStorage.getItem(k);
+        if (!raw) continue;
+        var payload = JSON.stringify({ key: k, value: raw });
+        var blob = new Blob([payload], { type: 'application/json' });
+        // sendBeacon 결과는 무시 — 페이지 떠나는 중이라 확인 불가
+        // _pendingSync 마크는 그대로 유지 → 다음 init에서 한 번 더 보호
+        navigator.sendBeacon('/api/sync/save', blob);
+      }
+    } catch (e) {
+      // beforeunload에서 throw하면 페이지 떠나기 차단 위험 — 무시
+    }
+  });
+})();
 
 function updateSyncStatus(text) {
   // 기존 설정 탭 #sync-status 업데이트
@@ -587,6 +636,11 @@ function _bgSyncFromSupabase(activeTab) {
       }
       // pending sync가 있는 키는 스킵 (로컬 변경 보호)
       if (_syncTimers[item.key]) continue;
+      // [STEP 3-A] localStorage 마크 보호 — 새로고침 후 미완 sync도 차단
+      if (localStorage.getItem('_pendingSync_' + item.key)) {
+        console.log('[BgSync] pending 마크 — 덮어쓰기 차단:', item.key);
+        continue;
+      }
       var newVal = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
       var oldVal = localStorage.getItem(item.key);
       if (newVal !== oldVal) {
