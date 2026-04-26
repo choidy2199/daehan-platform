@@ -1797,6 +1797,45 @@ function debounce(fn, delay) {
     timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
   };
 }
+
+/**
+ * [Phase B-1] 검색 input 통합 바인딩 — IME 처리 + debounce 표준화.
+ * - 같은 element에 여러 번 호출해도 리스너 1개만 (중복 가드)
+ * - 한글 IME 조합 중에는 발동 안 됨, compositionend 후 debounce 시작
+ * - mode='search' → 300ms (기본), mode='autocomplete' → 150ms
+ *
+ * @param {HTMLInputElement} el
+ * @param {Function} handler - 인자 없는 함수. el.value는 핸들러 내부에서 직접 읽음
+ * @param {{delay?:number, mode?:'search'|'autocomplete'}} [opts]
+ */
+function bindSearchInput(el, handler, opts) {
+  if (!el || typeof handler !== 'function') {
+    console.warn('[bindSearchInput] invalid args', { el: el, handler: handler });
+    return;
+  }
+  if (el._dhSearchBound) return;
+  el._dhSearchBound = true;
+
+  var delay = (opts && typeof opts.delay === 'number')
+    ? opts.delay
+    : (opts && opts.mode === 'autocomplete' ? 150 : 300);
+
+  var isComposing = false;
+  var timer = null;
+
+  el.addEventListener('compositionstart', function() { isComposing = true; });
+  el.addEventListener('compositionend', function() {
+    isComposing = false;
+    clearTimeout(timer);
+    timer = setTimeout(handler, delay);
+  });
+  el.addEventListener('input', function() {
+    if (isComposing) return;
+    clearTimeout(timer);
+    timer = setTimeout(handler, delay);
+  });
+}
+
 // 검색 input의 oninput을 debounce로 오버라이드 (index.html 수정 불가이므로)
 (function() {
   var overrides = {
@@ -4626,6 +4665,10 @@ function renderPOTab() {
   initPOAutocomplete('po-foc-search', function(p) { console.log('[발주] FOC 검색 선택:', p.model); });
   initPOAutocomplete('po-foc-cart-search', function(p) { console.log('[발주] FOC 등록:', p.model); toast('FOC 기능은 다음 단계에서 구현됩니다'); });
 
+  // [Phase B-1] po-prod-search debounce + IME 바인딩
+  var _poProdSearchEl = document.getElementById('po-prod-search');
+  if (_poProdSearchEl) bindSearchInput(_poProdSearchEl, filterPOProducts, { mode: 'search' });
+
   // 발주리스트 탭이 활성인 경우 초기화
   if (activeSubTab === 'prelist') {
     _initPLTab();
@@ -4659,7 +4702,7 @@ function buildPOProductPanel() {
 
   // 필터 행
   html += '<div class="po-filter-row">';
-  html += '<input type="search" placeholder="코드, 모델명 검색" id="po-prod-search" autocomplete="off" oninput="filterPOProducts()">';
+  html += '<input type="search" placeholder="코드, 모델명 검색" id="po-prod-search" autocomplete="off">';
 
   // 카테고리 select — 실제 카테고리에서 동적 생성
   var cats = {};
@@ -5702,13 +5745,18 @@ function _buildPromoLeftPanel(subtab, title, discountPct, items) {
   var h = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
   var _lim = PO_PROMO_LIMIT[subtab] || 99;
   h += '<div class="po-panel-header"><span>' + title + ' · ' + discountPct + '% 할인 · <span id="po-' + subtab + '-count">' + items.length + '</span>건 · <span class="po-limit-btn" onclick="_changePromoLimit(\'' + subtab + '\')" title="클릭하여 수정">제한: ' + _lim + '개</span></span></div>';
-  h += '<div class="po-filter-row"><input type="search" placeholder="코드, 모델명 검색" id="po-' + subtab + '-search" autocomplete="off" oninput="_filterPromoTab(\'' + subtab + '\',' + discountPct + ')"></div>';
+  h += '<div class="po-filter-row"><input type="search" placeholder="코드, 모델명 검색" id="po-' + subtab + '-search" autocomplete="off"></div>';
   h += '<div class="po-table-wrap"><table class="po-table"><thead><tr><th>No</th><th>제품번호</th><th>모델명</th><th style="text-align:right">공급가</th><th style="text-align:right">할인가</th><th>재고</th><th style="width:50px">수량</th><th></th></tr></thead>';
   h += '<tbody id="po-' + subtab + '-tbody">';
   items.forEach(function(item, i) {
     h += _buildPromoRow(item, i, subtab, discountPct);
   });
   h += '</tbody></table></div></div>';
+  // [Phase B-1] po-{subtab}-search debounce + IME 바인딩 (다음 tick에서 DOM 적용 후 바인딩)
+  setTimeout(function() {
+    var _el = document.getElementById('po-' + subtab + '-search');
+    if (_el) bindSearchInput(_el, function() { _filterPromoTab(subtab, discountPct); }, { mode: 'search' });
+  }, 0);
   return h;
 }
 function _getPromoLimits() {
@@ -5885,11 +5933,16 @@ function _buildPackageTabContent() {
 function _buildPackageLeftPanel(items) {
   var h = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
   h += '<div class="po-panel-header"><span>패키지 프로모션 · <span id="po-package-count">' + items.length + '</span>건</span></div>';
-  h += '<div class="po-filter-row"><input type="search" placeholder="M코드, 모델명 검색" id="po-package-search" autocomplete="off" oninput="_filterPackageTab()"></div>';
+  h += '<div class="po-filter-row"><input type="search" placeholder="M코드, 모델명 검색" id="po-package-search" autocomplete="off"></div>';
   h += '<div class="po-table-wrap"><table class="po-table"><thead><tr><th>No</th><th>M코드</th><th>프로모션명</th><th>모델명</th><th style="text-align:right">공급가</th><th style="text-align:right">프로모션가</th><th>가능</th><th style="width:50px">수량</th><th></th></tr></thead>';
   h += '<tbody id="po-package-tbody">';
   items.forEach(function(item, i) { h += _buildPackageRow(item, i); });
   h += '</tbody></table></div></div>';
+  // [Phase B-1] po-package-search debounce + IME 바인딩
+  setTimeout(function() {
+    var _el = document.getElementById('po-package-search');
+    if (_el) bindSearchInput(_el, _filterPackageTab, { mode: 'search' });
+  }, 0);
   return h;
 }
 function _buildPackageRow(item, i) {
@@ -20766,7 +20819,7 @@ function _poRenderDetail() {
   h += '<input type="text" id="po-customer-input" class="po-customer-input" placeholder="거래처명 검색 (예: 장구)" value="' + _poEsc(poCustName) + '" autocomplete="off"' + poCustDisabled + ' style="width:100%;height:34px;padding:0 12px;border:2px solid ' + poCustBorderColor + ';border-radius:6px;font-size:13px;font-family:Pretendard,sans-serif;background:' + poCustBg + ';box-sizing:border-box;" oninput="_poCustomerOnInput(event)" onblur="_poCustomerOnBlur(event)" onkeydown="_poCustomerOnKeydown(event)" onfocus="_poCustomer.openDropdown()">';
   h += '</div>';
   // 우 70%: 제품 검색 (기존 유지)
-  h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" oninput="_poFilterProductList(this.value)" autocomplete="off"' + (hasError ? ' disabled' : '') + '>';
+  h += '<input class="pc-search-input" placeholder="관리코드, 코드, 모델명, 품명 검색" autocomplete="off"' + (hasError ? ' disabled' : '') + '>';
   h += '</div>';
   if (hasError) {
     h += '<div class="pc-tbl-placeholder">로드 실패 — 우측 상단 [↻ 다시 시도] 버튼을 눌러 주세요</div>';
@@ -20819,6 +20872,9 @@ function _poRenderDetail() {
 
 function _poBindDetailEvents() {
   // 검색/필터는 인라인 onclick/oninput으로 연결됨
+  // [Phase B-1] pc-search-input debounce + IME 바인딩
+  var _pcEl = document.querySelector('.pc-search-input');
+  if (_pcEl) bindSearchInput(_pcEl, function() { _poFilterProductList(_pcEl.value); }, { mode: 'search' });
 }
 
 // 좌측 제품 목록 — mw_import_po_products 원본 실시간 참조 렌더링 (12컬럼)
@@ -21591,7 +21647,7 @@ function _poOpenProductPicker() {
   h += '</div>';
   h += '<div class="po-picker-brandbar" id="po-picker-brandbar"></div>';
   h += '<div class="po-picker-filter">';
-  h += '<input type="text" id="po-picker-search" placeholder="관리코드, 코드, 모델명, 품명 검색" oninput="_poPickerOnSearch(this.value)" autocomplete="off">';
+  h += '<input type="text" id="po-picker-search" placeholder="관리코드, 코드, 모델명, 품명 검색" autocomplete="off">';
   h += '<label><input type="checkbox" id="po-picker-stockonly" onchange="_poPickerToggleStockOnly(this.checked)"> 재고 있음만</label>';
   h += '</div>';
   h += '<div class="po-picker-body" id="po-picker-body"></div>';
@@ -21616,8 +21672,14 @@ function _poOpenProductPicker() {
 
   // ESC 처리 — capture 단계 등록 + stopImmediatePropagation으로 전역 탭 핸들러 차단
   document.addEventListener('keydown', _poPickerEscHandler, true);
-  // 첫 input 포커스
-  setTimeout(function() { var s = document.getElementById('po-picker-search'); if (s) s.focus(); }, 0);
+  // 첫 input 포커스 + [Phase B-1] debounce + IME 바인딩
+  setTimeout(function() {
+    var s = document.getElementById('po-picker-search');
+    if (s) {
+      s.focus();
+      bindSearchInput(s, function() { _poPickerOnSearch(s.value); }, { mode: 'search' });
+    }
+  }, 0);
 }
 
 function _poPickerEscHandler(e) {
