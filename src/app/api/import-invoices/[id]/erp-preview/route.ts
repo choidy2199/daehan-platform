@@ -29,7 +29,8 @@ const supabase = createClient(
 type RawItem = {
   id: string;
   management_code: string | null;
-  model: string | null;
+  model: string | null;          // ※ 실제 brand 값이 들어감 (예: "콜라보", "TC.BL")
+  name: string | null;           // ※ 실제 모델명이 들어감 (예: "DC660 2HP-통없는모델")
   qty: number | null;
   fob_usd: number | null;
   net_fob_usd: number | null;
@@ -194,7 +195,8 @@ export async function GET(
     const previewItems = items.map((it, idx) => ({
       no: idx + 1,
       code: it.raw.management_code || null,
-      model: it.raw.model || '',
+      // [Hot-fix] DB의 model 컬럼에는 brand 값이 들어가고, 실제 모델명은 name 컬럼에 저장됨
+      model: it.raw.name || it.raw.model || '',
       qty: it.qty,
       price: it.unit_cost,
       amount: it.supply_price,
