@@ -2552,12 +2552,45 @@ var _legacyTabIdMap = {
   'manage':   'setting'
 };
 
+// [Hot-fix 2026-04-27] 뒤로가기 시 이전 탭 복원 — history.pushState 추적
+// 설계: switchTab 첫 호출은 replaceState (첫 history 항목에 dhTabId 박음),
+//       이후는 pushState. popstate에서 switchTab 호출 시 무한 루프 방지 위해 _dhHistoryReplaying 플래그.
+//       URL은 변경 X (state만 push). 같은 탭 연속 시 _dhLastPushedTabId로 중복 방지.
+var _dhHistoryReplaying = false;
+var _dhLastPushedTabId = null;
+(function _dhBindHistory() {
+  if (typeof window === 'undefined' || window._dhHistoryBound) return;
+  window._dhHistoryBound = true;
+  window.addEventListener('popstate', function(e) {
+    var state = e.state || {};
+    if (state.dhTabId && typeof switchTab === 'function') {
+      _dhHistoryReplaying = true;
+      try { switchTab(state.dhTabId); }
+      finally { _dhHistoryReplaying = false; }
+    }
+    // state.dhTabId 없으면 = 우리가 push 안 한 항목 → 정상 뒤로가기 허용 (브라우저 기본 동작)
+  });
+})();
+
 function switchTab(tab) {
   // 레거시 호환: 기존 ID가 넘어오면 신규 ID로 변환
   if (_legacyTabIdMap[tab]) tab = _legacyTabIdMap[tab];
 
   var meta = _tabIdMap[tab];
   if (!meta) return;
+
+  // [Hot-fix] history 추적 — popstate 재진입이 아니고 같은 탭 연속이 아닐 때만
+  if (!_dhHistoryReplaying && tab !== _dhLastPushedTabId) {
+    try {
+      if (_dhLastPushedTabId === null) {
+        // 첫 호출: replaceState로 첫 history 항목에 dhTabId 박음 (뒤로가기 1번이면 외부로 이탈)
+        history.replaceState({ dhTabId: tab }, '');
+      } else {
+        history.pushState({ dhTabId: tab }, '');
+      }
+      _dhLastPushedTabId = tab;
+    } catch (e) { /* history API 미지원 환경 무시 */ }
+  }
 
   // (레거시 main-nav는 hidden — navEl은 호환용으로 유지)
   var navEl = null;
