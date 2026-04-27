@@ -23783,6 +23783,23 @@ function _ipinv2FmtKrw2(value) {
   return Number(value).toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+// [보정 5] ISO 일시(2026-04-27T06:13:20Z 등) → YYYY-MM-DD (KST 변환 없이 로컬 표시 — 사장님 본사 KST 환경 가정)
+function _ipinv2FmtDate(isoStr) {
+  if (!isoStr) return '';
+  try {
+    var d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    // KST(UTC+9) 변환 — Vercel/Supabase가 UTC를 반환할 수 있음
+    var k = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    var yyyy = k.getUTCFullYear();
+    var mm = String(k.getUTCMonth() + 1).padStart(2, '0');
+    var dd = String(k.getUTCDate()).padStart(2, '0');
+    return yyyy + '-' + mm + '-' + dd;
+  } catch (e) {
+    return '';
+  }
+}
+
 // [B-3-2-2b H] 달러 합계 소수점 절삭 (개별 제품은 원본 유지, 합계/총계에만 사용)
 function _ipinv2UsdFloor(value) {
   var n = Math.floor(Number(value) || 0);
@@ -24248,10 +24265,10 @@ function _ipinv2ExportCostExcel() {
   // [Stage 4 Phase B-2] 소스 전환: _ipinv2CostCalc → _ipinv2CostCalcLocal
   var calc = _ipinv2CostCalcLocal;
   if (!calc || !calc.items || calc.items.length === 0) return alert('출력할 데이터가 없습니다.');
-  // [Stage 6 Phase B-2 Step 3] 17컬럼 — 단가/금액 헤더 정정 + 물품가 신규 + 부가세 시프트
+  // [Stage 6 Phase B-2 Step 3 보정 2] 화면과 동일하게 단가(VAT포함)/금액(VAT포함)/단가(VAT별도)/금액(=단가×수량)/부가세 5컬럼
   var data = [[
     'No.', '브랜드', '모델명', '관리코드', '품명', '수량', 'FOB ($)', '할인가 ($)', 'FOB$ 계',
-    '배분 (%)', '배분 (₩)', '단가 (₩)', '금액 (₩)', '물품가 (₩)', '부가세 (₩)', '최종환율', '마진 (%)', '예상판매 (₩)'
+    '배분 (%)', '배분 (₩)', '단가 (VAT포함)', '금액 (VAT포함)', '단가 (VAT별도)', '금액 (=단가×수량)', '부가세', '최종환율', '마진 (%)', '예상판매 (₩)'
   ]];
   var items = _ipinv2CurrentItems.filter(function(it) { return !it.is_pallet_line; });
   var costMap = _ipinv2BuildCostMap();
@@ -24271,13 +24288,15 @@ function _ipinv2ExportCostExcel() {
     var unitCost = cost.unit_cost != null ? Number(cost.unit_cost) : null;
     var supplyTotalN = cost.supply_price != null ? Math.round(Number(cost.supply_price)) : '';
     // [Stage 6 Phase B-2 Step 3] 물품가/부가세 — _ipinv2CalcCostLocal 라인 값 (★잔차 흡수 반영)
+    // [보정 2] 단가(VAT별도) 신규 — goods_unit_price
+    var goodsUnit = cost.goods_unit_price != null ? Number(cost.goods_unit_price) : '';
     var goodsAmt = cost.goods_amount != null ? Number(cost.goods_amount) : '';
     var vat = cost.vat_amount != null ? Number(cost.vat_amount) : '';
     var expected = unitCost != null ? Math.round(unitCost * (1 + _ipinv2MarginPct / 100)) : '';
     data.push([
       i + 1, _ipinv2GetBrand(it), it.model || '', _ipinv2GetManageCode(it), it.name || '',
       qty, fobUsd, discCellVal, fobSum,
-      ratioPct, allocAmt, unitCost == null ? '' : unitCost, supplyTotalN, goodsAmt, vat,
+      ratioPct, allocAmt, unitCost == null ? '' : unitCost, supplyTotalN, goodsUnit, goodsAmt, vat,
       wavgRateX != null ? Number(wavgRateX.toFixed(4)) : '',
       _ipinv2MarginPct, expected,
     ]);
@@ -24529,6 +24548,15 @@ async function _ipinv2ConfirmSendErp() {
     + '계속하시겠습니까?';
 
   if (!confirm(confirmMsg)) return;
+
+  // [Stage 6 Phase B-2 Step 3 보정 7] 재전송 시 추가 경고 다이얼로그 (멱등성 해제 안전망)
+  if (inv.erp_sent_at) {
+    var _sentDate2 = _ipinv2FmtDate(inv.erp_sent_at);
+    var rerunMsg = '⚠️ 이미 ' + _sentDate2 + '에 전송 완료된 인보이스입니다.\n\n'
+      + '다시 보내시면 경영박사에 매입전표가 추가로 등록됩니다.\n'
+      + '중복 등록 위험을 감수하고 계속하시겠습니까?';
+    if (!confirm(rerunMsg)) return;
+  }
 
   // [전송 확정] 버튼 잠금 (미리보기 모달 푸터 내)
   var modal = document.getElementById('ipinv2-erp-modal-overlay');
@@ -25209,14 +25237,17 @@ function _ipinv2RenderItemsTable() {
   h += '<div class="ipinv2-cost-header">';
   h += '<div class="ipinv2-cost-title"><span>제품 최종 원가</span><span class="count">(' + items.length + '건)</span></div>';
   h += '<div class="ipinv2-cost-actions">';
+  // [Stage 6 Phase B-2 Step 3 보정 5] erp_sent_at 채워졌을 때 회색 작은 글씨로 전송 일자 표시
+  var _ipinv2SentDate = (_ipinv2CurrentInvoice && _ipinv2CurrentInvoice.erp_sent_at)
+    ? _ipinv2FmtDate(_ipinv2CurrentInvoice.erp_sent_at) : '';
+  if (_ipinv2SentDate) {
+    h += '<span style="color:#6B7280;font-size:12px;margin-right:12px;align-self:center;">' + _ipinv2SentDate + ' 전송완료</span>';
+  }
   h += '<button type="button" onclick="_ipinv2ExportCostExcel()">📊 엑셀 출력</button>';
-  // [Stage 6 Phase B-2 Step 2] 활성화 조건: 검증 뱃지 = ok && erp_sent_at IS NULL
+  // [보정 4] 활성화 조건: 검증 뱃지 = ok만 (erp_sent_at 조건 제거 — 멱등성 해제)
   var _ipinv2VStatus = _ipinv2ComputeValidationStatus();
-  var _ipinv2AlreadySent = !!(_ipinv2CurrentInvoice && _ipinv2CurrentInvoice.erp_sent_at);
-  var erpDisabled = (_ipinv2VStatus !== 'ok' || _ipinv2AlreadySent) ? ' disabled' : '';
-  var erpBtnLabel = _ipinv2AlreadySent ? '✓ 전송완료' : '✅ 경영박사 전송';
-  var erpBtnExtraStyle = _ipinv2AlreadySent ? ' style="background:#9BA3B2;color:#fff;cursor:not-allowed;"' : '';
-  h += '<button type="button" onclick="_ipinv2SendErp()" class="ipinv2-btn-erp"' + erpDisabled + erpBtnExtraStyle + '>' + erpBtnLabel + '</button>';
+  var erpDisabled = (_ipinv2VStatus !== 'ok') ? ' disabled' : '';
+  h += '<button type="button" onclick="_ipinv2SendErp()" class="ipinv2-btn-erp"' + erpDisabled + '>✅ 경영박사 전송</button>';
   h += '</div>';
   h += '</div>';
 
@@ -25239,10 +25270,11 @@ function _ipinv2RenderItemsTable() {
   h += '<col style="width:85px">';   // 할인가($) [B-3-2-2c 3]
   h += '<col style="width:95px">';   // FOB$계
   h += '<col style="width:108px">';  // 배분
-  h += '<col style="width:95px">';   // 단가 (= 부가세포함 단가, 헤더 정정)
-  h += '<col style="width:110px">';  // 금액 (= 부가세포함 금액, 헤더 정정)
-  h += '<col style="width:110px">';  // 물품가 [Stage 6 Phase B-2 Step 3] 신규
-  h += '<col style="width:105px">';  // 부가세 (정정)
+  h += '<col style="width:95px">';   // 단가 (VAT포함)
+  h += '<col style="width:110px">';  // 금액 (VAT포함)
+  h += '<col style="width:95px">';   // 단가 (VAT별도) [보정 1] 신규
+  h += '<col style="width:110px">';  // 금액 (=단가×수량) [보정 1] 헤더 변경
+  h += '<col style="width:105px">';  // 부가세
   h += '<col style="width:80px">';   // 최종환율 [B-3-2-2d 2]
   h += '<col style="width:58px">';   // 마진%
   h += '<col style="width:105px">';  // 예상판매
@@ -25258,9 +25290,10 @@ function _ipinv2RenderItemsTable() {
   h += '<th>할인가 ($)<div class="col-resize-handle"></div></th>';
   h += '<th>FOB$ 계<div class="col-resize-handle"></div></th>';
   h += '<th>배분 (%/₩)<div class="col-resize-handle"></div></th>';
-  h += '<th class="ipinv2-col-supply">단가<div class="col-resize-handle"></div></th>';
-  h += '<th class="ipinv2-col-supply">금액<div class="col-resize-handle"></div></th>';
-  h += '<th class="ipinv2-col-supply">물품가<div class="col-resize-handle"></div></th>';
+  h += '<th class="ipinv2-col-supply">단가 (VAT포함)<div class="col-resize-handle"></div></th>';
+  h += '<th class="ipinv2-col-supply">금액 (VAT포함)<div class="col-resize-handle"></div></th>';
+  h += '<th class="ipinv2-col-supply">단가 (VAT별도)<div class="col-resize-handle"></div></th>';
+  h += '<th class="ipinv2-col-supply">금액 (=단가×수량)<div class="col-resize-handle"></div></th>';
   h += '<th class="ipinv2-col-supply">부가세<div class="col-resize-handle"></div></th>';
   h += '<th>최종환율<div class="col-resize-handle"></div></th>';
   h += '<th class="ipinv2-col-margin">마진 %<div class="col-resize-handle"></div></th>';
@@ -25279,7 +25312,7 @@ function _ipinv2RenderItemsTable() {
   var wavgRateTxt = wavgRate != null ? _ipinv2FormatRate(wavgRate) : '-';
 
   if (items.length === 0) {
-    h += '<tr><td colspan="17" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다.</td></tr>';
+    h += '<tr><td colspan="18" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다.</td></tr>';
   } else {
     items.forEach(function(it, i) {
       var cost = costMap[it.id] || {};
@@ -25300,6 +25333,8 @@ function _ipinv2RenderItemsTable() {
       var supplyTotalNum = cost.supply_price != null ? Math.round(Number(cost.supply_price)) : 0;
       var supplyTotalTxt = cost.supply_price != null ? _ipinv2Num(supplyTotalNum) : '';
       // [Stage 6 Phase B-2 Step 3] 물품가/부가세 — _ipinv2CalcCostLocal에서 산출된 라인별 값 (★잔차 흡수 반영)
+      // [보정 1] 단가(VAT별도) 신규 — 라인별 goods_unit_price (= goods_amount / qty)
+      var goodsUnitTxt = cost.goods_unit_price != null ? _ipinv2FmtKrw2(cost.goods_unit_price) : '';
       var goodsAmtTxt = cost.goods_amount != null ? _ipinv2FmtKrw2(cost.goods_amount) : '';
       var vatTxt = cost.vat_amount != null ? _ipinv2FmtKrw2(cost.vat_amount) : '';
       var expectedSell = unitCost != null ? Math.round(unitCost * (1 + _ipinv2MarginPct / 100)) : null;
@@ -25339,10 +25374,11 @@ function _ipinv2RenderItemsTable() {
         h += '<div class="ipinv2-alloc-pct" style="color:#9BA3B2;">' + (canCalc ? '-' : '') + '</div>';
       }
       h += '</td>';
-      h += '<td class="ipinv2-col-supply">' + supplyUnitTxt + '</td>';
-      h += '<td class="ipinv2-col-supply">' + supplyTotalTxt + '</td>';
-      h += '<td class="ipinv2-col-supply">' + goodsAmtTxt + '</td>';
-      h += '<td class="ipinv2-col-supply">' + vatTxt + '</td>';
+      h += '<td class="ipinv2-col-supply">' + supplyUnitTxt + '</td>';   // ⑪ 단가 (VAT포함)
+      h += '<td class="ipinv2-col-supply">' + supplyTotalTxt + '</td>';  // ⑫ 금액 (VAT포함)
+      h += '<td class="ipinv2-col-supply">' + goodsUnitTxt + '</td>';     // ⑬ 단가 (VAT별도) [보정 1] 신규
+      h += '<td class="ipinv2-col-supply">' + goodsAmtTxt + '</td>';      // ⑭ 금액 (=단가×수량)
+      h += '<td class="ipinv2-col-supply">' + vatTxt + '</td>';           // ⑮ 부가세
       // [B-3-2-2d 2] 최종환율 — 모든 행 동일 (가중평균환율), 회색 중앙정렬
       h += '<td class="center" style="color:#5A6070;">' + wavgRateTxt + '</td>';
       // 마진 % 입력
@@ -25367,10 +25403,11 @@ function _ipinv2RenderItemsTable() {
     h += '<td class="tot-cell">-</td>';                                           // 할인가($) — 개별값
     h += '<td class="tot-cell">' + _ipinv2UsdFloor(totFobSum) + '</td>';          // FOB$계 (달러 절삭, 할인 반영)
     h += '<td class="tot-cell">' + _ipinv2Num(totAllocAmt) + '</td>';             // 배분액
-    h += '<td class="tot-cell">-</td>';                                           // 단가 — 개별값
-    h += '<td class="tot-cell">' + _ipinv2Num(totSupplyTotal) + '</td>';          // 금액
-    h += '<td class="tot-cell">' + _ipinv2FmtKrw2(totGoodsAmt) + '</td>';         // 물품가 합계 [Step 3 신규]
-    h += '<td class="tot-cell">' + _ipinv2FmtKrw2(totVatAmt) + '</td>';           // 부가세 합계 (정정)
+    h += '<td class="tot-cell">-</td>';                                           // ⑪ 단가 (VAT포함) — 개별값
+    h += '<td class="tot-cell">' + _ipinv2Num(totSupplyTotal) + '</td>';          // ⑫ 금액 (VAT포함)
+    h += '<td class="tot-cell">-</td>';                                           // ⑬ 단가 (VAT별도) — 개별값 [보정 1] 신규
+    h += '<td class="tot-cell">' + _ipinv2FmtKrw2(totGoodsAmt) + '</td>';         // ⑭ 금액 (=단가×수량) — goods 합
+    h += '<td class="tot-cell">' + _ipinv2FmtKrw2(totVatAmt) + '</td>';           // ⑮ 부가세 합계
     h += '<td class="tot-cell">-</td>';                                           // 최종환율
     h += '<td class="tot-cell">-</td>';                                           // 마진%
     h += '<td class="tot-cell total"><span class="tot-value">' + _ipinv2FmtKrw2(grandTotal) + '</span></td>'; // 토탈
@@ -26787,11 +26824,9 @@ function _ipinv2RenderCombinedSummary() {
   var customsLen = (_ipinv2Customs || []).length;
 
   var vStatus, vLabel;
-  // [Stage 6 Phase B-2 Step 2] erp_sent_at truthy → 전송완료 우선 표시 (다른 검증 결과 무관)
-  if (inv.erp_sent_at) {
-    vStatus = 'sent';
-    vLabel = '✓ 전송완료 (전표 #' + (inv.erp_order_no || '?') + ')';
-  } else if (!canCalc) {
+  // [Stage 6 Phase B-2 Step 3 보정 3] sent 분기 제거 — 검증 뱃지는 검증 결과만 표시
+  // (전송완료는 헤더 우측 회색 글씨 + [경영박사 전송] 버튼은 항상 활성화로 분리)
+  if (!canCalc) {
     vStatus = 'pending_payment';
     vLabel = '— 송금 대기';
   } else if (customsLen > 0 && customsTotal === 0) {
@@ -26808,9 +26843,9 @@ function _ipinv2RenderCombinedSummary() {
   }
 
   // 배경색 — CSS data-status 규칙으로도 적용되지만 inline으로 확정 (다크바 내 일관성)
+  // [보정 3] 'sent' 키 제거 — 검증 뱃지는 검증 결과만 표시
   var vBg;
-  if (vStatus === 'sent') vBg = '#7280A0';
-  else if (vStatus === 'ok') vBg = '#10B981';
+  if (vStatus === 'ok') vBg = '#10B981';
   else if (vStatus === 'error') vBg = '#DC2626';
   else if (vStatus === 'pending_customs') vBg = '#F59E0B';
   else vBg = '#6B7280'; // pending_payment

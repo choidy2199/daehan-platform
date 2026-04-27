@@ -59,15 +59,8 @@ export async function POST(
       throw err;
     }
 
-    // 멱등성 — 이미 전송된 인보이스는 admin 수동 리셋 필요
-    if (result.already_sent.sent) {
-      const orderNo = result.already_sent.order_no || '없음';
-      return NextResponse.json(
-        { error: `이미 전송된 인보이스입니다 (전표번호: ${orderNo})` },
-        { status: 409 }
-      );
-    }
-
+    // [Stage 6 Phase B-2 Step 3 보정 6] 멱등성(409) 제거 — 같은 인보이스 여러 번 전송 가능
+    // 클라이언트가 _ipinv2ConfirmSendErp에서 재전송 confirm 다이얼로그로 안전망 처리.
     // 검증 실패 — 거래처/품목 코드 누락은 blockers에 이미 포함 (DRY)
     if (result.blockers.length > 0) {
       return NextResponse.json(
@@ -112,30 +105,11 @@ export async function POST(
 
     // ─────────────────────────────────────────────────
     // dryRun=false → 실 ERP 호출 (Phase B-2 Step 2)
+    // [Stage 6 Phase B-2 Step 3 보정 6] race 재확인 SELECT + 409 제거 — 멱등성 완전 해제
+    // 같은 인보이스 여러 번 전송 가능. 클라이언트 confirm 다이얼로그가 중복 방지 안전망.
     // ─────────────────────────────────────────────────
 
-    // 1. race 차단 — buildInvoicePayload 이후/ERP 호출 직전에 한 번 더 SELECT
-    const { data: recheck, error: recheckError } = await supabase
-      .from('import_invoices')
-      .select('erp_sent_at, erp_order_no')
-      .eq('id', invoiceId)
-      .single();
-
-    if (recheckError) {
-      return NextResponse.json(
-        { error: `재확인 실패: ${recheckError.message}` },
-        { status: 500 }
-      );
-    }
-
-    if (recheck?.erp_sent_at) {
-      return NextResponse.json(
-        { error: `이미 전송된 인보이스입니다 (전표번호: ${recheck.erp_order_no || '없음'})` },
-        { status: 409 }
-      );
-    }
-
-    // 2. ERP 호출 (callNewOrderIn — Error: 검사는 호출자 책임)
+    // ERP 호출 (callNewOrderIn — Error: 검사는 호출자 책임)
     const requestPayload = {
       info: result.newOrderIn.info,
       items: result.newOrderIn.items,
