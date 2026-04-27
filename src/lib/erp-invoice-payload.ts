@@ -43,8 +43,12 @@ export type InvoicePayloadResult = {
     code: string | null;            // management_code
     model: string;
     qty: number;
-    price: number;                  // round(supply_price / qty)
-    amount: number;                 // supply_price (= fob_krw + cost_alloc)
+    price: number;                  // 부가세포함 단가 = unit_cost
+    amount: number;                 // 부가세포함 금액 = supply_price (fob_krw + cost_alloc)
+    // [Stage 6 Phase B-2 Step 3] 부가세 정정 — 경영박사 페이로드용 (Q-A: 물품가 + VAT 별도)
+    goods_unit_price: number;       // 물품가 단가 (소수점 2자리)
+    goods_amount: number;           // 물품가 (소수점 2자리)
+    vat_amount: number;             // 부가세 (소수점 2자리)
     has_code: boolean;
   }>;
   totals: { qty_sum: number; amount_sum: number };
@@ -154,7 +158,14 @@ export async function buildInvoicePayload(invoiceId: string): Promise<InvoicePay
     supply_price: number;
     unit_cost: number;
     is_overflow_absorber: boolean;
+    // [Stage 6 Phase B-2 Step 3] 부가세 정정
+    goods_amount: number;
+    vat_amount: number;
+    goods_unit_price: number;
+    vat_unit_price: number;
   };
+
+  const round2 = (x: number) => Math.round((x || 0) * 100) / 100;
 
   const items: CalcItem[] = rawItems.map(it => {
     const netFobUsd = Number(it.net_fob_usd || 0) > 0 ? Number(it.net_fob_usd) : Number(it.amount_usd || 0);
@@ -168,6 +179,10 @@ export async function buildInvoicePayload(invoiceId: string): Promise<InvoicePay
       supply_price: 0,
       unit_cost: 0,
       is_overflow_absorber: false,
+      goods_amount: 0,
+      vat_amount: 0,
+      goods_unit_price: 0,
+      vat_unit_price: 0,
     };
   });
 
@@ -209,6 +224,32 @@ export async function buildInvoicePayload(invoiceId: string): Promise<InvoicePay
       it.supply_price = it.fob_krw + it.cost_alloc;
       it.unit_cost = it.qty > 0 ? Math.round(it.supply_price / it.qty) : 0;
     });
+
+    // [Stage 6 Phase B-2 Step 3] 부가세 정정 — supply_price를 부가세포함으로 간주, ÷1.1 분리
+    // ★vat 잔차도 maxIdx에 흡수 (1원 오차 0 보장). 클라 _ipinv2CalcCostLocal과 1:1 동기화.
+    items.forEach(it => {
+      const supply = it.supply_price;
+      it.goods_amount = round2(supply / 1.1);
+      it.vat_amount = round2(supply - it.goods_amount);
+      it.goods_unit_price = it.qty > 0 ? round2(it.goods_amount / it.qty) : 0;
+      it.vat_unit_price = it.qty > 0 ? round2(it.vat_amount / it.qty) : 0;
+    });
+    const totalLeft = totalPaymentKrw + costTotal + vatTotal; // 좌변 = 1차+2차+통관(cost+vat)
+    const totalGoodsExpected = round2(totalLeft / 1.1);
+    const totalVatExpected = round2(totalLeft - totalGoodsExpected);
+    const totalGoodsSummed = items.reduce((s, l) => s + l.goods_amount, 0);
+    const totalVatSummed = items.reduce((s, l) => s + l.vat_amount, 0);
+    const goodsDiff = round2(totalGoodsExpected - totalGoodsSummed);
+    const vatDiff = round2(totalVatExpected - totalVatSummed);
+    if (Math.abs(goodsDiff) >= 0.01 || Math.abs(vatDiff) >= 0.01) {
+      const target = items[maxIdx];
+      target.goods_amount = round2(target.goods_amount + goodsDiff);
+      target.vat_amount = round2(target.vat_amount + vatDiff);
+      if (target.qty > 0) {
+        target.goods_unit_price = round2(target.goods_amount / target.qty);
+        target.vat_unit_price = round2(target.vat_amount / target.qty);
+      }
+    }
   }
 
   // ─────────────────────────────────────────────────
@@ -232,8 +273,12 @@ export async function buildInvoicePayload(invoiceId: string): Promise<InvoicePay
     // [Hot-fix] DB의 model 컬럼에는 brand 값이 들어가고, 실제 모델명은 name 컬럼에 저장됨
     model: it.raw.name || it.raw.model || '',
     qty: it.qty,
-    price: it.unit_cost,
-    amount: it.supply_price,
+    price: it.unit_cost,           // 부가세포함 단가 (= supply_unit_cost, 표시용)
+    amount: it.supply_price,       // 부가세포함 금액 (표시용)
+    // [Stage 6 Phase B-2 Step 3] 신규 — 경영박사 페이로드는 물품가/부가세 분리 (Q-A: 물품가 + VAT 별도)
+    goods_unit_price: it.goods_unit_price,
+    goods_amount: it.goods_amount,
+    vat_amount: it.vat_amount,
     has_code: !!(it.raw.management_code && String(it.raw.management_code).trim()),
   }));
 
@@ -277,16 +322,19 @@ export async function buildInvoicePayload(invoiceId: string): Promise<InvoicePay
   // ─────────────────────────────────────────────────
   // newOrderIn 페이로드 빌드
   // info  : "{customer_code}|{memo}|{today YY.MM.DD KST}|"  (마지막 |는 자동채번 자리)
-  // items : 라인별 "{code}${qty}${price}${amount}$0$" 를 |로 join
-  //         · 다섯 번째 필드(부가세)는 항상 0
-  //         · 여섯 번째 필드(비고)는 빈 문자열 (= $0$ 뒤에 그대로 끝)
+  // items : 라인별 "{code}${qty}${goods_unit_price}${goods_amount}${vat_amount}$" 를 |로 join
+  //         · [Stage 6 Phase B-2 Step 3] Q-A 결정: 단가 = 물품가 (VAT 별도, 한국 회계 표준)
+  //           - 셋째 필드 단가     = goods_unit_price (.toFixed(2))
+  //           - 넷째 필드 금액     = goods_amount (.toFixed(2))
+  //           - 다섯째 필드 부가세 = vat_amount (.toFixed(2))  ← 정정: 0 하드코딩 → 실 부가세
+  //         · 여섯 번째 필드(비고)는 빈 문자열 (= 다섯번째 $뒤에 그대로 끝)
   //         · 라인 0개면 빈 문자열
   // ibgum : "" (D4 — 매입만, 출금 없음)
   // ─────────────────────────────────────────────────
   const today = ymdShortKST();
   const info = `${customerCode}|${memo}|${today}|`;
   const itemsStr = previewItems
-    .map(it => `${it.code || ''}$${it.qty}$${it.price}$${it.amount}$0$`)
+    .map(it => `${it.code || ''}$${it.qty}$${it.goods_unit_price.toFixed(2)}$${it.goods_amount.toFixed(2)}$${it.vat_amount.toFixed(2)}$`)
     .join('|');
   const ibgum = '';
 
