@@ -773,6 +773,11 @@ async function realtimeDownloadAndRefresh() {
           console.log('[Realtime] 로컬 변경 대기 중, 스킵:', item.key);
           continue;
         }
+        // [STEP 3-A 보강] localStorage 마크 보호 — 새로고침 후 미완 sync도 차단 (_bgSync와 동일 패턴)
+        if (localStorage.getItem('_pendingSync_' + item.key)) {
+          console.log('[Realtime] pending 마크, 스킵:', item.key);
+          continue;
+        }
         var newVal = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
         var oldVal = localStorage.getItem(item.key);
         if (newVal !== oldVal) {
@@ -21151,8 +21156,12 @@ function _poOnPalletKeyDown(ev, inputEl) {
 }
 
 // PO 없을 때 자동 draft 생성 (서버 POST + state 세팅 + 렌더)
+// [핫픽스] 1초 안 빠른 더블 클릭 시 평행 호출 → 별도 PO 생성 race 차단을 위해 in-flight Promise 캐시
+var _poDraftCreatingPromise = null;
 function _poCreateAndLoadNewDraft() {
-  return fetch('/api/import-po', {
+  // 이미 진행 중인 draft 생성이 있으면 같은 promise 반환 (두 클릭이 같은 PO에 추가됨)
+  if (_poDraftCreatingPromise) return _poDraftCreatingPromise;
+  _poDraftCreatingPromise = fetch('/api/import-po', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ po_date: new Date().toISOString().slice(0, 10) })
@@ -21169,7 +21178,12 @@ function _poCreateAndLoadNewDraft() {
       _poRenderDetail();
       if (typeof _poCacheCurrentPo === 'function') _poCacheCurrentPo();
       return po;
+    })
+    .finally(function() {
+      // 성공/실패 모두 lock 해제 → 다음 신규 PO 생성 가능
+      _poDraftCreatingPromise = null;
     });
+  return _poDraftCreatingPromise;
 }
 
 // 🛒 버튼 또는 엔터 키 공통 핸들러 (PO 없으면 자동 draft 생성)
@@ -21657,7 +21671,8 @@ function _poRenderCart(poId) {
     var p = gpByCode[code];
     var brandTxt = p ? _poEsc(getGenBrand(p) || '-') : '-';
     var descTxt = p ? _poEsc(p.description || '-') : '<span style="color:#9BA3B2;font-style:italic;">원본 삭제됨</span>';
-    var modelTxt = p ? _poEsc(p.model || '-') : '-';
+    // [핫픽스] mw_gen_products의 model 필드에 brand가 들어있는 케이스 대응 — name/description fallback
+    var modelTxt = p ? _poEsc(p.name || p.description || p.model || '-') : '-';
     var palletQtyNum = (p && p.palletQty != null && Number(p.palletQty) > 0) ? Number(p.palletQty) : 0;
     var palletCell = palletQtyNum > 0 ? palletQtyNum.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
     var priceNum = (p && p.importPrice != null) ? Number(p.importPrice) : 0;
