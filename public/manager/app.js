@@ -25260,6 +25260,8 @@ function _ipinv2RenderItemsTable() {
   if (_ipinv2SentDate) {
     h += '<span style="color:#6B7280;font-size:12px;margin-right:12px;align-self:center;">' + _ipinv2SentDate + ' 전송완료</span>';
   }
+  // [트랙 B] 환차 정산 메모 (인보이스 본 화면 영향 X)
+  h += '<button type="button" onclick="_ipinv2OpenForexSettlementModal()" style="background:#534AB7;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;">💱 환차 정산</button>';
   h += '<button type="button" onclick="_ipinv2ExportCostExcel()">📊 엑셀 출력</button>';
   // [보정 4] 활성화 조건: 검증 뱃지 = ok만 (erp_sent_at 조건 제거 — 멱등성 해제)
   var _ipinv2VStatus = _ipinv2ComputeValidationStatus();
@@ -25446,6 +25448,284 @@ function _ipinv2RenderItemsTable() {
   var totalAmt = allItems.reduce(function(s, it) { return s + Number(it.amount_usd || 0); }, 0);
   var sumEl = document.getElementById('ipinv2-items-summary');
   if (sumEl) sumEl.textContent = allItems.length > 0 ? '· ' + _ipinv2Int(totalQty) + ' EA · ' + _ipinv2Money(totalAmt) : '';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [트랙 B] 환차 정산 메모 — 신규 기능 (인보이스V2 본 화면 영향 X)
+// ─────────────────────────────────────────────────────────────────────────────
+// 사장님 → 장구공사(수입대행) 입금 KRW vs 장구공사 → 공장 송금 KRW 차익을 메모.
+// 입력값 2개 (1차/2차 입금 KRW + 날짜)는 import_payments.my_deposit_krw/date에 저장.
+// 자동 산출(차익/실 정산 통관비)은 클라가 _ipinv2Payments + _ipinv2Customs 메모리로 처리.
+
+function _ipinv2TodayKst() {
+  var d = new Date();
+  var kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  var yyyy = kst.getUTCFullYear();
+  var mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  var dd = String(kst.getUTCDate()).padStart(2, '0');
+  return yyyy + '-' + mm + '-' + dd;
+}
+
+function _ipinv2OpenForexSettlementModal() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv || !inv.id) {
+    alert('인보이스를 먼저 선택하세요.');
+    return;
+  }
+  // GET — 사장님 입력값(my_deposit_krw/date) 조회
+  fetch('/api/import-invoices/' + encodeURIComponent(inv.id) + '/forex-settlement', { cache: 'no-store' })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.success) {
+        alert('환차 정산 데이터 로드 실패: ' + (json && json.error || '알 수 없는 오류'));
+        return;
+      }
+      _ipinv2RenderForexSettlementModal(json.payments || []);
+    })
+    .catch(function(e) {
+      alert('네트워크 오류: ' + (e && e.message || String(e)));
+    });
+}
+
+function _ipinv2CloseForexSettlementModal() {
+  var ov = document.getElementById('ipinv2-forex-modal-overlay');
+  if (ov) ov.remove();
+}
+
+function _ipinv2RenderForexSettlementModal(savedPayments) {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv) return;
+
+  // 클라 메모리에서 자동 산출 — _ipinv2Payments / _ipinv2Customs (인보이스 본 화면과 동일 데이터)
+  var pays = _ipinv2Payments || [];
+  var cust = _ipinv2Customs || [];
+  var p1 = pays.find(function(p) { return p.seq === 1; }) || {};
+  var p2 = pays.find(function(p) { return p.seq === 2; }) || {};
+  var saved1 = savedPayments.find(function(p) { return p.seq === 1; }) || {};
+  var saved2 = savedPayments.find(function(p) { return p.seq === 2; }) || {};
+
+  var p1FactoryKrw = Number(p1.total_paid_krw || 0);  // 1차 공장송금 (= remittance + fee)
+  var p2FactoryKrw = Number(p2.total_paid_krw || 0);
+  var p1Usd = Number(p1.actual_usd || 0);
+  var p2Usd = Number(p2.actual_usd || 0);
+  var p1ActDate = p1.actual_date || null;
+  var p2ActDate = p2.actual_date || null;
+  var customsTotal = cust.reduce(function(s, c) { return s + Number(c.amount_krw || 0); }, 0);
+
+  var saved1Krw = saved1.my_deposit_krw != null ? Number(saved1.my_deposit_krw) : null;
+  var saved2Krw = saved2.my_deposit_krw != null ? Number(saved2.my_deposit_krw) : null;
+  var saved1Date = saved1.my_deposit_date || '';
+  var saved2Date = saved2.my_deposit_date || '';
+
+  // 모달 컨테이너
+  var existing = document.getElementById('ipinv2-forex-modal-overlay');
+  if (existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'ipinv2-forex-modal-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;font-family:Pretendard,sans-serif;';
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) _ipinv2CloseForexSettlementModal(); });
+
+  var modal = document.createElement('div');
+  modal.id = 'ipinv2-forex-modal-content';
+  modal.style.cssText = 'background:#fff;border-radius:8px;width:820px;max-width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);';
+
+  var fmtKrw = function(n) { return Number(n || 0).toLocaleString('ko-KR'); };
+  var fmtUsd = function(n) { return n > 0 ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; };
+
+  // 헤더
+  var html = '<div id="ipinv2-forex-modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#1A1D23;color:#fff;cursor:move;">'
+    + '<span style="font-size:14px;font-weight:600;">💱 환차 정산 — ' + _ipinv2Esc(inv.invoice_no || '') + '</span>'
+    + '<button onclick="_ipinv2CloseForexSettlementModal()" style="background:transparent;border:none;color:#fff;font-size:18px;cursor:pointer;">&times;</button>'
+    + '</div>';
+
+  // 본문
+  html += '<div style="flex:1;overflow-y:auto;padding:18px 20px;font-size:13px;color:#1A1D23;">';
+  html += '<div style="font-size:11px;color:#6B7280;margin-bottom:10px;">📌 메모용 — 인보이스 본 화면에 영향 없음</div>';
+
+  // 6컬럼 표
+  html += '<div style="border:1px solid #EEF0F4;border-radius:6px;overflow:hidden;">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  html += '<thead><tr style="background:#1A1D23;color:#fff;">'
+    + '<th style="padding:8px 10px;text-align:left;width:80px;">항목</th>'
+    + '<th style="padding:8px 10px;text-align:center;width:120px;">날짜</th>'
+    + '<th style="padding:8px 10px;text-align:right;width:110px;">인보이스</th>'
+    + '<th style="padding:8px 10px;text-align:right;width:140px;">입금</th>'
+    + '<th style="padding:8px 10px;text-align:right;width:140px;">공장송금</th>'
+    + '<th style="padding:8px 10px;text-align:right;">차익</th>'
+    + '</tr></thead><tbody>';
+
+  // 1차/2차 행 빌드 헬퍼
+  var lineRow = function(label, seq, usd, factoryKrw, savedKrw, savedDate, actDate) {
+    var dateVal = savedDate || '';
+    var krwVal = savedKrw != null ? fmtKrw(savedKrw) : '';
+    var diff = savedKrw != null ? (savedKrw - factoryKrw) : 0;
+    var diffColor = diff > 0 ? '#1D9E75' : (diff < 0 ? '#A32D2D' : '#5A6070');
+    var diffSign = diff > 0 ? '+' : '';
+    var diffTxt = savedKrw != null ? (diffSign + fmtKrw(diff) + '원') : '—';
+    var inputDateHint = actDate ? ' title="실 송금일: ' + _ipinv2Esc(actDate) + '"' : '';
+    return '<tr style="border-bottom:1px solid #EEF0F4;">'
+      + '<td style="padding:8px 10px;font-weight:500;">' + label + '</td>'
+      + '<td style="padding:6px 8px;text-align:center;"' + inputDateHint + '>'
+        + '<input type="date" id="ipinv2-forex-date-' + seq + '" value="' + _ipinv2Esc(dateVal) + '" style="width:100%;padding:4px 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:11px;font-family:Pretendard,sans-serif;text-align:center;">'
+      + '</td>'
+      + '<td style="padding:8px 10px;text-align:right;color:#5A6070;">' + fmtUsd(usd) + '</td>'
+      + '<td style="padding:6px 8px;text-align:right;">'
+        + '<input type="text" inputmode="numeric" id="ipinv2-forex-deposit-' + seq + '" value="' + _ipinv2Esc(krwVal) + '" placeholder="0" oninput="_ipinv2OnForexInputChange(' + seq + ')" style="width:100%;padding:4px 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:12px;font-family:Pretendard,sans-serif;text-align:right;">'
+      + '</td>'
+      + '<td style="padding:8px 10px;text-align:right;">' + fmtKrw(factoryKrw) + '원</td>'
+      + '<td id="ipinv2-forex-diff-' + seq + '" style="padding:8px 10px;text-align:right;color:' + diffColor + ';font-weight:500;">' + diffTxt + '</td>'
+      + '</tr>';
+  };
+
+  html += lineRow('계약금', 1, p1Usd, p1FactoryKrw, saved1Krw, saved1Date, p1ActDate);
+  html += lineRow('잔금', 2, p2Usd, p2FactoryKrw, saved2Krw, saved2Date, p2ActDate);
+
+  // 통관비 행 (입금 빈칸, 차익 = -customs_total)
+  html += '<tr style="border-bottom:1px solid #EEF0F4;">'
+    + '<td style="padding:8px 10px;font-weight:500;">통관비용</td>'
+    + '<td style="padding:8px 10px;text-align:center;color:#9BA3B2;">—</td>'
+    + '<td style="padding:8px 10px;text-align:right;color:#9BA3B2;">—</td>'
+    + '<td style="padding:8px 10px;text-align:right;color:#9BA3B2;">—</td>'
+    + '<td style="padding:8px 10px;text-align:right;">' + fmtKrw(customsTotal) + '원</td>'
+    + '<td style="padding:8px 10px;text-align:right;color:#A32D2D;font-weight:500;">-' + fmtKrw(customsTotal) + '원</td>'
+    + '</tr>';
+  html += '</tbody></table></div>';
+
+  // 정산 결과 박스
+  var diff1 = saved1Krw != null ? (saved1Krw - p1FactoryKrw) : 0;
+  var diff2 = saved2Krw != null ? (saved2Krw - p2FactoryKrw) : 0;
+  var diffSum = diff1 + diff2;
+  var customsActual = customsTotal - diffSum;
+  var diffSumSign = diffSum > 0 ? '+' : '';
+
+  html += '<div style="margin-top:14px;padding:14px 16px;background:#FAEEDA;border-radius:6px;color:#412402;">';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">'
+    + '<span>차익 합계 (1차 + 2차)</span>'
+    + '<span id="ipinv2-forex-diff-total" style="font-weight:600;">' + diffSumSign + fmtKrw(diffSum) + '원</span>'
+    + '</div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">'
+    + '<span>통관비 청구액</span>'
+    + '<span style="font-weight:500;">' + fmtKrw(customsTotal) + '원</span>'
+    + '</div>';
+  html += '<div style="border-top:1px solid #D6BC85;margin:8px 0;"></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:14px;color:#633806;">'
+    + '<span style="font-weight:600;">실 정산 통관비</span>'
+    + '<span id="ipinv2-forex-customs-actual" style="font-weight:700;">' + fmtKrw(customsActual) + '원</span>'
+    + '</div>';
+  html += '</div>';
+
+  html += '</div>'; // body 끝
+
+  // 푸터
+  html += '<div style="display:flex;gap:8px;padding:12px 20px;border-top:1px solid #EEF0F4;justify-content:flex-end;background:#FAFAF7;">'
+    + '<button onclick="_ipinv2CloseForexSettlementModal()" style="padding:8px 18px;border:1px solid #DDE1EB;border-radius:6px;background:#fff;font-size:13px;cursor:pointer;">취소</button>'
+    + '<button onclick="_ipinv2SaveForexSettlement()" style="padding:8px 18px;border:none;border-radius:6px;background:#1D9E75;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">💾 저장</button>'
+    + '</div>';
+
+  modal.innerHTML = html;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  if (typeof _makeDraggable === 'function') {
+    _makeDraggable(modal, document.getElementById('ipinv2-forex-modal-header'));
+  }
+
+  // 메모리에 컨텍스트 저장 (재계산 시 사용)
+  window._ipinv2ForexCtx = {
+    p1FactoryKrw: p1FactoryKrw,
+    p2FactoryKrw: p2FactoryKrw,
+    customsTotal: customsTotal,
+  };
+}
+
+function _ipinv2OnForexInputChange(seq) {
+  var input = document.getElementById('ipinv2-forex-deposit-' + seq);
+  if (!input) return;
+  // 콤마 자동 포맷
+  var raw = input.value.replace(/[^0-9]/g, '');
+  var num = raw === '' ? null : parseInt(raw, 10);
+  input.value = num != null ? num.toLocaleString('ko-KR') : '';
+
+  // 날짜 자동 기재 (이미 있으면 보존)
+  var dateInput = document.getElementById('ipinv2-forex-date-' + seq);
+  if (dateInput && !dateInput.value && num != null && num > 0) {
+    dateInput.value = _ipinv2TodayKst();
+  }
+
+  // 차익 즉시 재계산
+  var ctx = window._ipinv2ForexCtx || {};
+  var factoryKrw = seq === 1 ? Number(ctx.p1FactoryKrw || 0) : Number(ctx.p2FactoryKrw || 0);
+  var diff = num != null ? (num - factoryKrw) : 0;
+  var diffEl = document.getElementById('ipinv2-forex-diff-' + seq);
+  if (diffEl) {
+    if (num == null) {
+      diffEl.textContent = '—';
+      diffEl.style.color = '#5A6070';
+      diffEl.style.fontWeight = 'normal';
+    } else {
+      var sign = diff > 0 ? '+' : '';
+      diffEl.textContent = sign + Number(diff).toLocaleString('ko-KR') + '원';
+      diffEl.style.color = diff > 0 ? '#1D9E75' : (diff < 0 ? '#A32D2D' : '#5A6070');
+      diffEl.style.fontWeight = '500';
+    }
+  }
+
+  // 정산 결과 박스 재계산
+  var get = function(s) {
+    var el = document.getElementById('ipinv2-forex-deposit-' + s);
+    if (!el || !el.value) return null;
+    var v = parseInt(el.value.replace(/[^0-9]/g, ''), 10);
+    return isNaN(v) ? null : v;
+  };
+  var d1 = get(1);
+  var d2 = get(2);
+  var diff1 = d1 != null ? (d1 - Number(ctx.p1FactoryKrw || 0)) : 0;
+  var diff2 = d2 != null ? (d2 - Number(ctx.p2FactoryKrw || 0)) : 0;
+  var diffSum = diff1 + diff2;
+  var customsActual = Number(ctx.customsTotal || 0) - diffSum;
+
+  var totalEl = document.getElementById('ipinv2-forex-diff-total');
+  if (totalEl) {
+    var sign2 = diffSum > 0 ? '+' : '';
+    totalEl.textContent = sign2 + Number(diffSum).toLocaleString('ko-KR') + '원';
+  }
+  var actualEl = document.getElementById('ipinv2-forex-customs-actual');
+  if (actualEl) actualEl.textContent = Number(customsActual).toLocaleString('ko-KR') + '원';
+}
+
+function _ipinv2SaveForexSettlement() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv || !inv.id) return;
+
+  var read = function(seq) {
+    var krwEl = document.getElementById('ipinv2-forex-deposit-' + seq);
+    var dateEl = document.getElementById('ipinv2-forex-date-' + seq);
+    var krwRaw = krwEl ? krwEl.value.replace(/[^0-9]/g, '') : '';
+    var krw = krwRaw === '' ? null : parseInt(krwRaw, 10);
+    var date = (dateEl && dateEl.value) ? dateEl.value : null;
+    return { seq: seq, my_deposit_krw: krw, my_deposit_date: date };
+  };
+
+  var body = { payments: [read(1), read(2)] };
+
+  fetch('/api/import-invoices/' + encodeURIComponent(inv.id) + '/forex-settlement', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (json && json.success) {
+        if (typeof _ipinv2Toast === 'function') _ipinv2Toast('저장되었습니다', 'success');
+        else alert('저장되었습니다');
+        _ipinv2CloseForexSettlementModal();
+      } else {
+        alert('저장 실패: ' + (json && json.error || '알 수 없는 오류'));
+      }
+    })
+    .catch(function(e) {
+      alert('네트워크 오류: ' + (e && e.message || String(e)));
+    });
 }
 
 function _ipinv2RenderSummaryBar() {
