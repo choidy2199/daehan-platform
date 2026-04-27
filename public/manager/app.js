@@ -24357,7 +24357,7 @@ function _ipinv2OpenErpPreviewModal() {
 
   var modal = document.createElement('div');
   modal.id = 'ipinv2-erp-modal';
-  modal.style.cssText = 'background:#fff;border-radius:8px;width:760px;max-width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);';
+  modal.style.cssText = 'background:#fff;border-radius:8px;width:1280px;max-width:95vw;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);';
   modal.innerHTML =
     '<div id="ipinv2-erp-modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#1A1D23;color:#fff;cursor:move;">' +
       '<span style="font-size:14px;font-weight:600;">경영박사 매입전표 미리보기 — ' + _ipinv2Esc(inv.invoice_no || '') + '</span>' +
@@ -24435,34 +24435,49 @@ function _ipinv2RenderErpPreviewModalBody(data) {
   h += '<div style="font-size:11px;color:#6B7280;font-weight:600;margin-bottom:6px;">▼ 매입전표 라인 (' + items.length + '건)</div>';
   h += '<div style="border:1px solid #EEF0F4;border-radius:6px;overflow:hidden;">';
   h += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  // [추가 보정] 8셀 (# / 관리코드 / 모델명 / 수량 / 단가 / 금액 / 부가세 / 적요) — 부가세/적요 신규
+  // 단가/금액/부가세는 소수점 2자리 (정수면 정수, 소수면 최대 2자리)
+  var fmt2 = function(n) {
+    if (n == null || n === '') return '';
+    return Number(n).toLocaleString('ko-KR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  };
   h += '<thead><tr style="background:#1A1D23;color:#fff;">';
   h += '<th style="padding:8px 10px;text-align:right;width:40px;">#</th>';
   h += '<th style="padding:8px 10px;text-align:left;width:120px;">관리코드</th>';
   h += '<th style="padding:8px 10px;text-align:left;">모델명</th>';
   h += '<th style="padding:8px 10px;text-align:right;width:60px;">수량</th>';
-  h += '<th style="padding:8px 10px;text-align:right;width:90px;">단가</th>';
-  h += '<th style="padding:8px 10px;text-align:right;width:110px;">금액</th>';
+  h += '<th style="padding:8px 10px;text-align:right;width:110px;">단가</th>';
+  h += '<th style="padding:8px 10px;text-align:right;width:130px;">금액</th>';
+  h += '<th style="padding:8px 10px;text-align:right;width:120px;">부가세</th>';
+  h += '<th style="padding:8px 10px;text-align:left;width:170px;">적요</th>';
   h += '</tr></thead><tbody>';
+  // 부가세 합계 누적 (totals에는 없으므로 라인 합산)
+  var sumVat = 0;
   items.forEach(function(it) {
     var rowBg = it.has_code ? '#fff' : '#FEEFEF';
     var codeCell = it.has_code
       ? '<span style="font-family:ui-monospace,Menlo,monospace;">' + _ipinv2Esc(it.code) + '</span>'
       : '<span style="color:#CC2222;font-weight:600;">⚠️ 없음</span>';
+    sumVat += Number(it.vat_amount || 0);
     h += '<tr style="background:' + rowBg + ';border-bottom:1px solid #EEF0F4;">';
     h += '<td style="padding:6px 10px;text-align:right;color:#6B7280;">' + it.no + '</td>';
     h += '<td style="padding:6px 10px;">' + codeCell + '</td>';
     h += '<td style="padding:6px 10px;">' + _ipinv2Esc(it.model || '') + '</td>';
     h += '<td style="padding:6px 10px;text-align:right;">' + fmt(it.qty) + '</td>';
-    h += '<td style="padding:6px 10px;text-align:right;">' + fmt(it.price) + '</td>';
-    h += '<td style="padding:6px 10px;text-align:right;font-weight:500;">' + fmt(it.amount) + '</td>';
+    h += '<td style="padding:6px 10px;text-align:right;">' + fmt2(it.price) + '</td>';
+    h += '<td style="padding:6px 10px;text-align:right;font-weight:500;">' + fmt2(it.amount) + '</td>';
+    h += '<td style="padding:6px 10px;text-align:right;">' + fmt2(it.vat_amount) + '</td>';
+    h += '<td style="padding:6px 10px;text-align:left;color:#5A6070;">' + _ipinv2Esc(it.memo || '') + '</td>';
     h += '</tr>';
   });
-  // 합계 행
+  // 합계 행 (8셀 — 부가세 합계 추가, 적요 빈칸)
   h += '<tr style="background:#F4F6FA;font-weight:600;">';
   h += '<td colspan="3" style="padding:8px 10px;text-align:right;">합계</td>';
   h += '<td style="padding:8px 10px;text-align:right;">' + fmt(totals.qty_sum) + ' EA</td>';
   h += '<td style="padding:8px 10px;"></td>';
-  h += '<td style="padding:8px 10px;text-align:right;">' + fmt(totals.amount_sum) + '원</td>';
+  h += '<td style="padding:8px 10px;text-align:right;">' + fmt2(totals.amount_sum) + '원</td>';
+  h += '<td style="padding:8px 10px;text-align:right;">' + fmt2(sumVat) + '원</td>';
+  h += '<td style="padding:8px 10px;"></td>';
   h += '</tr>';
   h += '</tbody></table></div>';
 
@@ -24489,7 +24504,9 @@ function _ipinv2RenderErpPreviewModalBody(data) {
   body.innerHTML = h;
 
   // 푸터 — [전송 확정] / [클립보드 복사] / [취소]
-  var canSend = !!data.can_send;
+  // [추가 보정 4] already_sent 조건 제거 (멱등성 해제 일관성)
+  // can_send는 검증 ok && !already_sent라서, 재전송 시 false → 회색 비활성. 대신 blockers만 검사.
+  var canSend = !blockers || blockers.length === 0;
   var sendBtnDisabled = canSend ? '' : ' disabled';
   var sendBtnStyle = canSend
     ? 'padding:8px 18px;border:none;border-radius:6px;background:#10B981;color:#fff;font-size:13px;font-weight:600;cursor:pointer;'
@@ -25290,8 +25307,9 @@ function _ipinv2RenderItemsTable() {
   h += '<th>할인가 ($)<div class="col-resize-handle"></div></th>';
   h += '<th>FOB$ 계<div class="col-resize-handle"></div></th>';
   h += '<th>배분 (%/₩)<div class="col-resize-handle"></div></th>';
-  h += '<th class="ipinv2-col-supply">단가 (VAT포함)<div class="col-resize-handle"></div></th>';
-  h += '<th class="ipinv2-col-supply">금액 (VAT포함)<div class="col-resize-handle"></div></th>';
+  // [추가 보정 5] ⑪⑫ 단가/금액(VAT포함)은 색상 제거 (사장님 시각상 경영박사로 가는 컬럼만 강조)
+  h += '<th>단가 (VAT포함)<div class="col-resize-handle"></div></th>';
+  h += '<th>금액 (VAT포함)<div class="col-resize-handle"></div></th>';
   h += '<th class="ipinv2-col-supply">단가 (VAT별도)<div class="col-resize-handle"></div></th>';
   h += '<th class="ipinv2-col-supply">금액 (=단가×수량)<div class="col-resize-handle"></div></th>';
   h += '<th class="ipinv2-col-supply">부가세<div class="col-resize-handle"></div></th>';
@@ -25374,9 +25392,10 @@ function _ipinv2RenderItemsTable() {
         h += '<div class="ipinv2-alloc-pct" style="color:#9BA3B2;">' + (canCalc ? '-' : '') + '</div>';
       }
       h += '</td>';
-      h += '<td class="ipinv2-col-supply">' + supplyUnitTxt + '</td>';   // ⑪ 단가 (VAT포함)
-      h += '<td class="ipinv2-col-supply">' + supplyTotalTxt + '</td>';  // ⑫ 금액 (VAT포함)
-      h += '<td class="ipinv2-col-supply">' + goodsUnitTxt + '</td>';     // ⑬ 단가 (VAT별도) [보정 1] 신규
+      // [추가 보정 5] ⑪⑫ 단가/금액(VAT포함)은 색상 제거. ⑬⑭⑮만 #FDF4E8 (경영박사로 가는 컬럼)
+      h += '<td>' + supplyUnitTxt + '</td>';                              // ⑪ 단가 (VAT포함)
+      h += '<td>' + supplyTotalTxt + '</td>';                             // ⑫ 금액 (VAT포함)
+      h += '<td class="ipinv2-col-supply">' + goodsUnitTxt + '</td>';     // ⑬ 단가 (VAT별도)
       h += '<td class="ipinv2-col-supply">' + goodsAmtTxt + '</td>';      // ⑭ 금액 (=단가×수량)
       h += '<td class="ipinv2-col-supply">' + vatTxt + '</td>';           // ⑮ 부가세
       // [B-3-2-2d 2] 최종환율 — 모든 행 동일 (가중평균환율), 회색 중앙정렬

@@ -49,6 +49,8 @@ export type InvoicePayloadResult = {
     goods_unit_price: number;       // 물품가 단가 (소수점 2자리)
     goods_amount: number;           // 물품가 (소수점 2자리)
     vat_amount: number;             // 부가세 (소수점 2자리)
+    // [추가 보정] 라인 비고 = 경영박사 적요 (라인마다 동일값 "최종환율 X.XX")
+    memo: string;
     has_code: boolean;
   }>;
   totals: { qty_sum: number; amount_sum: number };
@@ -267,6 +269,10 @@ export async function buildInvoicePayload(invoiceId: string): Promise<InvoicePay
     invoiceDate,
   ].join(' · ');
 
+  // [Stage 6 Phase B-2 Step 3 추가 보정] 경영박사 적요(비고) — 라인마다 동일값
+  // 어제 첫 전송 시 비고 빈칸 → 부가세 컬럼이 경영박사 화면에 빈칸으로 보였던 가설 대응
+  const lineMemo = `최종환율 ${wAvg.toFixed(2)}`;
+
   const previewItems = items.map((it, idx) => ({
     no: idx + 1,
     code: it.raw.management_code || null,
@@ -279,6 +285,7 @@ export async function buildInvoicePayload(invoiceId: string): Promise<InvoicePay
     goods_unit_price: it.goods_unit_price,
     goods_amount: it.goods_amount,
     vat_amount: it.vat_amount,
+    memo: lineMemo,                // [추가 보정] 라인 비고 = 적요
     has_code: !!(it.raw.management_code && String(it.raw.management_code).trim()),
   }));
 
@@ -322,19 +329,20 @@ export async function buildInvoicePayload(invoiceId: string): Promise<InvoicePay
   // ─────────────────────────────────────────────────
   // newOrderIn 페이로드 빌드
   // info  : "{customer_code}|{memo}|{today YY.MM.DD KST}|"  (마지막 |는 자동채번 자리)
-  // items : 라인별 "{code}${qty}${goods_unit_price}${goods_amount}${vat_amount}$" 를 |로 join
+  // items : 라인별 "{code}${qty}${goods_unit_price}${goods_amount}${vat_amount}${lineMemo}" 를 |로 join
   //         · [Stage 6 Phase B-2 Step 3] Q-A 결정: 단가 = 물품가 (VAT 별도, 한국 회계 표준)
   //           - 셋째 필드 단가     = goods_unit_price (.toFixed(2))
   //           - 넷째 필드 금액     = goods_amount (.toFixed(2))
-  //           - 다섯째 필드 부가세 = vat_amount (.toFixed(2))  ← 정정: 0 하드코딩 → 실 부가세
-  //         · 여섯 번째 필드(비고)는 빈 문자열 (= 다섯번째 $뒤에 그대로 끝)
+  //           - 다섯째 필드 부가세 = vat_amount (.toFixed(2))
+  //         · [추가 보정] 여섯 번째 필드(비고/적요) = "최종환율 X.XX" 라인마다 동일
+  //           이전: 빈 문자열 → 경영박사 부가세 컬럼이 빈칸으로 보였던 가설 대응
   //         · 라인 0개면 빈 문자열
   // ibgum : "" (D4 — 매입만, 출금 없음)
   // ─────────────────────────────────────────────────
   const today = ymdShortKST();
   const info = `${customerCode}|${memo}|${today}|`;
   const itemsStr = previewItems
-    .map(it => `${it.code || ''}$${it.qty}$${it.goods_unit_price.toFixed(2)}$${it.goods_amount.toFixed(2)}$${it.vat_amount.toFixed(2)}$`)
+    .map(it => `${it.code || ''}$${it.qty}$${it.goods_unit_price.toFixed(2)}$${it.goods_amount.toFixed(2)}$${it.vat_amount.toFixed(2)}$${it.memo}`)
     .join('|');
   const ibgum = '';
 
