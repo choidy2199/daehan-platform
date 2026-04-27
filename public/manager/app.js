@@ -21643,8 +21643,9 @@ function _poRenderCart(poId) {
 
   var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  // 브랜드 / 품명(가변) / 모델명 / 1P / 낱개 / 금액$ / 총금액$ / ×
+  // 브랜드 / 관리코드 / 품명(가변) / 모델명 / 1P / 낱개 / 금액$ / 총금액$ / ×
   h += '<col style="width:54px">';
+  h += '<col style="width:90px">';   // [신규] 관리코드
   h += '<col style="">';
   h += '<col style="width:80px">';
   h += '<col style="width:38px">';
@@ -21655,6 +21656,7 @@ function _poRenderCart(poId) {
   h += '</colgroup>';
   h += '<thead><tr>';
   h += '<th style="' + thS + '">브랜드</th>';
+  h += '<th style="' + thS + '">관리코드</th>';   // [신규]
   h += '<th style="' + thS + 'text-align:left;padding-left:8px;">품명</th>';
   h += '<th style="' + thS + '">모델명</th>';
   h += '<th style="' + thS + '">1P</th>';
@@ -21683,8 +21685,11 @@ function _poRenderCart(poId) {
     totalUnit += unitCount;
     totalPallet += pCount;
     totalAmount += amount;
+    var manageCode = p ? (p.manageCode || '') : '';
+    var manageCellHtml = manageCode ? _poEsc(manageCode) : '<span style="color:#DDE1EB">-</span>';
     h += '<tr>';
     h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
+    h += '<td style="' + tdS + 'font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#5A6070;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="' + _poEsc(manageCode) + '">' + manageCellHtml + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + descTxt + '</td>';
     h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
@@ -24141,9 +24146,11 @@ function _ipinv2GetManageCode(item) {
   return '';
 }
 
-// 브랜드 획득: 1) item.brand → 2) mw_products lookup → 3) Milwaukee
+// 브랜드 획득: 1) item.brand → 2) item.model (콜라보 등 데이터 패턴) → 3) mw_products lookup → 4) '-'
 function _ipinv2GetBrand(item) {
   if (item && item.brand) return String(item.brand);
+  // [핫픽스] import_invoice_items.model 컬럼에 brand가 저장되는 데이터 패턴 (cart→PO→invoice chain)
+  if (item && item.model) return String(item.model);
   try {
     var products = (typeof loadObj === 'function') ? (loadObj('mw_products', []) || []) : [];
     if (!Array.isArray(products)) products = [];
@@ -24155,7 +24162,7 @@ function _ipinv2GetBrand(item) {
   } catch (e) {
     // ignore, fall through to default
   }
-  return 'Milwaukee';
+  return '-';
 }
 
 // cost-calculation items를 item.id 기준 map으로 변환
