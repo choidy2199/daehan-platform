@@ -21689,7 +21689,7 @@ function _poRenderCart(poId) {
     var manageCellHtml = manageCode ? _poEsc(manageCode) : '<span style="color:#DDE1EB">-</span>';
     h += '<tr>';
     h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
-    h += '<td style="' + tdS + 'font-family:ui-monospace,Menlo,monospace;font-size:11px;color:#5A6070;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="' + _poEsc(manageCode) + '">' + manageCellHtml + '</td>';
+    h += '<td style="' + tdS + 'font-family:inherit;font-size:12px;color:#5A6070;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;" title="' + _poEsc(manageCode) + '">' + manageCellHtml + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + descTxt + '</td>';
     h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
