@@ -24467,9 +24467,81 @@ function _ipinv2CopyErpPreview() {
   }
 }
 
-// [Stage 6 Phase B-1] [전송 확정] 버튼 — Phase B-2에서 실 호출 구현 예정
-function _ipinv2ConfirmSendErp() {
-  alert('Phase B-2에서 실 전송 구현 예정 (경영박사 NewOrderIn 호출 + erp_invoice_send_logs 기록).');
+// [Stage 6 Phase B-2 Step 2] [전송 확정] 버튼 → 실 ERP 호출 (불가역)
+async function _ipinv2ConfirmSendErp() {
+  var inv = _ipinv2CurrentInvoice;
+  if (!inv || !inv.id) return;
+
+  // 합계는 매입전표 미리보기 응답(_ipinv2ErpPreview.totals.amount_sum = 공급가합계)
+  var totalKrw = (_ipinv2ErpPreview && _ipinv2ErpPreview.totals)
+    ? Number(_ipinv2ErpPreview.totals.amount_sum || 0)
+    : 0;
+
+  var confirmMsg = '경영박사로 매입전표를 전송합니다.\n\n'
+    + '거래처: ' + (inv.customer_name || '-') + '\n'
+    + '송장번호: ' + (inv.invoice_no || '-') + '\n'
+    + '합계: ' + totalKrw.toLocaleString('en-US') + '원\n\n'
+    + '⚠️ 한 번 전송되면 경영박사에서 수기 삭제만 가능합니다.\n'
+    + '계속하시겠습니까?';
+
+  if (!confirm(confirmMsg)) return;
+
+  // [전송 확정] 버튼 잠금 (미리보기 모달 푸터 내)
+  var modal = document.getElementById('ipinv2-erp-modal-overlay');
+  var btn = modal ? modal.querySelector('button[onclick*="ConfirmSendErp"]') : null;
+  var origLabel = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '전송 중...';
+    btn.style.opacity = '0.6';
+    btn.style.cursor = 'wait';
+  }
+
+  // sentBy: 3명 공유 시스템 → 누가 보냈는지 추적용
+  var sentBy = (window.currentUser && window.currentUser.loginId) || 'admin';
+
+  try {
+    var res = await fetch('/api/import-invoices/' + encodeURIComponent(inv.id) + '/erp-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dryRun: false, sentBy: sentBy })
+    });
+    var json = await res.json();
+
+    if (res.ok && json && json.success) {
+      var msg = '✅ 경영박사 전송 완료\n전표번호: ' + (json.erpOrderNo || '?');
+      if (json.warning) msg += '\n\n⚠️ ' + json.warning;
+      alert(msg);
+
+      // 메모리 갱신
+      _ipinv2CurrentInvoice.erp_sent_at = json.sentAt || new Date().toISOString();
+      _ipinv2CurrentInvoice.erp_order_no = json.erpOrderNo || null;
+
+      // 모달 닫기
+      _ipinv2CloseErpPreviewModal();
+
+      // 화면 재렌더 (검증 뱃지 → 전송완료, 버튼 → 비활성)
+      try { _ipinv2RenderCombinedSummary(); } catch (e) { /* DOM 미존재 시 무시 */ }
+      try { _ipinv2RenderItemsTable(); } catch (e) { /* DOM 미존재 시 무시 */ }
+    } else {
+      var errMsg = (json && json.error) ? json.error : ('HTTP ' + res.status);
+      alert('❌ 경영박사 전송 실패\n' + errMsg + '\n\n다시 시도하실 수 있습니다.');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = origLabel || '✅ 전송 확정';
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      }
+    }
+  } catch (e) {
+    alert('❌ 네트워크 오류\n' + (e && e.message ? e.message : String(e)) + '\n\n다시 시도하실 수 있습니다.');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = origLabel || '✅ 전송 확정';
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    }
+  }
 }
 
 // [Stage 6 Phase B-1] [경영박사 전송] 버튼 클릭 → 미리보기 모달 진입
@@ -25094,10 +25166,13 @@ function _ipinv2RenderItemsTable() {
   h += '<div class="ipinv2-cost-title"><span>제품 최종 원가</span><span class="count">(' + items.length + '건)</span></div>';
   h += '<div class="ipinv2-cost-actions">';
   h += '<button type="button" onclick="_ipinv2ExportCostExcel()">📊 엑셀 출력</button>';
-  // [Stage 6 Phase B-1] 활성화 조건: 검증 뱃지 = ok (이미 전송된 경우도 활성화 — 재전송은 모달에서 처리)
+  // [Stage 6 Phase B-2 Step 2] 활성화 조건: 검증 뱃지 = ok && erp_sent_at IS NULL
   var _ipinv2VStatus = _ipinv2ComputeValidationStatus();
-  var erpDisabled = (_ipinv2VStatus !== 'ok') ? ' disabled' : '';
-  h += '<button type="button" onclick="_ipinv2SendErp()" class="ipinv2-btn-erp"' + erpDisabled + '>✅ 경영박사 전송</button>';
+  var _ipinv2AlreadySent = !!(_ipinv2CurrentInvoice && _ipinv2CurrentInvoice.erp_sent_at);
+  var erpDisabled = (_ipinv2VStatus !== 'ok' || _ipinv2AlreadySent) ? ' disabled' : '';
+  var erpBtnLabel = _ipinv2AlreadySent ? '✓ 전송완료' : '✅ 경영박사 전송';
+  var erpBtnExtraStyle = _ipinv2AlreadySent ? ' style="background:#9BA3B2;color:#fff;cursor:not-allowed;"' : '';
+  h += '<button type="button" onclick="_ipinv2SendErp()" class="ipinv2-btn-erp"' + erpDisabled + erpBtnExtraStyle + '>' + erpBtnLabel + '</button>';
   h += '</div>';
   h += '</div>';
 
@@ -26663,7 +26738,11 @@ function _ipinv2RenderCombinedSummary() {
   var customsLen = (_ipinv2Customs || []).length;
 
   var vStatus, vLabel;
-  if (!canCalc) {
+  // [Stage 6 Phase B-2 Step 2] erp_sent_at truthy → 전송완료 우선 표시 (다른 검증 결과 무관)
+  if (inv.erp_sent_at) {
+    vStatus = 'sent';
+    vLabel = '✓ 전송완료 (전표 #' + (inv.erp_order_no || '?') + ')';
+  } else if (!canCalc) {
     vStatus = 'pending_payment';
     vLabel = '— 송금 대기';
   } else if (customsLen > 0 && customsTotal === 0) {
@@ -26681,7 +26760,8 @@ function _ipinv2RenderCombinedSummary() {
 
   // 배경색 — CSS data-status 규칙으로도 적용되지만 inline으로 확정 (다크바 내 일관성)
   var vBg;
-  if (vStatus === 'ok') vBg = '#10B981';
+  if (vStatus === 'sent') vBg = '#7280A0';
+  else if (vStatus === 'ok') vBg = '#10B981';
   else if (vStatus === 'error') vBg = '#DC2626';
   else if (vStatus === 'pending_customs') vBg = '#F59E0B';
   else vBg = '#6B7280'; // pending_payment
