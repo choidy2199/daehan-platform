@@ -21011,7 +21011,7 @@ function _poRenderProductList() {
   }
 
   var thS = 'padding:9px 6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
-  var tdS = 'padding:6px 6px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
+  var tdS = 'padding:6px 6px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;overflow:hidden;white-space:nowrap;';
 
   var h = '<table id="po-product-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
