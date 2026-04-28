@@ -27440,6 +27440,9 @@ const _tx = {
     this._bindFooterButtons();
     this._bindSearchInput();
     this._bindCustomerSelect();
+    if (this.customer && typeof this.customer.init === 'function') this.customer.init();
+    this._bindItemsResizeHandles();
+    this._loadItemsColWidths();
 
     // Phase 3B-1: 검색 컬럼 설정 로드 + 톱니바퀴 버튼 생성
     this.search.loadConfig();
@@ -27482,14 +27485,144 @@ const _tx = {
       if (!btn) return;
       const tr = btn.closest('tr');
       if (!tr) return;
-      const cells = tr.children;
-      const code = (cells[1] && cells[1].textContent || '').trim();
-      const name = (cells[2] && cells[2].textContent || '').trim();
-      const priceTxt = (cells[4] && cells[4].textContent || '').trim();
-      const fallbackPrice = parseInt(priceTxt.replace(/,/g, ''), 10) || 0;
-      if (!code) return;
-      _tx.addItem(code, { fallbackName: name, fallbackRetail: fallbackPrice });
+
+      // [Phase 8] data-col-id 기반 셀 매핑 (컬럼 가시성/순서 무관)
+      const codeCell = tr.querySelector('td[data-col-id="code"]');
+      const manageCodeCell = tr.querySelector('td[data-col-id="manageCode"]');
+      const modelCell = tr.querySelector('td[data-col-id="model"]');
+      const retailCell = tr.querySelector('td[data-col-id="retail"]');
+
+      const code = (codeCell && codeCell.textContent || '').trim();
+      const manageCode = (manageCodeCell && manageCodeCell.textContent || '').trim();
+      const model = (modelCell && modelCell.textContent || '').trim();
+      const retail = (retailCell && retailCell.textContent || '').trim();
+      const fallbackPrice = parseInt(retail.replace(/,/g, ''), 10) || 0;
+
+      // 코드+관리코드 모두 비어있으면 모달로 입력 받기
+      const noCode = (!code || code === '-') && (!manageCode || manageCode === '-');
+      if (noCode) {
+        _tx._promptForMissingCode(model, function(newCode) {
+          _tx._updateProductCode(model, newCode);
+          _tx.addItem(newCode, { fallbackName: model, fallbackRetail: fallbackPrice });
+        });
+        return;
+      }
+
+      // 정상 케이스 — code 우선, 없으면 manageCode
+      const finalCode = (code && code !== '-') ? code : manageCode;
+      _tx.addItem(finalCode, { fallbackName: model, fallbackRetail: fallbackPrice });
     });
+  },
+
+  // [Phase 8] 코드 없는 제품 추가 시 알림 모달
+  _promptForMissingCode(modelName, onConfirm) {
+    const existing = document.querySelector('.tx-code-modal-backdrop');
+    if (existing) existing.remove();
+
+    const safeModel = String(modelName || '(모델명 없음)')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const backdrop = document.createElement('div');
+    backdrop.className = 'tx-code-modal-backdrop';
+    backdrop.innerHTML =
+      '<div class="tx-code-modal" role="dialog" aria-modal="true">' +
+        '<h3>코드 입력 필요</h3>' +
+        '<div class="tx-code-modal-desc">' +
+          '이 제품은 코드와 관리코드가 모두 비어있습니다.<br>' +
+          '코드 또는 관리코드를 입력해주세요.' +
+        '</div>' +
+        '<div class="tx-code-modal-product">' + safeModel + '</div>' +
+        '<input type="text" class="tx-code-modal-input" placeholder="코드 또는 관리코드 입력" autocomplete="off" />' +
+        '<div class="tx-code-modal-actions">' +
+          '<button class="tx-code-modal-cancel" type="button">취소</button>' +
+          '<button class="tx-code-modal-confirm" type="button">확인</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(backdrop);
+
+    const input = backdrop.querySelector('.tx-code-modal-input');
+    const confirmBtn = backdrop.querySelector('.tx-code-modal-confirm');
+    const cancelBtn = backdrop.querySelector('.tx-code-modal-cancel');
+
+    setTimeout(function() { input && input.focus(); }, 50);
+
+    const close = function() {
+      if (backdrop && backdrop.parentNode) backdrop.remove();
+    };
+    const submit = function() {
+      const val = (input.value || '').trim();
+      if (!val) {
+        input.focus();
+        input.style.borderColor = '#E24B4A';
+        input.style.boxShadow = '0 0 0 2px rgba(226, 75, 74, 0.15)';
+        return;
+      }
+      close();
+      if (typeof onConfirm === 'function') onConfirm(val);
+    };
+
+    confirmBtn.addEventListener('click', submit);
+    cancelBtn.addEventListener('click', close);
+    input.addEventListener('input', function() {
+      input.style.borderColor = '';
+      input.style.boxShadow = '';
+    });
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); submit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    });
+    backdrop.addEventListener('click', function(e) {
+      if (e.target === backdrop) close();
+    });
+  },
+
+  // [Phase 8] 모델명 일치 + 코드 빈 제품의 code 필드 채우기 + 동기화
+  _updateProductCode(model, newCode) {
+    if (!model || !newCode) return false;
+
+    const dbProducts = (typeof DB !== 'undefined' && DB.products) ? DB.products : [];
+    const genList = (typeof genProducts !== 'undefined') ? genProducts : [];
+
+    let updated = false;
+    let updatedSource = null;
+
+    for (let i = 0; i < dbProducts.length; i++) {
+      const p = dbProducts[i];
+      if ((p.model || '') === model && (!p.code || p.code === '')) {
+        p.code = newCode;
+        updated = true;
+        updatedSource = 'milwaukee';
+        break;
+      }
+    }
+    if (!updated) {
+      for (let i = 0; i < genList.length; i++) {
+        const p = genList[i];
+        if ((p.model || '') === model && (!p.code || p.code === '')) {
+          p.code = newCode;
+          updated = true;
+          updatedSource = 'general';
+          break;
+        }
+      }
+    }
+
+    if (updated) {
+      try {
+        if (updatedSource === 'milwaukee' && typeof save === 'function' && typeof KEYS !== 'undefined') {
+          save(KEYS.products, dbProducts);
+          if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_products');
+        } else if (updatedSource === 'general') {
+          localStorage.setItem('mw_gen_products', JSON.stringify(genList));
+          if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_gen_products');
+        }
+      } catch (e) {
+        console.warn('[TX] _updateProductCode save failed:', e);
+      }
+      // 검색 캐시 무효화 hook (현재 _tx.search._cache 미정 — 향후 도입 대비)
+      if (this.search) this.search._cache = null;
+    }
+    return updated;
   },
 
   _bindItemsTable() {
@@ -27825,6 +27958,80 @@ const _tx = {
     if (supplyEl) supplyEl.textContent = totals.supply.toLocaleString();
     if (vatEl) vatEl.textContent = totals.vat.toLocaleString();
     if (totalEl) totalEl.textContent = totals.total.toLocaleString();
+  },
+
+  // [Phase 8] 매출 라인 테이블 컬럼 resize (thead 정적 — 1회 바인딩)
+  _bindItemsResizeHandles() {
+    const table = document.querySelector('#tab-transactions .tx-items-table');
+    if (!table) return;
+    const ths = table.querySelectorAll('thead th');
+    const self = this;
+    ths.forEach(function(th, idx) {
+      if (idx === ths.length - 1) return; // 마지막 컬럼(삭제) 핸들 없음
+      let handle = th.querySelector('.tx-row-resize-handle');
+      if (!handle) {
+        handle = document.createElement('div');
+        handle.className = 'tx-row-resize-handle';
+        th.appendChild(handle);
+      }
+      if (handle._txBound) return;
+      handle._txBound = true;
+      handle.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.pageX;
+        const startW = th.getBoundingClientRect().width;
+        const onMove = function(ev) {
+          const dx = ev.pageX - startX;
+          const newW = Math.max(40, startW + dx);
+          th.style.width = newW + 'px';
+        };
+        const onUp = function() {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          self._saveItemsColWidths();
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+    });
+  },
+
+  _itemsColWidthsKey() {
+    const u = (window.currentUser && window.currentUser.loginId) || 'default';
+    return 'tx_items_col_widths_' + u;
+  },
+
+  _saveItemsColWidths() {
+    const table = document.querySelector('#tab-transactions .tx-items-table');
+    if (!table) return;
+    const widths = {};
+    table.querySelectorAll('thead th').forEach(function(th, idx) {
+      widths['col_' + idx] = th.getBoundingClientRect().width;
+    });
+    try {
+      localStorage.setItem(this._itemsColWidthsKey(), JSON.stringify(widths));
+    } catch (e) {
+      console.warn('[TX] _saveItemsColWidths failed:', e);
+    }
+  },
+
+  _loadItemsColWidths() {
+    const table = document.querySelector('#tab-transactions .tx-items-table');
+    if (!table) return;
+    try {
+      const raw = localStorage.getItem(this._itemsColWidthsKey());
+      if (!raw) return;
+      const widths = JSON.parse(raw);
+      table.querySelectorAll('thead th').forEach(function(th, idx) {
+        const w = widths['col_' + idx];
+        if (typeof w === 'number' && w > 0) {
+          th.style.width = w + 'px';
+        }
+      });
+    } catch (e) {
+      console.warn('[TX] _loadItemsColWidths failed:', e);
+    }
   },
 
   // ================================================================
@@ -28379,64 +28586,176 @@ const _tx = {
           || String(c.manager || '').toLowerCase().includes(q);
     },
 
+    // [Phase 8] inline 드롭다운 — .tx-cust-wrap 자식, position:absolute (CSS .tx-cust-dd)
     _ensureDropdown() {
-      if (this._dropdown) return this._dropdown;
-      const dd = document.createElement('div');
-      dd.className = 'tx-customer-dropdown';
-      dd.style.display = 'none';
-      dd.innerHTML =
-        '<div class="tx-customer-search-wrap">' +
-          '<input type="text" class="tx-customer-search-input" placeholder="거래처명·코드·사업자번호 검색" autocomplete="off">' +
-        '</div>' +
-        '<div class="tx-customer-list"></div>';
-      document.body.appendChild(dd);
-      this._dropdown = dd;
-
-      const searchInput = dd.querySelector('.tx-customer-search-input');
-      // [Phase B-2 B] bindSearchInput 헬퍼로 통일 (search=300ms + IME 처리, clientData 2,471건)
-      bindSearchInput(searchInput, function() { _tx.customer.onSearch(searchInput.value); }, { mode: 'search' });
-      searchInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') _tx.customer.closeDropdown();
-      });
-
-      dd.querySelector('.tx-customer-list').addEventListener('click', function(e) {
-        const item = e.target.closest('.tx-customer-item');
-        if (!item) return;
-        const idx = parseInt(item.getAttribute('data-idx'), 10);
-        const list = _tx.customer._load();
-        if (!isNaN(idx) && list[idx]) _tx.customer.select(list[idx]);
-      });
-
-      document.addEventListener('mousedown', function(e) {
-        if (!_tx.customer._dropdown || _tx.customer._dropdown.style.display === 'none') return;
-        if (_tx.customer._dropdown.contains(e.target)) return;
-        const btn = document.getElementById('tx-customer-select-btn');
-        const inp = document.getElementById('tx-customer-input');
-        if ((btn && btn.contains(e.target)) || (inp && inp.contains(e.target))) return;
-        _tx.customer.closeDropdown();
-      });
-
+      if (this._dd) return this._dd;
+      const wrap = document.querySelector('#tab-transactions .tx-cust-wrap');
+      if (!wrap) return null;
+      let dd = wrap.querySelector('.tx-cust-dd');
+      if (!dd) {
+        dd = document.createElement('div');
+        dd.className = 'tx-cust-dd';
+        dd.style.display = 'none';
+        wrap.appendChild(dd);
+      }
+      this._dd = dd;
+      this._activeIdx = -1;
+      this._filtered = [];
       return dd;
     },
 
     openDropdown() {
       const dd = this._ensureDropdown();
-      const btn = document.getElementById('tx-customer-select-btn');
-      const combo = btn ? btn.closest('.tx-input-combo') : null;
-      const anchor = combo || btn;
-      if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      dd.style.left = rect.left + 'px';
-      dd.style.top = (rect.bottom + 4) + 'px';
-      dd.style.width = Math.max(240, rect.width) + 'px';
-      dd.style.display = 'flex';
-      this.onSearch('');
-      const si = dd.querySelector('.tx-customer-search-input');
-      if (si) { si.value = ''; si.focus(); }
+      if (!dd) return;
+      dd.style.display = 'block';
+      this._render(this._currentQuery() || '');
     },
 
     closeDropdown() {
-      if (this._dropdown) this._dropdown.style.display = 'none';
+      if (this._dd) this._dd.style.display = 'none';
+      this._activeIdx = -1;
+    },
+
+    _currentQuery() {
+      const input = document.getElementById('tx-customer-input');
+      return input ? input.value : '';
+    },
+
+    _render(query) {
+      if (!this._dd) return;
+      const q = String(query || '').trim().toLowerCase();
+      const clients = (typeof clientData !== 'undefined') ? clientData : [];
+      const filtered = clients.filter(function(c) {
+        if (!q) return true;
+        const name = String(c.name || '').toLowerCase();
+        const code = String(c.code || c.manageCode || '').toLowerCase();
+        const biz = String(c.bizNo || '').replace(/-/g, '');
+        return name.includes(q) || code.includes(q) || biz.includes(q.replace(/-/g, ''));
+      }).slice(0, 50);
+
+      this._filtered = filtered;
+      if (this._activeIdx >= filtered.length) this._activeIdx = filtered.length - 1;
+
+      if (filtered.length === 0) {
+        this._dd.innerHTML = '<div class="tx-cust-dd-empty">검색 결과 없음</div>';
+        return;
+      }
+      let html = '';
+      for (let i = 0; i < filtered.length; i++) {
+        const c = filtered[i];
+        const active = (i === this._activeIdx) ? ' tx-active' : '';
+        const name = String(c.name || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        html += '<div class="tx-cust-dd-item' + active + '" data-idx="' + i + '">' + name + '</div>';
+      }
+      this._dd.innerHTML = html;
+    },
+
+    _scrollToActive() {
+      if (!this._dd) return;
+      const active = this._dd.querySelector('.tx-cust-dd-item.tx-active');
+      if (active && active.scrollIntoView) {
+        active.scrollIntoView({ block: 'nearest' });
+      }
+    },
+
+    // [Phase 8] inline 드롭다운 input 이벤트 + 키보드 + 마우스 + blur
+    init() {
+      const self = this;
+      const input = document.getElementById('tx-customer-input');
+      if (!input) return;
+
+      // 중복 바인딩 가드 (탭 재진입 시)
+      if (input._txCustBound) return;
+      input._txCustBound = true;
+
+      // (1) 입력 이벤트 — bindSearchInput 헬퍼 (한글 IME + 150ms autocomplete)
+      // _poCustomer / _ipinv2Customer와 일관 (메모리 패턴: 자동완성 = autocomplete 150ms)
+      if (typeof bindSearchInput === 'function') {
+        bindSearchInput(input, function() {
+          self._activeIdx = -1;
+          self.openDropdown();
+        }, { mode: 'autocomplete' });
+      } else {
+        input.addEventListener('input', function() {
+          self._activeIdx = -1;
+          self.openDropdown();
+        });
+      }
+
+      // (2) 클릭/포커스 → 드롭다운 열기 (_bindCustomerSelect의 click과 중복이지만 무해)
+      input.addEventListener('focus', function() { self.openDropdown(); });
+      input.addEventListener('click', function() { self.openDropdown(); });
+
+      // (3) 키보드 ↑↓ Enter Esc
+      input.addEventListener('keydown', function(e) {
+        if (!self._dd || self._dd.style.display === 'none') {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            self.openDropdown();
+          }
+          return;
+        }
+        const list = self._filtered || [];
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          self._activeIdx = Math.min(list.length - 1, self._activeIdx + 1);
+          self._render(self._currentQuery());
+          self._scrollToActive();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          self._activeIdx = Math.max(0, self._activeIdx - 1);
+          self._render(self._currentQuery());
+          self._scrollToActive();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (self._activeIdx >= 0 && list[self._activeIdx]) {
+            self.select(list[self._activeIdx]);
+          } else if (list.length > 0) {
+            self.select(list[0]);
+          }
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          self.closeDropdown();
+          input.blur();
+        }
+      });
+
+      // (4) blur — 200ms 지연 후 닫기 (mousedown 선택 처리 후)
+      input.addEventListener('blur', function() {
+        setTimeout(function() {
+          const ae = document.activeElement;
+          if (self._dd && self._dd.contains(ae)) return;
+          self.closeDropdown();
+        }, 200);
+      });
+
+      // (5) 드롭다운 항목 mousedown 클릭 + mouseover activeIdx 동기화
+      if (!self._ddClickBound) {
+        const dd = self._ensureDropdown();
+        if (dd) {
+          dd.addEventListener('mousedown', function(e) {
+            const item = e.target.closest('.tx-cust-dd-item');
+            if (!item) return;
+            e.preventDefault();
+            const idx = parseInt(item.getAttribute('data-idx'), 10);
+            if (self._filtered && self._filtered[idx]) {
+              self.select(self._filtered[idx]);
+            }
+          });
+          dd.addEventListener('mouseover', function(e) {
+            const item = e.target.closest('.tx-cust-dd-item');
+            if (!item) return;
+            const idx = parseInt(item.getAttribute('data-idx'), 10);
+            if (idx !== self._activeIdx) {
+              self._activeIdx = idx;
+              dd.querySelectorAll('.tx-cust-dd-item').forEach(function(el, i) {
+                el.classList.toggle('tx-active', i === idx);
+              });
+            }
+          });
+          self._ddClickBound = true;
+        }
+      }
     },
 
     onSearch(queryText) {

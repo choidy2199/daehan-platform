@@ -3369,3 +3369,208 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   .tx-grid { grid-template-columns: 1fr; }
   .tx-darkbar { flex-wrap: wrap; }
 }
+
+/* =================================================================
+   Phase 8 — v5 거래명세서
+   (거래처 inline 드롭다운 + 80:20 + 매출 테이블 resize + 코드 입력 모달)
+   ================================================================= */
+
+/* === A. 거래처 단일 input — 흰색 (3266 후행 override) === */
+.tx-darkbar .tx-cust-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.tx-darkbar #tx-customer-input,
+.tx-darkbar .tx-dk-cust {
+  background: #fff !important;
+  color: #1A1D23 !important;
+  border: 1px solid #DDE1EB !important;
+  border-radius: 4px !important;
+  font-size: 12px;
+  height: 30px;
+  padding: 0 10px;
+  width: 220px !important;
+  box-sizing: border-box;
+  font-family: 'Pretendard', sans-serif;
+}
+.tx-darkbar #tx-customer-input::placeholder {
+  color: #9BA3B2 !important;
+}
+.tx-darkbar #tx-customer-input:focus {
+  outline: none;
+  border-color: #185FA5 !important;
+  box-shadow: 0 0 0 2px rgba(24, 95, 165, 0.15);
+}
+
+/* === B. 거래처 inline 드롭다운 (input 자식) === */
+.tx-cust-dd {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  width: 280px;
+  background: #fff;
+  border: 1px solid #DDE1EB;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  z-index: 1000;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.tx-cust-dd-item {
+  padding: 7px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #1A1D23;
+}
+.tx-cust-dd-item:hover,
+.tx-cust-dd-item.tx-active {
+  background: #EFF5FB;
+}
+.tx-cust-dd-empty {
+  padding: 16px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: #9BA3B2;
+}
+
+/* === C. 그리드 70:30 → 80:20 (3198 후행 override) === */
+#tab-transactions .tx-grid {
+  grid-template-columns: 80fr 20fr !important;
+}
+
+/* === D. 매출 라인 테이블 — 다크 헤더 구분바 + resize 핸들 === */
+.tx-items-table thead th {
+  position: relative;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+.tx-items-table thead th:last-child {
+  border-right: none;
+}
+.tx-row-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 25%;
+  height: 50%;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 2;
+}
+.tx-row-resize-handle::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: 0;
+  height: 100%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.tx-row-resize-handle:hover::after {
+  background: #4A9EFF;
+  width: 2px;
+}
+.tx-items-table tbody td {
+  border-right: 0.5px solid #EAECF2;
+}
+.tx-items-table tbody td:last-child {
+  border-right: none;
+}
+
+/* === E. 검색 결과 — 가로 스크롤 + 컬럼 구분바 === */
+/* overflow-x: auto는 2175에 이미 적용됨 — 중복 무해 */
+#tab-transactions .tx-search-results {
+  overflow-x: auto;
+}
+.tx-search-table thead th {
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+.tx-search-table thead th:last-child {
+  border-right: none;
+}
+.tx-search-table tbody td {
+  border-right: 0.5px solid #EAECF2;
+}
+.tx-search-table tbody td:last-child {
+  border-right: none;
+}
+
+/* === F. 코드 없는 제품 추가 시 알림 모달 === */
+.tx-code-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tx-code-modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+  font-family: 'Pretendard', sans-serif;
+}
+.tx-code-modal h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1A1D23;
+  margin: 0 0 8px 0;
+}
+.tx-code-modal-desc {
+  font-size: 12px;
+  color: #5A6070;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.tx-code-modal-product {
+  background: #F8FAFD;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #1A1D23;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+.tx-code-modal-input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #DDE1EB;
+  border-radius: 4px;
+  padding: 0 12px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+  font-family: 'Pretendard', sans-serif;
+}
+.tx-code-modal-input:focus {
+  outline: none;
+  border-color: #185FA5;
+}
+.tx-code-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.tx-code-modal-actions button {
+  font-size: 12px;
+  padding: 7px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Pretendard', sans-serif;
+  border: 0.5px solid #DDE1EB;
+  background: #fff;
+  color: #5A6070;
+}
+.tx-code-modal-actions button:hover {
+  background: #F4F6FA;
+}
+.tx-code-modal-confirm {
+  background: #185FA5 !important;
+  color: #fff !important;
+  border-color: #185FA5 !important;
+}
+.tx-code-modal-confirm:hover {
+  background: #0F4A88 !important;
+}
