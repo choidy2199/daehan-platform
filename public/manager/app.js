@@ -22596,7 +22596,7 @@ function _poDownloadPdf() {
   var filename = '발주서_' + (po.po_number || 'UNKNOWN') + '_' + yyyymmdd + '.pdf';
 
   var opt = {
-    margin: [10, 10, 10, 10],
+    margin: [0, 0, 0, 0],
     filename: filename,
     image: { type: 'jpeg', quality: 0.95 },
     html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#FFFFFF' },
