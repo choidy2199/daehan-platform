@@ -23162,9 +23162,84 @@ function _ipinv2StatusBadge(status) {
     partial_paid: { bg: '#FAEEDA', color: '#633806', label: '송금중' },
     paid:         { bg: '#1D9E75', color: '#fff',    label: '송금완료' },
     customs_done: { bg: '#E6F1FB', color: '#0C447C', label: '통관완료' },
+    // [트랙 C] 입고완료 — 경영박사 전송 시 erp-send 라우트에서 자동 전환
+    arrived:      { bg: '#EEEDFE', color: '#3C3489', label: '입고완료' },
   };
   var m = map[status] || map.draft;
   return '<span style="display:inline-block;font-size:11px;padding:3px 9px;border-radius:10px;background:' + m.bg + ';color:' + m.color + ';font-weight:500;">' + m.label + '</span>';
+}
+
+// [트랙 C] 모델명 배지 — 첫 토큰 + 수량 (사장님 결정 Q3-B)
+// 예: "DC660 2HP-통없는모델 96EA" → "DC660 96"
+function _ipinv2RenderModelBadges(items) {
+  if (!items || items.length === 0) return '<span style="color:#9BA3B2;">—</span>';
+  var badgeS = 'display:inline-flex;align-items:center;background:#F1EFE8;color:#2C2C2A;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:500;white-space:nowrap;';
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
+  items.forEach(function(it) {
+    var name = String(it.name || '').trim();
+    var firstToken = name.split(/\s+/)[0] || '?';
+    html += '<span style="' + badgeS + '">' + _ipinv2Esc(firstToken) + ' ' + Number(it.qty || 0) + '</span>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// [트랙 C] 입고날짜 셀 클릭 → date picker 열기
+function _ipinv2OnReceivedDateClick(invoiceId, currentIsoDate, ev) {
+  if (ev) { ev.stopPropagation(); }
+  var cell = document.querySelector('td.ipinv2-list-received-date[data-id="' + invoiceId + '"]');
+  if (!cell) return;
+  if (cell.querySelector('input[type="date"]')) return; // 이미 편집 중
+  var dateVal = '';
+  if (currentIsoDate) {
+    var d = new Date(currentIsoDate);
+    if (!isNaN(d.getTime())) {
+      // KST 보정
+      var kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+      dateVal = kst.getUTCFullYear() + '-' + String(kst.getUTCMonth() + 1).padStart(2, '0') + '-' + String(kst.getUTCDate()).padStart(2, '0');
+    }
+  }
+  var origHtml = cell.innerHTML;
+  cell.innerHTML = '<input type="date" value="' + dateVal + '" style="width:100%;padding:4px 6px;border:1px solid #185FA5;border-radius:4px;font-size:12px;font-family:Pretendard,sans-serif;text-align:center;" onclick="event.stopPropagation()" onblur="_ipinv2SaveReceivedDate(\'' + invoiceId + '\', this.value, \'' + dateVal + '\')" onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){this.value=\'' + dateVal + '\';this.blur();}">';
+  var input = cell.querySelector('input');
+  if (input) { input.focus(); }
+  cell.dataset.origHtml = origHtml;
+}
+
+function _ipinv2SaveReceivedDate(invoiceId, newDate, oldDate) {
+  var cell = document.querySelector('td.ipinv2-list-received-date[data-id="' + invoiceId + '"]');
+  if (!cell) return;
+  // 변경 없음 → 원상복구
+  if (newDate === oldDate) {
+    if (cell.dataset.origHtml) cell.innerHTML = cell.dataset.origHtml;
+    return;
+  }
+  fetch('/api/import-invoices/' + encodeURIComponent(invoiceId) + '/received-date', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ received_date: newDate || null }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.success) {
+        if (typeof _ipinv2Toast === 'function') _ipinv2Toast(json && json.error || '저장 실패', 'error');
+        if (cell.dataset.origHtml) cell.innerHTML = cell.dataset.origHtml;
+        return;
+      }
+      // 메모리 갱신
+      var inv = (_ipinv2Invoices || []).find(function(i) { return i.id === invoiceId; });
+      if (inv) inv.erp_sent_at = json.erp_sent_at;
+      // 셀 표시 갱신
+      var label = newDate ? newDate : '<span style="color:#9BA3B2;">—</span>';
+      cell.innerHTML = label;
+      // 캐시 갱신
+      try { _saveCache('mw_cache_import_invoices_v2', _ipinv2Invoices); } catch (e) {}
+      if (typeof _ipinv2Toast === 'function') _ipinv2Toast('저장되었습니다', 'success');
+    })
+    .catch(function(e) {
+      if (typeof _ipinv2Toast === 'function') _ipinv2Toast('네트워크 오류: ' + (e && e.message || String(e)), 'error');
+      if (cell.dataset.origHtml) cell.innerHTML = cell.dataset.origHtml;
+    });
 }
 
 // 편집 중인 차수가 있으면 paid → partial_paid 표시 전환
@@ -23243,7 +23318,8 @@ function _ipinv2RenderList() {
 
 function _ipinv2DoRenderList(container) {
   var total = _ipinv2Invoices.length;
-  var counts = { all: total, draft: 0, partial_paid: 0, paid: 0, customs_done: 0 };
+  // [트랙 C] arrived(입고완료) 카운트 추가
+  var counts = { all: total, draft: 0, partial_paid: 0, paid: 0, customs_done: 0, arrived: 0 };
   _ipinv2Invoices.forEach(function(inv) {
     if (counts[inv.status] !== undefined) counts[inv.status]++;
   });
@@ -23274,6 +23350,7 @@ function _ipinv2DoRenderList(container) {
     { k: 'partial_paid', l: '송금중' },
     { k: 'paid', l: '완료' },
     { k: 'customs_done', l: '통관완료' },
+    { k: 'arrived', l: '입고완료' },  // [트랙 C]
   ];
   tabs.forEach(function(t) {
     var isAct = _ipinv2Filter === t.k;
@@ -23283,40 +23360,78 @@ function _ipinv2DoRenderList(container) {
   });
   h += '</div>';
 
-  // 테이블
+  // [트랙 C] 테이블 — 10컬럼 (체크박스 + No + 8 데이터 → 12셀)
+  // 신규/변경: 인보이스일자(2번째) / 거래처(customer_name) / 모델명 배지 / 최종금액(원화) / 입고날짜(인라인 picker)
+  // 제거: 연결 수입건 / 작성일
   h += '<div style="overflow:auto;max-height:calc(100vh - 200px);">';
   h += '<table id="ipinv2-list-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
-  h += '<colgroup><col style="width:34px"><col style="width:40px"><col style="width:150px"><col><col style="width:110px"><col style="width:130px"><col style="width:70px"><col style="width:120px"><col style="width:100px"><col style="width:110px"></colgroup>';
+  // colgroup: 체크박스 + No + 8 데이터 = 10 col + class="resize-cg" 로 initColumnResize 재사용
+  h += '<colgroup class="resize-cg">';
+  h += '<col style="width:34px">';   // 체크박스
+  h += '<col style="width:40px">';   // No
+  h += '<col style="width:110px">';  // 인보이스일자
+  h += '<col style="width:140px">';  // 인보이스번호
+  h += '<col style="width:200px">';  // 거래처
+  h += '<col>';                       // 모델명 (가변)
+  h += '<col style="width:70px">';   // 제품수
+  h += '<col style="width:120px">';  // 최종금액($)
+  h += '<col style="width:140px">';  // 최종금액(원화)
+  h += '<col style="width:100px">';  // 상태
+  h += '<col style="width:130px">';  // 입고날짜
+  h += '</colgroup>';
   var thS = 'padding:9px 10px;font-size:12px;font-weight:600;background:#EAECF2;color:#5A6070;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 0 #DDE1EB;';
   h += '<thead><tr>';
   h += '<th style="' + thS + 'text-align:center;"><input type="checkbox" id="ipinv2-chk-all" onclick="event.stopPropagation()" onchange="_ipinv2ToggleAll(this)"></th>';
   h += '<th style="' + thS + 'text-align:center;">No.</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">인보이스 번호</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">공장</th>';
   h += '<th style="' + thS + 'text-align:center;">인보이스 일자</th>';
-  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">최종 금액 ($)</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">인보이스 번호</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">거래처</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:12px;">모델명</th>';
   h += '<th style="' + thS + 'text-align:center;">제품 수</th>';
-  h += '<th style="' + thS + 'text-align:center;">연결 수입건</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">최종 금액 ($)</th>';
+  h += '<th style="' + thS + 'text-align:right;padding-right:12px;">최종 금액 (₩)</th>';
   h += '<th style="' + thS + 'text-align:center;">상태</th>';
-  h += '<th style="' + thS + 'text-align:center;">작성일</th>';
+  h += '<th style="' + thS + 'text-align:center;">입고날짜</th>';
   h += '</tr></thead><tbody>';
 
   if (rows.length === 0) {
-    h += '<tr><td colspan="10" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 인보이스가 없습니다.</td></tr>';
+    h += '<tr><td colspan="11" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">등록된 인보이스가 없습니다.</td></tr>';
   } else {
     var tdS = 'padding:9px 10px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;';
     rows.forEach(function(inv, i) {
+      // 거래처 = customer_name (없으면 factory_name 폴백 — 구 데이터 호환)
+      var customer = inv.customer_name || inv.factory_name || '';
+      // 최종금액 원화 = final_total_usd × weighted_avg_rate (미산출 시 빈칸)
+      var usd = Number(inv.final_total_usd || inv.final_amount_usd || 0);
+      var wAvg = Number(inv.weighted_avg_rate || 0);
+      var krw = (usd > 0 && wAvg > 0) ? Math.round(usd * wAvg) : 0;
+      var krwTxt = krw > 0 ? krw.toLocaleString('en-US') + '원' : '<span style="color:#9BA3B2;">—</span>';
+      // 입고날짜 = erp_sent_at (KST YYYY-MM-DD), 없으면 —
+      var rcvDate = '';
+      if (inv.erp_sent_at) {
+        try {
+          var d = new Date(inv.erp_sent_at);
+          if (!isNaN(d.getTime())) {
+            var kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            rcvDate = kst.getUTCFullYear() + '-' + String(kst.getUTCMonth() + 1).padStart(2, '0') + '-' + String(kst.getUTCDate()).padStart(2, '0');
+          }
+        } catch (e) {}
+      }
+      var rcvCellTxt = rcvDate || '<span style="color:#9BA3B2;">—</span>';
+      var sentAtRaw = inv.erp_sent_at || '';
+
       h += '<tr data-id="' + inv.id + '" onclick="_ipinv2OpenDetail(\'' + inv.id + '\')" style="cursor:pointer;" onmouseover="this.style.background=\'#FAFAF7\'" onmouseout="this.style.background=\'\'">';
       h += '<td style="' + tdS + 'text-align:center;" onclick="event.stopPropagation()"><input type="checkbox" class="ipinv2-row-chk" data-inv-id="' + inv.id + '" onclick="event.stopPropagation()" onchange="_ipinv2UpdateDeleteBtn()"></td>';
       h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + (i + 1) + '</td>';
-      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;font-weight:500;">' + _ipinv2Esc(inv.invoice_no) + '</td>';
-      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;">' + _ipinv2Esc(inv.factory_name) + '</td>';
       h += '<td style="' + tdS + 'text-align:center;">' + _ipinv2Date(inv.invoice_date) + '</td>';
-      h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;">' + _ipinv2Money(inv.final_amount_usd) + '</td>';
+      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;font-weight:500;">' + _ipinv2Esc(inv.invoice_no) + '</td>';
+      h += '<td style="' + tdS + 'text-align:left;padding-left:12px;">' + _ipinv2Esc(customer) + '</td>';
+      h += '<td class="ipinv2-list-models" style="' + tdS + 'text-align:left;padding:6px 10px;" onclick="event.stopPropagation()">' + _ipinv2RenderModelBadges(inv.items_for_badge || []) + '</td>';
       h += '<td style="' + tdS + 'text-align:center;">' + (inv.item_count || 0) + '건</td>';
-      h += '<td style="' + tdS + 'text-align:center;color:#5A6070;">' + (inv.batch_no || '-') + '</td>';
+      h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;">' + _ipinv2Money(inv.final_total_usd || inv.final_amount_usd) + '</td>';
+      h += '<td style="' + tdS + 'text-align:right;padding-right:12px;color:#1A1D23;">' + krwTxt + '</td>';
       h += '<td style="' + tdS + 'text-align:center;">' + _ipinv2StatusBadge(inv.status) + '</td>';
-      h += '<td style="' + tdS + 'text-align:center;color:#9BA3B2;">' + _ipinv2Date(inv.created_at) + '</td>';
+      h += '<td class="ipinv2-list-received-date" data-id="' + inv.id + '" style="' + tdS + 'text-align:center;color:#5A6070;cursor:pointer;" onclick="_ipinv2OnReceivedDateClick(\'' + inv.id + '\', \'' + _ipinv2Esc(sentAtRaw) + '\', event)" title="클릭하여 입고날짜 수정">' + rcvCellTxt + '</td>';
       h += '</tr>';
     });
   }

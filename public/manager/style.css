@@ -592,6 +592,15 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 }
 #po-list-table th .col-resize:hover, #po-list-table th .col-resize.active { background: var(--tl-primary); opacity: 0.6; }
 
+/* [트랙 C] 인보이스V2 목록 테이블 리사이즈 핸들 — 제품·발주 패턴 동일 + hover 진한 파랑 */
+#ipinv2-list-table th.resizable { position: relative; border-right: 1px solid #DDE1EB; }
+#ipinv2-list-table th .col-resize {
+  position: absolute; right: -1px; top: 0; width: 7px; height: 100%;
+  cursor: col-resize; user-select: none; z-index: 11;
+}
+#ipinv2-list-table th .col-resize:hover,
+#ipinv2-list-table th .col-resize.active { background: #185FA5; opacity: 0.7; }
+
 /* 발주리스트(po-table) 리사이즈 핸들 — po-table th는 이미 position:sticky (relative 겸용) */
 .po-table th .col-resize {
   position: absolute; right: -1px; top: 0; width: 7px; height: 100%;

@@ -14,10 +14,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '500', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    // 인보이스 목록 + 제품 라인 수 (batch_no는 2nd query로 join)
+    // [트랙 C] 모델명 배지 표시를 위해 import_invoice_items의 line_no/name/qty/is_pallet_line도 가져옴
+    // count는 클라가 items 배열 길이로 산출 (별도 count() 불필요)
     let query = supabase
       .from('import_invoices')
-      .select('*, import_invoice_items(count)', { count: 'exact' })
+      .select('*, import_invoice_items(line_no, name, qty, is_pallet_line)', { count: 'exact' })
       .order('invoice_date', { ascending: false })
       .order('created_at', { ascending: false });
 
@@ -42,15 +43,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    type ItemBadge = { line_no: number | null; name: string | null; qty: number | null; is_pallet_line: boolean | null };
     const shaped = (data || []).map((row: Record<string, unknown>) => {
-      const itemsArr = row.import_invoice_items as Array<{ count: number }> | null;
-      const itemCount = itemsArr && itemsArr.length > 0 ? itemsArr[0].count : 0;
+      const itemsArr = (row.import_invoice_items as ItemBadge[] | null) || [];
+      // 팔렛 라인 제외 + line_no 정렬
+      const realItems = itemsArr
+        .filter(it => !it.is_pallet_line)
+        .sort((a, b) => (Number(a.line_no || 0) - Number(b.line_no || 0)));
       const linked = batchMap.get(row.id as string);
       return {
         ...row,
-        item_count: itemCount,
+        item_count: realItems.length,
+        // 모델명 배지용 — name(첫 토큰) + qty 페어
+        items_for_badge: realItems.map(it => ({
+          name: it.name || '',
+          qty: Number(it.qty || 0),
+        })),
         batch_no: linked?.batch_no || null,
-        // linked 우선, 없으면 legacy row.batch_id (nullable) 폴백
         batch_id: linked?.id || (row.batch_id as string | null) || null,
       };
     });

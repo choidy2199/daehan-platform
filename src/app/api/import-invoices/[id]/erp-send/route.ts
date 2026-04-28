@@ -146,9 +146,10 @@ export async function POST(
       const sentAt = new Date().toISOString();
 
       // 3-a. import_invoices UPDATE
+      // [트랙 C] status='arrived' 자동 전환 (입고완료 — 사장님 결정 ②)
       const { error: updateError } = await supabase
         .from('import_invoices')
-        .update({ erp_sent_at: sentAt, erp_order_no: erpOrderNo })
+        .update({ erp_sent_at: sentAt, erp_order_no: erpOrderNo, status: 'arrived' })
         .eq('id', invoiceId);
 
       // 3-b. erp_invoice_send_logs INSERT — UPDATE 결과와 무관하게 기록
