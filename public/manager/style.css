@@ -1156,9 +1156,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #tab-import-invoice-v2.tab-content.active { display:block !important; overflow-y:auto; }
 #tab-import-invoice-v2.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
 
-/* 수입건V2 — tab-content flex 무효화 */
-#tab-import-batch-v2.tab-content.active { display:block !important; overflow-y:auto; }
-#tab-import-batch-v2.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
+/* [트랙 C 정리] #tab-import-batch-v2 CSS 제거 — 수입건V2 메뉴 폐지 */
 
 /* 공지 NEW 깜빡임 */
 /* 공지 확인 뱃지 */

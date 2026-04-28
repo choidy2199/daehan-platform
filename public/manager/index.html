@@ -90,9 +90,8 @@ document.head.appendChild(s);
         <span class="sidebar-arrow"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
       </button>
       <div class="sidebar-sub">
-        <div class="sidebar-sub-item" data-tab="tab-import-po-v2" data-window="발주서V2" onclick="_sidebarOpenWindow('발주서V2')"><span>제품·발주</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('발주서V2')">★</button></div>
-        <div class="sidebar-sub-item" data-tab="tab-import-invoice-v2" data-window="인보이스V2" onclick="_sidebarOpenWindow('인보이스V2')"><span>인보이스V2</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('인보이스V2')">★</button></div>
-        <div class="sidebar-sub-item" data-tab="tab-import-batch-v2" data-window="수입건V2" onclick="_sidebarOpenWindow('수입건V2')"><span>수입건V2</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('수입건V2')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-import-po-v2" data-window="발주서V2" onclick="_sidebarOpenWindow('발주서V2')"><span>수입발주서</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('발주서V2')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-import-invoice-v2" data-window="인보이스V2" onclick="_sidebarOpenWindow('인보이스V2')"><span>수입 인보이스</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('인보이스V2')">★</button></div>
       </div>
     </div>
 
@@ -209,8 +208,7 @@ document.head.appendChild(s);
     <div class="tb-menu tb-dropdown" data-menu="import">
       <span class="tb-dot" style="color:#AFA9EC">●</span> 수입
       <div class="tb-dropdown-panel">
-        <div class="tb-dd-item" onclick="openWindow('인보이스V2')">인보이스V2</div>
-        <div class="tb-dd-item" onclick="openWindow('수입건V2')">수입건V2</div>
+        <div class="tb-dd-item" onclick="openWindow('인보이스V2')">수입 인보이스</div>
       </div>
     </div>
     <div class="tb-sep"></div>
@@ -1080,7 +1078,6 @@ document.head.appendChild(s);
 </div>
 <div id="tab-import-po-v2" class="tab-content"></div>
 <div id="tab-import-invoice-v2" class="tab-content"></div>
-<div id="tab-import-batch-v2" class="tab-content"></div>
 <div id="tab-notice" class="tab-content"></div>
 <div id="tab-backorder" class="tab-content"></div>
 <div id="tab-delivery" class="tab-content">
