@@ -27429,15 +27429,6 @@ const _tx = {
     const dateEl = document.querySelector('#tab-transactions .tx-input[type="date"]');
     if (dateEl) dateEl.value = this.state.transactionDate;
 
-    const mgrInputs = document.querySelectorAll('#tab-transactions .tx-input-field');
-    mgrInputs.forEach(function(field) {
-      const lbl = field.querySelector('.tx-label');
-      if (lbl && lbl.textContent.trim() === '담당자') {
-        const input = field.querySelector('.tx-input');
-        if (input) input.value = _tx.state.manager;
-      }
-    });
-
     // 거래처 입력 초기값 비움
     const custInput = document.getElementById('tx-customer-input');
     if (custInput) custInput.value = '';

@@ -3179,3 +3179,189 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   font-weight: 800;
   font-size: 13px;
 }
+
+/* =================================================================
+   거래명세서 v3 레이아웃 (TX Layout)
+   - Phase 1/2 (2026-04-28): 좌70/우30 그리드 + 통합 다크 네비바
+   - 기존 룰 수정 0건 — override 전용
+   ================================================================= */
+
+/* [충돌 대응] 1572 룰 (`#tab-transactions ... > div:not(...)`)이
+   `.tx-grid`에도 display:block !important를 강제하므로 해제. */
+#tab-transactions.tab-content.active > .tx-grid {
+  display: grid !important;
+  flex: none !important;
+  overflow: visible !important;
+}
+
+/* 좌70/우30 그리드 — 두 카드 높이 동일 stretch */
+.tx-grid {
+  display: grid;
+  grid-template-columns: 70fr 30fr;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+/* 매출작성 카드 컨테이너 */
+.tx-doc-card {
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 0.5px solid #DDE1EB;
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 다크 네비게이션 바 */
+.tx-darkbar {
+  background: #1A1D23;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.tx-dk-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.tx-dk-spacer { flex: 1; }
+
+/* 탭 (다크바 컨텍스트) */
+.tx-darkbar .tx-tab {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.tx-darkbar .tx-tab:hover { color: rgba(255, 255, 255, 0.85); }
+.tx-darkbar .tx-tab.active {
+  background: #FFFFFF;
+  color: #1A1D23;
+  font-weight: 600;
+}
+
+/* 거래처 콤보 (다크 스타일) */
+.tx-darkbar .tx-input-combo,
+.tx-darkbar .tx-dk-combo {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.tx-darkbar #tx-customer-input {
+  background: #2A2D33;
+  color: #FFFFFF;
+  border: none;
+  font-size: 12px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 4px 0 0 4px;
+  width: 180px;
+  font-family: 'Pretendard', sans-serif;
+}
+.tx-darkbar #tx-customer-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+.tx-darkbar #tx-customer-input:focus {
+  outline: 1px solid rgba(255, 255, 255, 0.3);
+  outline-offset: -1px;
+}
+
+.tx-darkbar #tx-customer-select-btn {
+  background: #2A2D33;
+  color: #FFFFFF;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+}
+.tx-darkbar #tx-customer-select-btn:hover { background: #353941; }
+
+/* 거래일자 (다크바 위 화이트 input) */
+.tx-darkbar .tx-dk-date {
+  background: #FFFFFF;
+  color: #1A1D23;
+  border: none;
+  font-size: 12px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-family: 'Pretendard', sans-serif;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tx-darkbar .tx-dk-date::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: opacity(0.6);
+}
+
+/* 액션 버튼 (다크바 우측) */
+.tx-dk-action {
+  background: rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  font-family: 'Pretendard', sans-serif;
+}
+.tx-dk-action:hover { background: rgba(255, 255, 255, 0.18); }
+.tx-dk-action-red { background: #E24B4A; }
+.tx-dk-action-red:hover { background: #C93A39; }
+
+/* 본문 영역 */
+.tx-doc-body {
+  padding: 14px 16px 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 상품라인 — 10행까지 자연 확장 */
+.tx-doc-body .tx-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  flex-shrink: 0;
+}
+
+/* 과거거래 패널 — stretch + 리스트 스크롤 */
+.tx-grid .tx-history-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tx-grid .tx-history-panel .tx-history-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* 반응형 — 1280px 이하 세로 스택 */
+@media (max-width: 1280px) {
+  .tx-grid { grid-template-columns: 1fr; }
+  .tx-darkbar { flex-wrap: wrap; }
+}
