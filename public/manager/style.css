@@ -3186,9 +3186,9 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
    - 기존 룰 수정 0건 — override 전용
    ================================================================= */
 
-/* [충돌 대응] 1572 룰 (`#tab-transactions ... > div:not(...)`)이
-   `.tx-grid`에도 display:block !important를 강제하므로 해제. */
-#tab-transactions.tab-content.active > .tx-grid {
+/* [충돌 대응 v2] 1572 룰의 specificity (1,4,1)을 이기기 위해 (1,5,1)로 강화.
+   `:not()` 안 selector도 specificity에 합산됨 — Phase 6에서 정정. */
+#tab-transactions.tab-content.active > div.tx-grid:not(.tx-toolbar):not(.tx-save-popup-backdrop) {
   display: grid !important;
   flex: none !important;
   overflow: visible !important;
@@ -3234,6 +3234,9 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 
 .tx-dk-spacer { flex: 1; }
 
+/* 다크바 안 .tx-tab-group은 외부 정의에 flex-shrink 없음 → 명시 보강 */
+.tx-darkbar .tx-tab-group { flex-shrink: 0; }
+
 /* 탭 (다크바 컨텍스트) */
 .tx-darkbar .tx-tab {
   background: transparent;
@@ -3275,7 +3278,7 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   font-family: 'Pretendard', sans-serif;
 }
 .tx-darkbar #tx-customer-input::placeholder {
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.6);
 }
 .tx-darkbar #tx-customer-input:focus {
   outline: 1px solid rgba(255, 255, 255, 0.3);
@@ -3306,7 +3309,8 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   border-radius: 4px;
   font-family: 'Pretendard', sans-serif;
   cursor: pointer;
-  flex-shrink: 0;
+  width: 140px;
+  flex: 0 0 140px;
 }
 .tx-darkbar .tx-dk-date::-webkit-calendar-picker-indicator {
   cursor: pointer;

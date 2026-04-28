@@ -28428,7 +28428,7 @@ const _tx = {
       const rect = anchor.getBoundingClientRect();
       dd.style.left = rect.left + 'px';
       dd.style.top = (rect.bottom + 4) + 'px';
-      dd.style.width = Math.max(320, rect.width) + 'px';
+      dd.style.width = Math.max(240, rect.width) + 'px';
       dd.style.display = 'flex';
       this.onSearch('');
       const si = dd.querySelector('.tx-customer-search-input');
