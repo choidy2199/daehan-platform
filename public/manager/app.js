@@ -27629,6 +27629,434 @@ const _tx = {
     return updated;
   },
 
+  // === Phase 9 — 품명 셀 인라인 검색 (사이드이펙트 0) ===
+  // _tx.search._run은 검색 패널 컨테이너까지 렌더하므로 사용 X
+  // _buildIndex + _score 직접 호출 (캐시는 _buildIndex 내부에서 자동 관리)
+  _runInlineNameSearch(query, max) {
+    if (max == null) max = 5;
+    const q = String(query || '').trim();
+    if (!q) return [];
+
+    if (typeof this.search === 'undefined' || typeof this.search._buildIndex !== 'function') {
+      return [];
+    }
+
+    // _buildIndex가 this._cache 자동 관리 (Phase 8 _updateProductCode가 무효화)
+    const idx = this.search._buildIndex();
+    if (!idx || idx.length === 0) return [];
+
+    const scored = [];
+    for (let i = 0; i < idx.length; i++) {
+      const entry = idx[i];
+      // 정정 (그룹 ① 진단): _score(query, entry) 시그니처
+      const score = this.search._score(q, entry);
+      // 정정 (그룹 ① 진단): score < 999 매칭 (낮을수록 좋음)
+      if (score < 999) {
+        scored.push({ entry: entry, score: score });
+      }
+    }
+
+    // 정정 (그룹 ① 진단): 오름차순 (낮을수록 좋음)
+    scored.sort(function(a, b) { return a.score - b.score; });
+
+    // 상위 max개 (entry = {source, data} 그대로 반환)
+    const top = scored.slice(0, max);
+    return top.map(function(s) { return s.entry; });
+  },
+
+  _renderItemsNameDropdown(rowIdx, query, results) {
+    // 지역 헬퍼 (의존성 0)
+    const escHtml = function(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    };
+    const formatNum = function(n) {
+      if (typeof n !== 'number') n = parseFloat(n) || 0;
+      return n.toLocaleString('ko-KR');
+    };
+
+    // 해당 행의 빈 라인 품명 셀 찾기
+    const tr = document.querySelector('#tx-items-body tr[data-idx="' + rowIdx + '"]');
+    if (!tr) return null;
+    const cell = tr.querySelector('td.tx-cell-name-empty');
+    if (!cell) return null;
+
+    // 기존 드롭다운 제거 (재호출 안전)
+    let dd = cell.querySelector('.tx-name-inline-dd');
+    if (dd) dd.remove();
+
+    // 빈 결과
+    if (!results || results.length === 0) {
+      if (!query) return null;  // 빈 쿼리는 드롭다운 안 그림
+      dd = document.createElement('div');
+      dd.className = 'tx-name-inline-dd';
+      dd.innerHTML = '<div class="tx-name-inline-dd-empty">검색 결과 없음</div>';
+      cell.appendChild(dd);
+      return dd;
+    }
+
+    // 결과 렌더 (entry = {source, data})
+    let html =
+      '<div class="tx-name-inline-dd-header">' +
+        '<span>🔍 검색 결과 — 밀워키 + 일반 통합</span>' +
+        '<span>↑↓ 이동, Enter 선택, Esc 닫기</span>' +
+      '</div>';
+
+    for (let i = 0; i < results.length; i++) {
+      const entry = results[i];
+      // 정정 (그룹 ② 진단): entry.source 직접 사용
+      const isMw = (entry.source === 'milwaukee');
+      const srcLabel = isMw ? '밀워키' : '일반';
+      const srcClass = isMw ? 'tx-mw' : 'tx-gen';
+      const p = entry.data;
+
+      const code = p.code || p.manageCode || '-';
+      const name = p.model || p.name || '-';
+      const price = formatNum(p.priceRetail || p.priceA || 0);
+
+      html +=
+        '<div class="tx-name-inline-dd-row" data-idx="' + i + '">' +
+          '<span class="tx-src-badge ' + srcClass + '">' + srcLabel + '</span>' +
+          '<span class="tx-name">' + escHtml(name) + '</span>' +
+          '<span class="tx-code">' + escHtml(code) + '</span>' +
+          '<span class="tx-price">' + price + '</span>' +
+        '</div>';
+    }
+
+    dd = document.createElement('div');
+    dd.className = 'tx-name-inline-dd';
+    dd.innerHTML = html;
+    cell.appendChild(dd);
+    return dd;
+  },
+
+  // === 품명 input 이벤트 바인딩 (autocomplete 150ms + IME + 키보드/마우스) ===
+  _bindItemsNameSearch() {
+    const inputs = document.querySelectorAll('#tx-items-body input.tx-name-input');
+    const self = this;
+
+    inputs.forEach(function(input) {
+      if (input._txNameBound) return;
+      input._txNameBound = true;
+
+      const cell = input.closest('td.tx-cell-name-empty');
+      const tr = input.closest('tr');
+      if (!cell || !tr) return;
+      const rowIdx = parseInt(tr.getAttribute('data-idx'), 10);
+      if (isNaN(rowIdx)) return;
+
+      // 행별 closure state
+      let activeIdx = -1;
+      let lastResults = [];
+      let timer = null;
+
+      // 입력 — bindSearchInput 헬퍼 (autocomplete 150ms + IME)
+      if (typeof bindSearchInput === 'function') {
+        bindSearchInput(input, function() {
+          const q = input.value;
+          clearTimeout(timer);
+          timer = setTimeout(function() {
+            activeIdx = -1;
+            lastResults = self._runInlineNameSearch(q, 5);
+            self._renderItemsNameDropdown(rowIdx, q, lastResults);
+          }, 150);
+        }, { mode: 'autocomplete' });
+      } else {
+        input.addEventListener('input', function() {
+          const q = input.value;
+          clearTimeout(timer);
+          timer = setTimeout(function() {
+            activeIdx = -1;
+            lastResults = self._runInlineNameSearch(q, 5);
+            self._renderItemsNameDropdown(rowIdx, q, lastResults);
+          }, 150);
+        });
+      }
+
+      // focus → 노란 outline + 결과 그리기
+      input.addEventListener('focus', function() {
+        cell.classList.add('tx-focused');
+        const q = input.value;
+        lastResults = self._runInlineNameSearch(q, 5);
+        self._renderItemsNameDropdown(rowIdx, q, lastResults);
+      });
+
+      // 키보드 — body 위임 핸들러 차단 위해 stopPropagation (그룹 ② 진단)
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Escape') {
+          e.stopPropagation();  // _bindItemsTable의 27662 핸들러 차단
+        }
+
+        const dd = cell.querySelector('.tx-name-inline-dd');
+        const rows = dd ? dd.querySelectorAll('.tx-name-inline-dd-row') : [];
+
+        if (e.key === 'ArrowDown') {
+          if (rows.length === 0) return;
+          e.preventDefault();
+          activeIdx = Math.min(rows.length - 1, activeIdx + 1);
+          self._highlightDropdownRow(dd, activeIdx);
+        } else if (e.key === 'ArrowUp') {
+          if (rows.length === 0) return;
+          e.preventDefault();
+          activeIdx = Math.max(0, activeIdx - 1);
+          self._highlightDropdownRow(dd, activeIdx);
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (activeIdx >= 0 && lastResults[activeIdx]) {
+            self._selectItemFromInline(rowIdx, lastResults[activeIdx]);
+          } else if (lastResults.length > 0) {
+            self._selectItemFromInline(rowIdx, lastResults[0]);
+          }
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          const ddEl = cell.querySelector('.tx-name-inline-dd');
+          if (ddEl) ddEl.remove();
+          cell.classList.remove('tx-focused');
+          input.blur();
+        }
+      });
+
+      // 드롭다운 mousedown — blur 방지 + 선택 (cell 단위 위임)
+      cell.addEventListener('mousedown', function(e) {
+        const row = e.target.closest('.tx-name-inline-dd-row');
+        if (!row) return;
+        e.preventDefault();  // input blur 방지
+        const idx = parseInt(row.getAttribute('data-idx'), 10);
+        if (lastResults[idx]) {
+          self._selectItemFromInline(rowIdx, lastResults[idx]);
+        }
+      });
+
+      // blur — 200ms 지연 후 닫기 (mousedown 처리 시간 확보)
+      input.addEventListener('blur', function() {
+        setTimeout(function() {
+          const ae = document.activeElement;
+          if (cell.contains(ae)) return;  // dd 내부 활성이면 닫지 않음
+          const ddEl = cell.querySelector('.tx-name-inline-dd');
+          if (ddEl) ddEl.remove();
+          cell.classList.remove('tx-focused');
+        }, 200);
+      });
+    });
+  },
+
+  _highlightDropdownRow(dd, idx) {
+    if (!dd) return;
+    const rows = dd.querySelectorAll('.tx-name-inline-dd-row');
+    rows.forEach(function(r, i) {
+      r.classList.toggle('tx-active', i === idx);
+    });
+    const active = rows[idx];
+    if (active && typeof active.scrollIntoView === 'function') {
+      active.scrollIntoView({ block: 'nearest' });
+    }
+  },
+
+  // === 인라인 검색 결과 선택 (단계 8 본격 — in-place 채움) ===
+  _selectItemFromInline(rowIdx, entry) {
+    if (!entry || !entry.data) {
+      console.warn('[TX] _selectItemFromInline: invalid entry', entry);
+      return;
+    }
+    const p = entry.data;
+    const code = p.code || p.manageCode;
+    const self = this;
+
+    // 코드 없으면 _promptForMissingCode (Phase 8 자산) → 입력 받으면 재귀
+    if (!code) {
+      this._promptForMissingCode(p.model || p.name, function(newCode) {
+        self._updateProductCode(p.model || p.name, newCode);
+        // entry.data에 code 채우고 재귀 (in-place 채움 흐름 유지)
+        entry.data.code = newCode;
+        self._selectItemFromInline(rowIdx, entry);
+      });
+      return;
+    }
+
+    // 빈 라인 in-place 채움 (state.items.push X)
+    const item = this.state.items[rowIdx];
+    if (!item) {
+      // 라인이 없으면 폴백 — addItem (예외 케이스)
+      if (typeof this.addItem === 'function') {
+        this.addItem(code, {
+          fallbackName: p.model || p.name,
+          fallbackRetail: p.priceRetail || p.priceA || 0,
+        });
+      }
+      return;
+    }
+
+    // addItem 패턴과 동일하게 item 갱신 (그룹 ② 진단 — productRef = entry 전체)
+    item.code = code;
+    item.manageCode = p.manageCode || '';
+    item.name = p.model || p.name || '';
+    item.spec = (p.detail || p.spec) ? String(p.detail || p.spec) : null;
+    if (!item.qty || Number(item.qty) <= 0) item.qty = 1;
+    item.productRef = entry;            // {source, data} 그대로 (그룹 ② Q2)
+    item.source = entry.source;
+    item.priceTiers = (typeof this._extractPriceTiers === 'function')
+      ? this._extractPriceTiers(entry)
+      : null;
+    item.isAuto = true;
+
+    // 단가 결정 4단계 (Phase 8 자산)
+    const defaultPrice = (typeof this._defaultUnitPrice === 'function')
+      ? this._defaultUnitPrice(entry, this.state.docType, { fallbackRetail: p.priceRetail || p.priceA || 0 })
+      : (p.priceRetail || p.priceA || 0);
+    item.unitPrice = Number(defaultPrice) || 0;
+
+    // 거래처 등급 + 수량 구간 우선순위 (addItem 28092~28096 패턴)
+    if (typeof this._determineUnitPrice === 'function') {
+      const resolved = this._determineUnitPrice(item);
+      if (resolved !== null && resolved !== undefined && Number(resolved) > 0) {
+        item.unitPrice = Number(resolved);
+      }
+    }
+
+    // 합계 재계산
+    if (typeof this.recalcItem === 'function') this.recalcItem(rowIdx);
+
+    // 마지막 빈 라인 보장
+    this._ensureEmptyTrailingRow();
+
+    // 재렌더 (in-place 채움 → 텍스트 표시 전환 + 다음 빈 라인 표시)
+    this.renderItemsTable();
+    this.renderSummary();
+
+    // 거래처 선택 시 last-price 비동기 덮어쓰기 (Phase 8 자산)
+    if (this.state.customerCode && typeof this._fetchLastPriceForItem === 'function') {
+      this._fetchLastPriceForItem(rowIdx);
+    }
+
+    // 다음 셀(수량) 자동 포커스 + 값 전체 선택
+    setTimeout(function() {
+      const qtyInput = document.querySelector(
+        '#tx-items-body tr[data-idx="' + rowIdx + '"] input[data-field="qty"]'
+      );
+      if (qtyInput) {
+        qtyInput.focus();
+        if (typeof qtyInput.select === 'function') qtyInput.select();
+      }
+    }, 50);
+  },
+
+  // === 마지막 빈 라인 보장 (in-place 채움 후 새 빈 라인 자동 추가) ===
+  _ensureEmptyTrailingRow() {
+    const items = this.state.items;
+    const last = items[items.length - 1];
+    if (!last || last.code || last.name) {
+      items.push(this._createEmptyItem());
+    }
+  },
+
+  _createEmptyItem() {
+    return {
+      code: '',
+      manageCode: '',
+      name: '',
+      spec: '',
+      qty: 1,
+      unitPrice: 0,
+      supplyAmount: 0,
+      vatAmount: 0,
+      memo: '',
+      isAuto: true,
+      source: '',
+      productRef: null,
+      priceTiers: null,
+    };
+  },
+
+  // === 셀 네비 (수량/단가/적요 — Tab/Enter 다음 셀 + memo blur 저장) ===
+  _bindItemsCellNav() {
+    const body = document.getElementById('tx-items-body');
+    if (!body) return;
+    if (body._txCellNavBound) return;
+    body._txCellNavBound = true;
+    const self = this;
+
+    // bubble keydown — _bindItemsTable의 27662 (Enter→blur)와 분리됨
+    // 단, _bindItemsTable의 keydown은 bubble이고 e.preventDefault 호출하므로
+    // 여기서 먼저 잡혀야 함. body 위임 → input bubble 순서.
+    // body는 같은 요소라 등록 순서에 따라 호출 — 여기는 _bindItemsTable 후 등록
+    // 따라서 _bindItemsTable이 먼저 실행 (Enter → blur). 차단을 위해 capture 사용.
+    body.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter' && e.key !== 'Tab') return;
+      const target = e.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      const field = target.getAttribute('data-field');
+      if (!field) return;
+      const tr = target.closest('tr');
+      if (!tr) return;
+      const rowIdx = parseInt(tr.getAttribute('data-idx'), 10);
+      if (isNaN(rowIdx)) return;
+
+      // 수량 → 단가
+      if (field === 'qty') {
+        e.preventDefault();
+        e.stopPropagation();
+        const priceInput = tr.querySelector('input[data-field="price"]');
+        if (priceInput) {
+          priceInput.focus();
+          if (typeof priceInput.select === 'function') priceInput.select();
+        }
+        return;
+      }
+
+      // 단가 → 다음 라인 품명
+      if (field === 'price') {
+        e.preventDefault();
+        e.stopPropagation();
+        target.blur();   // capture blur 트리거 → 가격 commit
+        self._ensureEmptyTrailingRow();
+        self.renderItemsTable();
+        setTimeout(function() {
+          const nextRow = document.querySelector(
+            '#tx-items-body tr[data-idx="' + (rowIdx + 1) + '"]'
+          );
+          if (nextRow) {
+            const nameInput = nextRow.querySelector('input.tx-name-input');
+            if (nameInput) nameInput.focus();
+          }
+        }, 50);
+        return;
+      }
+
+      // 적요 Enter → 다음 라인 품명 (Tab은 브라우저 기본 동작)
+      if (field === 'memo' && e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        const item = self.state.items[rowIdx];
+        if (item) item.memo = target.value || '';
+        self._ensureEmptyTrailingRow();
+        const nextRow = document.querySelector(
+          '#tx-items-body tr[data-idx="' + (rowIdx + 1) + '"]'
+        );
+        if (nextRow) {
+          const nameInput = nextRow.querySelector('input.tx-name-input');
+          if (nameInput) nameInput.focus();
+        }
+        return;
+      }
+    }, true);  // capture: true — _bindItemsTable의 27662 (bubble) 보다 먼저 실행
+
+    // memo blur — state.items[rowIdx].memo 저장 (capture: true, _bindItemsTable과 동일 레벨)
+    body.addEventListener('blur', function(e) {
+      const target = e.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      const field = target.getAttribute('data-field');
+      if (field !== 'memo') return;
+      const tr = target.closest('tr');
+      if (!tr) return;
+      const rowIdx = parseInt(tr.getAttribute('data-idx'), 10);
+      if (isNaN(rowIdx)) return;
+      const item = self.state.items[rowIdx];
+      if (item) item.memo = target.value || '';
+    }, true);
+  },
+
   _bindItemsTable() {
     const body = document.getElementById('tx-items-body');
     if (!body) return;
@@ -27975,6 +28403,15 @@ const _tx = {
       html += '</tr>';
     }
     body.innerHTML = html;
+
+    // [Phase 9] 동적 렌더 후 인라인 품명 검색 이벤트 바인딩 (input._txNameBound 가드로 중복 방지)
+    if (typeof this._bindItemsNameSearch === 'function') {
+      this._bindItemsNameSearch();
+    }
+    // [Phase 9 단계 8] 셀 네비 (body._txCellNavBound 가드로 1회 바인딩)
+    if (typeof this._bindItemsCellNav === 'function') {
+      this._bindItemsCellNav();
+    }
   },
 
   // [Phase 9] 컬럼별 td 렌더 헬퍼 (data-col-id + data-row-idx + 기존 인라인 편집 패턴 보존)
