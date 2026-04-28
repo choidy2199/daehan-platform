@@ -20493,6 +20493,17 @@ function _poInit() {
   var container = document.getElementById('tab-import-po-v2');
   if (!container) return;
 
+  // [마이그레이션 v1] po-product-table colwidth 캐시 1회 정리 (2026-04-28)
+  // 흔들림 원인이었던 stale measure-based 캐시를 비워주고 인라인 colgroup만 사용
+  (function migrateClearPoProductTableColwidths() {
+    try {
+      if (localStorage.getItem('_migration_clear_po_product_colwidths_v1')) return;
+      localStorage.removeItem('mw_colwidths_po-product-table');
+      localStorage.setItem('_migration_clear_po_product_colwidths_v1', String(Date.now()));
+      console.log('[마이그레이션] po-product-table colwidth 캐시 정리 완료');
+    } catch (e) { /* localStorage quota/blocked 무시 */ }
+  })();
+
   // 탭 컨테이너 스크롤 설정 (P3-B2-A 유지)
   container.style.overflowY = 'auto';
   container.style.height = '100%';
@@ -21026,8 +21037,8 @@ function _poRenderProductList() {
   h += '<col style="width:62px">';
   h += '<col style="width:44px">';
   h += '<col style="width:54px">';
-  h += '<col style="width:44px">';
-  h += '<col style="width:44px">';
+  h += '<col style="width:80px">';
+  h += '<col style="width:80px">';
   h += '<col style="width:36px">';
   h += '</colgroup>';
   h += '<thead><tr>';
@@ -21103,7 +21114,10 @@ function _poRenderProductList() {
 
   h += '</tbody></table>';
   body.innerHTML = h;
-  if (typeof initColumnResize === 'function') initColumnResize('po-product-table');
+  // initColumnResize('po-product-table') 호출 제거 (2026-04-28):
+  // 비동기 measure-기반 colgroup override + localStorage 캐시 우선 적용으로
+  // 인라인 colgroup width가 무력화되어 새로고침/입력 시 컬럼 흔들림 발생.
+  // 인라인 colgroup width(라인 21017~21032)만 사용하도록 호출 차단.
 }
 
 // 컬럼 너비 초기화 — 저장된 값 제거 후 재렌더
