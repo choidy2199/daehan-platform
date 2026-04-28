@@ -27441,6 +27441,10 @@ const _tx = {
     this._bindSearchInput();
     this._bindCustomerSelect();
     if (this.customer && typeof this.customer.init === 'function') this.customer.init();
+    if (this.lineColumns && typeof this.lineColumns.loadConfig === 'function') {
+      this.lineColumns.loadConfig();
+      this.lineColumns._renderThead();
+    }
     this._bindItemsResizeHandles();
     this._loadItemsColWidths();
 
@@ -27914,9 +27918,15 @@ const _tx = {
     const body = document.getElementById('tx-items-body');
     if (!body) return;
 
+    // [Phase 9] 동적 컬럼 — lineColumns.getVisibleColumns 기반
+    const cols = (this.lineColumns && typeof this.lineColumns.getVisibleColumns === 'function')
+      ? this.lineColumns.getVisibleColumns()
+      : null;
+    const colspanTotal = cols ? cols.length + 1 : 8;  // ⚙ 컬럼 포함
+
     const items = this.state.items;
     if (items.length === 0) {
-      body.innerHTML = '<tr class="tx-empty-row"><td colspan="8" style="text-align:center;padding:28px 8px;color:#9BA3B2;font-size:12px">상품을 검색하여 추가해주세요</td></tr>';
+      body.innerHTML = '<tr class="tx-empty-row"><td colspan="' + colspanTotal + '" style="text-align:center;padding:28px 8px;color:#9BA3B2;font-size:12px">상품을 검색하여 추가해주세요</td></tr>';
       return;
     }
 
@@ -27927,25 +27937,121 @@ const _tx = {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     };
 
+    // lineColumns 없으면 폴백 — 옛 정적 8컬럼 (회귀 안전망)
+    if (!cols) {
+      let html = '';
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const priceClass = (Number(it.unitPrice) || 0) <= 0 ? 'tx-input-warn' : (it.isAuto ? 'tx-input-auto' : '');
+        html +=
+          '<tr data-idx="' + i + '">' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td>' + escape(it.code) + '</td>' +
+            '<td style="text-align:left">' + escape(it.name) + '</td>' +
+            '<td><input class="tx-cell-input" data-field="qty" type="text" inputmode="numeric" value="' + fmt(it.qty) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;font-family:inherit;text-align:center;outline:none"></td>' +
+            '<td class="' + priceClass + '" style="padding:2px 6px"><input class="tx-cell-input" data-field="price" type="text" inputmode="numeric" value="' + fmt(it.unitPrice) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid transparent;background:transparent;border-radius:4px;font-size:13px;font-family:inherit;font-weight:inherit;color:inherit;text-align:right;outline:none"></td>' +
+            '<td style="text-align:right">' + fmt(it.supplyAmount) + '</td>' +
+            '<td style="text-align:right">' + fmt(it.vatAmount) + '</td>' +
+            '<td><button type="button" class="tx-row-del">✕</button></td>' +
+          '</tr>';
+      }
+      body.innerHTML = html;
+      return;
+    }
+
+    // [Phase 9] 동적 컬럼 렌더 + ⚙ 자리에 삭제 × 버튼
     let html = '';
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
-      const priceClass = (Number(it.unitPrice) || 0) <= 0
-        ? 'tx-input-warn'
-        : (it.isAuto ? 'tx-input-auto' : '');
-      html +=
-        '<tr data-idx="' + i + '">' +
-          '<td>' + (i + 1) + '</td>' +
-          '<td>' + escape(it.code) + '</td>' +
-          '<td style="text-align:left">' + escape(it.name) + '</td>' +
-          '<td><input class="tx-cell-input" data-field="qty" type="text" inputmode="numeric" value="' + fmt(it.qty) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;font-family:inherit;text-align:center;outline:none"></td>' +
-          '<td class="' + priceClass + '" style="padding:2px 6px"><input class="tx-cell-input" data-field="price" type="text" inputmode="numeric" value="' + fmt(it.unitPrice) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid transparent;background:transparent;border-radius:4px;font-size:13px;font-family:inherit;font-weight:inherit;color:inherit;text-align:right;outline:none"></td>' +
-          '<td style="text-align:right">' + fmt(it.supplyAmount) + '</td>' +
-          '<td style="text-align:right">' + fmt(it.vatAmount) + '</td>' +
-          '<td><button type="button" class="tx-row-del">✕</button></td>' +
-        '</tr>';
+      html += '<tr data-idx="' + i + '">';
+      for (let ci = 0; ci < cols.length; ci++) {
+        html += this._renderItemCell(it, i, cols[ci], escape, fmt);
+      }
+      // ⚙ 자리는 삭제 × 버튼 (값 있는 라인만)
+      const hasContent = it.code || it.name;
+      html += '<td class="tx-cell-action" data-col-id="__settings">' +
+              (hasContent ? '<button type="button" class="tx-row-del">✕</button>' : '') +
+              '</td>';
+      html += '</tr>';
     }
     body.innerHTML = html;
+  },
+
+  // [Phase 9] 컬럼별 td 렌더 헬퍼 (data-col-id + data-row-idx + 기존 인라인 편집 패턴 보존)
+  _renderItemCell(item, rowIdx, col, escape, fmt) {
+    const id = col.id;
+    const align = col.align || 'left';
+    const dataAttr = ' data-col-id="' + id + '" data-row-idx="' + rowIdx + '"';
+    const styleAttr = ' style="text-align:' + align + '"';
+
+    switch (id) {
+      case 'no':
+        return '<td' + dataAttr + styleAttr + '>' + (rowIdx + 1) + '</td>';
+
+      case 'manageCode':
+        return '<td' + dataAttr + styleAttr + '>' + escape(item.manageCode || '-') + '</td>';
+
+      case 'name': {
+        const isEmpty = !item.code && !item.name;
+        if (isEmpty) {
+          return '<td class="tx-cell-name-empty"' + dataAttr + styleAttr + '>' +
+                 '<input type="text" class="tx-name-input" placeholder="클릭하여 검색..." autocomplete="off" data-row-idx="' + rowIdx + '" />' +
+                 '</td>';
+        }
+        return '<td' + dataAttr + styleAttr + '>' + escape(item.name || '-') + '</td>';
+      }
+
+      case 'qty':
+        return '<td' + dataAttr + styleAttr + '>' +
+               '<input class="tx-cell-input" data-field="qty" type="text" inputmode="numeric" value="' + fmt(item.qty) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;font-family:inherit;text-align:center;outline:none">' +
+               '</td>';
+
+      case 'unitPrice': {
+        const priceClass = (Number(item.unitPrice) || 0) <= 0 ? 'tx-input-warn' : (item.isAuto ? 'tx-input-auto' : '');
+        return '<td class="' + priceClass + '"' + dataAttr + ' style="padding:2px 6px;text-align:' + align + '">' +
+               '<input class="tx-cell-input" data-field="price" type="text" inputmode="numeric" value="' + fmt(item.unitPrice) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid transparent;background:transparent;border-radius:4px;font-size:13px;font-family:inherit;font-weight:inherit;color:inherit;text-align:right;outline:none">' +
+               '</td>';
+      }
+
+      case 'supplyAmount':
+        return '<td' + dataAttr + styleAttr + '>' + fmt(item.supplyAmount) + '</td>';
+
+      case 'vatAmount':
+        return '<td' + dataAttr + styleAttr + '>' + fmt(item.vatAmount) + '</td>';
+
+      case 'memo':
+        return '<td class="tx-cell-memo"' + dataAttr + styleAttr + '>' +
+               '<input type="text" class="tx-memo-input" data-field="memo" placeholder="적요 입력..." autocomplete="off" value="' + escape(item.memo || '').replace(/"/g, '&quot;') + '" data-row-idx="' + rowIdx + '" />' +
+               '</td>';
+
+      // === 선택 컬럼 ===
+      case 'spec':
+        return '<td' + dataAttr + styleAttr + '>' + escape((item.productRef && item.productRef.data && item.productRef.data.detail) || item.spec || '-') + '</td>';
+
+      case 'remark':
+        return '<td' + dataAttr + styleAttr + '>' + escape((item.productRef && item.productRef.data && item.productRef.data.bigo) || '-') + '</td>';
+
+      case 'stock':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.stock) || 0) + '</td>';
+
+      case 'unit':
+        return '<td' + dataAttr + styleAttr + '>' + escape((item.productRef && item.productRef.data && item.productRef.data.unit) || '-') + '</td>';
+
+      case 'cost':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.cost) || 0) + '</td>';
+
+      case 'priceA':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.priceA) || 0) + '</td>';
+
+      case 'naver':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.priceNaver) || 0) + '</td>';
+
+      case 'open':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.priceOpen) || 0) + '</td>';
+
+      default:
+        return '<td' + dataAttr + styleAttr + '>-</td>';
+    }
   },
 
   renderSummary() {
@@ -28562,6 +28668,372 @@ const _tx = {
     if (!input) return;
     // [Phase B-2 C] bindSearchInput 헬퍼로 통일 (search=300ms + IME 처리)
     bindSearchInput(input, function() { _tx.search.onInput(input.value); }, { mode: 'search' });
+  },
+
+  // ================================================================
+  // Phase 9 — 매출 라인 컬럼 시스템 (8 필수 + 8 선택)
+  // ================================================================
+  lineColumns: {
+    // 필수 컬럼 (8개, 사용자가 숨김 불가)
+    COLUMNS_REQUIRED: [
+      { id: 'no',           label: 'No',      width: 32,    align: 'center', resizable: false },
+      { id: 'manageCode',   label: '관리코드', width: 100,   align: 'center', resizable: true },
+      { id: 'name',         label: '품명',     width: 'flex', align: 'left',  resizable: true, flex: 2 },
+      { id: 'qty',          label: '수량',     width: 56,    align: 'center', resizable: true },
+      { id: 'unitPrice',    label: '단가',     width: 80,    align: 'right',  resizable: true },
+      { id: 'supplyAmount', label: '공급가액', width: 90,    align: 'right',  resizable: true },
+      { id: 'vatAmount',    label: 'VAT',      width: 60,    align: 'right',  resizable: true },
+      { id: 'memo',         label: '적요',     width: 'flex', align: 'left',  resizable: true, flex: 1 }
+    ],
+
+    // 선택 컬럼 (8개, ⚙ 모달에서 추가/숨김)
+    COLUMNS_OPTIONAL: [
+      { id: 'spec',     label: '규격',     width: 100, align: 'left',   resizable: true },
+      { id: 'remark',   label: '비고',     width: 100, align: 'left',   resizable: true },
+      { id: 'stock',    label: '재고',     width: 50,  align: 'center', resizable: true },
+      { id: 'unit',     label: '단위',     width: 50,  align: 'center', resizable: true },
+      { id: 'cost',     label: '원가',     width: 80,  align: 'right',  resizable: true },
+      { id: 'priceA',   label: '도매A',    width: 80,  align: 'right',  resizable: true },
+      { id: 'naver',    label: '스토어팜', width: 80,  align: 'right',  resizable: true },
+      { id: 'open',     label: '오픈마켓', width: 80,  align: 'right',  resizable: true }
+    ],
+
+    _config: null,    // { visibility: {id: bool} }
+    _bound: false,    // 중복 init 가드
+
+    _configKey() {
+      const u = (window.currentUser && (window.currentUser.loginId || window.currentUser.name)) || 'default';
+      return 'tx_items_visible_columns_' + u;
+    },
+
+    _defaultConfig() {
+      const visibility = {};
+      this.COLUMNS_REQUIRED.forEach(function(c) { visibility[c.id] = true; });
+      this.COLUMNS_OPTIONAL.forEach(function(c) { visibility[c.id] = false; });
+      return { visibility: visibility };
+    },
+
+    loadConfig() {
+      const key = this._configKey();
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.visibility) {
+            const merged = this._defaultConfig();
+            // 저장된 visibility로 덮어쓰기 (선택 컬럼만 의미 있음)
+            Object.keys(parsed.visibility).forEach(function(id) {
+              if (id in merged.visibility) {
+                merged.visibility[id] = parsed.visibility[id];
+              }
+            });
+            // 필수 컬럼은 무조건 true 강제
+            this.COLUMNS_REQUIRED.forEach(function(c) {
+              merged.visibility[c.id] = true;
+            });
+            this._config = merged;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('[TX] lineColumns.loadConfig failed:', e);
+      }
+      this._config = this._defaultConfig();
+      this.saveConfig();
+    },
+
+    saveConfig() {
+      if (!this._config) return;
+      try {
+        localStorage.setItem(this._configKey(), JSON.stringify(this._config));
+      } catch (e) {
+        console.warn('[TX] lineColumns.saveConfig failed:', e);
+      }
+    },
+
+    // 현재 표시할 컬럼 (REQUIRED 순서 + OPTIONAL의 visible만 정의 순으로 뒤에)
+    getVisibleColumns() {
+      if (!this._config) this.loadConfig();
+      const out = [];
+      const cfg = this._config;
+      this.COLUMNS_REQUIRED.forEach(function(c) { out.push(c); });
+      this.COLUMNS_OPTIONAL.forEach(function(c) {
+        if (cfg.visibility[c.id]) out.push(c);
+      });
+      return out;
+    },
+
+    findColumn(id) {
+      let found = this.COLUMNS_REQUIRED.find(function(c) { return c.id === id; });
+      if (!found) found = this.COLUMNS_OPTIONAL.find(function(c) { return c.id === id; });
+      return found || null;
+    },
+
+    isRequired(id) {
+      return this.COLUMNS_REQUIRED.some(function(c) { return c.id === id; });
+    },
+
+    setVisibility(id, visible) {
+      if (!this._config) this.loadConfig();
+      if (this.isRequired(id)) {
+        this._config.visibility[id] = true;
+        return;
+      }
+      this._config.visibility[id] = !!visible;
+    },
+
+    resetToDefault() {
+      this._config = this._defaultConfig();
+      this.saveConfig();
+    },
+
+    // === thead 동적 생성 (colgroup + thead + handle + ⚙) ===
+    _renderThead() {
+      const colgroup = document.getElementById('tx-items-colgroup');
+      const thead = document.getElementById('tx-items-thead');
+      if (!colgroup || !thead) return;
+
+      const cols = this.getVisibleColumns();
+      const widths = this._loadColWidths();
+
+      // colgroup 동적 — table-layout: fixed에서 col width 우선 ("품명만 동작" fix 핵심)
+      let colHtml = '';
+      for (let i = 0; i < cols.length; i++) {
+        const c = cols[i];
+        const savedW = widths[c.id];
+        let style = '';
+        if (savedW && typeof savedW === 'number' && savedW > 0) {
+          style = ' style="width:' + savedW + 'px"';
+        } else if (c.width !== 'flex') {
+          style = ' style="width:' + c.width + 'px"';
+        }
+        colHtml += '<col data-col-id="' + c.id + '"' + style + '>';
+      }
+      colHtml += '<col data-col-id="__settings" style="width:36px">';
+      colgroup.innerHTML = colHtml;
+
+      // thead 동적
+      let thHtml = '<tr>';
+      for (let i = 0; i < cols.length; i++) {
+        const c = cols[i];
+        const align = c.align || 'left';
+        const isReq = this.isRequired(c.id);
+        const lockHtml = isReq ? '<span class="tx-col-lock" title="필수 컬럼">🔒</span>' : '';
+        // 마지막 컬럼은 ⚙ 버튼과 인접 — 핸들 제외 (사용자 결정 옵션 A)
+        const resizeHtml = (c.resizable !== false && i < cols.length - 1)
+          ? '<span class="tx-row-resize-handle" data-col-id="' + c.id + '"></span>'
+          : '';
+        thHtml += '<th data-col-id="' + c.id + '" style="text-align:' + align + '">' +
+                  c.label + lockHtml + resizeHtml + '</th>';
+      }
+      thHtml += '<th class="tx-col-settings" data-col-id="__settings" title="컬럼 설정">⚙</th>';
+      thHtml += '</tr>';
+      thead.innerHTML = thHtml;
+
+      this._bindResizeHandles();
+      this._bindSettingsButton();
+    },
+
+    // === Phase 8 "품명만 동작" 버그 진짜 fix — th + col 둘 다 갱신 ===
+    _bindResizeHandles() {
+      const thead = document.getElementById('tx-items-thead');
+      const colgroup = document.getElementById('tx-items-colgroup');
+      if (!thead || !colgroup) return;
+      const handles = thead.querySelectorAll('.tx-row-resize-handle');
+      const self = this;
+      handles.forEach(function(handle) {
+        if (handle._txBound) return;
+        handle._txBound = true;
+        handle.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const colId = handle.getAttribute('data-col-id');
+          const th = handle.closest('th');
+          const col = colgroup.querySelector('col[data-col-id="' + colId + '"]');
+          if (!th || !col) return;
+          const startX = e.pageX;
+          const startW = th.getBoundingClientRect().width;
+          const onMove = function(ev) {
+            const dx = ev.pageX - startX;
+            const newW = Math.max(40, startW + dx);
+            // ⚠️ Phase 8 fix: th + col 둘 다 갱신 (table-layout: fixed에서 col 우선)
+            th.style.width = newW + 'px';
+            col.style.width = newW + 'px';
+          };
+          const onUp = function() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+            self._saveColWidths();
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+      });
+    },
+
+    // === width 저장/로드 — id 기반 (Phase 8 인덱스 기반은 마이그레이션) ===
+    _colWidthsKey() {
+      const u = (window.currentUser && (window.currentUser.loginId || window.currentUser.name)) || 'default';
+      return 'tx_items_col_widths_' + u;
+    },
+
+    _saveColWidths() {
+      const colgroup = document.getElementById('tx-items-colgroup');
+      if (!colgroup) return;
+      const widths = {};
+      colgroup.querySelectorAll('col').forEach(function(col) {
+        const id = col.getAttribute('data-col-id');
+        if (!id || id === '__settings') return;
+        const w = col.getBoundingClientRect().width;
+        if (w > 0) widths[id] = w;
+      });
+      try {
+        localStorage.setItem(this._colWidthsKey(), JSON.stringify(widths));
+      } catch (e) {
+        console.warn('[TX] lineColumns._saveColWidths failed:', e);
+      }
+    },
+
+    _loadColWidths() {
+      try {
+        const raw = localStorage.getItem(this._colWidthsKey());
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          const keys = Object.keys(parsed);
+          // Phase 8 인덱스 기반 (col_0, col_1, ...) 데이터 무시 — id 기반 새로 시작
+          if (keys.length > 0 && keys[0].indexOf('col_') === 0) {
+            return {};
+          }
+          return parsed;
+        }
+      } catch (e) {
+        console.warn('[TX] lineColumns._loadColWidths failed:', e);
+      }
+      return {};
+    },
+
+    // === ⚙ 설정 버튼 클릭 → _showSettingsModal ===
+    _bindSettingsButton() {
+      const btn = document.querySelector('#tx-items-thead th.tx-col-settings');
+      if (!btn) return;
+      if (btn._txBound) return;
+      btn._txBound = true;
+      const self = this;
+      btn.addEventListener('click', function() {
+        self._showSettingsModal();
+      });
+    },
+
+    // === 컬럼 설정 모달 (Phase 8 .tx-code-modal-backdrop 백드롭 공유, .tx-cols-modal 본체) ===
+    _showSettingsModal() {
+      const self = this;
+
+      // 중복 모달 제거 (안전)
+      const existing = document.querySelector('.tx-code-modal-backdrop');
+      if (existing) existing.remove();
+
+      const escHtml = function(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      };
+
+      // 필수 컬럼 (잠금 + 체크 disabled)
+      let requiredHtml = '';
+      this.COLUMNS_REQUIRED.forEach(function(c) {
+        requiredHtml += '<label class="tx-cols-modal-item tx-locked">' +
+                        '<input type="checkbox" checked disabled>' +
+                        '<span>' + escHtml(c.label) + '</span>' +
+                        '<span class="tx-lock-icon">🔒</span>' +
+                        '</label>';
+      });
+
+      // 선택 컬럼 (현재 _config 반영)
+      let optionalHtml = '';
+      this.COLUMNS_OPTIONAL.forEach(function(c) {
+        const checked = self._config && self._config.visibility[c.id] ? ' checked' : '';
+        optionalHtml += '<label class="tx-cols-modal-item">' +
+                        '<input type="checkbox" data-col-id="' + c.id + '"' + checked + '>' +
+                        '<span>' + escHtml(c.label) + '</span>' +
+                        '</label>';
+      });
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'tx-code-modal-backdrop';
+      backdrop.innerHTML =
+        '<div class="tx-cols-modal" role="dialog" aria-modal="true">' +
+          '<h4>매출 라인 컬럼 설정</h4>' +
+          '<div class="tx-cols-modal-desc">표시할 컬럼을 선택하세요. 🔒 표시는 잠금 (해제 불가).</div>' +
+          '<div class="tx-cols-modal-section">' +
+            '<div class="tx-cols-modal-section-title">필수 컬럼 (잠금)</div>' +
+            '<div class="tx-cols-modal-list">' + requiredHtml + '</div>' +
+          '</div>' +
+          '<div class="tx-cols-modal-section">' +
+            '<div class="tx-cols-modal-section-title">선택 컬럼</div>' +
+            '<div class="tx-cols-modal-list">' + optionalHtml + '</div>' +
+          '</div>' +
+          '<div class="tx-cols-modal-actions">' +
+            '<button class="tx-cols-modal-reset" type="button">기본값으로 초기화</button>' +
+            '<div class="tx-cols-modal-buttons">' +
+              '<button class="tx-cols-modal-btn" data-action="cancel" type="button">취소</button>' +
+              '<button class="tx-cols-modal-btn tx-primary" data-action="apply" type="button">적용</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(backdrop);
+
+      // === 이벤트 ===
+      let onKey = null;
+      const close = function() {
+        if (onKey) document.removeEventListener('keydown', onKey);
+        if (backdrop && backdrop.parentNode) backdrop.remove();
+      };
+
+      // 적용 — 모든 체크박스 일괄 읽어서 _config 갱신 (스냅샷 패턴 회피)
+      const applyBtn = backdrop.querySelector('button[data-action="apply"]');
+      applyBtn.addEventListener('click', function() {
+        backdrop.querySelectorAll('input[type="checkbox"][data-col-id]').forEach(function(cb) {
+          const colId = cb.getAttribute('data-col-id');
+          self.setVisibility(colId, cb.checked);
+        });
+        self.saveConfig();
+        self._renderThead();
+        if (typeof _tx !== 'undefined' && typeof _tx.renderItemsTable === 'function') {
+          _tx.renderItemsTable();
+        }
+        close();
+      });
+
+      // 취소 — 변경 무시 (체크박스 상태가 _config에 반영 안 됨)
+      const cancelBtn = backdrop.querySelector('button[data-action="cancel"]');
+      cancelBtn.addEventListener('click', close);
+
+      // 기본값 초기화 — confirm + reset + 즉시 적용 + 모달 재오픈
+      const resetBtn = backdrop.querySelector('.tx-cols-modal-reset');
+      resetBtn.addEventListener('click', function() {
+        if (!confirm('컬럼 설정을 기본값으로 초기화하시겠습니까?')) return;
+        self.resetToDefault();
+        self._renderThead();
+        if (typeof _tx !== 'undefined' && typeof _tx.renderItemsTable === 'function') {
+          _tx.renderItemsTable();
+        }
+        close();
+        self._showSettingsModal();
+      });
+
+      // Esc 키 → 취소
+      onKey = function(e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          close();
+        }
+      };
+      document.addEventListener('keydown', onKey);
+
+      // 백드롭 클릭 → 취소 (모달 본체 클릭은 stopPropagation 없이도 안전 — backdrop 직접 매칭)
+      backdrop.addEventListener('click', function(e) {
+        if (e.target === backdrop) close();
+      });
+    },
   },
 
   // ================================================================

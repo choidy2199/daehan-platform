@@ -705,29 +705,9 @@ document.head.appendChild(s);
       <div class="tx-doc-body">
         <!-- 상품 라인 테이블 -->
         <div class="tx-items-wrap">
-          <table class="tx-items-table">
-            <colgroup>
-              <col style="width:40px">
-              <col style="width:100px">
-              <col>
-              <col style="width:60px">
-              <col style="width:110px">
-              <col style="width:120px">
-              <col style="width:100px">
-              <col style="width:36px">
-            </colgroup>
-            <thead>
-              <tr>
-                <th>No</th>
-                <th>코드</th>
-                <th>품명</th>
-                <th>수량</th>
-                <th>단가</th>
-                <th>공급가액</th>
-                <th>VAT</th>
-                <th></th>
-              </tr>
-            </thead>
+          <table class="tx-items-table" id="tx-items-table">
+            <colgroup id="tx-items-colgroup"></colgroup>
+            <thead id="tx-items-thead"></thead>
             <tbody id="tx-items-body"></tbody>
           </table>
         </div>

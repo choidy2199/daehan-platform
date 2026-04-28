@@ -3574,3 +3574,284 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 .tx-code-modal-confirm:hover {
   background: #0F4A88 !important;
 }
+
+/* =================================================================
+   Phase 9 — v7 거래명세서
+   (8컬럼 잠금 + 컬럼 설정 모달 + 품명 인라인 검색 + 다크바-thead 통합)
+   ================================================================= */
+
+/* === 안 5 — 다크바 ↔ thead 시각 통합 (사용자 4.1) === */
+.tx-doc-body {
+  padding-top: 0;
+}
+.tx-doc-body .tx-items-wrap {
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.tx-items-table thead {
+  border-top: 2px solid #4A9EFF;
+}
+
+/* === 컬럼 헤더 잠금 아이콘 === */
+.tx-items-table thead th .tx-col-lock {
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 3px;
+  vertical-align: middle;
+}
+
+/* === 컬럼 헤더 ⚙ 설정 버튼 (마지막 컬럼 자리) === */
+.tx-items-table thead th.tx-col-settings {
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  text-align: center;
+  border-right: none;
+  width: 36px;
+}
+.tx-items-table thead th.tx-col-settings:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* === 적요 셀 input === */
+.tx-items-table tbody td.tx-cell-memo {
+  padding: 0;
+}
+.tx-items-table tbody td.tx-cell-memo input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-family: 'Pretendard', sans-serif;
+  color: #1A1D23;
+  padding: 6px 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+.tx-items-table tbody td.tx-cell-memo input::placeholder {
+  color: #C0C5D0;
+  font-style: italic;
+}
+.tx-items-table tbody td.tx-cell-memo input:focus {
+  background: #FEF7E8;
+}
+
+/* === 빈 라인 품명 셀 (인라인 검색 활성화 영역) === */
+.tx-items-table tbody td.tx-cell-name-empty {
+  position: relative;
+  cursor: text;
+  padding: 0;
+}
+.tx-items-table tbody td.tx-cell-name-empty input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-family: 'Pretendard', sans-serif;
+  color: #1A1D23;
+  padding: 6px 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+.tx-items-table tbody td.tx-cell-name-empty input::placeholder {
+  color: #B0B5C0;
+  font-style: italic;
+}
+.tx-items-table tbody td.tx-cell-name-empty.tx-focused {
+  background: #FEF7E8;
+  outline: 2px solid #F4B400;
+  outline-offset: -2px;
+  z-index: 50;
+}
+
+/* === 품명 인라인 자동완성 드롭다운 === */
+.tx-name-inline-dd {
+  position: absolute;
+  top: 100%;
+  left: -1px;
+  right: -1px;
+  background: #fff;
+  border: 1px solid #DDE1EB;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 1px;
+  min-width: 380px;
+}
+.tx-name-inline-dd-header {
+  padding: 6px 10px;
+  font-size: 10px;
+  color: #5A6070;
+  background: #F8FAFD;
+  border-bottom: 0.5px solid #EAECF2;
+  display: flex;
+  justify-content: space-between;
+}
+.tx-name-inline-dd-row {
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 60px 1fr 80px 80px;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 0.5px solid #F4F6FA;
+}
+.tx-name-inline-dd-row:hover,
+.tx-name-inline-dd-row.tx-active {
+  background: #EFF5FB;
+}
+.tx-name-inline-dd-row .tx-src-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  text-align: center;
+  font-weight: 500;
+}
+.tx-name-inline-dd-row .tx-src-badge.tx-mw {
+  background: #FFE4E4;
+  color: #B10000;
+}
+.tx-name-inline-dd-row .tx-src-badge.tx-gen {
+  background: #E1F5EE;
+  color: #085041;
+}
+.tx-name-inline-dd-row .tx-name {
+  color: #1A1D23;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tx-name-inline-dd-row .tx-code {
+  color: #5A6070;
+  font-family: 'SF Mono', monospace;
+  font-size: 10px;
+  text-align: right;
+}
+.tx-name-inline-dd-row .tx-price {
+  color: #185FA5;
+  text-align: right;
+  font-weight: 500;
+}
+.tx-name-inline-dd-empty {
+  padding: 16px 10px;
+  text-align: center;
+  font-size: 11px;
+  color: #9BA3B2;
+}
+
+/* === 컬럼 설정 모달 (Phase 8 .tx-code-modal 패턴 재사용 — backdrop은 .tx-code-modal-backdrop 공유) === */
+.tx-cols-modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 18px 20px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  font-family: 'Pretendard', sans-serif;
+}
+.tx-cols-modal h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1D23;
+  margin: 0 0 4px 0;
+}
+.tx-cols-modal-desc {
+  font-size: 11px;
+  color: #5A6070;
+  margin-bottom: 12px;
+}
+.tx-cols-modal-section {
+  margin-bottom: 12px;
+}
+.tx-cols-modal-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #5A6070;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.tx-cols-modal-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+.tx-cols-modal-item {
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 3px;
+  user-select: none;
+}
+.tx-cols-modal-item:hover {
+  background: #F4F6FA;
+}
+.tx-cols-modal-item.tx-locked {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.tx-cols-modal-item.tx-locked:hover {
+  background: transparent;
+}
+.tx-cols-modal-item input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.tx-cols-modal-item.tx-locked input[type="checkbox"] {
+  cursor: not-allowed;
+}
+.tx-cols-modal-item .tx-lock-icon {
+  font-size: 9px;
+  color: #9BA3B2;
+  margin-left: auto;
+}
+.tx-cols-modal-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 0.5px solid #EAECF2;
+  padding-top: 12px;
+  margin-top: 12px;
+}
+.tx-cols-modal-reset {
+  font-size: 10px;
+  color: #5A6070;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.tx-cols-modal-buttons {
+  display: flex;
+  gap: 6px;
+}
+.tx-cols-modal-btn {
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 0.5px solid #DDE1EB;
+  background: #fff;
+  color: #5A6070;
+  cursor: pointer;
+  font-family: 'Pretendard', sans-serif;
+}
+.tx-cols-modal-btn:hover {
+  background: #F4F6FA;
+}
+.tx-cols-modal-btn.tx-primary {
+  background: #185FA5;
+  color: #fff;
+  border-color: #185FA5;
+}
+.tx-cols-modal-btn.tx-primary:hover {
+  background: #0F4A88;
+}
