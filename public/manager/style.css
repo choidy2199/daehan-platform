@@ -2662,7 +2662,8 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 /* A4 문서 본체 */
 .po-pdf-document { background:#fff; width:210mm; min-height:297mm; margin:0 auto; padding:15mm; box-sizing:border-box; box-shadow:0 4px 12px rgba(0,0,0,0.1); font-family:Pretendard,-apple-system,sans-serif; font-size:11px; color:#1A1D23; line-height:1.5; }
 
-.pdf-header { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #1A1D23; padding-bottom:12px; margin-bottom:20px; }
+.pdf-header { display:grid; grid-template-columns:1fr 1fr 1fr; align-items:center; border-bottom:2px solid #1A1D23; padding-bottom:12px; margin-bottom:20px; }
+.pdf-header-center { text-align:center; }
 .pdf-logo { height:40px; width:auto; }
 .pdf-title { font-size:28px; font-weight:700; letter-spacing:8px; margin:0; color:#1A1D23; }
 

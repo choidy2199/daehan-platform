@@ -22497,7 +22497,8 @@ function _poBuildPdfHtml(po, items) {
   var h = '';
   h += '<div class="pdf-header">';
   h += '<div class="pdf-header-left"><img src="' + info.logoUrl + '" alt="로고" class="pdf-logo"></div>';
-  h += '<div class="pdf-header-right"><h1 class="pdf-title">발 주 서</h1></div>';
+  h += '<div class="pdf-header-center"><h1 class="pdf-title">발 주 서</h1></div>';
+  h += '<div class="pdf-header-right"></div>';
   h += '</div>';
 
   h += '<div class="pdf-info-grid">';
