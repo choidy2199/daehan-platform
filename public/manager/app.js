@@ -21652,7 +21652,7 @@ function _poRenderCart(poId) {
   var thS = 'padding:9px 6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
   var tdS = 'padding:6px 6px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
 
-  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  var h = '<table id="po-cart-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
   // 브랜드 / 관리코드 / 품명(가변) / 모델명 / 1P / 낱개 / 금액$ / 총금액$ / ×
   h += '<col style="width:54px">';
@@ -21674,7 +21674,7 @@ function _poRenderCart(poId) {
   h += '<th style="' + thS + '">낱개</th>';
   h += '<th style="' + thS + '">금액$</th>';
   h += '<th style="' + thS + '">총금액$</th>';
-  h += '<th style="' + thS + '">×</th>';
+  h += '<th data-no-resize="true" style="' + thS + '">×</th>';
   h += '</tr></thead><tbody>';
 
   var totalUnit = 0, totalPallet = 0, totalAmount = 0;
@@ -21713,6 +21713,7 @@ function _poRenderCart(poId) {
 
   h += '</tbody></table>';
   body.innerHTML = h;
+  if (typeof initColumnResize === 'function') initColumnResize('po-cart-table');
 
   var sHtml = '';
   sHtml += '<div class="po-cart-summary-row"><span>총 수량</span><b>' + totalUnit.toLocaleString() + '개</b></div>';
