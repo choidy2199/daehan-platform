@@ -28289,7 +28289,17 @@ const _tx = {
       if (this.state.customerCode) this._fetchLastPriceForItem(dupIdx);
       return;
     }
-    const idx = this.state.items.push(item) - 1;
+    // [Phase 10 단계 3.8] 빈 라인은 항상 마지막 — 데이터는 빈 라인 직전에 splice
+    const firstEmptyIdx = this.state.items.findIndex(function(it) {
+      return !it.code && !it.name;
+    });
+    let idx;
+    if (firstEmptyIdx >= 0) {
+      this.state.items.splice(firstEmptyIdx, 0, item);
+      idx = firstEmptyIdx;
+    } else {
+      idx = this.state.items.push(item) - 1;
+    }
     this.recalcItem(idx);
     this.renderItemsTable();
     this.renderSummary();
