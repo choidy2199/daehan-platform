@@ -27959,26 +27959,31 @@ const _tx = {
     }, 50);
 
     // 키보드 핸들러 (document keydown)
+    // [Phase 10 단계 5-2a] 모든 키 분기에 stopPropagation 추가 — 탭 닫기 등 상위 핸들러 차단
     this._txModalKeydownHandler = function(e) {
       if (!document.getElementById('tx-search-modal-backdrop')) return;
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
+        e.stopPropagation();
         if (lastResults.length === 0) return;
         selectedIdx = Math.min(selectedIdx + 1, lastResults.length - 1);
         self._renderTxModalResults(lastResults, selectedIdx);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
+        e.stopPropagation();
         if (lastResults.length === 0) return;
         selectedIdx = Math.max(selectedIdx - 1, 0);
         self._renderTxModalResults(lastResults, selectedIdx);
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         if (lastResults[selectedIdx]) {
           self._selectTxNameFromModal(rowIdx, lastResults[selectedIdx]);
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         self._closeTxNameSearchModal();
       }
     };
@@ -28132,9 +28137,28 @@ const _tx = {
     backdrop.appendChild(modal);
     document.body.appendChild(backdrop);
 
+    // [Phase 10 단계 5-2a] Esc 핸들러 — 컬럼 설정 모달만 닫고 상위(검색 모달/탭) 차단
+    const colsModalKeydownHandler = function(e) {
+      const modalEl = document.getElementById('tx-search-modal-cols-settings-backdrop');
+      if (!modalEl) {
+        document.removeEventListener('keydown', colsModalKeydownHandler, true);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        modalEl.remove();
+        document.removeEventListener('keydown', colsModalKeydownHandler, true);
+      }
+    };
+    document.addEventListener('keydown', colsModalKeydownHandler, true);  // capture로 검색 모달 핸들러보다 먼저 실행
+
     // 닫기: 백드롭 클릭 (모달 안 클릭은 stopPropagation)
     backdrop.addEventListener('click', function(e) {
-      if (e.target === backdrop) backdrop.remove();
+      if (e.target === backdrop) {
+        backdrop.remove();
+        document.removeEventListener('keydown', colsModalKeydownHandler, true);
+      }
     });
     modal.addEventListener('click', function(e) {
       e.stopPropagation();
