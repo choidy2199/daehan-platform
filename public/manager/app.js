@@ -27748,15 +27748,6 @@ const _tx = {
       if (input._txNameBound) return;
       input._txNameBound = true;
 
-      // [단계 5-2d] IME 로컬 플래그 — Apple SK 한글 받침 음절 commit 타이밍 quirk 방어
-      let isComposing = false;
-      input.addEventListener('compositionstart', function() {
-        isComposing = true;
-      });
-      input.addEventListener('compositionend', function() {
-        isComposing = false;
-      });
-
       const cell = input.closest('td.tx-cell-name-empty');
       const tr = input.closest('tr');
       if (!cell || !tr) return;
@@ -27773,9 +27764,7 @@ const _tx = {
 
       // 키보드 — Enter 시 검색 → 0/1/2+건 분기
       input.addEventListener('keydown', function(e) {
-        // [단계 5-2d] 로컬 플래그 우선 체크 (Apple SK Enter 시점에 e.isComposing=false 보고되는 quirk 방어)
-        if (isComposing) return;
-        // [Phase 10 단계 5-2c] 표준 IME 가드 (보강용 유지)
+        // [Phase 10 단계 5-2c] 한글 IME composing 중 Enter는 변환 확정용 — 무시
         if (e.isComposing || e.keyCode === 229) return;
         if (e.key !== 'Enter') return;
 
