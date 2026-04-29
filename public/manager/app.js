@@ -28275,6 +28275,20 @@ const _tx = {
     if (resolved !== null && resolved !== undefined && Number(resolved) > 0) {
       item.unitPrice = Number(resolved);
     }
+    // [Phase 10 단계 3.7] 같은 코드 + 동일 단가면 qty 누적 (early return)
+    const newPrice = Number(item.unitPrice || 0);
+    const dupIdx = this.state.items.findIndex(function(it) {
+      return it.code && it.code === item.code
+          && Number(it.unitPrice || 0) === newPrice;
+    });
+    if (dupIdx >= 0) {
+      this.state.items[dupIdx].qty = (Number(this.state.items[dupIdx].qty) || 0) + (Number(item.qty) || 1);
+      this.recalcItem(dupIdx);
+      this.renderItemsTable();
+      this.renderSummary();
+      if (this.state.customerCode) this._fetchLastPriceForItem(dupIdx);
+      return;
+    }
     const idx = this.state.items.push(item) - 1;
     this.recalcItem(idx);
     this.renderItemsTable();
