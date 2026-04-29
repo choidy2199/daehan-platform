@@ -27740,6 +27740,7 @@ const _tx = {
 
   // === 품명 input 이벤트 바인딩 (autocomplete 150ms + IME + 키보드/마우스) ===
   _bindItemsNameSearch() {
+    // [Phase 10 단계 5] 인라인 드롭다운 폐기 — Enter 시 검색 모달 트리거
     const inputs = document.querySelectorAll('#tx-items-body input.tx-name-input');
     const self = this;
 
@@ -27753,97 +27754,38 @@ const _tx = {
       const rowIdx = parseInt(tr.getAttribute('data-idx'), 10);
       if (isNaN(rowIdx)) return;
 
-      // 행별 closure state
-      let activeIdx = -1;
-      let lastResults = [];
-      let timer = null;
-
-      // 입력 — bindSearchInput 헬퍼 (autocomplete 150ms + IME)
-      if (typeof bindSearchInput === 'function') {
-        bindSearchInput(input, function() {
-          const q = input.value;
-          clearTimeout(timer);
-          timer = setTimeout(function() {
-            activeIdx = -1;
-            lastResults = self._runInlineNameSearch(q, 5);
-            self._renderItemsNameDropdown(rowIdx, q, lastResults);
-          }, 150);
-        }, { mode: 'autocomplete' });
-      } else {
-        input.addEventListener('input', function() {
-          const q = input.value;
-          clearTimeout(timer);
-          timer = setTimeout(function() {
-            activeIdx = -1;
-            lastResults = self._runInlineNameSearch(q, 5);
-            self._renderItemsNameDropdown(rowIdx, q, lastResults);
-          }, 150);
-        });
-      }
-
-      // focus → 노란 outline + 결과 그리기
+      // focus/blur — 노란 outline 시각 효과 보존 (Phase 9 자산)
       input.addEventListener('focus', function() {
         cell.classList.add('tx-focused');
-        const q = input.value;
-        lastResults = self._runInlineNameSearch(q, 5);
-        self._renderItemsNameDropdown(rowIdx, q, lastResults);
       });
-
-      // 키보드 — body 위임 핸들러 차단 위해 stopPropagation (그룹 ② 진단)
-      input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Escape') {
-          e.stopPropagation();  // _bindItemsTable의 27662 핸들러 차단
-        }
-
-        const dd = cell.querySelector('.tx-name-inline-dd');
-        const rows = dd ? dd.querySelectorAll('.tx-name-inline-dd-row') : [];
-
-        if (e.key === 'ArrowDown') {
-          if (rows.length === 0) return;
-          e.preventDefault();
-          activeIdx = Math.min(rows.length - 1, activeIdx + 1);
-          self._highlightDropdownRow(dd, activeIdx);
-        } else if (e.key === 'ArrowUp') {
-          if (rows.length === 0) return;
-          e.preventDefault();
-          activeIdx = Math.max(0, activeIdx - 1);
-          self._highlightDropdownRow(dd, activeIdx);
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          if (activeIdx >= 0 && lastResults[activeIdx]) {
-            self._selectItemFromInline(rowIdx, lastResults[activeIdx]);
-          } else if (lastResults.length > 0) {
-            self._selectItemFromInline(rowIdx, lastResults[0]);
-          }
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          const ddEl = cell.querySelector('.tx-name-inline-dd');
-          if (ddEl) ddEl.remove();
-          cell.classList.remove('tx-focused');
-          input.blur();
-        }
-      });
-
-      // 드롭다운 mousedown — blur 방지 + 선택 (cell 단위 위임)
-      cell.addEventListener('mousedown', function(e) {
-        const row = e.target.closest('.tx-name-inline-dd-row');
-        if (!row) return;
-        e.preventDefault();  // input blur 방지
-        const idx = parseInt(row.getAttribute('data-idx'), 10);
-        if (lastResults[idx]) {
-          self._selectItemFromInline(rowIdx, lastResults[idx]);
-        }
-      });
-
-      // blur — 200ms 지연 후 닫기 (mousedown 처리 시간 확보)
       input.addEventListener('blur', function() {
-        setTimeout(function() {
-          const ae = document.activeElement;
-          if (cell.contains(ae)) return;  // dd 내부 활성이면 닫지 않음
-          const ddEl = cell.querySelector('.tx-name-inline-dd');
-          if (ddEl) ddEl.remove();
-          cell.classList.remove('tx-focused');
-        }, 200);
+        cell.classList.remove('tx-focused');
+      });
+
+      // 키보드 — Enter 시 검색 → 0/1/2+건 분기
+      input.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter') return;
+
+        const query = (input.value || '').trim();
+        if (!query) {
+          // 빈 입력 + Enter는 기존 동작 유지 (다른 핸들러가 처리)
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();  // _bindItemsTable / _bindItemsCellNav 추가 핸들러 차단
+
+        const results = self._runTxModalSearch(query);
+        if (results.length === 0) {
+          alert('제품이 없습니다');
+          // 입력값 유지, 사용자 다시 입력 대기
+        } else if (results.length === 1) {
+          // 즉시 라인 채움 (모달 X) — _selectItemFromInline 재활용 (수량 셀 포커스 포함)
+          self._selectItemFromInline(rowIdx, results[0]);
+        } else {
+          // 2+건 → 80% 모달 표시
+          self._openTxNameSearchModal(rowIdx, query);
+        }
       });
     });
   },
@@ -27943,6 +27885,216 @@ const _tx = {
         if (typeof qtyInput.select === 'function') qtyInput.select();
       }
     }, 50);
+  },
+
+  // === [Phase 10 단계 5] 80% 검색 모달 — 신규 5개 함수 ===
+  _openTxNameSearchModal(rowIdx, query) {
+    const self = this;
+
+    // 기존 모달 있으면 닫기
+    this._closeTxNameSearchModal();
+
+    // 초기 검색
+    let lastResults = this._runTxModalSearch(query);
+    let selectedIdx = 0;
+
+    // 모달 DOM 생성 (tx-code-modal-backdrop 재사용)
+    const backdrop = document.createElement('div');
+    backdrop.className = 'tx-code-modal-backdrop';
+    backdrop.id = 'tx-search-modal-backdrop';
+
+    const modal = document.createElement('div');
+    modal.className = 'tx-search-modal';
+    const safeQuery = String(query || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    modal.innerHTML = ''
+      + '<div class="tx-search-modal-header">'
+      +   '<div>'
+      +     '<span>제품 검색</span>'
+      +     '<span class="tx-search-modal-header-meta">No ' + (rowIdx + 1) + ' · 품명</span>'
+      +   '</div>'
+      +   '<button class="tx-search-modal-close" type="button">✕</button>'
+      + '</div>'
+      + '<div class="tx-search-modal-search">'
+      +   '<input id="tx-search-modal-input" type="text" value="' + safeQuery + '" autocomplete="off" />'
+      +   '<span class="tx-search-modal-count">' + lastResults.length + '건 매칭</span>'
+      + '</div>'
+      + '<div class="tx-search-modal-results-header">'
+      +   '<div>모델명</div>'
+      +   '<div>품명</div>'
+      +   '<div>규격</div>'
+      +   '<div style="text-align: right;">단가</div>'
+      +   '<div style="text-align: right;">재고</div>'
+      + '</div>'
+      + '<div class="tx-search-modal-results" id="tx-search-modal-results"></div>'
+      + '<div class="tx-search-modal-footer">'
+      +   '<div class="tx-search-modal-footer-keys">'
+      +     '<span>↑↓ 이동</span>'
+      +     '<span>Enter 선택</span>'
+      +     '<span>Esc 닫기</span>'
+      +     '<span class="tx-search-modal-footer-mouse">마우스 1클릭 = 즉시 선택</span>'
+      +   '</div>'
+      +   '<button class="tx-search-modal-cancel" type="button">취소</button>'
+      + '</div>';
+
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+
+    // 결과 렌더
+    this._renderTxModalResults(lastResults, selectedIdx);
+
+    // 검색 input debounce 300ms
+    const searchInput = document.getElementById('tx-search-modal-input');
+    let debounceTimer = null;
+    searchInput.addEventListener('input', function() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() {
+        const newQuery = searchInput.value.trim();
+        lastResults = self._runTxModalSearch(newQuery);
+        selectedIdx = 0;
+        modal.querySelector('.tx-search-modal-count').textContent = lastResults.length + '건 매칭';
+        self._renderTxModalResults(lastResults, selectedIdx);
+      }, 300);
+    });
+
+    // 검색 input 자동 포커스 + 끝 커서
+    setTimeout(function() {
+      searchInput.focus();
+      const len = searchInput.value.length;
+      searchInput.setSelectionRange(len, len);
+    }, 50);
+
+    // 키보드 핸들러 (document keydown)
+    this._txModalKeydownHandler = function(e) {
+      if (!document.getElementById('tx-search-modal-backdrop')) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (lastResults.length === 0) return;
+        selectedIdx = Math.min(selectedIdx + 1, lastResults.length - 1);
+        self._renderTxModalResults(lastResults, selectedIdx);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (lastResults.length === 0) return;
+        selectedIdx = Math.max(selectedIdx - 1, 0);
+        self._renderTxModalResults(lastResults, selectedIdx);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (lastResults[selectedIdx]) {
+          self._selectTxNameFromModal(rowIdx, lastResults[selectedIdx]);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        self._closeTxNameSearchModal();
+      }
+    };
+    document.addEventListener('keydown', this._txModalKeydownHandler);
+
+    // 마우스 핸들러 — 행 click (이벤트 위임)
+    const resultsEl = document.getElementById('tx-search-modal-results');
+    resultsEl.addEventListener('click', function(e) {
+      const row = e.target.closest('.tx-search-modal-row');
+      if (!row) return;
+      const idx = parseInt(row.getAttribute('data-idx'), 10);
+      if (lastResults[idx]) {
+        self._selectTxNameFromModal(rowIdx, lastResults[idx]);
+      }
+    });
+
+    // 닫기 버튼들
+    modal.querySelector('.tx-search-modal-close').addEventListener('click', function() {
+      self._closeTxNameSearchModal();
+    });
+    modal.querySelector('.tx-search-modal-cancel').addEventListener('click', function() {
+      self._closeTxNameSearchModal();
+    });
+
+    // 백드롭 click (모달 안 click은 stopPropagation)
+    backdrop.addEventListener('click', function(e) {
+      if (e.target === backdrop) {
+        self._closeTxNameSearchModal();
+      }
+    });
+    modal.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+  },
+
+  _runTxModalSearch(query) {
+    if (!query || !String(query).trim()) return [];
+    // _runInlineNameSearch는 max 인자 받음. 모달은 max=200 (큰 값)
+    return this._runInlineNameSearch(String(query).trim(), 200);
+  },
+
+  _renderTxModalResults(results, selectedIdx) {
+    const container = document.getElementById('tx-search-modal-results');
+    if (!container) return;
+
+    if (!results || results.length === 0) {
+      container.innerHTML = '<div class="tx-search-modal-empty">검색 결과가 없습니다</div>';
+      return;
+    }
+
+    const esc = function(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+
+    let html = '';
+    for (let i = 0; i < results.length; i++) {
+      const entry = results[i] || {};
+      const data = entry.data || {};
+      const code = data.code || data.manageCode || '';
+      const model = data.model || code || '-';
+      // mw_products: description (품명), detail (규격) / gen_products: name, spec
+      const name = data.description || data.name || '-';
+      const spec = data.detail || data.spec || '-';
+      const price = Number(data.priceRetail || data.priceA || 0);
+      // 재고 — findStock 전역 함수 (mw_products 기준)
+      let stock = '-';
+      let stockNum = null;
+      if (typeof findStock === 'function' && code) {
+        const s = findStock(code);
+        if (typeof s === 'number') {
+          stockNum = s;
+          stock = s.toLocaleString();
+        }
+      }
+      const stockClass = (stockNum === 0) ? ' tx-search-modal-stock-zero'
+                       : (stockNum != null && stockNum > 0) ? ' tx-search-modal-stock-ok'
+                       : '';
+      const selectedClass = (i === selectedIdx) ? ' tx-search-modal-row-selected' : '';
+
+      html += '<div class="tx-search-modal-row' + selectedClass + '" data-idx="' + i + '">'
+        +   '<span class="tx-search-modal-cell-model">' + esc(model) + '</span>'
+        +   '<span class="tx-search-modal-cell-name">' + esc(name) + '</span>'
+        +   '<span class="tx-search-modal-cell-spec">' + esc(spec) + '</span>'
+        +   '<span class="tx-search-modal-cell-price">' + price.toLocaleString() + '</span>'
+        +   '<span class="tx-search-modal-cell-stock' + stockClass + '">' + esc(stock) + '</span>'
+        + '</div>';
+    }
+
+    container.innerHTML = html;
+
+    // 선택된 행 scrollIntoView
+    const selectedEl = container.querySelector('.tx-search-modal-row-selected');
+    if (selectedEl && typeof selectedEl.scrollIntoView === 'function') {
+      selectedEl.scrollIntoView({ block: 'nearest' });
+    }
+  },
+
+  _selectTxNameFromModal(rowIdx, entry) {
+    this._closeTxNameSearchModal();
+    // 옵션 C — _selectItemFromInline 재활용 (in-place 채움 + 수량 셀 포커스)
+    this._selectItemFromInline(rowIdx, entry);
+  },
+
+  _closeTxNameSearchModal() {
+    const backdrop = document.getElementById('tx-search-modal-backdrop');
+    if (backdrop) backdrop.remove();
+    if (this._txModalKeydownHandler) {
+      document.removeEventListener('keydown', this._txModalKeydownHandler);
+      this._txModalKeydownHandler = null;
+    }
   },
 
   _initEmptyRows() {
