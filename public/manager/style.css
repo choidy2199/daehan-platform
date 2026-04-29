@@ -1800,7 +1800,6 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 }
 .tx-items-table {
   width: auto;
-  min-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
   font-family: inherit;
