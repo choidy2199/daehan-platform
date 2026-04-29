@@ -28764,8 +28764,7 @@ const _tx = {
 
   removeItem(idx) {
     if (idx < 0 || idx >= this.state.items.length) return;
-    // 버그 E: 라인 삭제 → 값 클리어 (단계 4 빈 라인 5개 보장 정책)
-    this.state.items[idx] = this._createEmptyItem();
+    this.state.items.splice(idx, 1);
     this.renderItemsTable();
     this.renderSummary();
   },
