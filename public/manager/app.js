@@ -27785,7 +27785,12 @@ const _tx = {
         if (pendingEnter) {
           pendingEnter = false;
           // setTimeout 0 — IME가 input.value에 마지막 음절을 commit한 직후 실행 보장
-          setTimeout(executeNameSearch, 0);
+          setTimeout(function() {
+            // [버그 C 진범 fix] 콜백 실행 시점에 사용자가 다른 셀로 이동했거나
+            // input이 DOM에서 제거됐으면 무시 (잊혀진 setTimeout 큐가 모달을 잘못 여는 문제)
+            if (!document.body.contains(input) || document.activeElement !== input) return;
+            executeNameSearch();
+          }, 0);
         }
       });
 
