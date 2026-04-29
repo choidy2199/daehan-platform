@@ -28471,8 +28471,11 @@ const _tx = {
       if (field === 'price') {
         e.preventDefault();
         e.stopPropagation();
-        target.blur();   // capture blur 트리거 → 가격 commit
-        self.renderItemsTable();
+        // 버그 C: blur 의존 제거 — 명시적 commit (자동값/수정값 race 방지 + 이중 render 차단)
+        const raw = String(target.value || '').replace(/,/g, '').trim();
+        const num = parseInt(raw, 10);
+        const val = isNaN(num) ? 0 : num;
+        self.updateItemPrice(rowIdx, val);  // 내부에서 recalcItem + renderItemsTable + renderSummary
         setTimeout(function() {
           const nextRow = document.querySelector(
             '#tx-items-body tr[data-idx="' + (rowIdx + 1) + '"]'
