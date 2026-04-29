@@ -3855,3 +3855,88 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 .tx-cols-modal-btn.tx-primary:hover {
   background: #0F4A88;
 }
+
+/* =================================================================
+   Phase 9-e — v8 (FAIL fix + 컬럼 순서 드래그)
+   ================================================================= */
+
+/* FAIL 2 — 좌우 여백 0 (Phase 9 단계 2 padding-top: 0과 cascade) */
+.tx-doc-body {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* NEW — 컬럼 설정 모달 드래그 정렬 */
+.tx-cols-modal-tip {
+  font-size: 10px;
+  color: #185FA5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #EFF5FB;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+.tx-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: #F8FAFD;
+  border-radius: 6px;
+  padding: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.tx-order-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  background: #fff;
+  border-radius: 4px;
+  border: 0.5px solid #EAECF2;
+  cursor: grab;
+  font-size: 11px;
+  user-select: none;
+}
+.tx-order-item:hover {
+  border-color: #B0C4D6;
+}
+.tx-order-item.tx-locked {
+  background: #F8FAFD;
+}
+.tx-order-item.tx-dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.tx-order-item .tx-drag-handle {
+  color: #9BA3B2;
+  font-size: 14px;
+  cursor: grab;
+}
+.tx-order-item input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.tx-order-item.tx-locked input[type="checkbox"] {
+  cursor: not-allowed;
+}
+.tx-order-item .tx-label-text {
+  flex: 1;
+  color: #1A1D23;
+}
+.tx-order-item .tx-lock-icon {
+  font-size: 10px;
+  color: #9BA3B2;
+}
+.tx-order-item.tx-drop-indicator-top {
+  border-top: 2px solid #4A9EFF;
+}
+.tx-order-item.tx-drop-indicator-bottom {
+  border-bottom: 2px solid #4A9EFF;
+}
+.tx-cols-modal-section-title .tx-count {
+  font-weight: normal;
+  color: #9BA3B2;
+}

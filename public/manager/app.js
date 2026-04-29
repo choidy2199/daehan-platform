@@ -27461,12 +27461,18 @@ const _tx = {
     // Phase 4: 수정 모드 UI 초기화 (신규 작성 모드)
     this._updateSaveModeUI();
 
+    // [Phase 9-e FAIL 4 fix] 빈 라인 1개 보장 (인라인 검색 진입점)
+    this._ensureEmptyTrailingRow();
+
     // 초기 상태: 상품 라인 빈 안내 행
     this.renderItemsTable();
     this.renderSummary();
 
     // 초기: 과거 거래 패널 "거래처를 선택해주세요" 상태
     this.renderHistoryPanel(null, null);
+
+    // [Phase 9-e] 다크바 ⚙ 컬럼 버튼 바인딩
+    this._bindGearButton();
   },
 
   // ---- 이벤트 바인딩 ----
@@ -28057,6 +28063,22 @@ const _tx = {
     }, true);
   },
 
+  // === Phase 9-e — 다크바 [⚙ 컬럼] 버튼 클릭 → lineColumns._showSettingsModal ===
+  _bindGearButton() {
+    const btn = document.getElementById('tx-cols-btn');
+    if (!btn) return;
+    if (btn._txGearBound) return;
+    btn._txGearBound = true;
+    const self = this;
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (self.lineColumns && typeof self.lineColumns._showSettingsModal === 'function') {
+        self.lineColumns._showSettingsModal();
+      }
+    });
+  },
+
   _bindItemsTable() {
     const body = document.getElementById('tx-items-body');
     if (!body) return;
@@ -28395,9 +28417,9 @@ const _tx = {
       for (let ci = 0; ci < cols.length; ci++) {
         html += this._renderItemCell(it, i, cols[ci], escape, fmt);
       }
-      // ⚙ 자리는 삭제 × 버튼 (값 있는 라인만)
+      // [Phase 9-e] 마지막 좁은 컬럼 — 삭제 ✕ 버튼 (값 있는 라인만)
       const hasContent = it.code || it.name;
-      html += '<td class="tx-cell-action" data-col-id="__settings">' +
+      html += '<td class="tx-cell-action" data-col-id="__action">' +
               (hasContent ? '<button type="button" class="tx-row-del">✕</button>' : '') +
               '</td>';
       html += '</tr>';
@@ -29143,32 +29165,69 @@ const _tx = {
       return 'tx_items_visible_columns_' + u;
     },
 
+    // [Phase 9-e] 새 형식: { order: [id...], hidden: [id...] }
     _defaultConfig() {
-      const visibility = {};
-      this.COLUMNS_REQUIRED.forEach(function(c) { visibility[c.id] = true; });
-      this.COLUMNS_OPTIONAL.forEach(function(c) { visibility[c.id] = false; });
-      return { visibility: visibility };
+      return {
+        order: this.COLUMNS_REQUIRED.map(function(c) { return c.id; }),
+        hidden: this.COLUMNS_OPTIONAL.map(function(c) { return c.id; })
+      };
     },
 
     loadConfig() {
       const key = this._configKey();
+      const self = this;
       try {
         const raw = localStorage.getItem(key);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed && parsed.visibility) {
-            const merged = this._defaultConfig();
-            // 저장된 visibility로 덮어쓰기 (선택 컬럼만 의미 있음)
-            Object.keys(parsed.visibility).forEach(function(id) {
-              if (id in merged.visibility) {
-                merged.visibility[id] = parsed.visibility[id];
+
+          // === 마이그레이션: 옛 visibility 형식 → 새 order/hidden ===
+          if (parsed && parsed.visibility && !parsed.order) {
+            const visible = [];
+            const hidden = [];
+            // 필수는 항상 visible (정의 순서)
+            this.COLUMNS_REQUIRED.forEach(function(c) { visible.push(c.id); });
+            // 선택은 visibility 따라
+            this.COLUMNS_OPTIONAL.forEach(function(c) {
+              if (parsed.visibility[c.id]) visible.push(c.id);
+              else hidden.push(c.id);
+            });
+            this._config = { order: visible, hidden: hidden };
+            this.saveConfig();   // 새 형식으로 즉시 저장 (1회 마이그레이션)
+            return;
+          }
+
+          // === 새 형식 + 누락 컬럼 보충 + 필수 안전망 ===
+          if (parsed && Array.isArray(parsed.order) && Array.isArray(parsed.hidden)) {
+            const allIds = this.COLUMNS_REQUIRED.concat(this.COLUMNS_OPTIONAL).map(function(c) { return c.id; });
+            const known = {};
+            parsed.order.concat(parsed.hidden).forEach(function(id) { known[id] = true; });
+
+            const newOrder = parsed.order.slice();
+            const newHidden = parsed.hidden.slice();
+
+            // 누락된 컬럼 보충
+            allIds.forEach(function(id) {
+              if (!known[id]) {
+                if (self.isRequired(id)) newOrder.push(id);
+                else newHidden.push(id);
               }
             });
-            // 필수 컬럼은 무조건 true 강제
-            this.COLUMNS_REQUIRED.forEach(function(c) {
-              merged.visibility[c.id] = true;
+
+            // 필수 컬럼이 hidden에 들어있으면 order로 강제 이동
+            const orderSet = {};
+            newOrder.forEach(function(id) { orderSet[id] = true; });
+            const filteredHidden = [];
+            newHidden.forEach(function(id) {
+              if (self.isRequired(id) && !orderSet[id]) {
+                newOrder.push(id);
+                orderSet[id] = true;
+              } else if (!self.isRequired(id)) {
+                filteredHidden.push(id);
+              }
             });
-            this._config = merged;
+
+            this._config = { order: newOrder, hidden: filteredHidden };
             return;
           }
         }
@@ -29188,14 +29247,14 @@ const _tx = {
       }
     },
 
-    // 현재 표시할 컬럼 (REQUIRED 순서 + OPTIONAL의 visible만 정의 순으로 뒤에)
+    // 현재 표시할 컬럼 (order 배열 순서대로)
     getVisibleColumns() {
       if (!this._config) this.loadConfig();
+      const self = this;
       const out = [];
-      const cfg = this._config;
-      this.COLUMNS_REQUIRED.forEach(function(c) { out.push(c); });
-      this.COLUMNS_OPTIONAL.forEach(function(c) {
-        if (cfg.visibility[c.id]) out.push(c);
+      this._config.order.forEach(function(id) {
+        const c = self.findColumn(id);
+        if (c) out.push(c);
       });
       return out;
     },
@@ -29210,13 +29269,38 @@ const _tx = {
       return this.COLUMNS_REQUIRED.some(function(c) { return c.id === id; });
     },
 
+    // [Phase 9-e] 외부 호환성 — show/hide로 라우팅
     setVisibility(id, visible) {
+      if (this.isRequired(id)) return;
+      if (visible) this.showColumn(id);
+      else this.hideColumn(id);
+    },
+
+    showColumn(id) {
       if (!this._config) this.loadConfig();
-      if (this.isRequired(id)) {
-        this._config.visibility[id] = true;
-        return;
+      const idx = this._config.hidden.indexOf(id);
+      if (idx >= 0) {
+        this._config.hidden.splice(idx, 1);
+        this._config.order.push(id);
       }
-      this._config.visibility[id] = !!visible;
+    },
+
+    hideColumn(id) {
+      if (!this._config) this.loadConfig();
+      if (this.isRequired(id)) return;
+      const idx = this._config.order.indexOf(id);
+      if (idx >= 0) {
+        this._config.order.splice(idx, 1);
+        this._config.hidden.push(id);
+      }
+    },
+
+    moveColumnTo(id, newIndex) {
+      if (!this._config) this.loadConfig();
+      const idx = this._config.order.indexOf(id);
+      if (idx < 0) return;
+      this._config.order.splice(idx, 1);
+      this._config.order.splice(newIndex, 0, id);
     },
 
     resetToDefault() {
@@ -29246,7 +29330,8 @@ const _tx = {
         }
         colHtml += '<col data-col-id="' + c.id + '"' + style + '>';
       }
-      colHtml += '<col data-col-id="__settings" style="width:36px">';
+      // [Phase 9-e] ⚙ 자리 → ✕ 액션 컬럼 (다크바 [⚙ 컬럼] 버튼으로 이동)
+      colHtml += '<col data-col-id="__action" style="width:24px">';
       colgroup.innerHTML = colHtml;
 
       // thead 동적
@@ -29256,19 +29341,20 @@ const _tx = {
         const align = c.align || 'left';
         const isReq = this.isRequired(c.id);
         const lockHtml = isReq ? '<span class="tx-col-lock" title="필수 컬럼">🔒</span>' : '';
-        // 마지막 컬럼은 ⚙ 버튼과 인접 — 핸들 제외 (사용자 결정 옵션 A)
+        // 마지막 컬럼은 ✕ 액션과 인접 — 핸들 제외
         const resizeHtml = (c.resizable !== false && i < cols.length - 1)
           ? '<span class="tx-row-resize-handle" data-col-id="' + c.id + '"></span>'
           : '';
         thHtml += '<th data-col-id="' + c.id + '" style="text-align:' + align + '">' +
                   c.label + lockHtml + resizeHtml + '</th>';
       }
-      thHtml += '<th class="tx-col-settings" data-col-id="__settings" title="컬럼 설정">⚙</th>';
+      // [Phase 9-e] ✕ 액션 th — 빈 헤더 (⚙ 버튼은 다크바로 이동)
+      thHtml += '<th class="tx-col-action" data-col-id="__action"></th>';
       thHtml += '</tr>';
       thead.innerHTML = thHtml;
 
       this._bindResizeHandles();
-      this._bindSettingsButton();
+      // [Phase 9-e] _bindSettingsButton 호출 제거 — ⚙ 버튼은 다크바 [⚙ 컬럼]으로 이동, 단계 5에서 별도 _bindGearButton
     },
 
     // === Phase 8 "품명만 동작" 버그 진짜 fix — th + col 둘 다 갱신 ===
@@ -29320,7 +29406,7 @@ const _tx = {
       const widths = {};
       colgroup.querySelectorAll('col').forEach(function(col) {
         const id = col.getAttribute('data-col-id');
-        if (!id || id === '__settings') return;
+        if (!id || id === '__action' || id === '__settings') return;
         const w = col.getBoundingClientRect().width;
         if (w > 0) widths[id] = w;
       });
@@ -29362,51 +29448,75 @@ const _tx = {
       });
     },
 
-    // === 컬럼 설정 모달 (Phase 8 .tx-code-modal-backdrop 백드롭 공유, .tx-cols-modal 본체) ===
+    // === [Phase 9-e] 컬럼 설정 모달 — 드래그 정렬 + visible/hidden 영역 ===
     _showSettingsModal() {
       const self = this;
 
-      // 중복 모달 제거 (안전)
       const existing = document.querySelector('.tx-code-modal-backdrop');
       if (existing) existing.remove();
+
+      // deep-copy snapshot (취소 시 복원)
+      const snapshot = JSON.parse(JSON.stringify(this._config));
 
       const escHtml = function(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       };
 
-      // 필수 컬럼 (잠금 + 체크 disabled)
-      let requiredHtml = '';
-      this.COLUMNS_REQUIRED.forEach(function(c) {
-        requiredHtml += '<label class="tx-cols-modal-item tx-locked">' +
-                        '<input type="checkbox" checked disabled>' +
-                        '<span>' + escHtml(c.label) + '</span>' +
-                        '<span class="tx-lock-icon">🔒</span>' +
-                        '</label>';
-      });
+      const renderVisibleHtml = function() {
+        let html = '';
+        self._config.order.forEach(function(id) {
+          const c = self.findColumn(id);
+          if (!c) return;
+          const isReq = self.isRequired(id);
+          const lockedClass = isReq ? ' tx-locked' : '';
+          const lockIcon = isReq ? '<span class="tx-lock-icon">🔒</span>' : '';
+          const cbAttr = isReq ? 'checked disabled' : 'checked';
+          html += '<div class="tx-order-item' + lockedClass + '" draggable="true" data-col-id="' + escHtml(id) + '">' +
+                    '<span class="tx-drag-handle">⠿</span>' +
+                    '<input type="checkbox" ' + cbAttr + '>' +
+                    '<span class="tx-label-text">' + escHtml(c.label) + '</span>' +
+                    lockIcon +
+                  '</div>';
+        });
+        return html;
+      };
 
-      // 선택 컬럼 (현재 _config 반영)
-      let optionalHtml = '';
-      this.COLUMNS_OPTIONAL.forEach(function(c) {
-        const checked = self._config && self._config.visibility[c.id] ? ' checked' : '';
-        optionalHtml += '<label class="tx-cols-modal-item">' +
-                        '<input type="checkbox" data-col-id="' + c.id + '"' + checked + '>' +
-                        '<span>' + escHtml(c.label) + '</span>' +
-                        '</label>';
-      });
+      const renderHiddenHtml = function() {
+        let html = '';
+        self._config.hidden.forEach(function(id) {
+          const c = self.findColumn(id);
+          if (!c) return;
+          html += '<div class="tx-order-item" draggable="true" data-col-id="' + escHtml(id) + '">' +
+                    '<span class="tx-drag-handle">⠿</span>' +
+                    '<input type="checkbox">' +
+                    '<span class="tx-label-text">' + escHtml(c.label) + '</span>' +
+                  '</div>';
+        });
+        return html;
+      };
+
+      const totalCount = self.COLUMNS_REQUIRED.length + self.COLUMNS_OPTIONAL.length;
 
       const backdrop = document.createElement('div');
       backdrop.className = 'tx-code-modal-backdrop';
       backdrop.innerHTML =
         '<div class="tx-cols-modal" role="dialog" aria-modal="true">' +
           '<h4>매출 라인 컬럼 설정</h4>' +
-          '<div class="tx-cols-modal-desc">표시할 컬럼을 선택하세요. 🔒 표시는 잠금 (해제 불가).</div>' +
+          '<div class="tx-cols-modal-desc">표시할 컬럼을 선택하고 순서를 조정하세요.</div>' +
+          '<div class="tx-cols-modal-tip">⠿ 핸들을 드래그하여 순서를 바꿀 수 있습니다 (필수 + 선택 모두)</div>' +
           '<div class="tx-cols-modal-section">' +
-            '<div class="tx-cols-modal-section-title">필수 컬럼 (잠금)</div>' +
-            '<div class="tx-cols-modal-list">' + requiredHtml + '</div>' +
+            '<div class="tx-cols-modal-section-title tx-order-section-title">' +
+              '<span>표시 컬럼 (드래그로 순서 변경)</span>' +
+              '<span class="tx-count" id="tx-visible-count">' + self._config.order.length + ' / ' + totalCount + '</span>' +
+            '</div>' +
+            '<div class="tx-order-list" id="tx-visible-list">' + renderVisibleHtml() + '</div>' +
           '</div>' +
           '<div class="tx-cols-modal-section">' +
-            '<div class="tx-cols-modal-section-title">선택 컬럼</div>' +
-            '<div class="tx-cols-modal-list">' + optionalHtml + '</div>' +
+            '<div class="tx-cols-modal-section-title tx-order-section-title">' +
+              '<span>숨김 컬럼 (체크하면 추가됨)</span>' +
+              '<span class="tx-count" id="tx-hidden-count">' + self._config.hidden.length + ' / ' + self.COLUMNS_OPTIONAL.length + '</span>' +
+            '</div>' +
+            '<div class="tx-order-list" id="tx-hidden-list">' + renderHiddenHtml() + '</div>' +
           '</div>' +
           '<div class="tx-cols-modal-actions">' +
             '<button class="tx-cols-modal-reset" type="button">기본값으로 초기화</button>' +
@@ -29418,33 +29528,136 @@ const _tx = {
         '</div>';
       document.body.appendChild(backdrop);
 
-      // === 이벤트 ===
+      const visibleList = backdrop.querySelector('#tx-visible-list');
+      const hiddenList = backdrop.querySelector('#tx-hidden-list');
+      const visibleCountEl = backdrop.querySelector('#tx-visible-count');
+      const hiddenCountEl = backdrop.querySelector('#tx-hidden-count');
+
+      const updateCounts = function() {
+        visibleCountEl.textContent = visibleList.children.length + ' / ' + totalCount;
+        hiddenCountEl.textContent = hiddenList.children.length + ' / ' + self.COLUMNS_OPTIONAL.length;
+      };
+
+      // === HTML5 드래그 정렬 ===
+      const bindDragSort = function(list) {
+        let dragged = null;
+        list.addEventListener('dragstart', function(e) {
+          const item = e.target.closest('.tx-order-item');
+          if (!item) return;
+          dragged = item;
+          item.classList.add('tx-dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        list.addEventListener('dragend', function(e) {
+          const item = e.target.closest('.tx-order-item');
+          if (item) item.classList.remove('tx-dragging');
+          list.querySelectorAll('.tx-drop-indicator-top, .tx-drop-indicator-bottom').forEach(function(el) {
+            el.classList.remove('tx-drop-indicator-top', 'tx-drop-indicator-bottom');
+          });
+          dragged = null;
+        });
+        list.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          const target = e.target.closest('.tx-order-item');
+          if (!target || target === dragged) return;
+          const rect = target.getBoundingClientRect();
+          const isAfter = e.clientY > rect.top + rect.height / 2;
+          list.querySelectorAll('.tx-drop-indicator-top, .tx-drop-indicator-bottom').forEach(function(el) {
+            el.classList.remove('tx-drop-indicator-top', 'tx-drop-indicator-bottom');
+          });
+          target.classList.add(isAfter ? 'tx-drop-indicator-bottom' : 'tx-drop-indicator-top');
+        });
+        list.addEventListener('drop', function(e) {
+          e.preventDefault();
+          if (!dragged) return;
+          const target = e.target.closest('.tx-order-item');
+          if (!target || target === dragged) return;
+          const rect = target.getBoundingClientRect();
+          const isAfter = e.clientY > rect.top + rect.height / 2;
+          if (isAfter) target.parentNode.insertBefore(dragged, target.nextSibling);
+          else target.parentNode.insertBefore(dragged, target);
+        });
+      };
+
+      bindDragSort(visibleList);
+      bindDragSort(hiddenList);
+
+      // === 체크박스 변경 → 영역 이동 ===
+      visibleList.addEventListener('change', function(e) {
+        if (e.target.type !== 'checkbox') return;
+        if (e.target.disabled) return;
+        const item = e.target.closest('.tx-order-item');
+        if (!item || e.target.checked) return;
+        hiddenList.appendChild(item);
+        e.target.checked = false;
+        updateCounts();
+      });
+
+      hiddenList.addEventListener('change', function(e) {
+        if (e.target.type !== 'checkbox') return;
+        const item = e.target.closest('.tx-order-item');
+        if (!item || !e.target.checked) return;
+        visibleList.appendChild(item);
+        e.target.checked = true;
+        updateCounts();
+      });
+
+      // === 이벤트 cleanup 헬퍼 ===
       let onKey = null;
-      const close = function() {
+      const cleanupAndClose = function() {
         if (onKey) document.removeEventListener('keydown', onKey);
         if (backdrop && backdrop.parentNode) backdrop.remove();
       };
 
-      // 적용 — 모든 체크박스 일괄 읽어서 _config 갱신 (스냅샷 패턴 회피)
+      // === 적용 ===
       const applyBtn = backdrop.querySelector('button[data-action="apply"]');
       applyBtn.addEventListener('click', function() {
-        backdrop.querySelectorAll('input[type="checkbox"][data-col-id]').forEach(function(cb) {
-          const colId = cb.getAttribute('data-col-id');
-          self.setVisibility(colId, cb.checked);
+        const newOrder = Array.from(visibleList.children).map(function(item) {
+          return item.getAttribute('data-col-id');
         });
+        const newHidden = Array.from(hiddenList.children).map(function(item) {
+          return item.getAttribute('data-col-id');
+        });
+        // 안전망: 필수 컬럼이 hidden에 있으면 order로 강제 이동
+        const filteredHidden = [];
+        newHidden.forEach(function(id) {
+          if (self.isRequired(id)) {
+            if (newOrder.indexOf(id) < 0) newOrder.push(id);
+          } else {
+            filteredHidden.push(id);
+          }
+        });
+        self._config.order = newOrder;
+        self._config.hidden = filteredHidden;
         self.saveConfig();
         self._renderThead();
         if (typeof _tx !== 'undefined' && typeof _tx.renderItemsTable === 'function') {
           _tx.renderItemsTable();
         }
-        close();
+        cleanupAndClose();
       });
 
-      // 취소 — 변경 무시 (체크박스 상태가 _config에 반영 안 됨)
+      // === 취소 — snapshot 복원 ===
+      const cancel = function() {
+        self._config = snapshot;
+        cleanupAndClose();
+      };
       const cancelBtn = backdrop.querySelector('button[data-action="cancel"]');
-      cancelBtn.addEventListener('click', close);
+      cancelBtn.addEventListener('click', cancel);
 
-      // 기본값 초기화 — confirm + reset + 즉시 적용 + 모달 재오픈
+      onKey = function(e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          cancel();
+        }
+      };
+      document.addEventListener('keydown', onKey);
+
+      backdrop.addEventListener('click', function(e) {
+        if (e.target === backdrop) cancel();
+      });
+
+      // === 기본값 초기화 ===
       const resetBtn = backdrop.querySelector('.tx-cols-modal-reset');
       resetBtn.addEventListener('click', function() {
         if (!confirm('컬럼 설정을 기본값으로 초기화하시겠습니까?')) return;
@@ -29453,22 +29666,8 @@ const _tx = {
         if (typeof _tx !== 'undefined' && typeof _tx.renderItemsTable === 'function') {
           _tx.renderItemsTable();
         }
-        close();
+        cleanupAndClose();
         self._showSettingsModal();
-      });
-
-      // Esc 키 → 취소
-      onKey = function(e) {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          close();
-        }
-      };
-      document.addEventListener('keydown', onKey);
-
-      // 백드롭 클릭 → 취소 (모달 본체 클릭은 stopPropagation 없이도 안전 — backdrop 직접 매칭)
-      backdrop.addEventListener('click', function(e) {
-        if (e.target === backdrop) close();
       });
     },
   },
@@ -30183,6 +30382,8 @@ const _tx = {
     if (dateEl) dateEl.value = this.state.transactionDate;
 
     this._updateSaveModeUI();
+    // [Phase 9-e FAIL 4 fix] 빈 라인 1개 보장 (renderItemsTable 직전)
+    this._ensureEmptyTrailingRow();
     this.renderItemsTable();
     this.renderSummary();
     if (this.grade && typeof this.grade.renderBadge === 'function') this.grade.renderBadge();
