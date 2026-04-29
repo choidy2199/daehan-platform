@@ -27461,8 +27461,8 @@ const _tx = {
     // Phase 4: 수정 모드 UI 초기화 (신규 작성 모드)
     this._updateSaveModeUI();
 
-    // [Phase 9-e FAIL 4 fix] 빈 라인 1개 보장 (인라인 검색 진입점)
-    this._ensureEmptyTrailingRow();
+    // [Phase 10 단계 4] 첫 진입 시 빈 라인 5개 (수정 모드 진입 시 보존)
+    if (this.state.items.length === 0) this._initEmptyRows();
 
     // 초기 상태: 상품 라인 빈 안내 행
     this.renderItemsTable();
@@ -27924,10 +27924,7 @@ const _tx = {
     // 합계 재계산
     if (typeof this.recalcItem === 'function') this.recalcItem(rowIdx);
 
-    // 마지막 빈 라인 보장
-    this._ensureEmptyTrailingRow();
-
-    // 재렌더 (in-place 채움 → 텍스트 표시 전환 + 다음 빈 라인 표시)
+    // 재렌더 (in-place 채움 → 텍스트 표시 전환)
     this.renderItemsTable();
     this.renderSummary();
 
@@ -27946,6 +27943,17 @@ const _tx = {
         if (typeof qtyInput.select === 'function') qtyInput.select();
       }
     }, 50);
+  },
+
+  _initEmptyRows() {
+    // [Phase 10 단계 4] 빈 라인 5개 초기 보장 (자동 추가 X)
+    this.state.items = [
+      this._createEmptyItem(),
+      this._createEmptyItem(),
+      this._createEmptyItem(),
+      this._createEmptyItem(),
+      this._createEmptyItem()
+    ];
   },
 
   // === 마지막 빈 라인 보장 (in-place 채움 후 새 빈 라인 자동 추가) ===
@@ -28016,7 +28024,6 @@ const _tx = {
         e.preventDefault();
         e.stopPropagation();
         target.blur();   // capture blur 트리거 → 가격 commit
-        self._ensureEmptyTrailingRow();
         self.renderItemsTable();
         setTimeout(function() {
           const nextRow = document.querySelector(
@@ -28036,7 +28043,6 @@ const _tx = {
         e.stopPropagation();
         const item = self.state.items[rowIdx];
         if (item) item.memo = target.value || '';
-        self._ensureEmptyTrailingRow();
         const nextRow = document.querySelector(
           '#tx-items-body tr[data-idx="' + (rowIdx + 1) + '"]'
         );
@@ -28123,6 +28129,7 @@ const _tx = {
       resetBtn.addEventListener('click', function() {
         if (_tx.state.items.length > 0 && !confirm('작성 중인 라인을 모두 비우시겠습니까?')) return;
         _tx.state.items = [];
+        _tx._initEmptyRows();
         _tx.renderItemsTable();
         _tx.renderSummary();
       });
@@ -30415,8 +30422,8 @@ const _tx = {
     if (dateEl) dateEl.value = this.state.transactionDate;
 
     this._updateSaveModeUI();
-    // [Phase 9-e FAIL 4 fix] 빈 라인 1개 보장 (renderItemsTable 직전)
-    this._ensureEmptyTrailingRow();
+    // [Phase 10 단계 4] 새 거래명세서 진입 시 빈 라인 5개 보장
+    this._initEmptyRows();
     this.renderItemsTable();
     this.renderSummary();
     if (this.grade && typeof this.grade.renderBadge === 'function') this.grade.renderBadge();
