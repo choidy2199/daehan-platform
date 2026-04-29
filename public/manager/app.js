@@ -27754,28 +27754,14 @@ const _tx = {
       const rowIdx = parseInt(tr.getAttribute('data-idx'), 10);
       if (isNaN(rowIdx)) return;
 
-      // focus/blur — 노란 outline 시각 효과 보존 (Phase 9 자산)
-      input.addEventListener('focus', function() {
-        cell.classList.add('tx-focused');
-      });
-      input.addEventListener('blur', function() {
-        cell.classList.remove('tx-focused');
-      });
+      // [단계 5-2e] IME 상태 추적 + 검색 보류 플래그 (forEach 콜백마다 독립 인스턴스)
+      let isComposing = false;
+      let pendingEnter = false;
 
-      // 키보드 — Enter 시 검색 → 0/1/2+건 분기
-      input.addEventListener('keydown', function(e) {
-        // [Phase 10 단계 5-2c] 한글 IME composing 중 Enter는 변환 확정용 — 무시
-        if (e.isComposing || e.keyCode === 229) return;
-        if (e.key !== 'Enter') return;
-
+      // [단계 5-2e] 검색 실행 로직 추출 (keydown 즉시 실행 / compositionend 지연 실행에서 공유)
+      function executeNameSearch() {
         const query = (input.value || '').trim();
-        if (!query) {
-          // 빈 입력 + Enter는 기존 동작 유지 (다른 핸들러가 처리)
-          return;
-        }
-
-        e.preventDefault();
-        e.stopPropagation();  // _bindItemsTable / _bindItemsCellNav 추가 핸들러 차단
+        if (!query) return;
 
         const results = self._runTxModalSearch(query);
         if (results.length === 0) {
@@ -27788,6 +27774,43 @@ const _tx = {
           // 2+건 → 80% 모달 표시
           self._openTxNameSearchModal(rowIdx, query);
         }
+      }
+
+      input.addEventListener('compositionstart', function() {
+        isComposing = true;
+      });
+      input.addEventListener('compositionend', function() {
+        isComposing = false;
+        // [단계 5-2e] composing 중에 Enter가 눌렸으면 commit 완료 후 검색 트리거
+        if (pendingEnter) {
+          pendingEnter = false;
+          // setTimeout 0 — IME가 input.value에 마지막 음절을 commit한 직후 실행 보장
+          setTimeout(executeNameSearch, 0);
+        }
+      });
+
+      // focus/blur — 노란 outline 시각 효과 보존 (Phase 9 자산)
+      input.addEventListener('focus', function() {
+        cell.classList.add('tx-focused');
+      });
+      input.addEventListener('blur', function() {
+        cell.classList.remove('tx-focused');
+      });
+
+      // [단계 5-2e] keydown Enter 처리 — composing 중이면 보류, 아니면 즉시 실행
+      input.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        e.stopPropagation();  // _bindItemsTable / _bindItemsCellNav 추가 핸들러 차단
+
+        // composing 중이면 검색 보류 — compositionend가 깨어나서 처리
+        if (isComposing || e.isComposing || e.keyCode === 229) {
+          pendingEnter = true;
+          return;
+        }
+
+        // composing 중 아님 (영문, 받침 없는 음절 후, blur 후 재진입 등) → 즉시 실행
+        executeNameSearch();
       });
     });
   },
