@@ -29341,8 +29341,8 @@ const _tx = {
         const align = c.align || 'left';
         const isReq = this.isRequired(c.id);
         const lockHtml = isReq ? '<span class="tx-col-lock" title="필수 컬럼">🔒</span>' : '';
-        // 마지막 컬럼은 ✕ 액션과 인접 — 핸들 제외
-        const resizeHtml = (c.resizable !== false && i < cols.length - 1)
+        // [Phase 10 v9-2 A] 모든 표시 컬럼에 핸들 부착 (마지막 컬럼 ↔ ✕ 액션 사이도 조정 가능)
+        const resizeHtml = (c.resizable !== false && i < cols.length)
           ? '<span class="tx-row-resize-handle" data-col-id="' + c.id + '"></span>'
           : '';
         thHtml += '<th data-col-id="' + c.id + '" style="text-align:' + align + '">' +
