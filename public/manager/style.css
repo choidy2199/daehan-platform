@@ -1796,10 +1796,11 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .tx-items-wrap {
   border: 1px solid #EAECF2;
   border-radius: 6px;
-  overflow: hidden;
+  overflow-x: auto;
 }
 .tx-items-table {
-  width: 100%;
+  width: auto;
+  min-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
   font-family: inherit;
