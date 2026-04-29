@@ -27891,6 +27891,9 @@ const _tx = {
     // 합계 재계산
     if (typeof this.recalcItem === 'function') this.recalcItem(rowIdx);
 
+    // 버그 E-2: in-place 채움 후 마지막 빈 라인 1개 보장
+    this._ensureEmptyTrailingRow();
+
     // 재렌더 (in-place 채움 → 텍스트 표시 전환)
     this.renderItemsTable();
     this.renderSummary();
@@ -28753,6 +28756,8 @@ const _tx = {
       idx = this.state.items.push(item) - 1;
     }
     this.recalcItem(idx);
+    // 버그 E-2: 데이터 추가 후 마지막 빈 라인 1개 보장
+    this._ensureEmptyTrailingRow();
     this.renderItemsTable();
     this.renderSummary();
 
@@ -28765,6 +28770,8 @@ const _tx = {
   removeItem(idx) {
     if (idx < 0 || idx >= this.state.items.length) return;
     this.state.items.splice(idx, 1);
+    // 버그 E-2: splice 후 마지막 빈 라인 1개 보장
+    this._ensureEmptyTrailingRow();
     this.renderItemsTable();
     this.renderSummary();
   },
