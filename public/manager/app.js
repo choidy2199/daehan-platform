@@ -29135,7 +29135,7 @@ const _tx = {
   lineColumns: {
     // 필수 컬럼 (8개, 사용자가 숨김 불가)
     COLUMNS_REQUIRED: [
-      { id: 'no',           label: 'No',      width: 32,    align: 'center', resizable: false },
+      { id: 'no',           label: 'No',      width: 32,    align: 'center', resizable: true },
       { id: 'manageCode',   label: '관리코드', width: 100,   align: 'center', resizable: true },
       { id: 'name',         label: '품명',     width: 'flex', align: 'left',  resizable: true, flex: 2 },
       { id: 'qty',          label: '수량',     width: 56,    align: 'center', resizable: true },
