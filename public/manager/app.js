@@ -28407,7 +28407,7 @@ const _tx = {
       manageCode: '',
       name: '',
       spec: '',
-      qty: 1,
+      qty: '',
       unitPrice: 0,
       supplyAmount: 0,
       vatAmount: 0,
@@ -28443,8 +28443,17 @@ const _tx = {
       const rowIdx = parseInt(tr.getAttribute('data-idx'), 10);
       if (isNaN(rowIdx)) return;
 
-      // 수량 → 단가
+      // 수량 → 단가 (버그 D: 빈칸 가드 — Enter/Tab 빈값이면 알림 + 포커스 유지)
       if (field === 'qty') {
+        const v = String(target.value == null ? '' : target.value).trim();
+        if (v === '') {
+          e.preventDefault();
+          e.stopPropagation();
+          alert('수량을 입력하세요');
+          target.focus();
+          if (typeof target.select === 'function') target.select();
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         const priceInput = tr.querySelector('input[data-field="price"]');
@@ -28703,7 +28712,7 @@ const _tx = {
     const item = {
       code: code,
       name: name,
-      qty: 1,
+      qty: '',
       unitPrice: defaultPrice,
       spec: spec,
       supplyAmount: 0,
@@ -28865,7 +28874,7 @@ const _tx = {
             '<td>' + (i + 1) + '</td>' +
             '<td>' + escape(it.code) + '</td>' +
             '<td style="text-align:left">' + escape(it.name) + '</td>' +
-            '<td><input class="tx-cell-input" data-field="qty" type="text" inputmode="numeric" value="' + fmt(it.qty) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;font-family:inherit;text-align:center;outline:none"></td>' +
+            '<td><input class="tx-cell-input" data-field="qty" type="text" inputmode="numeric" placeholder="-" value="' + (it.qty == null || it.qty === '' ? '' : fmt(it.qty)) + '" style="width:100%;height:26px;padding:0 6px;border:none;background:transparent;font-size:13px;font-family:inherit;text-align:center;outline:none"></td>' +
             '<td class="' + priceClass + '" style="padding:2px 6px"><input class="tx-cell-input" data-field="price" type="text" inputmode="numeric" value="' + fmt(it.unitPrice) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid transparent;background:transparent;border-radius:4px;font-size:13px;font-family:inherit;font-weight:inherit;color:inherit;text-align:right;outline:none"></td>' +
             '<td style="text-align:right">' + fmt(it.supplyAmount) + '</td>' +
             '<td style="text-align:right">' + fmt(it.vatAmount) + '</td>' +
@@ -28929,7 +28938,7 @@ const _tx = {
 
       case 'qty':
         return '<td' + dataAttr + styleAttr + '>' +
-               '<input class="tx-cell-input" data-field="qty" type="text" inputmode="numeric" value="' + fmt(item.qty) + '" style="width:100%;height:26px;padding:0 6px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;font-family:inherit;text-align:center;outline:none">' +
+               '<input class="tx-cell-input" data-field="qty" type="text" inputmode="numeric" placeholder="-" value="' + (item.qty == null || item.qty === '' ? '' : fmt(item.qty)) + '" style="width:100%;height:26px;padding:0 6px;border:none;background:transparent;font-size:13px;font-family:inherit;text-align:center;outline:none">' +
                '</td>';
 
       case 'unitPrice': {
