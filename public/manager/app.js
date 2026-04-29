@@ -27764,6 +27764,8 @@ const _tx = {
 
       // 키보드 — Enter 시 검색 → 0/1/2+건 분기
       input.addEventListener('keydown', function(e) {
+        // [Phase 10 단계 5-2c] 한글 IME composing 중 Enter는 변환 확정용 — 무시
+        if (e.isComposing || e.keyCode === 229) return;
         if (e.key !== 'Enter') return;
 
         const query = (input.value || '').trim();
