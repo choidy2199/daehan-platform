@@ -29369,6 +29369,16 @@ const _tx = {
         handle.addEventListener('mousedown', function(e) {
           e.preventDefault();
           e.stopPropagation();
+          // [Phase 10 단계 3.5-2] drag 시작 시점에 flex col을 실측 px로 박음 (자동분배 차단)
+          const allCols = colgroup.querySelectorAll('col');
+          allCols.forEach(function(c) {
+            if (!c.style.width) {
+              const cid = c.getAttribute('data-col-id');
+              if (cid && cid !== '__action') {
+                c.style.width = c.getBoundingClientRect().width + 'px';
+              }
+            }
+          });
           const colId = handle.getAttribute('data-col-id');
           const th = handle.closest('th');
           const col = colgroup.querySelector('col[data-col-id="' + colId + '"]');

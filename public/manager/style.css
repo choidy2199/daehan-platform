@@ -3346,13 +3346,6 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   min-height: 0;
 }
 
-/* 상품라인 — 10행까지 자연 확장 */
-.tx-doc-body .tx-items-table {
-  width: 100%;
-  border-collapse: collapse;
-  flex-shrink: 0;
-}
-
 /* 과거거래 패널 — stretch + 리스트 스크롤 */
 .tx-grid .tx-history-panel {
   height: 100%;
