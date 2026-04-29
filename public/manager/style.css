@@ -4005,7 +4005,6 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 
 .tx-search-modal-results-header {
   display: grid;
-  grid-template-columns: 110px 1fr 110px 80px 50px;
   padding: 8px 14px;
   background: #EAECF2;
   font-size: 11px;
@@ -4024,7 +4023,6 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 
 .tx-search-modal-row {
   display: grid;
-  grid-template-columns: 110px 1fr 110px 80px 50px;
   padding: 9px 14px;
   border-bottom: 0.5px solid #F0F2F7;
   font-size: 13px;
@@ -4124,4 +4122,55 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 .tx-search-modal-cancel:hover {
   background: #F8F9FB;
   border-color: #B8BFCC;
+}
+
+/* === [Phase 10 단계 5-2] 모달 14컬럼 + ⚙ 컬럼 설정 === */
+
+/* 14컬럼 가로 스크롤 (옵션 A — 80vw 유지 + overflow-x: auto) */
+.tx-search-modal-results,
+.tx-search-modal-results-header {
+  overflow-x: auto;
+}
+
+/* 헤더와 결과 행 grid는 inline style.gridTemplateColumns로 동적 처리됨 */
+
+/* ⚙ 버튼 (모달 검색 영역) */
+.tx-search-modal-cogs {
+  background: transparent;
+  border: 0.5px solid #DDE1EB;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  color: #5A6070;
+  flex-shrink: 0;
+}
+.tx-search-modal-cogs:hover {
+  background: #F8F9FB;
+  border-color: #B8BFCC;
+  color: #1A1D23;
+}
+
+/* ⚙ 컬럼 설정 모달 — .tx-cols-modal 패턴 재활용, 추가 룰만 */
+.tx-search-modal-cols-item {
+  user-select: none;
+}
+.tx-search-modal-cols-item:hover {
+  background: #F8F9FB !important;
+  border-color: #B8BFCC !important;
+}
+.tx-search-modal-cols-item[draggable="true"] {
+  cursor: move;
+}
+
+/* 결과 행 — 14컬럼 동적 grid 적용 시 cell padding 보정 */
+.tx-search-modal-row > div {
+  padding: 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tx-search-modal-results-header > div {
+  padding: 0 6px;
 }

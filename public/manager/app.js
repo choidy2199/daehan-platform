@@ -27917,14 +27917,9 @@ const _tx = {
       + '<div class="tx-search-modal-search">'
       +   '<input id="tx-search-modal-input" type="text" value="' + safeQuery + '" autocomplete="off" />'
       +   '<span class="tx-search-modal-count">' + lastResults.length + '건 매칭</span>'
+      +   '<button type="button" id="tx-search-modal-cogs" class="tx-search-modal-cogs" title="컬럼 설정">⚙</button>'
       + '</div>'
-      + '<div class="tx-search-modal-results-header">'
-      +   '<div>모델명</div>'
-      +   '<div>품명</div>'
-      +   '<div>규격</div>'
-      +   '<div style="text-align: right;">단가</div>'
-      +   '<div style="text-align: right;">재고</div>'
-      + '</div>'
+      + '<div class="tx-search-modal-results-header" id="tx-search-modal-results-header"></div>'
       + '<div class="tx-search-modal-results" id="tx-search-modal-results"></div>'
       + '<div class="tx-search-modal-footer">'
       +   '<div class="tx-search-modal-footer-keys">'
@@ -28008,6 +28003,11 @@ const _tx = {
       self._closeTxNameSearchModal();
     });
 
+    // [Phase 10 단계 5-2] ⚙ 컬럼 설정 버튼
+    modal.querySelector('#tx-search-modal-cogs').addEventListener('click', function() {
+      self._openTxSearchModalColsSettings();
+    });
+
     // 백드롭 click (모달 안 click은 stopPropagation)
     backdrop.addEventListener('click', function(e) {
       if (e.target === backdrop) {
@@ -28027,50 +28027,59 @@ const _tx = {
 
   _renderTxModalResults(results, selectedIdx) {
     const container = document.getElementById('tx-search-modal-results');
+    const headerContainer = document.getElementById('tx-search-modal-results-header');
     if (!container) return;
 
+    // [Phase 10 단계 5-2] 모달 컬럼 설정 로드 (visible + order)
+    const visibleCols = this._getTxSearchModalVisibleCols();
+    const gridCols = visibleCols.map(function(c) {
+      return (c.width || c.defaultWidth || 80) + 'px';
+    }).join(' ');
+
+    // 헤더 동적 렌더 (label + align)
+    if (headerContainer) {
+      const RIGHT_ALIGN_IDS = ['stock','cost','priceA','retail','naver','open','ssg','in','out','pallet'];
+      let headerHtml = '';
+      visibleCols.forEach(function(col) {
+        const align = (RIGHT_ALIGN_IDS.indexOf(col.id) >= 0) ? 'right' : 'left';
+        headerHtml += '<div style="text-align:' + align + ';">' + (col.label || col.id) + '</div>';
+      });
+      headerContainer.style.gridTemplateColumns = gridCols;
+      headerContainer.innerHTML = headerHtml;
+    }
+
+    // 빈 결과 처리
     if (!results || results.length === 0) {
       container.innerHTML = '<div class="tx-search-modal-empty">검색 결과가 없습니다</div>';
       return;
     }
 
-    const esc = function(s) {
-      return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    };
+    // _tx.search._renderCell 재활용 (mw/gen source 분기 + 모든 14+컬럼 셀 매핑)
+    const renderCellFn = (this.search && typeof this.search._renderCell === 'function')
+      ? this.search._renderCell.bind(this.search)
+      : null;
 
     let html = '';
     for (let i = 0; i < results.length; i++) {
       const entry = results[i] || {};
+      const source = entry.source || 'milwaukee';
       const data = entry.data || {};
-      const code = data.code || data.manageCode || '';
-      const model = data.model || code || '-';
-      // mw_products: description (품명), detail (규격) / gen_products: name, spec
-      const name = data.description || data.name || '-';
-      const spec = data.detail || data.spec || '-';
-      const price = Number(data.priceRetail || data.priceA || 0);
-      // 재고 — findStock 전역 함수 (mw_products 기준)
-      let stock = '-';
-      let stockNum = null;
-      if (typeof findStock === 'function' && code) {
-        const s = findStock(code);
-        if (typeof s === 'number') {
-          stockNum = s;
-          stock = s.toLocaleString();
-        }
-      }
-      const stockClass = (stockNum === 0) ? ' tx-search-modal-stock-zero'
-                       : (stockNum != null && stockNum > 0) ? ' tx-search-modal-stock-ok'
-                       : '';
       const selectedClass = (i === selectedIdx) ? ' tx-search-modal-row-selected' : '';
 
-      html += '<div class="tx-search-modal-row' + selectedClass + '" data-idx="' + i + '">'
-        +   '<span class="tx-search-modal-cell-model">' + esc(model) + '</span>'
-        +   '<span class="tx-search-modal-cell-name">' + esc(name) + '</span>'
-        +   '<span class="tx-search-modal-cell-spec">' + esc(spec) + '</span>'
-        +   '<span class="tx-search-modal-cell-price">' + price.toLocaleString() + '</span>'
-        +   '<span class="tx-search-modal-cell-stock' + stockClass + '">' + esc(stock) + '</span>'
-        + '</div>';
+      let rowHtml = '<div class="tx-search-modal-row' + selectedClass + '" data-idx="' + i + '" style="grid-template-columns:' + gridCols + ';">';
+      visibleCols.forEach(function(col) {
+        let cellContent = '';
+        if (renderCellFn) {
+          try {
+            cellContent = renderCellFn(col, data, source);
+          } catch (e) {
+            cellContent = '';
+          }
+        }
+        rowHtml += '<div>' + cellContent + '</div>';
+      });
+      rowHtml += '</div>';
+      html += rowHtml;
     }
 
     container.innerHTML = html;
@@ -28095,6 +28104,230 @@ const _tx = {
       document.removeEventListener('keydown', this._txModalKeydownHandler);
       this._txModalKeydownHandler = null;
     }
+  },
+
+  // [Phase 10 단계 5-2] ⚙ 컬럼 설정 모달 — 검색 모달 전용 (lineColumns 모달과 별개)
+  _openTxSearchModalColsSettings() {
+    const self = this;
+
+    // 기존 컬럼 설정 모달 있으면 닫기
+    const existing = document.getElementById('tx-search-modal-cols-settings-backdrop');
+    if (existing) existing.remove();
+
+    // 현재 컬럼 설정 로드
+    const config = this._loadTxSearchModalColumns();
+
+    // 백드롭 + 모달 (.tx-code-modal-backdrop + .tx-cols-modal 패턴 재활용)
+    const backdrop = document.createElement('div');
+    backdrop.className = 'tx-code-modal-backdrop';
+    backdrop.id = 'tx-search-modal-cols-settings-backdrop';
+    backdrop.style.zIndex = '10000';  // 검색 모달(9999)보다 위
+
+    const modal = document.createElement('div');
+    modal.className = 'tx-cols-modal';
+    modal.style.maxWidth = '460px';
+
+    this._renderTxSearchModalColsSettings(modal, config);
+
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+
+    // 닫기: 백드롭 클릭 (모달 안 클릭은 stopPropagation)
+    backdrop.addEventListener('click', function(e) {
+      if (e.target === backdrop) backdrop.remove();
+    });
+    modal.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+  },
+
+  _renderTxSearchModalColsSettings(modal, config) {
+    const self = this;
+    const allCols = (this.search && this.search.COLUMNS) ? this.search.COLUMNS : [];
+
+    // order 기준 정렬
+    const sortedConfig = config.slice().sort(function(a, b) { return a.order - b.order; });
+
+    let html = '';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+    html += '<h3 style="margin:0;font-size:15px;font-weight:600;">검색 모달 컬럼 설정</h3>';
+    html += '<button type="button" id="tx-search-modal-cols-close" style="background:transparent;border:none;font-size:18px;cursor:pointer;color:#5A6070;">✕</button>';
+    html += '</div>';
+
+    html += '<div style="font-size:11px;color:#888A93;margin-bottom:8px;">드래그로 순서 변경, 토글로 표시/숨김</div>';
+
+    html += '<div id="tx-search-modal-cols-list" style="max-height:400px;overflow-y:auto;">';
+    sortedConfig.forEach(function(c) {
+      const def = allCols.find(function(d) { return d.id === c.id; });
+      if (!def) return;
+      const checked = c.hidden ? '' : 'checked';
+      html += '<div class="tx-search-modal-cols-item" draggable="true" data-id="' + c.id + '" style="display:flex;align-items:center;padding:6px 8px;border:1px solid #E5E7EB;border-radius:4px;margin-bottom:4px;background:#FFF;cursor:move;">';
+      html += '<span style="margin-right:8px;color:#888A93;">⋮⋮</span>';
+      html += '<span style="flex:1;font-size:13px;">' + def.label + '</span>';
+      html += '<label style="display:flex;align-items:center;cursor:pointer;">';
+      html += '<input type="checkbox" data-id="' + c.id + '" class="tx-search-modal-cols-toggle" ' + checked + ' style="margin-right:4px;">';
+      html += '<span style="font-size:11px;color:#5A6070;">표시</span>';
+      html += '</label>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    html += '<div style="display:flex;gap:8px;margin-top:14px;">';
+    html += '<button type="button" id="tx-search-modal-cols-reset" style="flex:1;padding:7px 10px;border:0.5px solid #DDE1EB;border-radius:6px;background:#FFF;cursor:pointer;font-size:12px;">기본값으로 초기화</button>';
+    html += '<button type="button" id="tx-search-modal-cols-apply" style="flex:1;padding:7px 10px;border:none;border-radius:6px;background:var(--tl-info);color:#FFF;cursor:pointer;font-size:12px;font-weight:500;">적용</button>';
+    html += '</div>';
+
+    modal.innerHTML = html;
+
+    // 드래그 정렬
+    const list = modal.querySelector('#tx-search-modal-cols-list');
+    let draggedEl = null;
+
+    list.addEventListener('dragstart', function(e) {
+      const item = e.target.closest && e.target.closest('.tx-search-modal-cols-item');
+      if (item) {
+        draggedEl = item;
+        item.style.opacity = '0.5';
+      }
+    });
+    list.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      const target = e.target.closest && e.target.closest('.tx-search-modal-cols-item');
+      if (target && draggedEl && target !== draggedEl) {
+        const rect = target.getBoundingClientRect();
+        const after = (e.clientY - rect.top) > rect.height / 2;
+        if (after) {
+          target.parentNode.insertBefore(draggedEl, target.nextSibling);
+        } else {
+          target.parentNode.insertBefore(draggedEl, target);
+        }
+      }
+    });
+    list.addEventListener('dragend', function() {
+      if (draggedEl) {
+        draggedEl.style.opacity = '1';
+        draggedEl = null;
+      }
+    });
+
+    // 닫기
+    modal.querySelector('#tx-search-modal-cols-close').addEventListener('click', function() {
+      const bd = document.getElementById('tx-search-modal-cols-settings-backdrop');
+      if (bd) bd.remove();
+    });
+
+    // 초기화
+    modal.querySelector('#tx-search-modal-cols-reset').addEventListener('click', function() {
+      if (!confirm('기본값으로 되돌리시겠습니까?')) return;
+      const userId = (window.currentUser && window.currentUser.loginId) || 'default';
+      const key = 'tx_search_modal_columns_' + userId;
+      try { localStorage.removeItem(key); } catch (e) {}
+      const newConfig = self._loadTxSearchModalColumns();
+      self._renderTxSearchModalColsSettings(modal, newConfig);
+    });
+
+    // 적용 — DOM 순서 + 토글 상태로 새 config 저장 + 검색 모달 재렌더
+    modal.querySelector('#tx-search-modal-cols-apply').addEventListener('click', function() {
+      const items = modal.querySelectorAll('#tx-search-modal-cols-list .tx-search-modal-cols-item');
+      const newConfig = [];
+      items.forEach(function(item, i) {
+        const id = item.getAttribute('data-id');
+        const toggle = item.querySelector('.tx-search-modal-cols-toggle');
+        const oldEntry = config.find(function(c) { return c.id === id; });
+        newConfig.push({
+          id: id,
+          order: i,
+          hidden: !toggle.checked,
+          width: oldEntry ? oldEntry.width : null
+        });
+      });
+      self._saveTxSearchModalColumns(newConfig);
+
+      // 컬럼 설정 모달 닫기
+      const bd = document.getElementById('tx-search-modal-cols-settings-backdrop');
+      if (bd) bd.remove();
+
+      // 검색 모달 재렌더 (현재 검색어로 재검색)
+      const searchInput = document.getElementById('tx-search-modal-input');
+      if (searchInput) {
+        const query = searchInput.value.trim();
+        const results = self._runTxModalSearch(query);
+        const countEl = document.querySelector('.tx-search-modal-count');
+        if (countEl) countEl.textContent = results.length + '건 매칭';
+        self._renderTxModalResults(results, 0);
+      }
+    });
+  },
+
+  // === [Phase 10 단계 5-2] 검색 모달 전용 컬럼 설정 — 사용자별 분리 (_tx.search.COLUMNS 17개 재활용) ===
+  _loadTxSearchModalColumns() {
+    const userId = (window.currentUser && window.currentUser.loginId) || 'default';
+    const key = 'tx_search_modal_columns_' + userId;
+    let saved = null;
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) saved = JSON.parse(raw);
+    } catch (e) {}
+
+    // _tx.search.COLUMNS (17개) 기준 + 모달 default hidden 3개 (대분류/소매가/SSG)
+    const HIDDEN_DEFAULT = ['category', 'retail', 'ssg'];
+    const allCols = (this.search && this.search.COLUMNS) ? this.search.COLUMNS : [];
+
+    if (!saved || !Array.isArray(saved) || saved.length === 0) {
+      return allCols.map(function(c, i) {
+        return {
+          id: c.id,
+          order: i,
+          hidden: HIDDEN_DEFAULT.indexOf(c.id) >= 0,
+          width: c.defaultWidth
+        };
+      });
+    }
+
+    // saved 검증 + 누락 컬럼 추가 (마이그레이션)
+    const result = [];
+    const savedIds = saved.map(function(s) { return s.id; });
+    saved.forEach(function(s) {
+      const col = allCols.find(function(c) { return c.id === s.id; });
+      if (col) result.push(s);
+    });
+    allCols.forEach(function(c) {
+      if (savedIds.indexOf(c.id) < 0) {
+        result.push({
+          id: c.id,
+          order: result.length,
+          hidden: HIDDEN_DEFAULT.indexOf(c.id) >= 0,
+          width: c.defaultWidth
+        });
+      }
+    });
+    return result;
+  },
+
+  _saveTxSearchModalColumns(config) {
+    const userId = (window.currentUser && window.currentUser.loginId) || 'default';
+    const key = 'tx_search_modal_columns_' + userId;
+    try {
+      localStorage.setItem(key, JSON.stringify(config));
+    } catch (e) {
+      console.error('[Phase 10 단계 5-2] modal columns save 실패:', e);
+    }
+  },
+
+  _getTxSearchModalVisibleCols() {
+    const config = this._loadTxSearchModalColumns();
+    const allCols = (this.search && this.search.COLUMNS) ? this.search.COLUMNS : [];
+
+    // hidden 제외 + order 정렬 + 컬럼 정의(label/defaultWidth) 머지
+    return config
+      .filter(function(c) { return !c.hidden; })
+      .sort(function(a, b) { return a.order - b.order; })
+      .map(function(c) {
+        const def = allCols.find(function(d) { return d.id === c.id; });
+        if (!def) return null;
+        return Object.assign({}, def, { width: c.width || def.defaultWidth });
+      })
+      .filter(function(c) { return c !== null; });
   },
 
   _initEmptyRows() {
