@@ -30268,6 +30268,34 @@ const _tx = {
       if (input._txCustBound) return;
       input._txCustBound = true;
 
+      // [버그 F] IME 가드 + Enter → 첫 빈 라인 품명 셀 포커스 (5-2e 패턴)
+      let isComposing = false;
+      let pendingEnter = false;
+
+      input.addEventListener('compositionstart', function() { isComposing = true; });
+      input.addEventListener('compositionend', function() {
+        isComposing = false;
+        if (pendingEnter) {
+          pendingEnter = false;
+          setTimeout(handleCustomerEnterToItemName, 0);
+        }
+      });
+
+      function handleCustomerEnterToItemName() {
+        const value = String(input.value || '').trim();
+        if (!value && !_tx.state.customerName) return;
+        const emptyIdx = _tx.state.items.findIndex(function(it) {
+          return !it.code && !it.name;
+        });
+        if (emptyIdx < 0) return;
+        const tbody = document.getElementById('tx-items-body');
+        if (!tbody) return;
+        const targetRow = tbody.querySelector('tr[data-idx="' + emptyIdx + '"]');
+        if (!targetRow) return;
+        const nameInput = targetRow.querySelector('input.tx-name-input');
+        if (nameInput) nameInput.focus();
+      }
+
       // (1) 입력 이벤트 — bindSearchInput 헬퍼 (한글 IME + 150ms autocomplete)
       // _poCustomer / _ipinv2Customer와 일관 (메모리 패턴: 자동완성 = autocomplete 150ms)
       if (typeof bindSearchInput === 'function') {
@@ -30292,6 +30320,18 @@ const _tx = {
           if (e.key === 'ArrowDown') {
             e.preventDefault();
             self.openDropdown();
+            return;
+          }
+          // [버그 F] dropdown 닫힘 + Enter → 첫 빈 라인 품명 셀 포커스
+          if (e.key === 'Enter') {
+            if (isComposing || e.isComposing || e.keyCode === 229) {
+              pendingEnter = true;
+              e.preventDefault();
+              return;
+            }
+            e.preventDefault();
+            handleCustomerEnterToItemName();
+            return;
           }
           return;
         }
