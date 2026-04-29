@@ -27987,7 +27987,8 @@ const _tx = {
         self._closeTxNameSearchModal();
       }
     };
-    document.addEventListener('keydown', this._txModalKeydownHandler);
+    // [Phase 10 단계 5-2b] capture phase로 등록 — 2411 전역 Esc 핸들러(bubble)보다 먼저 실행
+    document.addEventListener('keydown', this._txModalKeydownHandler, true);
 
     // 마우스 핸들러 — 행 click (이벤트 위임)
     const resultsEl = document.getElementById('tx-search-modal-results');
@@ -28106,7 +28107,8 @@ const _tx = {
     const backdrop = document.getElementById('tx-search-modal-backdrop');
     if (backdrop) backdrop.remove();
     if (this._txModalKeydownHandler) {
-      document.removeEventListener('keydown', this._txModalKeydownHandler);
+      // [Phase 10 단계 5-2b] capture phase 등록과 일치 — cleanup 정상 동작
+      document.removeEventListener('keydown', this._txModalKeydownHandler, true);
       this._txModalKeydownHandler = null;
     }
   },
