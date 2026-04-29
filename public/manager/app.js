@@ -29339,14 +29339,13 @@ const _tx = {
       for (let i = 0; i < cols.length; i++) {
         const c = cols[i];
         const align = c.align || 'left';
-        const isReq = this.isRequired(c.id);
-        const lockHtml = isReq ? '<span class="tx-col-lock" title="필수 컬럼">🔒</span>' : '';
+        // [Phase 10 v11 D] 자물쇠 element 제거 — 잠금 상태는 ⚙ 모달에서만 표시
         // [Phase 10 v9-2 A] 모든 표시 컬럼에 핸들 부착 (마지막 컬럼 ↔ ✕ 액션 사이도 조정 가능)
         const resizeHtml = (c.resizable !== false && i < cols.length)
           ? '<span class="tx-row-resize-handle" data-col-id="' + c.id + '"></span>'
           : '';
         thHtml += '<th data-col-id="' + c.id + '" style="text-align:' + align + '">' +
-                  c.label + lockHtml + resizeHtml + '</th>';
+                  c.label + resizeHtml + '</th>';
       }
       // [Phase 9-e] ✕ 액션 th — 빈 헤더 (⚙ 버튼은 다크바로 이동)
       thHtml += '<th class="tx-col-action" data-col-id="__action"></th>';
