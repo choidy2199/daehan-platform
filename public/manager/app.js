@@ -28461,8 +28461,8 @@ const _tx = {
         e.stopPropagation();
         const priceInput = tr.querySelector('input[data-field="price"]');
         if (priceInput) {
-          // 버그 C-2: select() 제거 — 자동값 전체 선택이 race 트리거 + 커서 깜빡 가시화
           priceInput.focus();
+          if (typeof priceInput.select === 'function') priceInput.select();
         }
         return;
       }
