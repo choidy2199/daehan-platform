@@ -702,8 +702,8 @@ var _realtimeRefreshTimer = null;
     return;
   }
 
-  var SUPABASE_URL = 'https://vmbqutwrfzhruukerfkc.supabase.co';
-  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtYnF1dHdyZnpocnV1a2VyZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Mzc5MjAsImV4cCI6MjA5MDIxMzkyMH0.-FI_3De1sRmAxLNQ8J45MT9hO9U9aSTchxBcq47_b-I';
+  var SUPABASE_URL = 'https://skloeaxinaxzqmihfzet.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
 
   var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -16502,8 +16502,8 @@ function _calcBotCostPeriods(daily) {
 
 async function loadBotApiCost() {
   try {
-    var url = 'https://vmbqutwrfzhruukerfkc.supabase.co';
-    var anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtYnF1dHdyZnpocnV1a2VyZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Mzc5MjAsImV4cCI6MjA5MDIxMzkyMH0.-FI_3De1sRmAxLNQ8J45MT9hO9U9aSTchxBcq47_b-I';
+    var url = 'https://skloeaxinaxzqmihfzet.supabase.co';
+    var anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
     var res = await fetch(url + '/rest/v1/app_data?key=eq.mw_bot_usage&select=value', {
       headers: { 'apikey': anonKey, 'Authorization': 'Bearer ' + anonKey }
     });
@@ -19247,8 +19247,8 @@ function _updateNoticeBadge() {
 
 (function initNoticesRealtime() {
   if (typeof supabase === 'undefined' || !supabase.createClient) return;
-  var SUPABASE_URL = 'https://vmbqutwrfzhruukerfkc.supabase.co';
-  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtYnF1dHdyZnpocnV1a2VyZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Mzc5MjAsImV4cCI6MjA5MDIxMzkyMH0.-FI_3De1sRmAxLNQ8J45MT9hO9U9aSTchxBcq47_b-I';
+  var SUPABASE_URL = 'https://skloeaxinaxzqmihfzet.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
   var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   sbClient.channel('notices_changes')
@@ -20339,8 +20339,8 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── Realtime ──
 (function initBackordersRealtime() {
   if (typeof supabase === 'undefined' || !supabase.createClient) return;
-  var SUPABASE_URL = 'https://vmbqutwrfzhruukerfkc.supabase.co';
-  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtYnF1dHdyZnpocnV1a2VyZmtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2Mzc5MjAsImV4cCI6MjA5MDIxMzkyMH0.-FI_3De1sRmAxLNQ8J45MT9hO9U9aSTchxBcq47_b-I';
+  var SUPABASE_URL = 'https://skloeaxinaxzqmihfzet.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
   var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   sbClient.channel('backorders_changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'backorders' }, function(payload) {

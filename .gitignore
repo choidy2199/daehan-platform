@@ -48,3 +48,4 @@ daehan-platform-setup-complete.md
 
 # Claude Code 로컬 작업파일 (launch.json, scheduled_tasks.lock 등)
 .claude/
+public/manager/app.js.backup-before-migration
