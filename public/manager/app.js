@@ -28459,11 +28459,23 @@ const _tx = {
         }
         e.preventDefault();
         e.stopPropagation();
-        const priceInput = tr.querySelector('input[data-field="price"]');
-        if (priceInput) {
-          priceInput.focus();
-          if (typeof priceInput.select === 'function') priceInput.select();
-        }
+        // [버그 C 진범 fix] focus 이동 전에 명시 commit으로 render 먼저 끝냄
+        // race: priceInput.focus() → qty input blur → blur capture에서 updateItemQty 자동 호출
+        //       → renderItemsTable → focus 대상 detached → focus body
+        // 해결: focus 이동 안 함. 명시 commit + blur capture 가드 + setTimeout(0)으로 새 DOM에서 다음 라인 품명 focus
+        // 정책 (ii): 단가는 마우스 클릭으로만 수정. 키보드는 다음 라인 품명 직진
+        const num = parseInt(v.replace(/,/g, ''), 10);
+        const val = isNaN(num) ? 0 : num;
+        self._isCommitting = true;
+        self.updateItemQty(rowIdx, val);   // recalcItem + renderItemsTable + renderSummary 동기 완료
+        self._isCommitting = false;
+        setTimeout(function() {
+          const nextRow = document.querySelector('#tx-items-body tr[data-idx="' + (rowIdx + 1) + '"]');
+          if (nextRow) {
+            const nameInput = nextRow.querySelector('input.tx-name-input');
+            if (nameInput) nameInput.focus();
+          }
+        }, 0);
         return;
       }
 
@@ -28549,6 +28561,8 @@ const _tx = {
 
     // 수량 / 단가 편집 (blur 저장)
     body.addEventListener('blur', function(e) {
+      // [버그 C 진범 fix] 명시 commit 진행 중이면 중복 호출 방지
+      if (_tx._isCommitting) return;
       const input = e.target;
       if (!(input instanceof HTMLInputElement)) return;
       const tr = input.closest('tr[data-idx]');
