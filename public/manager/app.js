@@ -28459,16 +28459,11 @@ const _tx = {
         }
         e.preventDefault();
         e.stopPropagation();
-        // [버그 C 우회] 단가 셀 키보드 자동 진입은 recalcItem 자동 단가 계산과 충돌(race).
-        // 단가 수정은 마우스 클릭만 허용. 키보드 흐름은 다음 라인 품명으로 직진.
-        // setTimeout(0)로 defer — 동기 renderItemsTable 호출 시 DOM 재생성 후 focus 보장.
-        setTimeout(function() {
-          const nextRow = document.querySelector('#tx-items-body tr[data-idx="' + (rowIdx + 1) + '"]');
-          if (nextRow) {
-            const nameInput = nextRow.querySelector('input.tx-name-input');
-            if (nameInput) nameInput.focus();
-          }
-        }, 0);
+        const priceInput = tr.querySelector('input[data-field="price"]');
+        if (priceInput) {
+          priceInput.focus();
+          if (typeof priceInput.select === 'function') priceInput.select();
+        }
         return;
       }
 
