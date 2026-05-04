@@ -24,12 +24,25 @@ export default function LoginPage() {
     const token = localStorage.getItem("session_token") || sessionStorage.getItem("session_token");
     if (token) {
       fetch("/api/auth/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        method: "GET",
+        headers: { "Authorization": "Bearer " + token },
       })
-        .then((r) => r.json())
-        .then((d) => { if (d.valid) window.location.href = "/"; });
+        .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+        .then(({ ok, d }) => {
+          if (ok && d.valid) {
+            window.location.href = "/";
+          } else {
+            // 토큰 무효 → 정리
+            localStorage.removeItem("session_token");
+            localStorage.removeItem("session_refresh_token");
+            localStorage.removeItem("session_expires_at");
+            sessionStorage.removeItem("session_token");
+            sessionStorage.removeItem("session_refresh_token");
+            sessionStorage.removeItem("session_expires_at");
+            localStorage.removeItem("current_user");
+          }
+        })
+        .catch(() => { /* 네트워크 오류 시 그대로 로그인 화면 유지 */ });
     }
   }, []);
 
@@ -64,12 +77,21 @@ export default function LoginPage() {
       }
       localStorage.setItem("keep_login_checked", keepLogin ? "true" : "false");
 
-      // 세션 토큰 저장
-      if (keepLogin) {
-        localStorage.setItem("session_token", data.token);
-      } else {
-        sessionStorage.setItem("session_token", data.token);
+      // Supabase JWT 저장 (app.js와 호환을 위해 키 이름 유지)
+      const storage = keepLogin ? localStorage : sessionStorage;
+      storage.setItem("session_token", data.token);
+      // refresh_token, expires_at도 저장 (app.js Step 4-3에서 갱신 시 사용)
+      if (data.refresh_token) {
+        storage.setItem("session_refresh_token", data.refresh_token);
       }
+      if (data.expires_at) {
+        storage.setItem("session_expires_at", String(data.expires_at));
+      }
+      // 다른 storage에 잔존 가능한 옛 토큰 정리 (keepLogin 토글 시 양쪽 공존 방지)
+      const otherStorage = keepLogin ? sessionStorage : localStorage;
+      otherStorage.removeItem("session_token");
+      otherStorage.removeItem("session_refresh_token");
+      otherStorage.removeItem("session_expires_at");
 
       // 사용자 정보 저장
       localStorage.setItem("current_user", JSON.stringify(data.user));
