@@ -2597,6 +2597,8 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-row-btn:hover:not(:disabled) { background:#F4F6FA; border-color:#B0B8CC; }
 .po-row-btn-pdf { color:#185FA5; border-color:#185FA5; }
 .po-row-btn-pdf:hover { background:#E6F1FB; }
+.po-row-btn-excel { color:#1D9E75; border-color:#1D9E75; }
+.po-row-btn-excel:hover { background:#E1F5EE; }
 /* 2026-04-24 Stage 3: 인보이스 연결 대기 버튼 — 빨강 → 파랑 (비파괴 액션) + 호버 블루 틴트 */
 .po-row-btn-invoice-pending { background:#fff; color:#378ADD; border-color:#378ADD; }
 .po-row-btn-invoice-pending:hover { background: rgba(55, 138, 221, 0.08); color:#378ADD; border-color:#378ADD; }

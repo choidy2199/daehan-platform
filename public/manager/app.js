@@ -22827,6 +22827,57 @@ function _poDownloadPdf() {
     });
 }
 
+// 발주서 리스트 모달 — 엑셀 출력 (8컬럼 데이터형, 1건씩)
+function _poExportExcel(poId) {
+  if (typeof XLSX === 'undefined') { alert('엑셀 라이브러리 미로드'); return; }
+  if (!poId) return;
+
+  fetch('/api/import-po/' + encodeURIComponent(poId))
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+      if (!json || !json.data || !json.data.header) {
+        alert('발주서 데이터 조회 실패');
+        return;
+      }
+      var header = json.data.header;
+      var items = (json.data.items || []).slice().sort(function(a, b) {
+        return (a.sort_order || 0) - (b.sort_order || 0);
+      });
+
+      var data = [[
+        'No', '발주번호', '발주일', '모델명', '품명', '팔렛수', '팔렛당수량', '총수량'
+      ]];
+
+      items.forEach(function(it, i) {
+        var qty = Number(it.quantity || 0);
+        var palletQty = Number(it.pallet_qty || 0);
+        var palletCount = palletQty > 0 ? Math.round((qty / palletQty) * 100) / 100 : '';
+        data.push([
+          i + 1,
+          header.po_number || '',
+          header.po_date || '',
+          it.model || '',
+          it.product_name || '',
+          palletCount,
+          palletQty,
+          qty
+        ]);
+      });
+
+      var ws = XLSX.utils.aoa_to_sheet(data);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, '발주서');
+
+      var poNum = header.po_number || 'unknown';
+      var poDate = (header.po_date || '').replace(/-/g, '');
+      var fileName = '발주서_' + poNum + (poDate ? '_' + poDate : '') + '.xlsx';
+      XLSX.writeFile(wb, fileName);
+    })
+    .catch(function(e) {
+      alert('엑셀 출력 실패: ' + (e && e.message || e));
+    });
+}
+
 // ===== 커밋 6 후속 — 발주서 리스트 모달 =====
 
 var _poListFilter = 'all';
@@ -23081,10 +23132,11 @@ function _poRenderPoListTable(list, currentId) {
       actionsHtml = '<span class="po-list-draft-label">작성 중</span>';
     } else {
       var pdfBtn = '<button class="po-row-btn po-row-btn-pdf" onclick="event.stopPropagation(); _poOpenPdfPreview(\'' + idEsc + '\');">📄 PDF</button>';
+      var excelBtn = '<button class="po-row-btn po-row-btn-excel" onclick="event.stopPropagation(); _poExportExcel(\'' + idEsc + '\');">📊 엑셀</button>';
       var invoiceBtn = isLinked
         ? '<button class="po-row-btn po-row-btn-invoice-linked" disabled>✓ 연결됨</button>'
         : '<button class="po-row-btn po-row-btn-invoice-pending" onclick="event.stopPropagation(); _poOpenInvoiceLink(\'' + idEsc + '\');">🔗 인보이스</button>';
-      actionsHtml = '<div class="po-list-row-actions">' + pdfBtn + invoiceBtn + '</div>';
+      actionsHtml = '<div class="po-list-row-actions">' + pdfBtn + excelBtn + invoiceBtn + '</div>';
     }
     var invoiceCell = p.linked_invoice_no
       ? '<a class="po-list-invoice-link" onclick="event.stopPropagation(); _poGotoInvoice(\'' + _poEsc(p.linked_invoice_id) + '\');">' + _poEsc(p.linked_invoice_no) + '</a>'
