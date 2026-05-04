@@ -58,7 +58,7 @@ export async function PUT(
   const requestedCodes: string[] = Array.isArray(body.sites) ? body.sites : [];
 
   // 자물쇠: admin 자기 daehan 권한은 회수 불가
-  const requesterUserId = (guard as any).user?.id;
+  const requesterUserId = guard.user.id;
   if (requesterUserId === userId && !requestedCodes.includes('daehan')) {
     return NextResponse.json(
       { error: '본인의 대한플랫폼 권한은 제거할 수 없습니다.' },
