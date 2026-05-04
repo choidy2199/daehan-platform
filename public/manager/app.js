@@ -1990,7 +1990,7 @@ var _windowConfig = {
   '온라인':     { tabId: 'sales-online',   color: 'green' },
   'AD-LAB':     { tabId: 'sales-marketing',color: 'teal', displayName: 'AD-LAB' },
   '발주서V2':   { tabId: 'import-po-v2',   color: 'purple', displayName: '수입발주서' },
-  '인보이스V2': { tabId: 'import-invoice-v2', color: 'purple', displayName: '수입 인보이스' },
+  '인보이스V2': { tabId: 'import-invoice-v2', color: 'purple', displayName: '수입인보이스' },
   '택배':       { tabId: 'delivery',       color: 'gray' },
   '카톡':       { tabId: 'kakao',          color: 'pink' },
   '공지':       { tabId: 'notice',         color: 'orange' },
@@ -22475,7 +22475,7 @@ function _poOpenInvoiceLink(poId) {
         return null;
       }
       var itemCount = poItemsCached.length;
-      if (!confirm('발주서 ' + po.po_number + '에 연결할 새 인보이스를 생성하시겠습니까?\n\n생성 후 수입 인보이스 메뉴로 이동합니다.\nPO 제품 ' + itemCount + '건이 인보이스로 자동 복사됩니다.')) {
+      if (!confirm('발주서 ' + po.po_number + '에 연결할 새 인보이스를 생성하시겠습니까?\n\n생성 후 수입인보이스 메뉴로 이동합니다.\nPO 제품 ' + itemCount + '건이 인보이스로 자동 복사됩니다.')) {
         return null;
       }
       return po;
@@ -23393,7 +23393,7 @@ var _ipinv2MissingGenCodeToastShownInvoiceId = null;
 var _ipinv2AcTimer = null;
 var _ipinv2AcResults = [];
 var _ipinv2AcActiveInput = null;
-// [B-3-2-1] 통관비 상태 (수입건V2 _ipbat2Customs 복제, 3단계에서 invoice 기반으로 전환)
+// [B-3-2-1] 통관비 상태
 var _ipinv2Customs = [];
 var _ipinv2CustomsCalcTimer = null;
 var _IPINV2_DEFAULT_CUSTOMS = [
@@ -23403,7 +23403,7 @@ var _IPINV2_DEFAULT_CUSTOMS = [
   { item_name: '보세 운송료' },
   { item_name: '공항 보험료' },
 ];
-// [B-3-2-2] 제품 최종 원가 13컬럼 상태 (수입건V2 _ipbat2* 복제, 3단계에서 invoice 기반 재계산으로 전환)
+// [B-3-2-2] 제품 최종 원가 13컬럼 상태
 // [Stage 4 Phase B-2] _ipinv2CostCalc (서버 응답 캐시) 제거. 렌더 소스는 _ipinv2CostCalcLocal로 단일화.
 var _ipinv2CostCalcLocal = null; // 클라 계산 엔진 결과. 렌더·엑셀·비교 모두 이 값 사용.
 // [Stage 6 Phase B-1] 신규 invoice 단위 erp-preview API 응답 캐시
@@ -23607,7 +23607,7 @@ function _ipinv2DoRenderList(container) {
   // 다크 헤더
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;justify-content:space-between !important;padding:12px 20px;background:#1A1D23;color:#fff;">';
   h += '<div style="display:flex !important;flex-direction:row !important;align-items:center !important;gap:10px;">';
-  h += '<span style="font-size:14px;font-weight:500;color:#fff;">수입 인보이스</span>';
+  h += '<span style="font-size:14px;font-weight:500;color:#fff;">수입인보이스</span>';
   h += '<span style="font-size:12px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.15);color:#fff;font-weight:500;">' + total + '건</span>';
   h += '</div>';
   h += '<div style="display:flex;align-items:center;gap:6px;">';
@@ -23933,7 +23933,7 @@ function _ipinv2CloseDetail() {
 }
 
 // ========================================
-// [B-3-2-1] 통관비 관련 함수 (수입건V2 _ipbat2* 복제, 3단계에서 invoice 기반으로 전환)
+// [B-3-2-1] 통관비 관련 함수
 // ========================================
 
 function _ipinv2GetLinkedBatchId() {
@@ -24152,7 +24152,7 @@ function _ipinv2ScheduleCustomsCalc() {
 }
 
 // ========================================
-// [B-3-2-2] 제품 최종 원가 13컬럼 (수입건V2 _ipbat2* 복제, 3단계에서 invoice 기반으로 전환)
+// [B-3-2-2] 제품 최종 원가 13컬럼
 // ========================================
 
 function _ipinv2ScheduleCalc() {
@@ -25666,7 +25666,7 @@ function _ipinv2DeleteInvoice() {
 }
 
 // ── 제품 라인 ──
-// [B-3-2-2] 제품 최종 원가 테이블 (기존 제품 라인 편집기 대체, 수입건V2 _ipbat2RenderCostSection 이관)
+// [B-3-2-2] 제품 최종 원가 테이블 (기존 제품 라인 편집기 대체)
 // [B-3-2-2b I] 관리코드 컬럼 → 14컬럼
 // [B-3-2-2c 3+4] 할인가($) 컬럼 → 15컬럼. FOB$계 = 할인가 × 수량.
 // [B-3-2-2d 2] 최종환율 컬럼 (부가세 오른쪽, 마진% 왼쪽) → 16컬럼. 경영박사 전송 적요 용도.
