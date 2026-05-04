@@ -15624,12 +15624,12 @@ function saveUser() {
 
   if (!name) { toast('이름을 입력하세요'); return; }
   if (!loginId) { toast('아이디를 입력하세요'); return; }
-  if (!id && (!password || password.length < 4)) { toast('비밀번호는 4자 이상이어야 합니다'); return; }
+  if (!id && (!password || password.length < 6)) { toast('비밀번호는 6자 이상이어야 합니다'); return; }
 
   var method = id ? 'PUT' : 'POST';
   var body = { name: name, loginId: loginId, role: _selectedRole, isActive: isActive };
   if (id) body.id = id;
-  if (password && password.length >= 4) body.password = password;
+  if (password && password.length >= 6) body.password = password;
 
   var token = _getAccessToken();
   fetch('/api/auth/users', {
