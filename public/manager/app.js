@@ -15610,6 +15610,11 @@ function closeUserModal() {
   document.getElementById('user-modal').classList.remove('show');
 }
 
+// admin 가드 API 호출용 토큰 추출
+function _getAccessToken() {
+  return localStorage.getItem('session_token') || sessionStorage.getItem('session_token') || null;
+}
+
 function saveUser() {
   var id = document.getElementById('user-edit-id').value;
   var name = document.getElementById('user-name').value.trim();
@@ -15626,9 +15631,13 @@ function saveUser() {
   if (id) body.id = id;
   if (password && password.length >= 6) body.password = password;
 
+  var token = _getAccessToken();
   fetch('/api/auth/users', {
     method: method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
     body: JSON.stringify(body)
   }).then(function(r){return r.json()}).then(function(d) {
     if (d.error) { toast(d.error); return; }
@@ -15640,9 +15649,13 @@ function saveUser() {
 
 function deleteUser(id) {
   if (!confirm('정말 삭제하시겠습니까?')) return;
+  var token = _getAccessToken();
   fetch('/api/auth/users', {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
     body: JSON.stringify({ id: id })
   }).then(function(r){return r.json()}).then(function(d) {
     if (d.error) { toast(d.error); return; }
@@ -15652,9 +15665,13 @@ function deleteUser(id) {
 }
 
 function toggleUserActive(id, current) {
+  var token = _getAccessToken();
   fetch('/api/auth/users', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
     body: JSON.stringify({ id: id, isActive: !current })
   }).then(function(r){return r.json()}).then(function(d) {
     if (d.error) { toast(d.error); return; }
@@ -15668,12 +15685,19 @@ function renderUsers() {
     document.getElementById('user-count').textContent = users.length + '명';
     var roleBadge = { admin: 'background:#DBEAFE;color:#1E40AF', staff: 'background:#D1FAE5;color:#065F46', customer: 'background:#FEF3C7;color:#92400E' };
     var roleLabel = { admin: '관리자', staff: '직원', customer: '거래처' };
+    var myLoginId = (window.currentUser && window.currentUser.loginId) || '';
     document.getElementById('user-body').innerHTML = users.map(function(u, i) {
       var badge = roleBadge[u.role] || roleBadge.staff;
       var label = roleLabel[u.role] || u.role;
       var activeColor = u.isActive ? '#22C55E' : '#DC2626';
       var activeText = u.isActive ? 'ON' : 'OFF';
       var lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleString('ko-KR') : '-';
+      var isSelf = (u.loginId === myLoginId);
+      var nameStr = (u.name || '').replace(/'/g, '&#39;');
+      var loginStr = (u.loginId || '').replace(/'/g, '&#39;');
+      var deleteBtn = isSelf
+        ? ''
+        : ' <button class="btn-danger btn-sm" onclick="deleteUser(' + u.id + ')" style="padding:2px 6px;font-size:11px">삭제</button>';
       return '<tr>' +
         '<td class="center">' + (i+1) + '</td>' +
         '<td style="font-weight:500">' + (u.name||'-') + '</td>' +
@@ -15682,10 +15706,85 @@ function renderUsers() {
         '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;' + badge + '">' + label + '</span></td>' +
         '<td class="center"><button onclick="toggleUserActive(' + u.id + ',' + u.isActive + ')" style="background:' + activeColor + ';color:#fff;border:none;border-radius:10px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer">' + activeText + '</button></td>' +
         '<td style="font-size:11px;color:#5A6070">' + lastLogin + '</td>' +
-        '<td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="showUserModal(' + u.id + ')">수정</button> <button class="btn-danger btn-sm" onclick="deleteUser(' + u.id + ')" style="padding:2px 6px;font-size:11px">삭제</button></td>' +
+        '<td class="center" style="white-space:nowrap">' +
+          '<button class="btn-edit" onclick="showUserModal(' + u.id + ')">수정</button> ' +
+          '<button class="btn-edit" onclick="showPasswordModal(' + u.id + ', \'' + nameStr + '\', \'' + loginStr + '\')">비번변경</button>' +
+          deleteBtn +
+        '</td>' +
         '</tr>';
     }).join('');
   });
+}
+
+// ======================== 비밀번호 변경 ========================
+var _passwordTargetId = null;
+
+function showPasswordModal(userId, userName, loginId) {
+  _passwordTargetId = userId;
+  document.getElementById('password-target').textContent = (userName || '') + ' (' + (loginId || '') + ')';
+  document.getElementById('password-new').value = '';
+  document.getElementById('password-confirm').value = '';
+  document.getElementById('password-error').style.display = 'none';
+  var modal = document.getElementById('password-modal');
+  modal.style.display = '';
+  modal.classList.add('show');
+  setTimeout(function() {
+    var pw = document.getElementById('password-new');
+    if (pw) pw.focus();
+  }, 50);
+}
+
+function closePasswordModal() {
+  _passwordTargetId = null;
+  var modal = document.getElementById('password-modal');
+  modal.classList.remove('show');
+  modal.style.display = 'none';
+}
+
+async function submitPasswordChange() {
+  var pw = document.getElementById('password-new').value;
+  var pw2 = document.getElementById('password-confirm').value;
+  var errEl = document.getElementById('password-error');
+  errEl.style.display = 'none';
+
+  if (!pw || pw.length < 6) {
+    errEl.textContent = '비밀번호는 6자 이상이어야 합니다.';
+    errEl.style.display = '';
+    return;
+  }
+  if (pw !== pw2) {
+    errEl.textContent = '비밀번호 확인이 일치하지 않습니다.';
+    errEl.style.display = '';
+    return;
+  }
+  if (!_passwordTargetId) {
+    errEl.textContent = '대상 사용자가 지정되지 않았습니다.';
+    errEl.style.display = '';
+    return;
+  }
+
+  try {
+    var token = _getAccessToken();
+    var res = await fetch('/api/auth/users', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ id: _passwordTargetId, password: pw })
+    });
+    var json = await res.json();
+    if (!res.ok) {
+      errEl.textContent = json.error || '비밀번호 변경 실패';
+      errEl.style.display = '';
+      return;
+    }
+    closePasswordModal();
+    toast('비밀번호가 변경되었습니다.');
+  } catch (e) {
+    errEl.textContent = '네트워크 오류: ' + e.message;
+    errEl.style.display = '';
+  }
 }
 
 init();

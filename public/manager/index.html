@@ -1039,6 +1039,35 @@ document.head.appendChild(s);
     </div>
   </div>
 
+  <!-- Password Change Modal -->
+  <div class="modal-bg" id="password-modal" style="display:none">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <h3>비밀번호 변경</h3>
+        <button class="modal-close" onclick="closePasswordModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:12px">
+          <label style="font-size:12px;font-weight:600;color:#1A1D23;display:block;margin-bottom:4px">대상 사용자</label>
+          <div id="password-target" style="font-size:13px;font-weight:600;color:#1A1D23;padding:8px 12px;background:#F4F6FA;border-radius:6px">-</div>
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:12px;font-weight:600;color:#1A1D23;display:block;margin-bottom:4px" for="password-new">새 비밀번호 (6자 이상)</label>
+          <input class="input" id="password-new" type="password" placeholder="새 비밀번호 입력">
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:12px;font-weight:600;color:#1A1D23;display:block;margin-bottom:4px" for="password-confirm">비밀번호 확인</label>
+          <input class="input" id="password-confirm" type="password" placeholder="다시 입력">
+        </div>
+        <div id="password-error" style="color:#791F1F;font-size:12px;margin-top:8px;display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closePasswordModal()">취소</button>
+        <button class="btn-primary" onclick="submitPasswordChange()">변경</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- =============== Placeholder TABS (추후 구현 예정) =============== -->
