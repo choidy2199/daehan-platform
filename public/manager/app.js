@@ -24562,38 +24562,52 @@ function _ipinv2GetBrand(item) {
   return '-';
 }
 
-// 일반단가표(mw_gen_products) G코드 lookup
-// 1) item.model unreliable → '' / 2) 정확 일치(trim+ci) → code
-// 3) name 토큰 fallback (_ipinv2GetManageCode와 동일 패턴) → code / 4) '' (미매칭)
-// 정확히 1개 매칭만 신뢰 (다중 매칭은 빈 문자열)
+// 일반단가표(mw_gen_products) G코드 lookup — _ipinv2GetManageCode 1:1 복제 + 2지점 변경
+// 변경점 1: 검색 대상 = mw_gen_products 단독 (mw_products 제외)
+// 변경점 2: 반환 필드 = p.code (G코드, manageCode 아님)
 function _ipinv2GetGenCode(item) {
   if (!item) return '';
+  // 1순위: PO enrich
+  if (item._po_manage_code) return String(item._po_manage_code);
+  // 2순위: DB 직접 필드
+  if (item.manage_code) return String(item.manage_code);
+
   var model = String(item.model || '').trim();
   var name = String(item.name || '').trim();
 
+  // model 신뢰도 판정: unreliableModels에 포함되면 모델명으로 매칭 시도 안 함
   var modelIsReliable = !!model && _IPINV2_UNRELIABLE_MODELS.indexOf(model) < 0;
 
+  // name에서 실제 모델 코드 추출 ("DC660 2HP-..." → "DC660")
+  // 규칙: 대문자/숫자로 시작하여 대문자/숫자/하이픈으로 이어지는 첫 토큰
   var nameToken = '';
   if (name) {
     var m = name.match(/^([A-Z0-9][A-Z0-9-]*)/);
     if (m) nameToken = m[1];
   }
 
+  // 매칭 후보 구성 (신뢰 가능한 것만, 중복 제거)
   var candidates = [];
   if (modelIsReliable) candidates.push(model);
   if (nameToken && candidates.indexOf(nameToken) < 0) candidates.push(nameToken);
-  if (candidates.length === 0) return '';
+  if (candidates.length === 0) return ''; // 모델/이름 둘 다 신뢰 불가 → 빈값 (⚠ 미매칭 표시)
 
   try {
+    // [변경점 1] mw_gen_products 단독 (mw_products 제외)
     var gen = (typeof loadObj === 'function') ? (loadObj('mw_gen_products', []) || []) : [];
     if (!Array.isArray(gen)) gen = [];
+    var all = gen;
 
     for (var i = 0; i < candidates.length; i++) {
-      var cand = String(candidates[i]).trim().toLowerCase();
-      var matches = gen.filter(function(p) {
-        if (!p || !p.model) return false;
-        return String(p.model).trim().toLowerCase() === cand;
+      var cand = candidates[i];
+      var matches = all.filter(function(p) {
+        if (!p) return false;
+        if (p.code && String(p.code) === cand) return true;
+        if (p.model && String(p.model) === cand) return true;
+        return false;
       });
+      // [핵심] 정확히 1개 매칭일 때만 신뢰 — 다수 매칭은 애매하므로 다음 candidate로
+      // [변경점 2] 반환 필드 = code (G코드)
       if (matches.length === 1 && matches[0].code) {
         return String(matches[0].code);
       }
