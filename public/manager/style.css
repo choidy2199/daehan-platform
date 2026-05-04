@@ -2600,12 +2600,19 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-row-btn-excel { color:#1D9E75; border-color:#1D9E75; }
 .po-row-btn-excel:hover { background:#E1F5EE; }
 /* 발주서 리스트 모달 — 3버튼(PDF/엑셀/인보이스) 들어가도록 폭 축소 */
-.po-list-row-actions .po-row-btn { width: 70px; }
+.po-list-row-actions .po-row-btn { width: 60px; padding: 0 4px; }
 /* 2026-04-24 Stage 3: 인보이스 연결 대기 버튼 — 빨강 → 파랑 (비파괴 액션) + 호버 블루 틴트 */
 .po-row-btn-invoice-pending { background:#fff; color:#378ADD; border-color:#378ADD; }
 .po-row-btn-invoice-pending:hover { background: rgba(55, 138, 221, 0.08); color:#378ADD; border-color:#378ADD; }
-.po-row-btn-invoice-linked { background:#DDE1EB; color:#5A6070; border-color:#DDE1EB; cursor:default; }
-.po-row-btn-invoice-linked:hover { background:#DDE1EB; }
+.po-row-btn-invoice-linked,
+.po-row-btn-invoice-linked:disabled {
+  background: #CC2222;
+  color: #fff;
+  border-color: #CC2222;
+  opacity: 1;
+  cursor: default;
+}
+.po-row-btn-invoice-linked:hover { background:#CC2222; }
 .po-list-current-label { color:#9BA3B2; font-size:12px; font-style:italic; }
 .po-list-draft-label { color:#9BA3B2; font-size:12px; }
 .po-list-td-invoice { text-align:center; }

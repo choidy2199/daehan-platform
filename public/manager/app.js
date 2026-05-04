@@ -23134,7 +23134,7 @@ function _poRenderPoListTable(list, currentId) {
       var pdfBtn = '<button class="po-row-btn po-row-btn-pdf" onclick="event.stopPropagation(); _poOpenPdfPreview(\'' + idEsc + '\');">📄 PDF</button>';
       var excelBtn = '<button class="po-row-btn po-row-btn-excel" onclick="event.stopPropagation(); _poExportExcel(\'' + idEsc + '\');">📊 엑셀</button>';
       var invoiceBtn = isLinked
-        ? '<button class="po-row-btn po-row-btn-invoice-linked" disabled>✓ 연결됨</button>'
+        ? '<button class="po-row-btn po-row-btn-invoice-linked" disabled>✓ 연결</button>'
         : '<button class="po-row-btn po-row-btn-invoice-pending" onclick="event.stopPropagation(); _poOpenInvoiceLink(\'' + idEsc + '\');">🔗 인보이스</button>';
       actionsHtml = '<div class="po-list-row-actions">' + pdfBtn + excelBtn + invoiceBtn + '</div>';
     }
