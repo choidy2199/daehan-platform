@@ -75,3 +75,39 @@ export function decidePriceTier(
   }
   return { tier: 'in', unitPrice: product.inPrice };
 }
+
+// 거래처 검색 매칭 (name + ceo + bizNo + manageCode 4개 필드 부분 일치, 대소문자 무시)
+export function matchClient(query: string, client: Client): boolean {
+  const q = String(query || '').toLowerCase().trim();
+  if (!q) return true;  // 빈 쿼리는 모두 매칭
+
+  const fields = [
+    client.name || '',
+    client.ceo || '',
+    client.bizNo || '',
+    client.manageCode || '',
+  ];
+
+  for (const f of fields) {
+    if (f.toLowerCase().indexOf(q) !== -1) return true;
+  }
+  return false;
+}
+
+// 거래처 필터링 (검색 + 최대 표시 개수)
+export function filterClients(
+  query: string,
+  clients: Client[],
+  max: number = 20
+): Client[] {
+  if (!clients || clients.length === 0) return [];
+  const filtered: Client[] = [];
+  for (const c of clients) {
+    if (!c || !c.name) continue;
+    if (matchClient(query, c)) {
+      filtered.push(c);
+      if (filtered.length >= max) break;
+    }
+  }
+  return filtered;
+}

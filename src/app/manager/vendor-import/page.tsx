@@ -1,8 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { colors, fonts, spacing, radius, borders, shadows, ui } from './lib/design-tokens';
+import ClientSelector from './components/ClientSelector';
+import type { Client } from './lib/types';
 
 export default function VendorImportPage() {
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
   return (
     <div
       style={{
@@ -77,7 +82,7 @@ export default function VendorImportPage() {
             backgroundColor: colors.bg,
           }}
         >
-          {/* 거래처 선택 (Phase 5-b에서 구현) */}
+          {/* 거래처 선택 (Phase 5-b 구현) */}
           <div
             style={{
               padding: spacing.s3,
@@ -85,19 +90,7 @@ export default function VendorImportPage() {
               flexShrink: 0,
             }}
           >
-            <div
-              style={{
-                padding: spacing.s3,
-                border: `2px dashed ${colors.danger}`,
-                borderRadius: radius.base,
-                backgroundColor: colors.dangerBg,
-                color: colors.danger,
-                fontSize: fonts.bodySm.size,
-                textAlign: 'center',
-              }}
-            >
-              ⚠️ 거래처 선택 (필수) — Phase 5-b에서 구현
-            </div>
+            <ClientSelector value={selectedClient} onChange={setSelectedClient} />
           </div>
 
           {/* 브랜드 sub-tab + ⚙ 컬럼 설정 (Phase 5-c, 5-e) */}
