@@ -1,37 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import bcrypt from 'bcryptjs';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-// email = "loginId|passwordHash"
-function parseEmail(email: string) {
-  const idx = email.indexOf('|');
-  if (idx < 0) return { loginId: '', hash: '' };
-  return { loginId: email.substring(0, idx), hash: email.substring(idx + 1) };
-}
-
-/** GET /api/auth/users */
+/** GET /api/auth/users — 목록 (email 노출 X) */
 export async function GET() {
   try {
-    const { data, error } = await supabase.from('users').select('*').order('id', { ascending: true });
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, login_id, role, is_active, auth_id, created_at, updated_at')
+      .order('id', { ascending: true });
     if (error) throw error;
 
-    const users = (data || []).map(u => {
-      const { loginId } = parseEmail(u.email || '');
-      return {
-        id: u.id,
-        name: u.name,
-        loginId,
-        role: u.role,
-        isActive: u.is_active,
-        lastLogin: u.updated_at,
-        createdAt: u.created_at,
-      };
-    });
+    const users = (data || []).map((u: any) => ({
+      id: u.id,
+      name: u.name,
+      loginId: u.login_id || '',
+      role: u.role,
+      isActive: u.is_active,
+      lastLogin: u.updated_at,
+      createdAt: u.created_at,
+    }));
 
     return NextResponse.json({ users });
   } catch (err: any) {
@@ -40,9 +30,12 @@ export async function GET() {
   }
 }
 
-/** POST /api/auth/users — 추가 */
+/** POST /api/auth/users — 추가 (Supabase Admin API) */
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'service_role 키가 설정되지 않았습니다.' }, { status: 500 });
+    }
     const { name, loginId, password, role, isActive } = await request.json();
     if (!name || !loginId || !password) {
       return NextResponse.json({ error: '이름, 아이디, 비밀번호를 입력하세요' }, { status: 400 });
@@ -52,51 +45,125 @@ export async function POST(request: NextRequest) {
     }
 
     // 중복 체크
-    const { data: existing } = await supabase.from('users').select('id, email');
-    const dup = (existing || []).some(u => parseEmail(u.email || '').loginId === loginId);
+    const { data: dup } = await supabase
+      .from('users')
+      .select('id')
+      .eq('login_id', loginId)
+      .maybeSingle();
     if (dup) {
       return NextResponse.json({ error: '이미 존재하는 아이디입니다' }, { status: 409 });
     }
 
-    const hash = bcrypt.hashSync(password, 10);
-    const emailField = `${loginId}|${hash}`;
+    const fakeEmail = `${loginId}@daehantool.dev`;
 
-    const { data, error } = await supabase
+    // auth.users 생성
+    const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+      email: fakeEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { name, role: role || 'staff', login_id: loginId },
+    });
+    if (authErr || !authUser?.user) {
+      return NextResponse.json(
+        { error: 'Auth 사용자 생성 실패: ' + (authErr?.message || '') },
+        { status: 500 }
+      );
+    }
+
+    // public.users 동기화
+    const { data: inserted, error: insErr } = await supabase
       .from('users')
-      .insert({ name, email: emailField, role: role || 'staff', is_active: isActive !== false })
+      .insert({
+        name,
+        login_id: loginId,
+        email: fakeEmail,
+        role: role || 'staff',
+        auth_id: authUser.user.id,
+        is_active: isActive !== false,
+      })
       .select()
       .single();
 
-    if (error) throw error;
-    return NextResponse.json({ success: true, user: { id: data.id, name: data.name, loginId, role: data.role } });
+    if (insErr) {
+      // 롤백
+      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+      return NextResponse.json({ error: 'DB 동기화 실패: ' + insErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      user: { id: inserted.id, name: inserted.name, loginId, role: inserted.role },
+    });
   } catch (err: any) {
     console.error('[Users POST]', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
-/** PUT /api/auth/users — 수정 */
+/** PUT /api/auth/users — 수정 (비번 변경 시 Supabase Admin API) */
 export async function PUT(request: NextRequest) {
   try {
     const { id, name, loginId, password, role, isActive } = await request.json();
     if (!id) return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 });
+
+    const { data: current, error: curErr } = await supabase
+      .from('users')
+      .select('id, auth_id, login_id, email')
+      .eq('id', id)
+      .single();
+    if (curErr || !current) {
+      return NextResponse.json({ error: '대상 사용자를 찾을 수 없습니다' }, { status: 404 });
+    }
 
     const updates: any = {};
     if (name !== undefined) updates.name = name;
     if (role !== undefined) updates.role = role;
     if (isActive !== undefined) updates.is_active = isActive;
 
-    // loginId나 password 변경 시 email 필드 재구성
-    if (loginId !== undefined || (password && password.length >= 6)) {
-      const { data: current } = await supabase.from('users').select('email').eq('id', id).single();
-      const parsed = parseEmail(current?.email || '');
-      const newLoginId = loginId !== undefined ? loginId : parsed.loginId;
-      const newHash = password && password.length >= 6 ? bcrypt.hashSync(password, 10) : parsed.hash;
-      updates.email = `${newLoginId}|${newHash}`;
+    // loginId 변경 시 email/login_id 업데이트 + auth.users 이메일도 변경
+    if (loginId !== undefined && loginId !== current.login_id) {
+      const newEmail = `${loginId}@daehantool.dev`;
+      updates.login_id = loginId;
+      updates.email = newEmail;
+      if (current.auth_id && supabaseAdmin) {
+        const { error: emailErr } = await supabaseAdmin.auth.admin.updateUserById(
+          current.auth_id,
+          { email: newEmail }
+        );
+        if (emailErr) {
+          return NextResponse.json(
+            { error: 'Auth 이메일 변경 실패: ' + emailErr.message },
+            { status: 500 }
+          );
+        }
+      }
     }
 
-    const { error } = await supabase.from('users').update(updates).eq('id', id);
-    if (error) throw error;
+    // 비번 변경
+    if (password && password.length >= 6) {
+      if (!current.auth_id || !supabaseAdmin) {
+        return NextResponse.json(
+          { error: 'auth_id가 없거나 service_role 키가 설정되지 않았습니다.' },
+          { status: 500 }
+        );
+      }
+      const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(
+        current.auth_id,
+        { password }
+      );
+      if (pwErr) {
+        return NextResponse.json(
+          { error: '비밀번호 변경 실패: ' + pwErr.message },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      const { error: updErr } = await supabase.from('users').update(updates).eq('id', id);
+      if (updErr) throw updErr;
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('[Users PUT]', err);
@@ -104,11 +171,22 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-/** DELETE /api/auth/users */
+/** DELETE /api/auth/users — 삭제 (auth.users + public.users) */
 export async function DELETE(request: NextRequest) {
   try {
     const { id } = await request.json();
     if (!id) return NextResponse.json({ error: 'id가 필요합니다' }, { status: 400 });
+
+    const { data: current } = await supabase
+      .from('users')
+      .select('id, auth_id')
+      .eq('id', id)
+      .single();
+
+    if (current?.auth_id && supabaseAdmin) {
+      await supabaseAdmin.auth.admin.deleteUser(current.auth_id);
+    }
+
     const { error } = await supabase.from('users').delete().eq('id', id);
     if (error) throw error;
     return NextResponse.json({ success: true });

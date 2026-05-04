@@ -1,35 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/auth/logout
- * Body: { token }
+ * Header: Authorization: Bearer <access_token>
+ * 서버 측 세션 무효화 (Supabase Admin API)
  */
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const { token } = await request.json();
-    if (!token) return NextResponse.json({ success: true });
+    const authHeader = request.headers.get('authorization') || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
-    const { data: users } = await supabase
-      .from('users')
-      .select('id, customer_id')
-      .like('customer_id', `${token}|%`);
-
-    if (users && users.length > 0) {
-      await supabase
-        .from('users')
-        .update({ customer_id: null })
-        .eq('id', users[0].id);
+    if (token && supabaseAdmin) {
+      const { data } = await supabaseAdmin.auth.getUser(token);
+      if (data?.user) {
+        // 해당 access_token이 가리키는 세션을 서버 측에서 무효화
+        await supabaseAdmin.auth.admin.signOut(token);
+      }
     }
-
-    return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error('[Auth Logout]', err);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ ok: true });
+  } catch {
+    // 로그아웃은 실패해도 클라이언트가 토큰 지우면 사실상 로그아웃됨
+    return NextResponse.json({ ok: true });
   }
 }
