@@ -23267,6 +23267,7 @@ var _ipinv2Invoices = [];
 var _ipinv2Filter = 'all';
 var _ipinv2CurrentInvoice = null;
 var _ipinv2CurrentItems = [];
+var _ipinv2MissingGenCodeToastShownInvoiceId = null;
 var _ipinv2AcTimer = null;
 var _ipinv2AcResults = [];
 var _ipinv2AcActiveInput = null;
@@ -24491,6 +24492,48 @@ function _ipinv2GetBrand(item) {
   return '-';
 }
 
+// 일반단가표(mw_gen_products) G코드 lookup
+// 1) item.model unreliable → '' / 2) 정확 일치(trim+ci) → code
+// 3) name 토큰 fallback (_ipinv2GetManageCode와 동일 패턴) → code / 4) '' (미매칭)
+// 정확히 1개 매칭만 신뢰 (다중 매칭은 빈 문자열)
+function _ipinv2GetGenCode(item) {
+  if (!item) return '';
+  var model = String(item.model || '').trim();
+  var name = String(item.name || '').trim();
+
+  var modelIsReliable = !!model && _IPINV2_UNRELIABLE_MODELS.indexOf(model) < 0;
+
+  var nameToken = '';
+  if (name) {
+    var m = name.match(/^([A-Z0-9][A-Z0-9-]*)/);
+    if (m) nameToken = m[1];
+  }
+
+  var candidates = [];
+  if (modelIsReliable) candidates.push(model);
+  if (nameToken && candidates.indexOf(nameToken) < 0) candidates.push(nameToken);
+  if (candidates.length === 0) return '';
+
+  try {
+    var gen = (typeof loadObj === 'function') ? (loadObj('mw_gen_products', []) || []) : [];
+    if (!Array.isArray(gen)) gen = [];
+
+    for (var i = 0; i < candidates.length; i++) {
+      var cand = String(candidates[i]).trim().toLowerCase();
+      var matches = gen.filter(function(p) {
+        if (!p || !p.model) return false;
+        return String(p.model).trim().toLowerCase() === cand;
+      });
+      if (matches.length === 1 && matches[0].code) {
+        return String(matches[0].code);
+      }
+    }
+  } catch (e) {
+    console.error('[ipinv2] gen code lookup failed:', e);
+  }
+  return '';
+}
+
 // cost-calculation items를 item.id 기준 map으로 변환
 // [Stage 4 Phase B-2] 소스: _ipinv2CostCalcLocal (서버 대신 클라 계산 결과)
 function _ipinv2BuildCostMap() {
@@ -24533,7 +24576,7 @@ function _ipinv2ExportCostExcel() {
   if (!calc || !calc.items || calc.items.length === 0) return alert('출력할 데이터가 없습니다.');
   // [Stage 6 Phase B-2 Step 3 보정 2] 화면과 동일하게 단가(VAT포함)/금액(VAT포함)/단가(VAT별도)/금액(=단가×수량)/부가세 5컬럼
   var data = [[
-    'No.', '브랜드', '모델명', '관리코드', '품명', '수량', 'FOB ($)', '할인가 ($)', 'FOB$ 계',
+    'No.', '브랜드', '모델명', '코드', '관리코드', '품명', '수량', 'FOB ($)', '할인가 ($)', 'FOB$ 계',
     '배분 (%)', '배분 (₩)', '단가 (VAT포함)', '금액 (VAT포함)', '단가 (VAT별도)', '금액 (=단가×수량)', '부가세', '최종환율', '마진 (%)', '예상판매 (₩)'
   ]];
   var items = _ipinv2CurrentItems.filter(function(it) { return !it.is_pallet_line; });
@@ -24560,7 +24603,7 @@ function _ipinv2ExportCostExcel() {
     var vat = cost.vat_amount != null ? Number(cost.vat_amount) : '';
     var expected = unitCost != null ? Math.round(unitCost * (1 + _ipinv2MarginPct / 100)) : '';
     data.push([
-      i + 1, _ipinv2GetBrand(it), it.model || '', _ipinv2GetManageCode(it), it.name || '',
+      i + 1, _ipinv2GetBrand(it), it.model || '', _ipinv2GetGenCode(it) || '', _ipinv2GetManageCode(it), it.name || '',
       qty, fobUsd, discCellVal, fobSum,
       ratioPct, allocAmt, unitCost == null ? '' : unitCost, supplyTotalN, goodsUnit, goodsAmt, vat,
       wavgRateX != null ? Number(wavgRateX.toFixed(4)) : '',
@@ -25544,6 +25587,7 @@ function _ipinv2RenderItemsTable() {
   h += '<col style="width:42px">';   // No
   h += '<col style="width:85px">';   // 브랜드
   h += '<col style="width:110px">';  // 모델명
+  h += '<col style="width:80px">';   // 코드 (G코드, mw_gen_products lookup)
   h += '<col style="width:110px">';  // 관리코드 [B-3-2-2b I]
   h += '<col style="width:240px">';  // 품명
   h += '<col style="width:60px">';   // 수량
@@ -25564,6 +25608,7 @@ function _ipinv2RenderItemsTable() {
   h += '<th>No<div class="col-resize-handle"></div></th>';
   h += '<th>브랜드<div class="col-resize-handle"></div></th>';
   h += '<th>모델명<div class="col-resize-handle"></div></th>';
+  h += '<th>코드<div class="col-resize-handle"></div></th>';
   h += '<th>관리코드<div class="col-resize-handle"></div></th>';
   h += '<th>품명<div class="col-resize-handle"></div></th>';
   h += '<th>수량<div class="col-resize-handle"></div></th>';
@@ -25594,7 +25639,7 @@ function _ipinv2RenderItemsTable() {
   var wavgRateTxt = wavgRate != null ? _ipinv2FormatRate(wavgRate) : '-';
 
   if (items.length === 0) {
-    h += '<tr><td colspan="18" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다.</td></tr>';
+    h += '<tr><td colspan="19" style="padding:60px 20px;text-align:center;color:#9BA3B2;font-size:13px;">제품 라인이 없습니다.</td></tr>';
   } else {
     items.forEach(function(it, i) {
       var cost = costMap[it.id] || {};
@@ -25634,10 +25679,17 @@ function _ipinv2RenderItemsTable() {
         ? '<td class="left" style="color:#5A6070;">' + _ipinv2Esc(mc) + '</td>'
         : '<td class="left" style="color:#CC2222;font-weight:600;">⚠ 없음</td>';
 
+      // 코드 셀 (mw_gen_products G코드 lookup)
+      var gc = _ipinv2GetGenCode(it);
+      var gcCell = gc
+        ? '<td class="left" style="color:#5A6070;">' + _ipinv2Esc(gc) + '</td>'
+        : '<td class="left" title="일반단가표에 &#39;' + _ipinv2Esc(it.model || '') + '&#39; 등록 필요"><span style="color:#CC2222;font-size:11px;">⚠ 미매칭</span></td>';
+
       h += '<tr data-item-id="' + it.id + '"' + rowCls + '>';
       h += '<td class="center">' + (i + 1) + '</td>';
       h += '<td class="left">' + _ipinv2Esc(_ipinv2GetBrand(it)) + '</td>';
       h += '<td class="left model">' + _ipinv2Esc(it.model || '') + (isOverflow ? ' <span style="color:#1D9E75;font-weight:500;">⚖</span>' : '') + '</td>';
+      h += gcCell; // 코드 (G코드)
       h += mcCell; // [B-3-2-2b I] 관리코드
       h += '<td class="left">' + _ipinv2Esc(it.name || '') + '</td>';
       h += '<td>' + _ipinv2Int(qty) + '</td>';
@@ -25680,7 +25732,7 @@ function _ipinv2RenderItemsTable() {
     var grandTotal = Math.round((totGoodsAmt + totVatAmt) * 100) / 100;
     h += '<tfoot>';
     h += '<tr class="ipinv2-cost-total-row">';
-    h += '<td colspan="5" class="tot-label">합계</td>';                          // No~품명 5개 통합
+    h += '<td colspan="6" class="tot-label">합계</td>';                          // No~품명 6개 통합 (코드 컬럼 추가)
     h += '<td class="tot-cell">' + _ipinv2Int(totQty) + '</td>';                 // 수량
     h += '<td class="tot-cell">-</td>';                                           // FOB($) 단가 — 개별값
     h += '<td class="tot-cell">-</td>';                                           // 할인가($) — 개별값
@@ -25703,6 +25755,15 @@ function _ipinv2RenderItemsTable() {
 
   // 컬럼 리사이즈 바인딩
   _ipinv2BindCostTableEvents();
+
+  // G코드 미매칭 toast (인보이스당 1회)
+  var missingItems = items.filter(function(it) { return !_ipinv2GetGenCode(it); });
+  if (missingItems.length > 0 && _ipinv2CurrentInvoice
+      && _ipinv2MissingGenCodeToastShownInvoiceId !== _ipinv2CurrentInvoice.id) {
+    console.warn('[_ipinv2] G코드 미매칭 모델:', missingItems.map(function(it) { return it.model; }));
+    _ipinv2Toast(missingItems.length + '개 제품의 G코드를 찾을 수 없습니다. 일반단가표 등록을 확인하세요', 'error');
+    _ipinv2MissingGenCodeToastShownInvoiceId = _ipinv2CurrentInvoice.id;
+  }
 
   // 섹션 요약 (기존 호환: 제품 라인 수/총금액 표시 — 상단 summary-bar용)
   var allItems = _ipinv2CurrentItems || [];
