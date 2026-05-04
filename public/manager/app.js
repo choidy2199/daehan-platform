@@ -25476,7 +25476,6 @@ function _ipinv2DoRenderDetail(container) {
   h += '<span id="ipinv2-hdr-invno" style="font-size:14px;font-weight:500;color:#fff;">' + _ipinv2Esc(inv.invoice_no) + '</span>';
   h += '<span id="ipinv2-hdr-factory" style="font-size:13px;color:rgba(255,255,255,0.7);">' + _ipinv2Esc(inv.customer_name || inv.factory_name || '') + '</span>';
   h += '<span id="ipinv2-hdr-status">' + _ipinv2StatusBadge(inv.status) + '</span>';
-  // [트랙 C 정리] 수입건V2 메뉴 제거에 따라 헤더의 "수입건" 배지 + 클릭 이동도 제거
   h += '</div>';
   h += '<div style="display:flex;gap:6px;">';
   h += '<button id="ipinv2-btn-save" onclick="_ipinv2SaveBasicInfo()" style="font-size:12px;padding:6px 14px;border-radius:6px;background:#E24B4A;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;font-weight:500;">저장</button>';
@@ -26220,8 +26219,6 @@ function _ipinv2RenderSummaryBar() {
   h += '<div style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:4px 12px;background:rgba(255,255,255,0.08);border-radius:6px;"><span style="' + labelS + '">최종 금액</span><span style="font-size:17px;color:#fff;font-weight:700;">' + _ipinv2UsdFloor(finalTotal) + '</span></div>';
   bar.innerHTML = h;
 }
-
-// [트랙 C 정리] _ipinv2GotoBatch 제거 (수입건V2 메뉴 폐지)
 
 function _ipinv2UpdateInvoiceCalcField(field, value) {
   var inv = _ipinv2CurrentInvoice;
