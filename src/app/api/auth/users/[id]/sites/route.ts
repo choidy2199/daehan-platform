@@ -14,7 +14,8 @@ export async function GET(
     return NextResponse.json({ error: 'service_role 키가 없습니다.' }, { status: 500 });
   }
 
-  const userId = parseInt(params.id, 10);
+  const { id } = await params;
+  const userId = parseInt(id, 10);
   if (isNaN(userId)) {
     return NextResponse.json({ error: 'invalid user id' }, { status: 400 });
   }
@@ -49,7 +50,8 @@ export async function PUT(
     return NextResponse.json({ error: 'service_role 키가 없습니다.' }, { status: 500 });
   }
 
-  const userId = parseInt(params.id, 10);
+  const { id } = await params;
+  const userId = parseInt(id, 10);
   if (isNaN(userId)) {
     return NextResponse.json({ error: 'invalid user id' }, { status: 400 });
   }
