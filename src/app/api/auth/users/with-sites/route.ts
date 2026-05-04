@@ -14,7 +14,7 @@ export async function GET(_request: NextRequest) {
     .from('users')
     .select(`
       id, login_id, name, email, role, is_active, last_login_at, created_at, updated_at,
-      user_site_access (
+      user_site_access!user_site_access_user_id_fkey (
         site_id,
         access_level,
         sites ( code )
