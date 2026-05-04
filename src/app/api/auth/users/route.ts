@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** admin 가드: Authorization: Bearer <token> 검증 → public.users.role==='admin' 확인 */
-async function requireAdmin(request: NextRequest) {
+export async function requireAdmin(request: NextRequest) {
   if (!supabaseAdmin) {
     return NextResponse.json(
       { error: 'service_role 키가 설정되지 않았습니다.' },

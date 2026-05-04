@@ -13,7 +13,7 @@ export async function GET(_request: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from('users')
     .select(`
-      id, login_id, name, email, role, is_active, created_at, updated_at,
+      id, login_id, name, email, role, is_active, last_login_at, created_at, updated_at,
       user_site_access!user_site_access_user_id_fkey (
         site_id,
         access_level,
@@ -34,7 +34,7 @@ export async function GET(_request: NextRequest) {
     email: u.email,
     role: u.role,
     isActive: u.is_active,
-    lastLoginAt: u.updated_at,
+    lastLoginAt: u.last_login_at,
     createdAt: u.created_at,
     sites: (u.user_site_access || [])
       .map((a: any) => a.sites?.code)

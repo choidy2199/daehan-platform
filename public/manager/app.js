@@ -15730,9 +15730,15 @@ function _umBuildCard(u) {
   var sitesHtml = _umAllSites.map(function(code) {
     var meta = _umSiteMeta[code];
     var isActive = sitesArr.indexOf(code) >= 0;
-    var lockIcon = (isSelf && code === 'daehan' && u.role === 'admin') ? ' 🔒' : '';
+    var isLocked = (isSelf && code === 'daehan' && u.role === 'admin');
+    var lockIcon = isLocked ? ' 🔒' : '';
     var cls = isActive ? meta.cls : 'um-chip-inactive';
-    return '<span class="um-chip ' + cls + '" data-site="' + code + '" data-active="' + isActive + '">' +
+    if (isLocked) cls += ' um-chip-locked';
+    var onclickAttr = isLocked
+      ? ''
+      : ' onclick="_umToggleSite(' + u.id + ', \'' + code + '\', this)"';
+    return '<span class="um-chip ' + cls + '" data-site="' + code +
+           '" data-active="' + isActive + '"' + onclickAttr + '>' +
            meta.label + lockIcon + '</span>';
   }).join('');
 
@@ -15767,6 +15773,70 @@ function _umBuildAddCard() {
     '<div class="um-add-icon">+</div>' +
     '<div class="um-add-label">사용자 추가</div>' +
   '</div>';
+}
+
+// 사이트 권한 토글 (낙관적 업데이트 + 실패 시 롤백)
+async function _umToggleSite(userId, siteCode, chipEl) {
+  if (chipEl.classList.contains('um-chip-locked')) {
+    toast('본인의 대한플랫폼 권한은 변경할 수 없습니다.');
+    return;
+  }
+  if (chipEl.dataset.busy === '1') return;
+  chipEl.dataset.busy = '1';
+
+  // 카드의 모든 활성 사이트 코드 수집 → 토글 결과 계산
+  var card = chipEl.closest('.um-card');
+  var allChips = card.querySelectorAll('.um-chip[data-site]');
+  var currentActive = [];
+  allChips.forEach(function(c) {
+    if (c.dataset.active === 'true') currentActive.push(c.dataset.site);
+  });
+
+  var willActivate = chipEl.dataset.active !== 'true';
+  var newActive = willActivate
+    ? currentActive.concat([siteCode])
+    : currentActive.filter(function(c) { return c !== siteCode; });
+
+  // 낙관적 업데이트
+  var origActive = chipEl.dataset.active;
+  var origClass = chipEl.className;
+  var meta = _umSiteMeta[siteCode];
+  if (willActivate) {
+    chipEl.dataset.active = 'true';
+    chipEl.className = 'um-chip ' + meta.cls;
+  } else {
+    chipEl.dataset.active = 'false';
+    chipEl.className = 'um-chip um-chip-inactive';
+  }
+
+  try {
+    var token = _getAccessToken();
+    var res = await fetch('/api/auth/users/' + userId + '/sites', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ sites: newActive })
+    });
+    var json = await res.json();
+
+    if (!res.ok) {
+      chipEl.dataset.active = origActive;
+      chipEl.className = origClass;
+      toast(json.error || '권한 변경 실패 (HTTP ' + res.status + ')');
+      return;
+    }
+
+    var siteLabel = meta.label;
+    toast(willActivate ? siteLabel + ' 권한 부여됨' : siteLabel + ' 권한 회수됨');
+  } catch (e) {
+    chipEl.dataset.active = origActive;
+    chipEl.className = origClass;
+    toast('네트워크 오류: ' + (e && e.message ? e.message : e));
+  } finally {
+    chipEl.dataset.busy = '0';
+  }
 }
 
 function _umFormatDate(iso) {

@@ -59,6 +59,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '대한플랫폼 접속 권한이 없습니다.' }, { status: 403 });
     }
 
+    // last_login_at 갱신 (fire-and-forget — 응답 지연 방지)
+    if (supabaseAdmin && pubUser.id) {
+      supabaseAdmin
+        .from('users')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('id', pubUser.id)
+        .then(({ error }) => {
+          if (error) console.error('[login] last_login_at update failed:', error);
+        });
+    }
+
     return NextResponse.json({
       token: authData.session.access_token,
       refresh_token: authData.session.refresh_token,

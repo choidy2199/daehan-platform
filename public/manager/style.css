@@ -4261,6 +4261,29 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 .um-chip-amber  { background: #FAEEDA; color: #633806; }
 .um-chip-inactive { background: #F4F6FA; color: #9BA3B2; font-weight: 400; }
 
+/* 토글 가능한 칩: 호버 효과 */
+.um-chip[data-site]:not(.um-chip-locked) {
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+.um-chip[data-site]:not(.um-chip-locked):hover {
+  transform: scale(1.05);
+  opacity: 0.85;
+}
+.um-chip[data-site]:not(.um-chip-locked):active {
+  transform: scale(0.95);
+}
+/* 잠금 칩: 클릭 차단 시각 */
+.um-chip-locked {
+  cursor: not-allowed;
+  opacity: 1;
+}
+/* 진행 중 (busy) 시 클릭 차단 표시 */
+.um-chip[data-busy="1"] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .um-card-foot {
   display: flex;
   align-items: center;
