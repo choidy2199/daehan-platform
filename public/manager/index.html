@@ -976,15 +976,11 @@ document.head.appendChild(s);
     <div class="section-header">
       <span>사용자 관리</span>
       <div style="display:flex;gap:8px;align-items:center">
-        <span id="user-count" style="font-size:12px;font-weight:400;opacity:0.7">0명</span>
-        <button class="btn-action" onclick="showUserModal()">+ 사용자 추가</button>
+        <span id="um-user-count" style="font-size:12px;font-weight:400;opacity:0.7">0명</span>
       </div>
     </div>
-    <div class="section-body" style="padding:16px">
-      <table class="data-table" id="user-table">
-        <thead><tr><th style="width:40px">No</th><th>이름</th><th>아이디</th><th>비밀번호</th><th>역할</th><th style="width:60px">승인</th><th>최근 로그인</th><th style="width:100px">관리</th></tr></thead>
-        <tbody id="user-body"></tbody>
-      </table>
+    <div class="section-body" style="padding:0">
+      <div id="um-cards-container" class="um-cards"></div>
     </div>
   </div>
   </div><!-- /settings-sub-users -->

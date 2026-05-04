@@ -4175,3 +4175,150 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 .tx-search-modal-results-header > div {
   padding: 0 6px;
 }
+
+/* ===== User Management Card Grid (Step 2-A) ===== */
+.um-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 16px;
+}
+
+.um-card {
+  background: #FFFFFF;
+  border: 1px solid #DDE1EB;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.um-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.um-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Pretendard', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+  background: #E6F1FB;
+  color: #0C447C;
+}
+.um-avatar.um-role-admin    { background: #E6F1FB; color: #0C447C; }
+.um-avatar.um-role-staff    { background: #E1F5EE; color: #085041; }
+.um-avatar.um-role-engineer { background: #EEEDFE; color: #3C3489; }
+.um-avatar.um-role-customer { background: #FAEEDA; color: #633806; }
+
+.um-card-name { flex: 1; min-width: 0; }
+.um-name { font-size: 14px; font-weight: 600; color: #1A1D23; }
+.um-loginid { font-size: 12px; color: #5A6070; font-family: ui-monospace, Menlo, monospace; }
+
+.um-role-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.um-role-badge.um-role-admin    { background: #E6F1FB; color: #0C447C; }
+.um-role-badge.um-role-staff    { background: #E1F5EE; color: #085041; }
+.um-role-badge.um-role-engineer { background: #EEEDFE; color: #3C3489; }
+.um-role-badge.um-role-customer { background: #FAEEDA; color: #633806; }
+
+.um-card-sites {
+  border-top: 1px solid #F0F2F7;
+  border-bottom: 1px solid #F0F2F7;
+  padding: 10px 0;
+}
+.um-sites-label {
+  font-size: 11px;
+  color: #9BA3B2;
+  margin-bottom: 6px;
+}
+.um-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.um-chip {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: default;
+}
+.um-chip-blue   { background: #E6F1FB; color: #0C447C; }
+.um-chip-green  { background: #E1F5EE; color: #085041; }
+.um-chip-amber  { background: #FAEEDA; color: #633806; }
+.um-chip-inactive { background: #F4F6FA; color: #9BA3B2; font-weight: 400; }
+
+.um-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.um-meta { font-size: 11px; color: #9BA3B2; }
+.um-actions { display: flex; gap: 4px; }
+
+.um-btn {
+  font-size: 12px;
+  padding: 5px 12px;
+  border: 1px solid #DDE1EB;
+  background: #FFFFFF;
+  color: #1A1D23;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Pretendard', sans-serif;
+}
+.um-btn:hover { background: #F4F6FA; }
+.um-btn-danger {
+  border-color: #F09595;
+  color: #791F1F;
+}
+.um-btn-danger:hover { background: #FCEBEB; }
+
+.um-card-add {
+  border: 2px dashed #DDE1EB;
+  background: #FAFBFC;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.um-card-add:hover {
+  border-color: #185FA5;
+  background: #E6F1FB;
+}
+.um-add-icon {
+  font-size: 32px;
+  color: #9BA3B2;
+  font-weight: 300;
+}
+.um-card-add:hover .um-add-icon { color: #185FA5; }
+.um-add-label {
+  font-size: 13px;
+  color: #5A6070;
+  font-weight: 500;
+}
+.um-card-add:hover .um-add-label { color: #185FA5; }
+
+.um-loading, .um-error {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: #9BA3B2;
+  font-size: 13px;
+}
+.um-error { color: #791F1F; }

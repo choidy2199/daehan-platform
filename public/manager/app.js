@@ -15679,38 +15679,110 @@ function toggleUserActive(id, current) {
   });
 }
 
-function renderUsers() {
-  fetch('/api/auth/users').then(function(r){return r.json()}).then(function(d) {
-    var users = d.users || [];
-    document.getElementById('user-count').textContent = users.length + '명';
-    var roleBadge = { admin: 'background:#DBEAFE;color:#1E40AF', staff: 'background:#D1FAE5;color:#065F46', customer: 'background:#FEF3C7;color:#92400E' };
-    var roleLabel = { admin: '관리자', staff: '직원', customer: '거래처' };
-    var myLoginId = (window.currentUser && window.currentUser.loginId) || '';
-    document.getElementById('user-body').innerHTML = users.map(function(u, i) {
-      var badge = roleBadge[u.role] || roleBadge.staff;
-      var label = roleLabel[u.role] || u.role;
-      var activeColor = u.isActive ? '#22C55E' : '#DC2626';
-      var activeText = u.isActive ? 'ON' : 'OFF';
-      var lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleString('ko-KR') : '-';
-      var isSelf = (u.loginId === myLoginId);
-      var deleteBtn = isSelf
-        ? ''
-        : ' <button class="btn-danger btn-sm" onclick="deleteUser(' + u.id + ')" style="padding:2px 6px;font-size:11px">삭제</button>';
-      return '<tr>' +
-        '<td class="center">' + (i+1) + '</td>' +
-        '<td style="font-weight:500">' + (u.name||'-') + '</td>' +
-        '<td>' + (u.loginId||'-') + '</td>' +
-        '<td style="color:#9BA3B2">********</td>' +
-        '<td><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;' + badge + '">' + label + '</span></td>' +
-        '<td class="center"><button onclick="toggleUserActive(' + u.id + ',' + u.isActive + ')" style="background:' + activeColor + ';color:#fff;border:none;border-radius:10px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer">' + activeText + '</button></td>' +
-        '<td style="font-size:11px;color:#5A6070">' + lastLogin + '</td>' +
-        '<td class="center" style="white-space:nowrap">' +
-          '<button class="btn-edit" onclick="showUserModal(' + u.id + ')">수정</button>' +
-          deleteBtn +
-        '</td>' +
-        '</tr>';
-    }).join('');
-  });
+// ======================== 사용자관리 카드 그리드 (Step 2-A) ========================
+var _umSiteMeta = {
+  'daehan':     { label: '대한플랫폼', cls: 'um-chip-blue' },
+  'as_manager': { label: 'AS매니저',   cls: 'um-chip-green' },
+  'sales':      { label: '회계',       cls: 'um-chip-amber' }
+};
+var _umAllSites = ['daehan', 'as_manager', 'sales'];
+var _umRoleMeta = {
+  'admin':       { label: '관리자',  cls: 'um-role-admin' },
+  'staff':       { label: '직원',    cls: 'um-role-staff' },
+  'as_engineer': { label: 'AS기사',  cls: 'um-role-engineer' },
+  'customer':    { label: '거래처',  cls: 'um-role-customer' }
+};
+
+async function renderUsers() {
+  var container = document.getElementById('um-cards-container');
+  if (!container) return;
+  container.innerHTML = '<div class="um-loading">사용자 정보 불러오는 중...</div>';
+
+  try {
+    var token = _getAccessToken();
+    var res = await fetch('/api/auth/users/with-sites', {
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+    });
+    if (!res.ok) {
+      container.innerHTML = '<div class="um-error">사용자 목록 조회 실패 (HTTP ' + res.status + ')</div>';
+      return;
+    }
+    var users = await res.json();
+
+    var countEl = document.getElementById('um-user-count');
+    if (countEl) countEl.textContent = users.length + '명';
+
+    var html = users.map(function(u) { return _umBuildCard(u); }).join('');
+    html += _umBuildAddCard();
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="um-error">네트워크 오류: ' + (e && e.message ? e.message : e) + '</div>';
+  }
+}
+
+function _umBuildCard(u) {
+  var initial = ((u.name || u.loginId || '?') + '').charAt(0);
+  var roleMeta = _umRoleMeta[u.role] || { label: u.role || '-', cls: 'um-role-default' };
+  var isSelf = (u.loginId === (window.currentUser && window.currentUser.loginId));
+  var lastLogin = u.lastLoginAt ? _umFormatDate(u.lastLoginAt) : '미로그인';
+  var sitesArr = u.sites || [];
+
+  var sitesHtml = _umAllSites.map(function(code) {
+    var meta = _umSiteMeta[code];
+    var isActive = sitesArr.indexOf(code) >= 0;
+    var lockIcon = (isSelf && code === 'daehan' && u.role === 'admin') ? ' 🔒' : '';
+    var cls = isActive ? meta.cls : 'um-chip-inactive';
+    return '<span class="um-chip ' + cls + '" data-site="' + code + '" data-active="' + isActive + '">' +
+           meta.label + lockIcon + '</span>';
+  }).join('');
+
+  var deleteBtn = isSelf ? '' :
+    '<button class="um-btn um-btn-danger" onclick="deleteUser(' + u.id + ')">삭제</button>';
+
+  return '<div class="um-card" data-user-id="' + u.id + '">' +
+    '<div class="um-card-head">' +
+      '<div class="um-avatar ' + roleMeta.cls + '">' + initial + '</div>' +
+      '<div class="um-card-name">' +
+        '<div class="um-name">' + (u.name || '-') + '</div>' +
+        '<div class="um-loginid">' + (u.loginId || '-') + '</div>' +
+      '</div>' +
+      '<span class="um-role-badge ' + roleMeta.cls + '">' + roleMeta.label + '</span>' +
+    '</div>' +
+    '<div class="um-card-sites">' +
+      '<div class="um-sites-label">접속권한</div>' +
+      '<div class="um-chips">' + sitesHtml + '</div>' +
+    '</div>' +
+    '<div class="um-card-foot">' +
+      '<div class="um-meta">최근: ' + lastLogin + '</div>' +
+      '<div class="um-actions">' +
+        '<button class="um-btn" onclick="showUserModal(' + u.id + ')">수정</button>' +
+        deleteBtn +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function _umBuildAddCard() {
+  return '<div class="um-card um-card-add" onclick="showUserModal()">' +
+    '<div class="um-add-icon">+</div>' +
+    '<div class="um-add-label">사용자 추가</div>' +
+  '</div>';
+}
+
+function _umFormatDate(iso) {
+  try {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '-';
+    var month = d.getMonth() + 1;
+    var day = d.getDate();
+    var hour = d.getHours();
+    var minute = String(d.getMinutes()).padStart(2, '0');
+    var ampm = hour < 12 ? '오전' : '오후';
+    var hour12 = hour % 12 || 12;
+    return month + '/' + day + ' ' + ampm + ' ' + hour12 + ':' + minute;
+  } catch (e) {
+    return '-';
+  }
 }
 
 init();
