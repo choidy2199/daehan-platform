@@ -2627,6 +2627,7 @@ var _tabIdMap = {
   'transactions':     { contentId: 'tab-transactions',     render: 'tx' },
   'sales-online':     { contentId: 'tab-sales',            render: 'sales' },
   'sales-marketing':  { contentId: 'tab-sales-marketing',  render: 'adLab' },
+  'vendor-import':    { contentId: 'tab-vendor-import',    placeholder: true },
   'import-po-v2':     { contentId: 'tab-import-po-v2',       render: 'importPoV2' },
   'import-invoice-v2':{ contentId: 'tab-import-invoice-v2',  render: 'importInvoiceV2' },
   'delivery':         { contentId: 'tab-delivery',         placeholder: true },
