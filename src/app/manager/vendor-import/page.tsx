@@ -18,6 +18,7 @@ export default function VendorImportPage() {
         overflow: 'hidden',
       }}
     >
+      <style>{`.content { width: 100% !important; padding: 0 !important; max-width: none !important; }`}</style>
       {/* 페이지 헤더 (다크) */}
       <div
         style={{
