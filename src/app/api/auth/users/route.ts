@@ -81,8 +81,8 @@ export async function POST(request: NextRequest) {
     if (!name || !loginId || !password) {
       return NextResponse.json({ error: '이름, 아이디, 비밀번호를 입력하세요' }, { status: 400 });
     }
-    if (password.length < 6) {
-      return NextResponse.json({ error: '비밀번호는 6자 이상이어야 합니다' }, { status: 400 });
+    if (password.length < 4) {
+      return NextResponse.json({ error: '비밀번호는 4자 이상이어야 합니다' }, { status: 400 });
     }
 
     // 중복 체크
@@ -183,7 +183,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // 비번 변경
-    if (password && password.length >= 6) {
+    if (password && password.length >= 4) {
       if (!current.auth_id || !supabaseAdmin) {
         return NextResponse.json(
           { error: 'auth_id가 없거나 service_role 키가 설정되지 않았습니다.' },
