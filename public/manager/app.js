@@ -24567,10 +24567,6 @@ function _ipinv2GetBrand(item) {
 // 변경점 2: 반환 필드 = p.code (G코드, manageCode 아님)
 function _ipinv2GetGenCode(item) {
   if (!item) return '';
-  // 1순위: PO enrich
-  if (item._po_manage_code) return String(item._po_manage_code);
-  // 2순위: DB 직접 필드
-  if (item.manage_code) return String(item.manage_code);
 
   var model = String(item.model || '').trim();
   var name = String(item.name || '').trim();
