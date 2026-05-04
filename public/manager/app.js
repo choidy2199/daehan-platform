@@ -293,42 +293,77 @@ if (window.PerformanceObserver) {
 }
 
 // ======================== SESSION CHECK ========================
-(function checkSession() {
+// Supabase JWT를 서버 GET /api/auth/check 로 검증. 옛 토큰 형식("uuid|expires")은
+// 발견 시 즉시 정리. 네트워크 오류 시 localStorage current_user로 복원(오프라인 동작 보존).
+function _applyCurrentUserUI(user) {
+  if (!user) return;
+  window.currentUser = user;
+  var nameEl = document.getElementById('current-user-name');
+  if (nameEl) nameEl.textContent = (user.name || '') + '님';
+  var ctUser = document.getElementById('ct-username');
+  if (ctUser) ctUser.textContent = user.loginId || user.name || 'user';
+}
+function _clearAuthStorage() {
+  localStorage.removeItem('session_token');
+  sessionStorage.removeItem('session_token');
+  localStorage.removeItem('session_refresh_token');
+  sessionStorage.removeItem('session_refresh_token');
+  localStorage.removeItem('session_expires_at');
+  sessionStorage.removeItem('session_expires_at');
+  localStorage.removeItem('current_user');
+}
+(async function checkSession() {
   var token = localStorage.getItem('session_token') || sessionStorage.getItem('session_token');
   if (!token) { window.location.href = '/login'; return; }
 
-  // 토큰 형식: "uuid|expiresISO" — 클라이언트에서 만료 확인
-  var parts = token.split('|');
-  if (parts.length >= 2) {
-    var expires = new Date(parts[1]);
-    if (new Date() > expires) {
-      localStorage.removeItem('session_token');
-      sessionStorage.removeItem('session_token');
+  // 옛 토큰 형식("uuid|expires") 잔존 시 즉시 정리 (Supabase JWT는 '|' 미포함, '.' 포함)
+  if (token.indexOf('|') !== -1) {
+    _clearAuthStorage();
+    window.location.href = '/login';
+    return;
+  }
+
+  try {
+    var res = await fetch('/api/auth/check', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) {
+      _clearAuthStorage();
       window.location.href = '/login';
       return;
     }
-  }
-
-  // current_user에서 사용자 정보 복원
-  try {
-    var saved = JSON.parse(localStorage.getItem('current_user') || '{}');
-    if (saved && saved.name) {
-      window.currentUser = saved;
-      var nameEl = document.getElementById('current-user-name');
-      if (nameEl) nameEl.textContent = saved.name + '님';
-      // 우측 상단 사용자명 표시
-      var ctUser = document.getElementById('ct-username');
-      if (ctUser) ctUser.textContent = saved.loginId || saved.name || 'user';
+    var data = await res.json();
+    if (!data || !data.valid) {
+      _clearAuthStorage();
+      window.location.href = '/login';
+      return;
     }
-  } catch(e) {}
+    // 서버에서 받은 user로 갱신
+    localStorage.setItem('current_user', JSON.stringify(data.user));
+    _applyCurrentUserUI(data.user);
+  } catch (e) {
+    // 네트워크 에러: localStorage current_user로 복원 시도 (오프라인 동작 보존)
+    console.warn('checkSession network error:', e);
+    try {
+      var saved = JSON.parse(localStorage.getItem('current_user') || 'null');
+      if (saved && saved.name) {
+        _applyCurrentUserUI(saved);
+      } else {
+        window.location.href = '/login';
+      }
+    } catch(_) { window.location.href = '/login'; }
+  }
 })();
 
 function doLogout() {
   var token = localStorage.getItem('session_token') || sessionStorage.getItem('session_token');
-  fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) }).catch(function(){});
-  localStorage.removeItem('session_token');
-  sessionStorage.removeItem('session_token');
-  localStorage.removeItem('current_user');
+  if (token) {
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).catch(function(){});
+  }
+  _clearAuthStorage();
   window.location.href = '/login';
 }
 
@@ -18235,7 +18270,13 @@ function _markNoticeRead(id) {
   var read = _getReadNoticeIds();
   if (read.indexOf(id) === -1) { read.push(id); localStorage.setItem('mw_notice_read_' + uid, JSON.stringify(read)); }
 }
-function _isAdmin() { return window.currentUser && window.currentUser.loginId === 'admin'; }
+function _isAdmin() {
+  var u = window.currentUser;
+  if (!u) return false;
+  if (u.loginId === 'admin') return true;
+  if (u.role === 'admin') return true;
+  return false;
+}
 
 function _noticeCatBadge(cat) {
   var m = { 'update': { bg:'#E6F1FB', color:'#0C447C', text:'업데이트' }, 'bug': { bg:'#FCEBEB', color:'#791F1F', text:'오류' }, 'improve': { bg:'#EEEDFE', color:'#3C3489', text:'개선' }, 'notice': { bg:'#FAEEDA', color:'#633806', text:'공지' }, 'help': { bg:'#E1F5EE', color:'#085041', text:'도움말' } };
