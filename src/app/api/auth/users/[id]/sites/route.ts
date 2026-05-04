@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 /** GET /api/auth/users/[id]/sites — 특정 사용자의 사이트 권한 배열 (검증용) */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!supabaseAdmin) {
     return NextResponse.json({ error: 'service_role 키가 없습니다.' }, { status: 500 });
@@ -40,7 +40,7 @@ export async function GET(
 /** PUT /api/auth/users/[id]/sites — 사이트 권한 통째 교체 (delta INSERT/DELETE) */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const guard = await requireAdmin(request);
   if (guard instanceof NextResponse) return guard;

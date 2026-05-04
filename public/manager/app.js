@@ -24604,6 +24604,12 @@ function _ipinv2GetGenCode(item) {
         if (!p) return false;
         if (p.code && String(p.code) === cand) return true;
         if (p.model && String(p.model) === cand) return true;
+        // [핫픽스 v2] mw_gen_products는 model이 브랜드(콜라보 등)이고 실제 모델 코드가 description에 있음
+        // description 시작 토큰을 nameToken 추출과 동일한 정규식으로 비교
+        if (p.description) {
+          var dm = String(p.description).match(/^([A-Z0-9][A-Z0-9-]*)/);
+          if (dm && dm[1] === cand) return true;
+        }
         return false;
       });
       // [핵심] 정확히 1개 매칭일 때만 신뢰 — 다수 매칭은 애매하므로 다음 candidate로
