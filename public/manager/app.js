@@ -11151,12 +11151,12 @@ function exportGenProducts() {
   try { gp = JSON.parse(localStorage.getItem('mw_gen_products') || '[]') || []; } catch(e) { gp = []; }
   if (!gp.length) { toast('내보낼 일반제품 데이터가 없습니다'); return; }
   var wb = XLSX.utils.book_new();
-  var data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜', '수입가(USD)', '단위']];
+  var data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜', '수입가(USD)']];
   gp.forEach(function(p) {
-    data.push([p.code, p.manageCode || '', p.category || '', p.model || '', p.description || '', p.cost || 0, p.priceA || 0, p.priceNaver || 0, p.priceOpen || 0, p.inQty || 0, p.inPrice || 0, p.outQty || 0, p.outPrice || 0, p.palletQty || 0, p.palletPrice || 0, p.memo || '', p.inDate || '', p.importPrice != null ? p.importPrice : '', p.unit || '']);
+    data.push([p.code, p.manageCode || '', p.category || '', p.model || '', p.description || '', p.cost || 0, p.priceA || 0, p.priceNaver || 0, p.priceOpen || 0, p.inQty || 0, p.inPrice || 0, p.outQty || 0, p.outPrice || 0, p.palletQty || 0, p.palletPrice || 0, p.memo || '', p.inDate || '', p.importPrice != null ? p.importPrice : '']);
   });
   var ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 25 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 8 }];
+  ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 10 }, { wch: 25 }, { wch: 35 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, ws, '일반제품');
   XLSX.writeFile(wb, '일반제품_' + new Date().toISOString().slice(0, 10) + '.xlsx');
   toast('일반제품 엑셀 다운로드 완료 (' + gp.length + '건)');
@@ -11888,25 +11888,28 @@ function renderGenProducts() {
   body.innerHTML = filtered.map((p, i) => {
     const idx = genProducts.indexOf(p);
     return `<tr>
-      <td class="center">${i + 1}</td>
       <td>${p.code || '-'}</td>
       <td>${p.manageCode || '-'}</td>
       <td>${p.category || '-'}</td>
       <td style="font-weight:500">${p.model || '-'}</td>
       <td>${p.description || '-'}</td>
-      <td class="center">${p.unit || '-'}</td>
       <td class="center">${p.stock != null && p.stock !== '' ? (p.stock > 0 ? '<span class="badge badge-green">' + p.stock + '</span>' : p.stock === 0 ? '<span class="badge badge-amber">0</span>' : '<span class="badge badge-red">' + p.stock + '</span>') : '<span class="badge badge-gray">-</span>'}</td>
       <td class="num" style="color:#1D9E75">${fmt(p.cost || 0)}</td>
+      <td class="num">${fmt(p.priceA || 0)}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'naver')}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'gmarket')}</td>
+      <td class="num" style="padding:4px 3px">${marketBadge(p, 'ssg')}</td>
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'in')">${(p.inQty || p.inPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.inQty ? '<span style="font-size:10px;color:#5A6070">' + p.inQty + '개</span>' : '') + (p.inPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.inPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'out')">${(p.outQty || p.outPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.outQty ? '<span style="font-size:10px;color:#5A6070">' + p.outQty + '개</span>' : '') + (p.outPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.outPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
       <td class="center" style="cursor:pointer" onclick="editTierField(${idx},'pallet')">${(p.palletQty || p.palletPrice) ? '<div style="display:flex;flex-direction:column;align-items:center">' + (p.palletQty ? '<span style="font-size:10px;color:#5A6070">' + p.palletQty + '개</span>' : '') + (p.palletPrice ? '<span style="font-size:12px;font-weight:600;color:#185FA5">' + (p.palletPrice).toLocaleString() + '</span>' : '') + '</div>' : '<span style="color:#DDE1EB">-</span>'}</td>
-      <td class="num" style="padding:4px 3px">${marketBadge(p, 'naver')}</td>
-      <td class="num" style="padding:4px 3px">${marketBadge(p, 'gmarket')}</td>
+      <td class="num" style="cursor:pointer" onclick="editGenImportPrice(${idx})">${p.importPrice != null ? '$' + Number(p.importPrice).toFixed(2) : '<span style="color:#DDE1EB">—</span>'}</td>
+      <td><input value="${(p.memo || '').replace(/"/g,'&quot;')}" onchange="updateGenMemo(${idx},this.value)" placeholder="" style="width:100%;font-size:12px;border:1px solid #DDE1EB;border-radius:4px;padding:2px 6px;background:#fff;color:#1A1D23;text-align:left"></td>
+      <td style="text-align:left;font-size:12px;cursor:pointer;white-space:nowrap;padding-left:8px" onclick="editGenInDate(${idx})">${p.inDate ? '<span style="color:#CC2222;margin-right:4px">●</span>' + p.inDate : '-'}</td>
       <td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="editGenProduct(${idx})" style="padding:2px 8px;font-size:11px">수정</button> <button class="btn-danger btn-sm" onclick="removeGenProduct(${idx})" style="padding:2px 6px;font-size:11px">삭제</button></td>
     </tr>`;
   }).join('');
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="15"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="18"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
   }
   document.getElementById('gen-count').textContent = `${genProducts.length}건`;
   initColumnResize('gen-table');
@@ -11920,13 +11923,12 @@ function addGenProduct() {
   const category = prompt('대분류를 입력하세요') || '';
   const model = prompt('모델명을 입력하세요') || '';
   const description = prompt('제품설명을 입력하세요') || '';
-  const unit = prompt('단위를 입력하세요 (예: EA, SET, BOX)') || '';
   const cost = parseInt(prompt('원가를 입력하세요') || '0') || 0;
   const priceA = parseInt(prompt('판매가를 입력하세요') || '0') || 0;
   const priceNaver = parseInt(prompt('스토어팜 가격을 입력하세요') || '0') || 0;
   const priceOpen = parseInt(prompt('오픈마켓 가격을 입력하세요') || '0') || 0;
   const memo = prompt('비고를 입력하세요') || '';
-  genProducts.push({ code, manageCode, category, model, description, unit, supplyPrice: 0, cost, priceA, priceNaver, priceOpen, memo, source: 'general' });
+  genProducts.push({ code, manageCode, category, model, description, supplyPrice: 0, cost, priceA, priceNaver, priceOpen, memo, source: 'general' });
   localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
   renderGenProducts();
   toast('일반제품 추가 완료');
@@ -11945,8 +11947,6 @@ function editGenProduct(idx) {
   if (model === null) return;
   var description = prompt('제품설명', p.description || '');
   if (description === null) return;
-  var unit = prompt('단위 (예: EA, SET, BOX)', p.unit || '');
-  if (unit === null) return;
   var cost = prompt('원가', p.cost || '');
   if (cost === null) return;
   var priceA = prompt('판매가(도매A)', p.priceA || '');
@@ -11962,7 +11962,6 @@ function editGenProduct(idx) {
   genProducts[idx].category = category;
   genProducts[idx].model = model;
   genProducts[idx].description = description;
-  genProducts[idx].unit = unit;
   genProducts[idx].cost = parseInt(String(cost).replace(/,/g,'')) || 0;
   genProducts[idx].priceA = parseInt(String(priceA).replace(/,/g,'')) || 0;
   genProducts[idx].priceNaver = parseInt(String(priceNaver).replace(/,/g,'')) || 0;
@@ -12055,10 +12054,10 @@ function getGenBrand(product) {
 
 function downloadGenTemplate() {
   if (!window.XLSX) { toast('SheetJS 로딩 중...'); return; }
-  const data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜', '수입가(USD)', '단위']];
-  data.push(['SAMPLE-001', '8801234567890', '전동공구', '샘플 제품', '샘플 설명', 90000, 95000, 97000, 105000, 10, 800, 120, 750, 1200, 700, '', '', '', 'EA']);
+  const data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜', '수입가(USD)']];
+  data.push(['SAMPLE-001', '8801234567890', '전동공구', '샘플 제품', '샘플 설명', 90000, 95000, 97000, 105000, 10, 800, 120, 750, 1200, 700, '', '', '']);
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:12},{wch:16},{wch:12},{wch:25},{wch:40},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10},{wch:10},{wch:10},{wch:20},{wch:15},{wch:12},{wch:8}];
+  ws['!cols'] = [{wch:12},{wch:16},{wch:12},{wch:25},{wch:40},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10},{wch:10},{wch:10},{wch:20},{wch:15},{wch:12}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '일반제품');
   XLSX.writeFile(wb, '일반제품_양식.xlsx');
@@ -12104,7 +12103,6 @@ function uploadGenProducts(input) {
           memo: String(r[15] || ''),
           inDate: String(r[16] || ''),
           importPrice: ip,
-          unit: String(r[18] || ''),
           source: 'general'
         });
         count++;
@@ -12184,7 +12182,6 @@ function importGenExcel() {
           memo: String(r[15] || ''),
           inDate: String(r[16] || ''),
           importPrice: ip2,
-          unit: String(r[18] || ''),
           source: 'general'
         });
       }

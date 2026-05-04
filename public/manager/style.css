@@ -4354,8 +4354,3 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   font-size: 13px;
 }
 .um-error { color: #791F1F; }
-
-/* 일반단가표 헤더 색상 (Phase 3-a) */
-#gen-table thead th.col-naver { background: #1D9E75 !important; color: #fff !important; }
-#gen-table thead th.col-open  { background: #185FA5 !important; color: #fff !important; }
-#gen-table thead th.col-iop   { background: #E6F1FB !important; color: #0C447C !important; }
