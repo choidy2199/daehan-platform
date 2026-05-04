@@ -4354,3 +4354,66 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   font-size: 13px;
 }
 .um-error { color: #791F1F; }
+
+/* ============================================
+   [택배] 탭 (Phase 5-A)
+   대분류 탭 + iframe (AS매니저 [택배발송] 연동)
+   ============================================ */
+#tab-delivery.active {
+  display: flex !important;
+  flex-direction: column;
+  height: calc(100vh - 56px);
+  min-height: 0;
+  overflow: hidden;
+}
+.del-tab-row {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px 0;
+  background: #FFFFFF;
+  border-bottom: 1px solid #DDE1EB;
+  flex-shrink: 0;
+}
+.del-tab {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  margin-bottom: -1px;
+  background: transparent;
+  color: #5A6070;
+  font-family: 'Pretendard', sans-serif;
+}
+.del-tab.active {
+  background: #1A1D23;
+  color: #FFFFFF;
+}
+.del-tab.placeholder {
+  background: #FFFFFF;
+  color: #B4B2A9;
+  border-color: #DDE1EB;
+  border-style: dashed;
+  font-weight: 500;
+  font-style: italic;
+  cursor: not-allowed;
+}
+.del-iframe-frame {
+  flex: 1;
+  margin: 16px 24px 24px;
+  background: #FFFFFF;
+  border: 1px solid #DDE1EB;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.del-iframe {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  display: block;
+}

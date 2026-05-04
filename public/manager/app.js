@@ -2630,7 +2630,7 @@ var _tabIdMap = {
   'vendor-import':    { contentId: 'tab-vendor-import',    placeholder: true },
   'import-po-v2':     { contentId: 'tab-import-po-v2',       render: 'importPoV2' },
   'import-invoice-v2':{ contentId: 'tab-import-invoice-v2',  render: 'importInvoiceV2' },
-  'delivery':         { contentId: 'tab-delivery',         placeholder: true },
+  'delivery':         { contentId: 'tab-delivery',         render: 'delivery' },
   'kakao':            { contentId: 'tab-kakao',            render: 'kakao' },
   'notice':           { contentId: 'tab-notice',           render: 'notice' },
   'backorder':        { contentId: 'tab-backorder',        render: 'backorder' },
@@ -2726,6 +2726,7 @@ function switchTab(tab) {
       if (renderKey === 'kakao') renderKakaoTab();
       if (renderKey === 'notice') renderNoticeTab();
       if (renderKey === 'backorder') renderBackorderTab();
+      if (renderKey === 'delivery') _renderDeliveryTab();
       if (renderKey === 'importPoV2') _poInit();
       if (renderKey === 'importInvoiceV2') _ipinv2Render();
       if (renderKey === 'tx') _tx.init();
@@ -31427,4 +31428,44 @@ function _resolvePriceActionTargets(opts) {
   if (!confirm(msg)) return null;
 
   return { products: products, codes: codes, isSelection: isSelection };
+}
+
+/* ============================================
+ * [택배] 탭 (Phase 5-A)
+ * 대분류 탭 + iframe (AS매니저 [택배발송] 연동)
+ * ============================================ */
+
+var _delActiveTab = 'as_parcel';
+
+function _renderDeliveryTab() {
+  var root = document.getElementById('tab-delivery');
+  if (!root) {
+    console.warn('[del] tab-delivery 컨테이너 없음');
+    return;
+  }
+
+  root.innerHTML =
+    '<div class="del-tab-row">' +
+      '<button class="del-tab ' + (_delActiveTab === 'as_parcel' ? 'active' : '') + '" data-deltab="as_parcel">AS택배</button>' +
+      '<button class="del-tab placeholder" disabled>+ 추가 예정</button>' +
+    '</div>' +
+    '<div class="del-iframe-frame">' +
+      _delRenderActiveContent() +
+    '</div>';
+
+  root.querySelectorAll('.del-tab[data-deltab]').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      var t = e.currentTarget.dataset.deltab;
+      if (t === _delActiveTab) return;
+      _delActiveTab = t;
+      _renderDeliveryTab();
+    });
+  });
+}
+
+function _delRenderActiveContent() {
+  if (_delActiveTab === 'as_parcel') {
+    return '<iframe class="del-iframe" src="https://as.daehantool.dev/?tab=ship" title="AS택배 발송" referrerpolicy="origin"></iframe>';
+  }
+  return '<div style="padding:32px;text-align:center;color:#B4B2A9;">준비 중</div>';
 }
