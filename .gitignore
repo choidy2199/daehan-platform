@@ -40,7 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
-supabase/
+supabase/*
+!supabase/migrations/
 daehan-platform-setup-complete.md
 
 # 로컬 심볼릭 링크 (사용자별 home 절대경로 의존)
