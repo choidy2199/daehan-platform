@@ -21,6 +21,10 @@ export const colors = {
   border: '#DDE1EB',
   borderStrong: '#B0B8CC',
 
+  // Table
+  tableZebra: '#FAFBFC',
+  borderRow: '#F0F2F7',
+
   // Semantic
   success: '#1D9E75',
   successBg: '#E1F5EE',

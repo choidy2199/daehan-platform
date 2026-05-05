@@ -1,12 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { colors, fonts, spacing, radius, borders, shadows, ui } from './lib/design-tokens';
 import ClientSelector from './components/ClientSelector';
-import type { Client } from './lib/types';
+import BrandSubTabs from './components/BrandSubTabs';
+import ProductTable from './components/ProductTable';
+import type { Client, GenProduct } from './lib/types';
+import { loadGenProducts, getAllBrands, getBrandCounts, filterProducts } from './lib/storage';
 
 export default function VendorImportPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [allProducts, setAllProducts] = useState<GenProduct[]>([]);
+  const [activeBrand, setActiveBrand] = useState<string>('ALL');
+  const [productQuery, setProductQuery] = useState<string>('');
+
+  // mount 시 제품 로드
+  useEffect(() => {
+    setAllProducts(loadGenProducts());
+  }, []);
+
+  // 브랜드 목록 + 카운트 (입력 순서)
+  const brandList = useMemo(() => {
+    const brands = getAllBrands(allProducts);
+    const counts = getBrandCounts(allProducts);
+    return brands.map(name => ({ name, count: counts[name] || 0 }));
+  }, [allProducts]);
+
+  // 필터링된 제품
+  const filteredProducts = useMemo(() => {
+    return filterProducts(allProducts, activeBrand, productQuery);
+  }, [allProducts, activeBrand, productQuery]);
 
   return (
     <div
@@ -93,35 +116,22 @@ export default function VendorImportPage() {
             <ClientSelector value={selectedClient} onChange={setSelectedClient} />
           </div>
 
-          {/* 브랜드 sub-tab + ⚙ 컬럼 설정 (Phase 5-c, 5-e) */}
-          <div
-            style={{
-              padding: `${spacing.s2} ${spacing.s3}`,
-              borderBottom: borders.base,
-              backgroundColor: colors.bgSecondary,
-              color: colors.textSecondary,
-              fontSize: fonts.bodySm.size,
-              flexShrink: 0,
-            }}
-          >
-            🏷️ 브랜드 sub-tab (Phase 5-c) | ⚙️ 컬럼 설정 (Phase 5-e)
-          </div>
+          {/* 브랜드 sub-tab + 검색 (Phase 5-c) */}
+          <BrandSubTabs
+            brands={brandList}
+            activeBrand={activeBrand}
+            totalCount={allProducts.length}
+            query={productQuery}
+            onBrandChange={setActiveBrand}
+            onQueryChange={setProductQuery}
+          />
 
-          {/* 제품 테이블 (Phase 5-c, 5-d) */}
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              overflow: 'auto',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: colors.textHint,
-              fontSize: fonts.bodySm.size,
-            }}
-          >
-            제품 테이블 + 사진 (Phase 5-c, 5-d)
-          </div>
+          {/* 제품 테이블 (Phase 5-c, 사진은 5-d) */}
+          <ProductTable
+            products={filteredProducts}
+            isClientSelected={selectedClient !== null}
+          />
+
         </div>
 
         {/* 우측 30% — 장바구니 */}

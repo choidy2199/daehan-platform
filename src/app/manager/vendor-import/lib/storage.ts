@@ -34,12 +34,16 @@ export function getGenBrand(product: GenProduct): string {
 
 // 모든 브랜드 distinct 목록 (sub-tab 표시용)
 export function getAllBrands(products: GenProduct[]): string[] {
-  const set = new Set<string>();
-  products.forEach((p) => {
-    const b = getGenBrand(p);
-    if (b) set.add(b);
-  });
-  return Array.from(set).sort();
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const p of products) {
+    const brand = getGenBrand(p);
+    if (brand && !seen.has(brand)) {
+      seen.add(brand);
+      result.push(brand);
+    }
+  }
+  return result;
 }
 
 // 특정 브랜드 제품만 필터
@@ -110,4 +114,64 @@ export function filterClients(
     }
   }
   return filtered;
+}
+
+// 가격 포맷터 — 0/null/NaN은 '-' 반환 (Q20=B 결정)
+export function fmt(n: number | null | undefined): string {
+  if (n == null || isNaN(n as number) || n === 0) return '-';
+  return Math.round(n as number).toLocaleString();
+}
+
+// 브랜드별 제품 수 (sub-tab 카운트 뱃지용)
+export function getBrandCounts(products: GenProduct[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const p of products) {
+    const brand = getGenBrand(p);
+    if (brand) counts[brand] = (counts[brand] || 0) + 1;
+  }
+  return counts;
+}
+
+// 제품 검색 매칭 — code + model + description 부분 일치 (대소문자 무시)
+export function matchProduct(query: string, product: GenProduct): boolean {
+  const q = String(query || '').toLowerCase().trim();
+  if (!q) return true;
+  const fields = [
+    product.code || '',
+    product.model || '',
+    product.description || '',
+  ];
+  for (const f of fields) {
+    if (f.toLowerCase().indexOf(q) !== -1) return true;
+  }
+  return false;
+}
+
+// 제품 필터링 — 브랜드 + 검색어 + code 오름차순 정렬
+export function filterProducts(
+  products: GenProduct[],
+  brand: string,  // 'ALL' 또는 브랜드명
+  query: string
+): GenProduct[] {
+  let result = products;
+
+  // 브랜드 필터
+  if (brand !== 'ALL') {
+    result = result.filter(p => getGenBrand(p) === brand);
+  }
+
+  // 검색어 필터
+  const q = String(query || '').toLowerCase().trim();
+  if (q) {
+    result = result.filter(p => matchProduct(q, p));
+  }
+
+  // code 오름차순 정렬
+  result = [...result].sort((a, b) => {
+    const ca = String(a.code || '');
+    const cb = String(b.code || '');
+    return ca.localeCompare(cb, 'ko', { numeric: true });
+  });
+
+  return result;
 }
