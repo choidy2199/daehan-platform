@@ -149,72 +149,44 @@ export default function ClientSelector({ value, onChange }: ClientSelectorProps)
           border: `1px solid ${colors.success}`,
           borderRadius: radius.base,
           backgroundColor: colors.successBg,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: spacing.s3,
         }}
       >
         <div
           style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: spacing.s3,
+            flex: 1,
+            minWidth: 0,
+            fontSize: fonts.panelHeader.size,
+            fontWeight: fonts.panelHeader.weight,
+            color: colors.text,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
         >
-          {/* 좌측: 거래처 정보 4개 */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: fonts.panelHeader.size,
-                fontWeight: fonts.panelHeader.weight,
-                color: colors.text,
-                marginBottom: spacing.s1,
-              }}
-            >
-              ✓ {value.name}
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: `${spacing.s1} ${spacing.s4}`,
-                fontSize: fonts.bodySm.size,
-                color: colors.textSecondary,
-              }}
-            >
-              <span>
-                <span style={{ color: colors.textHint }}>대표자 </span>
-                {value.ceo || '-'}
-              </span>
-              <span>
-                <span style={{ color: colors.textHint }}>사업자 </span>
-                {value.bizNo || '-'}
-              </span>
-              <span>
-                <span style={{ color: colors.textHint }}>관리코드 </span>
-                {value.manageCode || '-'}
-              </span>
-            </div>
-          </div>
-
-          {/* 우측: 변경 버튼 */}
-          <button
-            type="button"
-            onClick={handleChangeClick}
-            style={{
-              flexShrink: 0,
-              height: '28px',
-              padding: `0 ${spacing.s3}`,
-              backgroundColor: colors.bg,
-              color: colors.text,
-              border: `1px solid ${colors.border}`,
-              borderRadius: radius.base,
-              fontSize: fonts.bodySm.size,
-              cursor: 'pointer',
-              fontFamily: fonts.family,
-            }}
-          >
-            변경
-          </button>
+          ✓ {value.name}
         </div>
+        <button
+          type="button"
+          onClick={handleChangeClick}
+          style={{
+            flexShrink: 0,
+            height: '28px',
+            padding: `0 ${spacing.s3}`,
+            backgroundColor: colors.bg,
+            color: colors.text,
+            border: `1px solid ${colors.border}`,
+            borderRadius: radius.base,
+            fontSize: fonts.bodySm.size,
+            cursor: 'pointer',
+            fontFamily: fonts.family,
+          }}
+        >
+          변경
+        </button>
       </div>
     );
   }
@@ -245,7 +217,12 @@ export default function ClientSelector({ value, onChange }: ClientSelectorProps)
           type="text"
           value={query}
           placeholder="거래처명 / 대표자 / 사업자번호 / 관리코드 검색"
-          autoComplete="off"
+          autoComplete="nope"
+          spellCheck={false}
+          data-form-type="other"
+          data-lpignore="true"
+          data-1p-ignore="true"
+          name="vendor_search"
           onChange={handleInput}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
