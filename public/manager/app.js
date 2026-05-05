@@ -11933,11 +11933,138 @@ function renderGenProducts() {
   initStickyHeader('gen-table');
 }
 
-// Phase A-2-a: 임시 stub — 실 구현은 Phase A-2-b
+// Phase A-2-b: 사진 라이트박스 + 업로드/삭제 시퀀스
 function openGenPhotoLightbox(idx) {
   var p = (typeof genProducts !== 'undefined' && genProducts[idx]) || null;
   if (!p) { alert('제품을 찾을 수 없습니다'); return; }
-  alert('사진 기능은 Phase A-2-b에서 구현됩니다 (제품: ' + (p.model || p.code || '?') + ')');
+  var hasPhoto = p.image_url && typeof p.image_url === 'string' && p.image_url.length > 0;
+  if (!hasPhoto) {
+    _genPhotoOpenFilePicker(idx);
+  } else {
+    _genPhotoOpenLightbox(idx, p);
+  }
+}
+
+function _genPhotoOpenFilePicker(idx) {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.addEventListener('change', function(e) {
+    var file = e.target.files && e.target.files[0];
+    if (file) _genPhotoProcessAndUpload(idx, file);
+    setTimeout(function() { input.remove(); }, 100);
+  });
+  input.click();
+}
+
+function _genPhotoOpenLightbox(idx, p) {
+  var overlay = document.createElement('div');
+  overlay.id = 'gen-photo-lightbox';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;font-family:inherit';
+  var modelLabel = (p.model || p.code || '');
+  var codeLabel = (p.code ? ('· ' + p.code) : '');
+  var safeUrl = String(p.image_url).replace(/"/g, '&quot;');
+  overlay.innerHTML =
+    '<div class="gen-photo-modal" style="background:white;border-radius:10px;padding:16px;max-width:720px;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px;max-height:90vh">' +
+      '<img src="' + safeUrl + '" alt="" style="max-width:100%;max-height:60vh;object-fit:contain;background:#F4F6FA;border-radius:6px" />' +
+      '<div style="font-size:13px;color:#1A1D23;font-weight:500">' + modelLabel + ' ' + codeLabel + '</div>' +
+      '<div style="display:flex;gap:8px;width:100%;max-width:280px">' +
+        '<button id="gen-photo-change-btn" style="flex:1;background:#185FA5;color:white;border:none;padding:8px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit">사진 변경</button>' +
+        '<button id="gen-photo-delete-btn" style="flex:1;background:#FCEBEB;color:#791F1F;border:none;padding:8px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit">사진 삭제</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  var prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  function closeModal() {
+    document.removeEventListener('keydown', escHandler);
+    document.body.style.overflow = prevOverflow;
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  }
+  function escHandler(e) { if (e.key === 'Escape') closeModal(); }
+  document.addEventListener('keydown', escHandler);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeModal(); });
+  var modalInner = overlay.querySelector('.gen-photo-modal');
+  if (modalInner) modalInner.addEventListener('click', function(e) { e.stopPropagation(); });
+  overlay.querySelector('#gen-photo-change-btn').addEventListener('click', function() {
+    closeModal();
+    _genPhotoOpenFilePicker(idx);
+  });
+  overlay.querySelector('#gen-photo-delete-btn').addEventListener('click', function() {
+    if (!confirm('사진을 삭제하시겠습니까?')) return;
+    closeModal();
+    _genPhotoDelete(idx);
+  });
+}
+
+function _genPhotoProcessAndUpload(idx, file) {
+  var p = genProducts[idx];
+  if (!p) { alert('제품을 찾을 수 없습니다'); return; }
+  var reader = new FileReader();
+  reader.onerror = function() { alert('파일 읽기 실패'); };
+  reader.onload = function(ev) {
+    var img = new Image();
+    img.onerror = function() { alert('이미지 디코딩 실패'); };
+    img.onload = function() {
+      var MAX = 1200;
+      var scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      var w = Math.round(img.width * scale);
+      var h = Math.round(img.height * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(async function(blob) {
+        if (!blob) { alert('이미지 변환 실패'); return; }
+        try {
+          var res = await fetch('/api/products/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'image/png' },
+            body: blob
+          });
+          var json = await res.json();
+          if (!res.ok || !json.ok || !json.url) {
+            alert('업로드 실패: ' + (json.error || res.statusText));
+            return;
+          }
+          if (json.url.indexOf('blob:') === 0) {
+            alert('업로드 URL 생성 실패');
+            return;
+          }
+          genProducts[idx].image_url = json.url;
+          localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+          if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_gen_products');
+          renderGenProducts();
+        } catch (err) {
+          alert('업로드 실패: ' + (err && err.message ? err.message : err));
+        }
+      }, 'image/png');
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function _genPhotoDelete(idx) {
+  var p = genProducts[idx];
+  if (!p) return;
+  var oldUrl = p.image_url;
+  if (!oldUrl) return;
+  try {
+    await fetch('/api/products/upload', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: oldUrl })
+    });
+  } catch (err) {
+    // Storage 삭제 실패해도 image_url 비우기는 진행
+  }
+  genProducts[idx].image_url = null;
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+  if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_gen_products');
+  renderGenProducts();
 }
 
 function addGenProduct() {
