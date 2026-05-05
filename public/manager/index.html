@@ -154,6 +154,12 @@ document.head.appendChild(s);
   </div>
   <div class="chrome-tab-items" id="chromeTabItems"></div>
   <div class="chrome-tab-bar-right">
+    <button id="as-bell-btn" class="as-bell-btn" type="button" aria-label="AS택배 알림" hidden>
+      <span class="as-bell-icon">📦</span>
+      <span class="as-bell-label">AS택배</span>
+      <span class="as-bell-badge" id="as-bell-badge" data-count="0">0</span>
+    </button>
+    <span class="as-bell-vsep" id="as-bell-vsep" hidden></span>
     <div id="erpSyncPill" class="kb-stock-pill kb-stock-pill--hidden" role="status" aria-live="polite">
       <span class="kb-stock-pill__icon"></span>
       <span class="kb-stock-pill__text"></span>
@@ -171,6 +177,19 @@ document.head.appendChild(s);
 </div>
 
 <div class="content-area">
+
+<!-- ==================== AS택배 알림 배너 (Phase 5-A) ==================== -->
+<div id="asn-banner" class="asn-banner hidden" role="alert">
+  <span class="asn-banner-icon">!</span>
+  <div class="asn-banner-body">
+    <div class="asn-banner-title">AS택배가 등록되었습니다</div>
+    <div class="asn-banner-meta" id="asn-banner-meta"></div>
+  </div>
+  <div class="asn-banner-actions">
+    <button class="asn-banner-go" id="asn-banner-go">택배 메뉴로 이동 →</button>
+    <button class="asn-banner-x" id="asn-banner-x" aria-label="닫기">×</button>
+  </div>
+</div>
 
 <!-- ==================== 기존 TOP BAR (숨김 — Step 2에서 JS 연결 후 삭제) ==================== -->
 <nav class="top-bar" id="top-bar" style="display:none">

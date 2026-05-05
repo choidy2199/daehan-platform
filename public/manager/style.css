@@ -4448,3 +4448,143 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
 .del-placeholder-desc {
   font-size: 13px;
 }
+
+/* ============================================
+   AS택배 알림 시스템 (Phase 5-A 3/3)
+   상단바 [📦 AS택배] 버튼 + 진한 파란 배너
+   ============================================ */
+.as-bell-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 12px;
+  background: #FFFFFF;
+  border: 1.5px solid #DDE1EB;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1D23;
+  cursor: pointer;
+  font-family: 'Pretendard', sans-serif;
+}
+.as-bell-btn:hover { border-color: #185FA5; }
+.as-bell-icon { font-size: 16px; }
+
+.as-bell-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: #DC2626;
+  color: #FFFFFF;
+  border: 2px solid #FFFFFF;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  animation: as-bell-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes as-bell-pulse {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+  50%  { transform: scale(1.12); box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+.as-bell-badge[data-count="0"] { display: none; }
+
+.as-bell-vsep {
+  width: 1px;
+  height: 24px;
+  background: #DDE1EB;
+  margin: 0 4px;
+  display: inline-block;
+}
+
+.asn-banner {
+  background: #0C447C;
+  color: #FFFFFF;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  position: relative;
+  border-bottom: 2px solid #042C53;
+  animation: asn-banner-slide 0.35s ease-out;
+  font-family: 'Pretendard', sans-serif;
+}
+.asn-banner.hidden { display: none; }
+.asn-banner::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 4px;
+  background: #FBBF24;
+}
+@keyframes asn-banner-slide {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.asn-banner-icon {
+  width: 36px;
+  height: 36px;
+  background: rgba(255,255,255,0.2);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 900;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.4);
+}
+.asn-banner-body { flex: 1; }
+.asn-banner-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 3px;
+  letter-spacing: -0.2px;
+}
+.asn-banner-meta { font-size: 12px; color: rgba(255,255,255,0.75); }
+.asn-banner-pill {
+  background: rgba(255,255,255,0.18);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-right: 4px;
+  display: inline-block;
+}
+.asn-banner-actions { display: flex; gap: 8px; }
+.asn-banner-go {
+  background: #FFFFFF;
+  color: #0C447C;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Pretendard', sans-serif;
+}
+.asn-banner-go:hover { background: #FBBF24; }
+.asn-banner-x {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #FFFFFF;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 700;
+}
+.asn-banner-x:hover { background: rgba(255,255,255,0.2); }

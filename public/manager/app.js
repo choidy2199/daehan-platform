@@ -31476,3 +31476,129 @@ function _delRenderActiveContent() {
   }
   return '';
 }
+
+/* ============================================
+ * AS택배 알림 시스템 (Phase 5-A 3/3)
+ * AS매니저 데이터 DB(dlzasdhhwgxshkyuzfyp) ship_records 구독
+ * 시나리오 B2 — 별도 supabase 클라이언트 (하드코딩 anon key)
+ * ============================================ */
+
+var _asnSupabase = null;
+var _asnChannel = null;
+
+var _ASN_SUPABASE_URL = 'https://dlzasdhhwgxshkyuzfyp.supabase.co';
+var _ASN_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsemFzZGhod2d4c2hreXV6ZnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTg4NjEsImV4cCI6MjA5MDI5NDg2MX0.io79K3ML_BL-eiQZ64MUOqF9g9vIWlq8E19JfcB19c0';
+
+async function _asnInit() {
+  if (typeof window.supabase === 'undefined' || typeof window.supabase.createClient !== 'function') {
+    console.warn('[asn] supabase-js 라이브러리 없음 — index.html CDN 확인');
+    return;
+  }
+  _asnSupabase = window.supabase.createClient(
+    _ASN_SUPABASE_URL,
+    _ASN_SUPABASE_ANON_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        storageKey: 'sb-asn-data'
+      }
+    }
+  );
+  await _asnRefreshCount();
+  _asnSubscribe();
+}
+
+async function _asnRefreshCount() {
+  if (!_asnSupabase) return;
+  try {
+    var res = await _asnSupabase
+      .from('ship_records')
+      .select('*', { count: 'exact', head: true })
+      .or('tracking_no.is.null,tracking_no.eq.');
+    if (res.error) throw res.error;
+    _asnUpdateBadge(res.count || 0);
+  } catch (err) {
+    console.error('[asn] refreshCount 실패:', err);
+  }
+}
+
+function _asnUpdateBadge(count) {
+  var btn = document.getElementById('as-bell-btn');
+  var vsep = document.getElementById('as-bell-vsep');
+  var badge = document.getElementById('as-bell-badge');
+  if (!btn || !badge) return;
+  badge.textContent = count > 99 ? '99+' : String(count);
+  badge.dataset.count = count;
+  btn.removeAttribute('hidden');
+  if (vsep) vsep.removeAttribute('hidden');
+}
+
+function _asnSubscribe() {
+  if (!_asnSupabase) return;
+  if (_asnChannel) _asnSupabase.removeChannel(_asnChannel);
+  _asnChannel = _asnSupabase
+    .channel('asn-ship-records')
+    .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'ship_records' },
+        function(payload) { _asnOnInsert(payload.new); })
+    .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'ship_records' },
+        function() { _asnRefreshCount(); })
+    .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'ship_records' },
+        function() { _asnRefreshCount(); })
+    .subscribe();
+}
+
+function _asnOnInsert(row) {
+  _asnRefreshCount();
+  if (row.tracking_no && row.tracking_no.trim() !== '') return;
+  _asnShowBanner(row);
+}
+
+function _asnShowBanner(row) {
+  var banner = document.getElementById('asn-banner');
+  var meta = document.getElementById('asn-banner-meta');
+  if (!banner || !meta) return;
+  var receiver = row.receiver_name || '미상';
+  var contents = row.contents || '내용 없음';
+  var qty = row.quantity || 1;
+  meta.innerHTML =
+    '<span class="asn-banner-pill">' + _asnEsc(receiver) + '</span>' +
+    '<span class="asn-banner-pill">' + _asnEsc(contents) + '</span>' +
+    '<span class="asn-banner-pill">' + qty + '개</span>' +
+    ' · 송장번호 입력이 필요합니다';
+  banner.classList.remove('hidden');
+}
+
+function _asnHideBanner() {
+  var banner = document.getElementById('asn-banner');
+  if (banner) banner.classList.add('hidden');
+}
+
+function _asnGoToDelivery() {
+  _asnHideBanner();
+  if (typeof switchTab === 'function') switchTab('delivery');
+  else console.error('[asn] switchTab 함수 없음');
+}
+
+function _asnEsc(s) {
+  return String(s).replace(/[&<>"']/g, function(c) {
+    return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c];
+  });
+}
+
+function _asnBindEvents() {
+  var btn = document.getElementById('as-bell-btn');
+  var goBtn = document.getElementById('asn-banner-go');
+  var xBtn = document.getElementById('asn-banner-x');
+  if (btn) btn.addEventListener('click', _asnGoToDelivery);
+  if (goBtn) goBtn.addEventListener('click', _asnGoToDelivery);
+  if (xBtn) xBtn.addEventListener('click', _asnHideBanner);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  _asnBindEvents();
+  _asnInit();
+});
