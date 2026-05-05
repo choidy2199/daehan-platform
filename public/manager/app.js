@@ -11888,8 +11888,13 @@ function renderGenProducts() {
   const body = document.getElementById('gen-body');
   body.innerHTML = filtered.map((p, i) => {
     const idx = genProducts.indexOf(p);
+    var hasPhoto = p && p.image_url && typeof p.image_url === 'string' && p.image_url.length > 0;
+    var photoCellInner = hasPhoto
+      ? `<img class="gen-photo-thumb" src="${String(p.image_url).replace(/"/g,'&quot;')}" data-idx="${idx}" loading="lazy" alt="" />`
+      : `<div class="gen-photo-empty" data-idx="${idx}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9BA3B2" stroke-width="1.5"><path d="M3 9 L7 9 L9 6 L15 6 L17 9 L21 9 L21 19 L3 19 Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>업로드</span></div>`;
     return `<tr>
       <td>${p.code || '-'}</td>
+      <td class="gen-photo-cell" data-idx="${idx}" style="text-align:center;padding:6px 4px">${photoCellInner}</td>
       <td>${p.manageCode || '-'}</td>
       <td>${p.category || '-'}</td>
       <td style="font-weight:500">${p.model || '-'}</td>
@@ -11910,11 +11915,29 @@ function renderGenProducts() {
     </tr>`;
   }).join('');
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="18"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
+    body.innerHTML = '<tr><td colspan="19"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
   }
   document.getElementById('gen-count').textContent = `${genProducts.length}건`;
+  // 사진 셀 클릭 이벤트 위임 — gen-body에 1회만 등록 (idempotent)
+  if (body && !body.__photoBound) {
+    body.__photoBound = true;
+    body.addEventListener('click', function(e) {
+      var cell = e.target.closest('.gen-photo-cell');
+      if (!cell) return;
+      var ix = parseInt(cell.getAttribute('data-idx'), 10);
+      if (isNaN(ix)) return;
+      openGenPhotoLightbox(ix);
+    });
+  }
   initColumnResize('gen-table');
   initStickyHeader('gen-table');
+}
+
+// Phase A-2-a: 임시 stub — 실 구현은 Phase A-2-b
+function openGenPhotoLightbox(idx) {
+  var p = (typeof genProducts !== 'undefined' && genProducts[idx]) || null;
+  if (!p) { alert('제품을 찾을 수 없습니다'); return; }
+  alert('사진 기능은 Phase A-2-b에서 구현됩니다 (제품: ' + (p.model || p.code || '?') + ')');
 }
 
 function addGenProduct() {

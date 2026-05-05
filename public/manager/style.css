@@ -568,6 +568,25 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .data-table input:focus { border-color: #185FA5; outline: none; }
 .data-table td.desc-cell { max-width: 220px; overflow: hidden; white-space: nowrap; }
 
+/* 일반단가표 — 사진 컬럼 (Phase A-2-a) */
+#gen-table tbody td { height: 80px; padding: 6px 10px; }
+#gen-table .gen-photo-cell { width: 80px; padding: 6px 4px !important; }
+#gen-table .gen-photo-empty {
+  width: 60px; height: 60px; margin: 0 auto;
+  border: 1px dashed #C8CDD8; border-radius: 4px;
+  background: #F9FAFB;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  cursor: pointer; transition: background 0.15s;
+}
+#gen-table .gen-photo-empty:hover { background: #F0F2F7; }
+#gen-table .gen-photo-empty span { font-size: 9px; color: #9BA3B2; }
+#gen-table .gen-photo-thumb {
+  width: 60px; height: 60px; object-fit: cover; border-radius: 4px;
+  background: #2C2C2A; margin: 0 auto; display: block;
+  cursor: pointer; transition: transform 0.15s;
+}
+#gen-table .gen-photo-thumb:hover { transform: scale(1.05); }
+
 /* Discontinued row */
 .data-table tr.row-discontinued td { background: #F9F5F0; color: #9BA3B2; }
 .data-table tr.row-discontinued:hover td { background: #F3EDE5; }
