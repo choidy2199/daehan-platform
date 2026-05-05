@@ -31447,7 +31447,7 @@ function _renderDeliveryTab() {
   root.innerHTML =
     '<div class="del-tab-row">' +
       '<button class="del-tab ' + (_delActiveTab === 'as_parcel' ? 'active' : '') + '" data-deltab="as_parcel">AS택배</button>' +
-      '<button class="del-tab placeholder" disabled>+ 추가 예정</button>' +
+      '<button class="del-tab ' + (_delActiveTab === 'general_parcel' ? 'active' : '') + '" data-deltab="general_parcel">일반택배</button>' +
     '</div>' +
     '<div class="del-iframe-frame">' +
       _delRenderActiveContent() +
@@ -31467,5 +31467,12 @@ function _delRenderActiveContent() {
   if (_delActiveTab === 'as_parcel') {
     return '<iframe class="del-iframe" src="https://as.daehantool.dev/?tab=ship" title="AS택배 발송" referrerpolicy="origin"></iframe>';
   }
-  return '<div style="padding:32px;text-align:center;color:#B4B2A9;">준비 중</div>';
+  if (_delActiveTab === 'general_parcel') {
+    return '<div class="del-placeholder">' +
+             '<div class="del-placeholder-icon">📦</div>' +
+             '<div class="del-placeholder-title">일반택배</div>' +
+             '<div class="del-placeholder-desc">추후 구현 예정입니다.</div>' +
+           '</div>';
+  }
+  return '';
 }
