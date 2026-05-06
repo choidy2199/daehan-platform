@@ -52,6 +52,9 @@ body { font-family: 'Pretendard', -apple-system, sans-serif; background: #f0ede8
 .sidebar-toggle { background:none; border:none; cursor:pointer; color:var(--dm-text-secondary); padding:4px; display:flex; align-items:center; justify-content:center; border-radius:4px; transition:background 0.15s; flex-shrink:0; }
 .sidebar-toggle:hover { background:rgba(0,0,0,0.06); }
 .sidebar.collapsed .sidebar-toggle svg { transform:rotate(180deg); }
+.sidebar-launcher { background:#111827; border:0.5px solid #111827; cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center; border-radius:4px; flex-shrink:0; transition:opacity 0.15s; }
+.sidebar-launcher:hover { opacity:0.85; }
+.sidebar.collapsed .sidebar-header { flex-direction:column; height:auto; gap:6px; padding:8px 0; align-items:center; justify-content:center; }
 .sidebar-divider { height:1px; background:var(--dm-border); margin:0 10px; flex-shrink:0; }
 .sidebar-menu { flex:1; overflow-y:auto; overflow-x:hidden; padding:6px 0; }
 .sidebar-bottom { padding:6px 0; flex-shrink:0; }
