@@ -12000,20 +12000,14 @@ function _genPhotoOpenLightbox(idx, p) {
 }
 
 function _genPhotoProcessAndUpload(idx, file) {
-  console.time('🔵 [TOTAL] 전체');
-  console.time('🔵 [1-2] FileReader→DataURL');
   var p = genProducts[idx];
   if (!p) { alert('제품을 찾을 수 없습니다'); return; }
   var reader = new FileReader();
   reader.onerror = function() { alert('파일 읽기 실패'); };
   reader.onload = function(ev) {
-    console.timeEnd('🔵 [1-2] FileReader→DataURL');
-    console.time('🔵 [3] new Image() 디코딩');
     var img = new Image();
     img.onerror = function() { alert('이미지 디코딩 실패'); };
     img.onload = function() {
-      console.timeEnd('🔵 [3] new Image() 디코딩');
-      console.time('🔵 [4] Canvas 리사이즈 (drawImage)');
       var MAX = 1200;
       var scale = Math.min(1, MAX / Math.max(img.width, img.height));
       var w = Math.round(img.width * scale);
@@ -12022,14 +12016,8 @@ function _genPhotoProcessAndUpload(idx, file) {
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      console.timeEnd('🔵 [4] Canvas 리사이즈 (drawImage)');
-      console.log('🔵    원본:', img.width, 'x', img.height, '→ 리사이즈:', w, 'x', h);
-      console.time('🔵 [5] toBlob (PNG 인코딩)');
       canvas.toBlob(async function(blob) {
-        console.timeEnd('🔵 [5] toBlob (PNG 인코딩)');
         if (!blob) { alert('이미지 변환 실패'); return; }
-        console.log('🔵    Blob:', (blob.size / 1024).toFixed(1), 'KB');
-        console.time('🔵 [6] fetch /api/products/upload (네트워크)');
         try {
           var res = await fetch('/api/products/upload', {
             method: 'POST',
@@ -12037,8 +12025,6 @@ function _genPhotoProcessAndUpload(idx, file) {
             body: blob
           });
           var json = await res.json();
-          console.timeEnd('🔵 [6] fetch /api/products/upload (네트워크)');
-          if (json && json._timing) console.log('🔵    Vercel timing:', json._timing);
           if (!res.ok || !json.ok || !json.url) {
             alert('업로드 실패: ' + (json.error || res.statusText));
             return;
@@ -12047,15 +12033,10 @@ function _genPhotoProcessAndUpload(idx, file) {
             alert('업로드 URL 생성 실패');
             return;
           }
-          console.time('🔵 [7] localStorage + autoSync');
           genProducts[idx].image_url = json.url;
           localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
           if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_gen_products');
-          console.timeEnd('🔵 [7] localStorage + autoSync');
-          console.time('🔵 [8] renderGenProducts');
           renderGenProducts();
-          console.timeEnd('🔵 [8] renderGenProducts');
-          console.timeEnd('🔵 [TOTAL] 전체');
         } catch (err) {
           alert('업로드 실패: ' + (err && err.message ? err.message : err));
         }
