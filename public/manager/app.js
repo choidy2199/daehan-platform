@@ -22705,12 +22705,57 @@ function _poPteRenderList(rows) {
   body.innerHTML = h;
 }
 
-function _poPteLoadTemplate(templateId) {
-  alert('불러오기는 다음 단계(C-4)에서 구현 예정\n템플릿 ID: ' + templateId);
+async function _poPteLoadTemplate(templateId) {
+  if (typeof supabase === 'undefined' || !supabase.createClient) {
+    alert('Supabase 클라이언트 미초기화');
+    return;
+  }
+  var SUPABASE_URL = 'https://skloeaxinaxzqmihfzet.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
+  var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  try {
+    var resp = await sbClient.from('po_templates').select('items, name').eq('id', templateId).single();
+    if (resp.error) throw resp.error;
+    if (!resp.data || !Array.isArray(resp.data.items)) {
+      alert('템플릿 데이터를 불러올 수 없습니다');
+      return;
+    }
+    var nowISO = new Date().toISOString();
+    var user = (window.currentUser && window.currentUser.loginId) || 'admin';
+    var newList = resp.data.items.map(function(it) {
+      return { productCode: String(it.productCode), addedAt: nowISO, addedBy: user };
+    });
+    save('mw_import_po_products', newList);
+    if (typeof _poRenderProductList === 'function') _poRenderProductList();
+    if (typeof _poRefreshMetaCounts === 'function') _poRefreshMetaCounts();
+    _poClosePtePopup();
+    alert('템플릿 [' + (resp.data.name || '') + '] 불러오기 완료 (' + newList.length + '개 제품)');
+  } catch (err) {
+    alert('불러오기 실패: ' + (err && err.message ? err.message : err));
+  }
 }
 
-function _poPteDeleteTemplate(templateId, templateName) {
-  alert('삭제는 다음 단계(C-4)에서 구현 예정\n[' + templateName + '] / ID: ' + templateId);
+async function _poPteDeleteTemplate(templateId, templateName) {
+  if (!confirm('[' + templateName + '] 템플릿이 영구 삭제됩니다.\n이 작업은 되돌릴 수 없습니다.\n\n계속하시겠습니까?')) return;
+  if (typeof supabase === 'undefined' || !supabase.createClient) {
+    alert('Supabase 클라이언트 미초기화');
+    return;
+  }
+  var SUPABASE_URL = 'https://skloeaxinaxzqmihfzet.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
+  var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  try {
+    var del = await sbClient.from('po_templates').delete().eq('id', templateId);
+    if (del.error) throw del.error;
+    var listResp = await sbClient.from('po_templates')
+      .select('id, brand, name, item_count, created_at, updated_at, created_by')
+      .order('brand', { ascending: true })
+      .order('updated_at', { ascending: false });
+    if (listResp.error) throw listResp.error;
+    _poPteRenderList(listResp.data || []);
+  } catch (err) {
+    alert('삭제 실패: ' + (err && err.message ? err.message : err));
+  }
 }
 
 // ===== 커밋 6 — 발주확정 =====
