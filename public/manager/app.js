@@ -21263,7 +21263,7 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-header">';
   h += '<div class="pc-panel-title">제품목록 <span class="pc-panel-count" id="po-product-list-count">' + registeredCount + '건</span></div>';
   h += '<div class="pc-panel-actions">';
-  h += '<button class="btn-mini" style="background:#5D52B0;color:#fff;border-color:#5D52B0;" onclick="' + placeholderAlert + '"' + disabledAttr + '>템플릿</button>';
+  h += '<button class="btn-mini" style="background:#5D52B0;color:#fff;border-color:#5D52B0;" onclick="_poOpenTemplatePopup()"' + disabledAttr + '>템플릿</button>';
   h += '<button class="btn-mini" style="background:#0F7A5F;color:#fff;border-color:#0F7A5F;" onclick="_poSaveTemplate()"' + disabledAttr + '>템플릿 저장</button>';
   h += '<div style="width:1px;height:22px;background:#3A4047;margin:0 6px;align-self:center;"></div>';
   h += '<button class="btn-mini btn-mini-p" onclick="_poOpenProductPicker()"' + disabledAttr + '>+ 제품등록</button>';
@@ -22601,6 +22601,116 @@ function _poToggleAllProducts(headerCheckbox) {
   var isChecked = headerCheckbox.checked;
   var rowBoxes = document.querySelectorAll('#po-product-list-body input[type="checkbox"][data-code]');
   rowBoxes.forEach(function(box) { box.checked = isChecked; });
+}
+
+// C-3 템플릿 팝업 (조회 + 카드 렌더링만 — [불러오기]/[삭제] 동작은 C-4)
+function _poPteEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _poPteFormatDate(iso) {
+  if (!iso) return '';
+  return String(iso).slice(0, 10);
+}
+
+async function _poOpenTemplatePopup() {
+  if (document.getElementById('po-pte-popup-backdrop')) return;
+
+  var backdrop = document.createElement('div');
+  backdrop.id = 'po-pte-popup-backdrop';
+  backdrop.addEventListener('click', _poPteOnBackdropClick);
+
+  var popup = document.createElement('div');
+  popup.id = 'po-pte-popup';
+  popup.addEventListener('click', function(e) { e.stopPropagation(); });
+
+  popup.innerHTML =
+    '<div id="po-pte-popup-header">' +
+      '<span>템플릿</span>' +
+      '<span id="po-pte-popup-close" onclick="_poClosePtePopup()">×</span>' +
+    '</div>' +
+    '<div id="po-pte-popup-body"><div class="po-pte-loading">불러오는 중...</div></div>' +
+    '<div id="po-pte-popup-footer">' +
+      '<button onclick="_poClosePtePopup()">닫기</button>' +
+    '</div>';
+
+  backdrop.appendChild(popup);
+  document.body.appendChild(backdrop);
+
+  if (typeof supabase === 'undefined' || !supabase.createClient) {
+    alert('Supabase 클라이언트 미초기화');
+    _poClosePtePopup();
+    return;
+  }
+  var SUPABASE_URL = 'https://skloeaxinaxzqmihfzet.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
+  var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  try {
+    var resp = await sbClient.from('po_templates')
+      .select('id, brand, name, item_count, created_at, updated_at, created_by')
+      .order('brand', { ascending: true })
+      .order('updated_at', { ascending: false });
+    if (resp.error) throw resp.error;
+    _poPteRenderList(resp.data || []);
+  } catch (err) {
+    alert('템플릿 로드 실패: ' + (err && err.message ? err.message : err));
+    _poClosePtePopup();
+  }
+}
+
+function _poClosePtePopup() {
+  var b = document.getElementById('po-pte-popup-backdrop');
+  if (b) b.remove();
+}
+
+function _poPteOnBackdropClick(event) {
+  if (event.target === event.currentTarget) _poClosePtePopup();
+}
+
+function _poPteRenderList(rows) {
+  var body = document.getElementById('po-pte-popup-body');
+  if (!body) return;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    body.innerHTML = '<div class="po-pte-empty">저장된 템플릿이 없습니다</div>';
+    return;
+  }
+  var groups = rows.reduce(function(acc, r) {
+    var b = r.brand || '-';
+    if (!acc[b]) { acc[b] = []; acc.__order.push(b); }
+    acc[b].push(r);
+    return acc;
+  }, { __order: [] });
+  var h = '';
+  groups.__order.forEach(function(brand) {
+    h += '<div class="po-pte-brand-group">';
+    h += '<p class="po-pte-brand-label">' + _poPteEsc(brand) + '</p>';
+    groups[brand].forEach(function(r) {
+      var nameEsc = _poPteEsc(r.name || '');
+      var nameAttr = String(r.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      h += '<div class="po-pte-card">' +
+        '<div class="po-pte-card-info">' +
+          '<p class="po-pte-card-name">' + nameEsc + '</p>' +
+          '<p class="po-pte-card-meta">' + (r.item_count || 0) + '개 제품 · ' + _poPteFormatDate(r.updated_at) + '</p>' +
+        '</div>' +
+        '<div class="po-pte-card-actions">' +
+          '<button class="po-pte-btn-load" onclick="_poPteLoadTemplate(\'' + r.id + '\')">불러오기</button>' +
+          '<button class="po-pte-btn-delete" onclick="_poPteDeleteTemplate(\'' + r.id + '\', \'' + nameAttr + '\')">삭제</button>' +
+        '</div>' +
+      '</div>';
+    });
+    h += '</div>';
+  });
+  body.innerHTML = h;
+}
+
+function _poPteLoadTemplate(templateId) {
+  alert('불러오기는 다음 단계(C-4)에서 구현 예정\n템플릿 ID: ' + templateId);
+}
+
+function _poPteDeleteTemplate(templateId, templateName) {
+  alert('삭제는 다음 단계(C-4)에서 구현 예정\n[' + templateName + '] / ID: ' + templateId);
 }
 
 // ===== 커밋 6 — 발주확정 =====

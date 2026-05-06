@@ -4624,3 +4624,122 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   font-weight: 700;
 }
 .asn-banner-x:hover { background: rgba(255,255,255,0.2); }
+
+/* C-3 발주서 템플릿 팝업 — 모든 selector po-pte- prefix (글로벌 오염 0) */
+#po-pte-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  font-family: Pretendard, sans-serif;
+}
+#po-pte-popup {
+  background: #fff;
+  border-radius: 12px;
+  width: 540px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#po-pte-popup-header {
+  background: #1A1D23;
+  color: #fff;
+  padding: 14px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#po-pte-popup-close {
+  color: #8B92A0;
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+#po-pte-popup-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+#po-pte-popup-footer {
+  background: #F8F9FA;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 0.5px solid #E5E7EB;
+}
+#po-pte-popup-footer button {
+  background: #fff;
+  color: #6B7280;
+  border: 1px solid #D5D7DD;
+  padding: 7px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.po-pte-brand-group { margin-bottom: 18px; }
+.po-pte-brand-group:last-child { margin-bottom: 0; }
+.po-pte-brand-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6B7280;
+  margin: 0 0 10px;
+  letter-spacing: 0.3px;
+}
+.po-pte-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.po-pte-card:last-child { margin-bottom: 0; }
+.po-pte-card-info p { margin: 0; }
+.po-pte-card-name { font-size: 14px; font-weight: 500; color: #1A1D23; }
+.po-pte-card-meta { font-size: 11px; color: #8B92A0; margin-top: 4px !important; }
+.po-pte-card-actions { display: flex; gap: 6px; }
+.po-pte-btn-load {
+  background: #1F4E8C;
+  color: #fff;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.po-pte-btn-delete {
+  background: #fff;
+  color: #A03B3B;
+  border: 1px solid #E2C8C8;
+  padding: 7px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.po-pte-empty {
+  font-size: 12px;
+  color: #8B92A0;
+  text-align: center;
+  padding: 18px 0;
+  border: 1px dashed #D5D7DD;
+  border-radius: 8px;
+}
+.po-pte-loading {
+  text-align: center;
+  padding: 40px 0;
+  color: #8B92A0;
+  font-size: 13px;
+}
