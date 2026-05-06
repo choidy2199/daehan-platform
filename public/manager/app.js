@@ -21349,6 +21349,16 @@ function _poBindDetailEvents() {
 
 // 좌측 제품 목록 — mw_import_po_products 원본 실시간 참조 렌더링 (12컬럼)
 // 컬럼: ☐ / 코드 / 브랜드 / 품명 / 모델명 / 1P / 가격$ / 재고 / 발주P / 낱개 / 합계 / 🛒
+// 모델명 셀 표시용 — description 첫 공백 전 토큰 추출
+// (예: "DC660 2HP-통없는모델" → "DC660"). DB 저장 데이터(model 필드)는 변환 대상 아님.
+function _poExtractModel(description) {
+  if (!description || typeof description !== 'string') return '';
+  var trimmed = description.trim();
+  if (!trimmed) return '';
+  var firstToken = trimmed.split(/\s+/)[0];
+  return firstToken || '';
+}
+
 function _poRenderProductList() {
   var body = document.getElementById('po-product-list-body');
   if (!body) return;
@@ -21412,9 +21422,9 @@ function _poRenderProductList() {
   h += '<th style="' + thS + '"><input type="checkbox" disabled></th>';
   h += '<th style="' + thS + '">코드</th>';
   h += '<th style="' + thS + '">관리코드</th>';
-  h += '<th style="' + thS + '">브랜드</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
   h += '<th style="' + thS + '">품명</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
+  h += '<th style="' + thS + '">모델명</th>';
   h += '<th style="' + thS + '">1P</th>';
   h += '<th style="' + thS + '">가격$</th>';
   h += '<th style="' + thS + '">재고</th>';
@@ -21451,7 +21461,7 @@ function _poRenderProductList() {
     var palletQtyNum = (p.palletQty != null && p.palletQty !== '' && Number(p.palletQty) > 0) ? Number(p.palletQty) : 0;
     var palletCell = palletQtyNum > 0 ? palletQtyNum.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
     var brandTxt = _poEsc(getGenBrand(p) || '-');
-    var modelTxt = _poEsc(p.model || '-');
+    var modelTxt = _poEsc(_poExtractModel(p.description) || '-');
     var descTxt = _poEsc(p.description || '-');
     var cbAttr = inCart ? ' disabled' : '';
     var inputAttr = inCart ? ' disabled' : '';
@@ -22033,10 +22043,10 @@ function _poRenderCart(poId) {
   h += '<col style="width:30px">';
   h += '</colgroup>';
   h += '<thead><tr>';
-  h += '<th style="' + thS + '">브랜드</th>';
+  h += '<th style="' + thS + '">품명</th>';
   h += '<th style="' + thS + '">관리코드</th>';   // [신규]
   h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
-  h += '<th style="' + thS + '">품명</th>';
+  h += '<th style="' + thS + '">모델명</th>';
   h += '<th style="' + thS + '">1P</th>';
   h += '<th style="' + thS + '">낱개</th>';
   h += '<th style="' + thS + '">금액$</th>';
@@ -22051,8 +22061,8 @@ function _poRenderCart(poId) {
     var p = gpByCode[code];
     var brandTxt = p ? _poEsc(getGenBrand(p) || '-') : '-';
     var descTxt = p ? _poEsc(p.description || '-') : '<span style="color:#9BA3B2;font-style:italic;">원본 삭제됨</span>';
-    // [핫픽스] mw_gen_products의 model 필드에 brand가 들어있는 케이스 대응 — name/description fallback
-    var modelTxt = p ? _poEsc(p.name || p.description || p.model || '-') : '-';
+    // [단계 ②-a 정정] 모델명 셀 = description 첫 토큰 추출 (DB.model은 그대로 보존됨)
+    var modelTxt = p ? _poEsc(_poExtractModel(p.description) || '-') : '-';
     var palletQtyNum = (p && p.palletQty != null && Number(p.palletQty) > 0) ? Number(p.palletQty) : 0;
     var palletCell = palletQtyNum > 0 ? palletQtyNum.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
     var priceNum = (p && p.importPrice != null) ? Number(p.importPrice) : 0;
@@ -22261,7 +22271,7 @@ function _poPickerRenderList() {
   h += '<th style="' + thS + '">코드</th>';
   h += '<th style="' + thS + '">관리코드</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
-  h += '<th style="' + thS + '">품명</th>';
+  h += '<th style="' + thS + '">모델명</th>';
   h += '<th style="' + thS + '">1P</th>';
   h += '<th style="' + thS + '">수입가$</th>';
   h += '<th style="' + thS + '">재고</th>';
@@ -22290,7 +22300,7 @@ function _poPickerRenderList() {
     h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + codeEsc + '</td>';
     h += '<td style="' + tdS + 'font-family:monospace;font-size:11px;">' + _poEsc(p.manageCode || '-') + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + _poEsc(p.description || '-') + '</td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + _poEsc(p.model || '-') + '</td>';
+    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + _poEsc(_poExtractModel(p.description) || '-') + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + priceCell + '</td>';
     h += '<td style="' + tdS + '">' + stockHtml + '</td>';
@@ -22442,7 +22452,7 @@ function _poBuildConfirmSummary(cart) {
     if (p) {
       var stock = (p.stock != null && p.stock !== '' && !isNaN(Number(p.stock))) ? Number(p.stock) : 0;
       if (stock <= 0) {
-        shortageList.push({ code: p.code, model: p.model, stock: stock });
+        shortageList.push({ code: p.code, modelDisplay: _poExtractModel(p.description), stock: stock });
       }
     }
   });
@@ -22459,7 +22469,7 @@ function _poBuildConfirmSummary(cart) {
     var limit = Math.min(5, shortageList.length);
     for (var i = 0; i < limit; i++) {
       var s = shortageList[i];
-      lines.push('- ' + (s.model || s.code) + ' (재고 ' + s.stock + ')');
+      lines.push('- ' + (s.modelDisplay || s.code) + ' (재고 ' + s.stock + ')');
     }
     if (shortageList.length > 5) lines.push('...외 ' + (shortageList.length - 5) + '건');
   }
@@ -23321,7 +23331,7 @@ function _poRenderPoListTable(list, currentId) {
     '<colgroup><col style="width:32px"><col style="width:120px"><col style="width:85px"><col style="width:70px"><col style="width:90px"><col style="width:65px"><col style="width:110px"><col style=""></colgroup>' +
     '<thead><tr>' +
     '<th class="po-list-th-check"><input type="checkbox" id="po-list-check-all" onchange="_poListToggleAllChecks(this.checked)"></th>' +
-    '<th>발주번호</th><th>날짜</th><th>브랜드</th><th style="text-align:right;">총금액</th><th>상태</th><th>연결 인보이스</th><th>작업</th>' +
+    '<th>발주번호</th><th>날짜</th><th>품명</th><th style="text-align:right;">총금액</th><th>상태</th><th>연결 인보이스</th><th>작업</th>' +
     '</tr></thead>' +
     '<tbody>' + rows + emptyRows + '</tbody>' +
     '</table>';
