@@ -21265,8 +21265,7 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-actions">';
   h += '<a href="#" class="po-col-reset-link" onclick="_poResetColWidths(event)">컬럼초기화</a>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>템플릿</button>';
-  h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>백업</button>';
-  h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>복원</button>';
+  h += '<button class="btn-mini" onclick="_poSaveTemplate()"' + disabledAttr + '>템플릿 저장</button>';
   h += '<button class="btn-mini btn-mini-p" onclick="_poOpenProductPicker()"' + disabledAttr + '>+ 제품등록</button>';
   h += '<button class="btn-mini btn-mini-danger" onclick="_poDeleteSelectedProducts()"' + disabledAttr + '>삭제</button>';
   h += '</div></div>';
@@ -22522,6 +22521,79 @@ function _poDeleteSelectedProducts() {
   _poRenderProductList();
   if (typeof _poRefreshMetaCounts === 'function') _poRefreshMetaCounts();
   _poToast(codes.length + '건 제거됨', 'success');
+}
+
+// 템플릿 저장 (브랜드별, 같은 이름 차단은 DB UNIQUE 제약 23505 catch)
+async function _poSaveTemplate() {
+  var boxes = document.querySelectorAll('#po-product-list-body input[type="checkbox"][data-code]:checked');
+  if (boxes.length === 0) { alert('저장할 제품을 선택하세요'); return; }
+  var codes = [];
+  boxes.forEach(function(cb) { var c = cb.getAttribute('data-code'); if (c) codes.push(String(c)); });
+
+  var gp = loadObj('mw_gen_products', []);
+  var gpByCode = {};
+  gp.forEach(function(p) { if (p && p.code != null) gpByCode[String(p.code)] = p; });
+
+  var brandCounts = {};
+  var noBrandCodes = [];
+  codes.forEach(function(code) {
+    var p = gpByCode[code];
+    if (!p) return;
+    var b = (p.category || '').split('-')[0].trim();
+    if (!b) noBrandCodes.push(code);
+    else brandCounts[b] = (brandCounts[b] || 0) + 1;
+  });
+
+  if (noBrandCodes.length > 0) {
+    alert('브랜드가 지정되지 않은 제품이 있습니다 (코드: ' + noBrandCodes.join(', ') + ')');
+    return;
+  }
+  var brandKeys = Object.keys(brandCounts);
+  if (brandKeys.length === 0) {
+    alert('브랜드를 식별할 수 없습니다');
+    return;
+  }
+  if (brandKeys.length > 1) {
+    var detail = brandKeys.map(function(b) { return b + ' ' + brandCounts[b] + '개'; }).join(', ');
+    alert('한 브랜드 제품만 선택 가능합니다 (현재: ' + detail + ')');
+    return;
+  }
+  var brand = brandKeys[0];
+
+  var name = prompt('템플릿 이름을 입력하세요\n(브랜드: ' + brand + ' / 제품: ' + codes.length + '개)');
+  if (name === null) return;
+  name = name.trim();
+  if (!name) { alert('이름을 입력하세요'); return; }
+
+  var items = codes.map(function(code) { return { productCode: String(code) }; });
+  var createdBy = (window.currentUser && window.currentUser.loginId) || 'admin';
+
+  if (typeof supabase === 'undefined' || !supabase.createClient) {
+    alert('Supabase 클라이언트 미초기화');
+    return;
+  }
+  var SUPABASE_URL = 'https://skloeaxinaxzqmihfzet.supabase.co';
+  var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
+  var sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  try {
+    var resp = await sbClient.from('po_templates').insert({
+      brand: brand,
+      name: name,
+      items: items,
+      created_by: createdBy
+    }).select().single();
+    if (resp.error) {
+      if (resp.error.code === '23505') {
+        alert('이미 같은 이름의 템플릿이 있습니다. 다른 이름을 입력하세요.');
+        _poSaveTemplate();
+        return;
+      }
+      throw resp.error;
+    }
+    alert('템플릿 저장 완료\n[' + brand + '] ' + name + ' (' + items.length + '개)');
+  } catch (err) {
+    alert('저장 실패: ' + (err && err.message ? err.message : err));
+  }
 }
 
 // ===== 커밋 6 — 발주확정 =====
