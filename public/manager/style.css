@@ -587,6 +587,20 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 }
 #gen-table .gen-photo-thumb:hover { transform: scale(1.05); }
 
+/* 발주서 사진 컬럼 (read-only) — 본 행/picker 80px, 장바구니 60px */
+.po-photo-cell { width: 80px; min-width: 80px; padding: 6px 4px !important; text-align: center; }
+.po-photo-cell-cart { width: 60px; min-width: 60px; padding: 6px 4px !important; text-align: center; }
+.po-photo-thumb {
+  width: 100%; max-width: 64px; aspect-ratio: 1 / 1; object-fit: contain;
+  border-radius: 4px; background: #F4F6FA; margin: 0 auto; display: block;
+  cursor: pointer; transition: transform 0.15s;
+}
+.po-photo-thumb:hover { transform: scale(1.05); }
+.po-photo-empty {
+  width: 100%; max-width: 64px; aspect-ratio: 1 / 1; border-radius: 4px;
+  background: #F4F6FA; margin: 0 auto; display: flex; align-items: center; justify-content: center;
+}
+
 /* Discontinued row */
 .data-table tr.row-discontinued td { background: #F9F5F0; color: #9BA3B2; }
 .data-table tr.row-discontinued:hover td { background: #F3EDE5; }

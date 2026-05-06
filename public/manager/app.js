@@ -21359,6 +21359,33 @@ function _poExtractModel(description) {
   return firstToken || '';
 }
 
+// 사진 Phase B — 발주서 read-only 라이트박스 (변경/삭제 버튼 없음)
+function _poPhotoOpenReadOnlyLightbox(p) {
+  if (!p || !p.image_url) return;
+  var overlay = document.createElement('div');
+  overlay.id = 'po-photo-lightbox';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;font-family:Pretendard,sans-serif';
+  var modelLabel = (p.model || p.code || '');
+  var codeLabel = (p.code ? ('· ' + p.code) : '');
+  var safeUrl = String(p.image_url).replace(/"/g, '&quot;');
+  overlay.innerHTML =
+    '<div style="background:white;border-radius:10px;padding:16px;max-width:720px;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px;max-height:90vh">' +
+      '<img src="' + safeUrl + '" alt="" style="max-width:100%;max-height:70vh;object-fit:contain;background:#F4F6FA;border-radius:6px" />' +
+      '<div style="font-size:13px;color:#1A1D23;font-weight:500">' + _poEsc(modelLabel) + ' ' + _poEsc(codeLabel) + '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  var prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  function closeModal() {
+    document.removeEventListener('keydown', escHandler);
+    document.body.style.overflow = prevOverflow;
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  }
+  function escHandler(e) { if (e.key === 'Escape') closeModal(); }
+  document.addEventListener('keydown', escHandler);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) closeModal(); });
+}
+
 function _poRenderProductList() {
   var body = document.getElementById('po-product-list-body');
   if (!body) return;
@@ -21403,8 +21430,9 @@ function _poRenderProductList() {
 
   var h = '<table id="po-product-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  // ☐ / 코드 / 관리코드 / 브랜드 / 품명(가변) / 모델명 / 1P / 가격$ / 재고 / 발주P / 낱개 / 합계 / 🛒
+  // ☐ / 사진 / 코드 / 관리코드 / 브랜드 / 품명(가변) / 모델명 / 1P / 가격$ / 재고 / 발주P / 낱개 / 합계 / 🛒
   h += '<col style="width:32px">';
+  h += '<col style="width:80px">';   // 사진 Phase B
   h += '<col style="width:70px">';
   h += '<col style="width:110px">';
   h += '<col style="width:54px">';
@@ -21420,6 +21448,7 @@ function _poRenderProductList() {
   h += '</colgroup>';
   h += '<thead><tr>';
   h += '<th style="' + thS + '"><input type="checkbox" disabled></th>';
+  h += '<th style="' + thS + '">사진</th>';
   h += '<th style="' + thS + '">코드</th>';
   h += '<th style="' + thS + '">관리코드</th>';
   h += '<th style="' + thS + '">품명</th>';
@@ -21441,6 +21470,7 @@ function _poRenderProductList() {
     if (!p) {
       h += '<tr style="background:#FAFBFC;">';
       h += '<td style="' + tdS + '"></td>';
+      h += '<td class="po-photo-cell"></td>';
       h += '<td style="' + tdS + 'font-size:12px;color:#9BA3B2;font-variant-numeric:tabular-nums;">' + codeEsc + '</td>';
       h += '<td style="' + tdS + 'text-align:left;"><span class="po-mc-empty">—</span></td>';
       h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
@@ -21472,8 +21502,13 @@ function _poRenderProductList() {
     var mcCell = mcRaw
       ? '<span style="font-size:11px;font-variant-numeric:tabular-nums;">' + _poEsc(mcRaw) + '</span>'
       : '<span class="po-mc-empty">—</span>';
+    var hasPhoto = p && p.image_url && typeof p.image_url === 'string' && p.image_url.length > 0;
+    var photoCell = hasPhoto
+      ? '<td class="po-photo-cell"><img class="po-photo-thumb" src="' + String(p.image_url).replace(/"/g,'&quot;') + '" data-code="' + codeEsc + '" loading="lazy" alt="" /></td>'
+      : '<td class="po-photo-cell"><div class="po-photo-empty"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9BA3B2" stroke-width="1.5"><path d="M3 9 L7 9 L9 6 L15 6 L17 9 L21 9 L21 19 L3 19 Z"/><circle cx="12" cy="13" r="3.5"/></svg></div></td>';
     h += '<tr' + rowClass + ' data-code="' + codeEsc + '">';
     h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '"' + cbAttr + '></td>';
+    h += photoCell;
     h += '<td style="' + tdS + 'font-size:12px;font-variant-numeric:tabular-nums;">' + _poEsc(p.code || '') + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;">' + mcCell + '</td>';
     h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
@@ -21495,6 +21530,22 @@ function _poRenderProductList() {
   // 비동기 measure-기반 colgroup override + localStorage 캐시 우선 적용으로
   // 인라인 colgroup width가 무력화되어 새로고침/입력 시 컬럼 흔들림 발생.
   // 인라인 colgroup width(라인 21017~21032)만 사용하도록 호출 차단.
+
+  // 사진 Phase B — 썸네일 클릭 위임 (idempotent)
+  if (body && !body.__poPhotoBound) {
+    body.__poPhotoBound = true;
+    body.addEventListener('click', function(e) {
+      var thumb = e.target.closest('.po-photo-thumb');
+      if (!thumb) return;
+      var code = thumb.getAttribute('data-code');
+      var gpList = loadObj('mw_gen_products', []);
+      var p = null;
+      for (var i = 0; i < gpList.length; i++) {
+        if (gpList[i] && String(gpList[i].code) === String(code)) { p = gpList[i]; break; }
+      }
+      if (p) _poPhotoOpenReadOnlyLightbox(p);
+    });
+  }
 }
 
 // 컬럼 너비 초기화 — 저장된 값 제거 후 재렌더
@@ -22031,7 +22082,8 @@ function _poRenderCart(poId) {
 
   var h = '<table id="po-cart-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  // 브랜드 / 관리코드 / 품명(가변) / 모델명 / 1P / 낱개 / 금액$ / 총금액$ / ×
+  // 사진 / 브랜드 / 관리코드 / 품명(가변) / 모델명 / 1P / 낱개 / 금액$ / 총금액$ / ×
+  h += '<col style="width:60px">';   // 사진 Phase B (장바구니는 60px, 가변 컬럼 보존)
   h += '<col style="width:54px">';
   h += '<col style="width:90px">';   // [신규] 관리코드
   h += '<col style="">';
@@ -22043,6 +22095,7 @@ function _poRenderCart(poId) {
   h += '<col style="width:30px">';
   h += '</colgroup>';
   h += '<thead><tr>';
+  h += '<th style="' + thS + '">사진</th>';
   h += '<th style="' + thS + '">품명</th>';
   h += '<th style="' + thS + '">관리코드</th>';   // [신규]
   h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
@@ -22075,7 +22128,12 @@ function _poRenderCart(poId) {
     totalAmount += amount;
     var manageCode = p ? (p.manageCode || '') : '';
     var manageCellHtml = manageCode ? _poEsc(manageCode) : '<span style="color:#DDE1EB">-</span>';
+    var hasCartPhoto = p && p.image_url && typeof p.image_url === 'string' && p.image_url.length > 0;
+    var cartPhotoCell = hasCartPhoto
+      ? '<td class="po-photo-cell-cart"><img class="po-photo-thumb" src="' + String(p.image_url).replace(/"/g,'&quot;') + '" data-code="' + codeEsc + '" loading="lazy" alt="" /></td>'
+      : '<td class="po-photo-cell-cart"><div class="po-photo-empty"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9BA3B2" stroke-width="1.5"><path d="M3 9 L7 9 L9 6 L15 6 L17 9 L21 9 L21 19 L3 19 Z"/><circle cx="12" cy="13" r="3.5"/></svg></div></td>';
     h += '<tr>';
+    h += cartPhotoCell;
     h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
     h += '<td style="' + tdS + 'font-family:inherit;font-size:12px;color:#5A6070;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;" title="' + _poEsc(manageCode) + '">' + manageCellHtml + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + descTxt + '</td>';
@@ -22091,6 +22149,22 @@ function _poRenderCart(poId) {
   h += '</tbody></table>';
   body.innerHTML = h;
   if (typeof initColumnResize === 'function') initColumnResize('po-cart-table');
+
+  // 사진 Phase B — 장바구니 썸네일 클릭 위임 (idempotent)
+  if (body && !body.__poCartPhotoBound) {
+    body.__poCartPhotoBound = true;
+    body.addEventListener('click', function(e) {
+      var thumb = e.target.closest('.po-photo-thumb');
+      if (!thumb) return;
+      var code = thumb.getAttribute('data-code');
+      var gpList = loadObj('mw_gen_products', []);
+      var p = null;
+      for (var i = 0; i < gpList.length; i++) {
+        if (gpList[i] && String(gpList[i].code) === String(code)) { p = gpList[i]; break; }
+      }
+      if (p) _poPhotoOpenReadOnlyLightbox(p);
+    });
+  }
 
   var sHtml = '';
   sHtml += '<div class="po-cart-summary-row"><span>총 수량</span><b>' + totalUnit.toLocaleString() + '개</b></div>';
@@ -22262,12 +22336,13 @@ function _poPickerRenderList() {
   var thS = 'padding:9px 6px;font-size:12px;font-weight:600;background:#1A1D23;color:#fff;position:sticky;top:0;z-index:10;text-align:center;';
   var tdS = 'padding:6px 6px;font-size:13px;color:#1A1D23;border-bottom:1px solid #F0F2F7;text-align:center;vertical-align:middle;';
 
-  var h = '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
+  var h = '<table id="po-picker-table" style="width:100%;border-collapse:collapse;table-layout:fixed;font-family:Pretendard,sans-serif;">';
   h += '<colgroup>';
-  h += '<col style="width:36px"><col style="width:70px"><col style="width:118px"><col style=""><col style="width:86px"><col style="width:42px"><col style="width:62px"><col style="width:46px"><col style="width:86px">';
+  h += '<col style="width:36px"><col style="width:80px"><col style="width:70px"><col style="width:118px"><col style=""><col style="width:86px"><col style="width:42px"><col style="width:62px"><col style="width:46px"><col style="width:86px">';
   h += '</colgroup>';
   h += '<thead><tr>';
   h += '<th style="' + thS + '"><input type="checkbox" id="po-picker-check-all" onchange="_poPickerToggleAll(this.checked)"></th>';
+  h += '<th style="' + thS + '">사진</th>';
   h += '<th style="' + thS + '">코드</th>';
   h += '<th style="' + thS + '">관리코드</th>';
   h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
@@ -22295,8 +22370,13 @@ function _poPickerRenderList() {
     var palletCell = palletQty != null ? palletQty.toLocaleString() : '<span style="color:#DDE1EB">-</span>';
     var priceCell = (p.importPrice != null) ? '$' + Number(p.importPrice).toFixed(2) : '<span style="color:#DDE1EB">-</span>';
     var statusCell = isReg ? '<span class="po-registered-badge">이미 등록됨</span>' : '';
+    var hasPickPhoto = p && p.image_url && typeof p.image_url === 'string' && p.image_url.length > 0;
+    var pickPhotoCell = hasPickPhoto
+      ? '<td class="po-photo-cell"><img class="po-photo-thumb" src="' + String(p.image_url).replace(/"/g,'&quot;') + '" data-code="' + codeEsc + '" loading="lazy" alt="" /></td>'
+      : '<td class="po-photo-cell"><div class="po-photo-empty"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9BA3B2" stroke-width="1.5"><path d="M3 9 L7 9 L9 6 L15 6 L17 9 L21 9 L21 19 L3 19 Z"/><circle cx="12" cy="13" r="3.5"/></svg></div></td>';
     h += '<tr' + rowStyle + '>';
     h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '" onchange="_poPickerToggleOne(\'' + codeEsc + '\', this.checked)"' + cbAttr + checked + '></td>';
+    h += pickPhotoCell;
     h += '<td style="' + tdS + 'font-size:12px;font-variant-numeric:tabular-nums;">' + codeEsc + '</td>';
     h += '<td style="' + tdS + 'font-size:11px;font-variant-numeric:tabular-nums;">' + _poEsc(p.manageCode || '-') + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + _poEsc(p.description || '-') + '</td>';
@@ -22310,6 +22390,23 @@ function _poPickerRenderList() {
   h += '</tbody></table>';
   bodyEl.innerHTML = h;
   _poPickerUpdateFooter();
+
+  // 사진 Phase B — picker 썸네일 클릭 위임 (idempotent)
+  if (bodyEl && !bodyEl.__poPickerPhotoBound) {
+    bodyEl.__poPickerPhotoBound = true;
+    bodyEl.addEventListener('click', function(e) {
+      var thumb = e.target.closest('.po-photo-thumb');
+      if (!thumb) return;
+      e.stopPropagation();  // 체크박스 toggle 방지
+      var code = thumb.getAttribute('data-code');
+      var gpList = loadObj('mw_gen_products', []);
+      var p = null;
+      for (var i = 0; i < gpList.length; i++) {
+        if (gpList[i] && String(gpList[i].code) === String(code)) { p = gpList[i]; break; }
+      }
+      if (p) _poPhotoOpenReadOnlyLightbox(p);
+    });
+  }
 }
 
 function _poPickerToggleOne(code, checked) {
@@ -22842,6 +22939,11 @@ function _poBuildPdfHtml(po, items) {
   var poDateFmt = po && po.po_date ? String(po.po_date).replace(/-/g, '. ') : '-';
   items = Array.isArray(items) ? items : [];
 
+  // 사진 Phase B — mw_gen_products lookup (it.product_code → image_url)
+  var gpList = loadObj('mw_gen_products', []);
+  var gpByCode = {};
+  gpList.forEach(function(p) { if (p && p.code != null) gpByCode[String(p.code)] = p; });
+
   var totalQty = 0, totalPalletCount = 0, totalFob = 0;
   items.forEach(function(it) {
     var q = Number(it.quantity) || 0;
@@ -22864,8 +22966,14 @@ function _poBuildPdfHtml(po, items) {
     var palletDisp = pCount > 0 ? pCount.toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'P' : '-';
     var fob = Number(it.fob_usd) || 0;
     var lineTotal = qty * fob;
+    var gp = gpByCode[String(it.product_code || '')];
+    var photoUrl = gp && gp.image_url ? String(gp.image_url).replace(/"/g, '&quot;') : '';
+    var photoCellHtml = photoUrl
+      ? '<td class="center"><img src="' + photoUrl + '" style="width:48px;height:48px;object-fit:contain;background:#F4F6FA;border-radius:3px" alt="" /></td>'
+      : '<td class="center"></td>';
     return '<tr>' +
       '<td class="center">' + (idx + 1) + '</td>' +
+      photoCellHtml +
       '<td class="center">' + _poEsc(it.brand || '-') + '</td>' +
       '<td>' + _poEsc(it.product_name || '-') + '</td>' +
       '<td>' + _poEsc(_poExtractModel(it.product_name) || '-') + '</td>' +
@@ -22876,7 +22984,7 @@ function _poBuildPdfHtml(po, items) {
     '</tr>';
   }).join('');
 
-  var emptyRow = '<tr><td colspan="8" class="center" style="padding:24px;color:#9BA3B2;">등록된 제품이 없습니다.</td></tr>';
+  var emptyRow = '<tr><td colspan="9" class="center" style="padding:24px;color:#9BA3B2;">등록된 제품이 없습니다.</td></tr>';
 
   var memoHtml = '';
   if (po.memo) {
@@ -22923,6 +23031,7 @@ function _poBuildPdfHtml(po, items) {
   h += '<table class="pdf-items-table">';
   h += '<thead><tr>';
   h += '<th style="width:40px;">No.</th>';
+  h += '<th style="width:54px;">사진</th>';
   h += '<th style="width:72px;">품명</th>';
   h += '<th>규격</th>';
   h += '<th style="width:120px;">모델명</th>';
@@ -22934,7 +23043,7 @@ function _poBuildPdfHtml(po, items) {
   h += '<tbody>' + (itemRows || emptyRow) + '</tbody>';
   if (items.length > 0) {
     h += '<tfoot><tr>';
-    h += '<td colspan="4" class="right"><strong>합계</strong></td>';
+    h += '<td colspan="5" class="right"><strong>합계</strong></td>';
     h += '<td class="right"><strong>' + totalPalletCount.toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'P</strong></td>';
     h += '<td class="right"><strong>' + totalQty.toLocaleString() + '</strong></td>';
     h += '<td class="right">-</td>';
@@ -23014,7 +23123,7 @@ function _poExportExcel(poId) {
       });
 
       var data = [[
-        'No', '발주번호', '발주일', '규격', '모델명', '팔렛수', '팔렛당수량', '총수량'
+        'No', '사진', '발주번호', '발주일', '규격', '모델명', '팔렛수', '팔렛당수량', '총수량'
       ]];
 
       items.forEach(function(it, i) {
@@ -23023,6 +23132,7 @@ function _poExportExcel(poId) {
         var palletCount = palletQty > 0 ? Math.round((qty / palletQty) * 100) / 100 : '';
         data.push([
           i + 1,
+          '',
           header.po_number || '',
           header.po_date || '',
           it.product_name || '',
