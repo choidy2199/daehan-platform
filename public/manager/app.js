@@ -24024,7 +24024,6 @@ async function _ipinv2OpenDetail(invoiceId) {
   _ipinv2Customs = d.customs || [];
   _ipinv2Payments = d.payments || [];
   _ipinv2ErpPreview = null;
-  var poItems = (d.po && Array.isArray(d.po.items) && d.po.items.length > 0) ? d.po.items : null;
 
   if (!_ipinv2CurrentInvoice) {
     alert('인보이스를 찾을 수 없습니다.');
@@ -24038,44 +24037,11 @@ async function _ipinv2OpenDetail(invoiceId) {
     await _ipinv2LoadCustoms();
   }
 
-  // PO items로 enrich (관리코드 + 순서)
-  if (poItems && poItems.length > 0) _ipinv2ApplyPoEnrich(poItems);
-
   // 클라 계산 실행 — 1회만 (payments 이미 통합 fetch에 포함됨, B-1 2차 비교 타이밍 갭 해소)
   _ipinv2RunLocalCalcAndCompare();
 
   console.log('[PERF] _ipinv2OpenDetail TOTAL: ' + (performance.now() - _t0).toFixed(0) + 'ms');
   _ipinv2DoRenderDetail(container);
-}
-
-// [B-3-2-2c] PO items를 _ipinv2PoItemsCache에 저장 + _ipinv2CurrentItems에 관리코드/순서 반영
-// 2-2b의 _ipinv2ReorderItemsByPo 확장: 관리코드 매칭 버그 수정 (PO의 management_code 직접 사용)
-function _ipinv2ApplyPoEnrich(poItems) {
-  if (!Array.isArray(poItems) || poItems.length === 0) return;
-  _ipinv2PoItemsCache = poItems;
-  // model → { sort_order, management_code } 맵 생성
-  var orderMap = {};
-  var mcMap = {};
-  poItems.forEach(function(pi, idx) {
-    var key = String(pi.model || '').trim();
-    if (!key) return;
-    if (orderMap[key] == null) orderMap[key] = (pi.sort_order != null ? Number(pi.sort_order) : idx);
-    if (mcMap[key] == null && pi.management_code) mcMap[key] = String(pi.management_code);
-  });
-  // invoice items에 관리코드 주입 (_po_manage_code)
-  _ipinv2CurrentItems.forEach(function(it) {
-    var key = String(it.model || '').trim();
-    if (key && mcMap[key] && !it._po_manage_code) it._po_manage_code = mcMap[key];
-  });
-  // 순서 재정렬 (매칭 안 되는 건 뒤로)
-  var UNMATCHED = 999999;
-  _ipinv2CurrentItems.sort(function(a, b) {
-    var oa = orderMap[String(a.model || '').trim()];
-    var ob = orderMap[String(b.model || '').trim()];
-    if (oa == null) oa = UNMATCHED + Number(a.line_no || 0);
-    if (ob == null) ob = UNMATCHED + Number(b.line_no || 0);
-    return oa - ob;
-  });
 }
 
 // [B-3-2-2c] PO items fetch (네트워크 호출). 성공 시 cache + enrich.
@@ -24705,18 +24671,15 @@ function _ipinv2RunLocalCalcAndCompare() {
 // 3) 매칭 결과가 정확히 1개일 때만 신뢰 — 다수 매칭 시 빈값 반환 (잘못된 동일 코드 반복 방지)
 //
 // 매칭 순서:
-// 1) PO enrich (_po_manage_code) — 가장 정확
-// 2) item.manage_code (DB 직접)
-// 3) mw_products + mw_gen_products concat 한 번만 lookup, 신뢰 가능한 candidates 순회
+// 1) item.management_code (DB 직접 — snake_case, 가장 정확)
+// 2) mw_products + mw_gen_products concat 한 번만 lookup, 신뢰 가능한 candidates 순회
 
 var _IPINV2_UNRELIABLE_MODELS = ['콜라보', '테스트', 'test', 'TEST', '공통', '기타', 'brand', 'BRAND'];
 
 function _ipinv2GetManageCode(item) {
   if (!item) return '';
-  // 1순위: PO enrich
-  if (item._po_manage_code) return String(item._po_manage_code);
-  // 2순위: DB 직접 필드
-  if (item.manage_code) return String(item.manage_code);
+  // 1순위: DB 직접 필드 (snake_case, import_invoice_items.management_code)
+  if (item.management_code) return String(item.management_code);
 
   var model = String(item.model || '').trim();
   var name = String(item.name || '').trim();
@@ -25994,7 +25957,7 @@ function _ipinv2RenderItemsTable() {
       h += '<tr data-item-id="' + it.id + '"' + rowCls + '>';
       h += '<td class="center">' + (i + 1) + '</td>';
       h += '<td class="left">' + _ipinv2Esc(_ipinv2GetBrand(it)) + '</td>';
-      h += '<td class="left model">' + _ipinv2Esc(it.model || '') + (isOverflow ? ' <span style="color:#1D9E75;font-weight:500;">⚖</span>' : '') + '</td>';
+      h += '<td class="left model">' + _ipinv2Esc(_poExtractModel(it.name) || it.model || '') + (isOverflow ? ' <span style="color:#1D9E75;font-weight:500;">⚖</span>' : '') + '</td>';
       h += gcCell; // 코드 (G코드)
       h += mcCell; // [B-3-2-2b I] 관리코드
       h += '<td class="left">' + _ipinv2Esc(it.name || '') + '</td>';
