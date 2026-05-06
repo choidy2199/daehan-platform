@@ -21263,8 +21263,9 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-header">';
   h += '<div class="pc-panel-title">제품목록 <span class="pc-panel-count" id="po-product-list-count">' + registeredCount + '건</span></div>';
   h += '<div class="pc-panel-actions">';
-  h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>템플릿</button>';
-  h += '<button class="btn-mini" onclick="_poSaveTemplate()"' + disabledAttr + '>템플릿 저장</button>';
+  h += '<button class="btn-mini" style="background:#5D52B0;color:#fff;border-color:#5D52B0;" onclick="' + placeholderAlert + '"' + disabledAttr + '>템플릿</button>';
+  h += '<button class="btn-mini" style="background:#0F7A5F;color:#fff;border-color:#0F7A5F;" onclick="_poSaveTemplate()"' + disabledAttr + '>템플릿 저장</button>';
+  h += '<div style="width:1px;height:22px;background:#3A4047;margin:0 6px;align-self:center;"></div>';
   h += '<button class="btn-mini btn-mini-p" onclick="_poOpenProductPicker()"' + disabledAttr + '>+ 제품등록</button>';
   h += '<button class="btn-mini btn-mini-danger" onclick="_poDeleteSelectedProducts()"' + disabledAttr + '>삭제</button>';
   h += '</div></div>';
