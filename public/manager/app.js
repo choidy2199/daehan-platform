@@ -12285,10 +12285,265 @@ function openGenImportModal() {
   if (fileInput) fileInput.value = '';
   var radios = document.querySelectorAll('input[name="gen-import-mode"]');
   if (radios[0]) radios[0].checked = true;
+  if (typeof _gpImportSwitchTab === 'function') _gpImportSwitchTab('excel');
 }
 
 function closeGenImportModal() {
   document.getElementById('gen-import-modal').classList.remove('show');
+}
+
+// ======================== 경영박사 가져오기 (일반제품) ========================
+function _gpImportSwitchTab(tab) {
+  var excelTab = document.getElementById('gen-import-tab-excel');
+  var erpTab = document.getElementById('gen-import-tab-erp');
+  var excelBtn = document.getElementById('gen-import-tab-btn-excel');
+  var erpBtn = document.getElementById('gen-import-tab-btn-erp');
+  var excelFooter = document.getElementById('gen-import-footer-excel');
+  var erpFooter = document.getElementById('gen-import-footer-erp');
+  if (!excelTab || !erpTab || !excelBtn || !erpBtn || !excelFooter || !erpFooter) return;
+  if (tab === 'erp') {
+    excelTab.style.display = 'none';
+    erpTab.style.display = '';
+    excelBtn.style.background = '#FAFBFC';
+    excelBtn.style.color = '#9BA3B2';
+    excelBtn.style.borderBottom = '2px solid transparent';
+    erpBtn.style.background = '#fff';
+    erpBtn.style.color = '#1A1D23';
+    erpBtn.style.borderBottom = '2px solid #0F6E56';
+    excelFooter.style.display = 'none';
+    erpFooter.style.display = 'flex';
+  } else {
+    excelTab.style.display = '';
+    erpTab.style.display = 'none';
+    excelBtn.style.background = '#fff';
+    excelBtn.style.color = '#1A1D23';
+    excelBtn.style.borderBottom = '2px solid #185FA5';
+    erpBtn.style.background = '#FAFBFC';
+    erpBtn.style.color = '#9BA3B2';
+    erpBtn.style.borderBottom = '2px solid transparent';
+    excelFooter.style.display = 'flex';
+    erpFooter.style.display = 'none';
+  }
+}
+
+function downloadGenErpTemplate() {
+  if (!window.XLSX) { toast('SheetJS 로딩 중...'); return; }
+  var data = [['관리코드', '내부코드 (선택)']];
+  data.push(['4892210237279', '']);
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 18 }, { wch: 14 }];
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '관리코드');
+  XLSX.writeFile(wb, '관리코드_양식.xlsx');
+  toast('양식 다운로드 완료');
+}
+
+function _gpErpExtractCodes(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(e.target.result, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      var seen = {};
+      var list = [];
+      for (var i = 1; i < rows.length; i++) {
+        var r = rows[i];
+        if (!r) continue;
+        var code2 = String(r[0] == null ? '' : r[0]).trim();
+        if (!code2) continue;
+        if (seen[code2]) continue;
+        seen[code2] = true;
+        var internal = String(r[1] == null ? '' : r[1]).trim();
+        list.push({ code2: code2, internalCode: internal });
+      }
+      callback(null, list);
+    } catch (err) {
+      callback(err, null);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function importFromErp() {
+  var fileInput = document.getElementById('gen-erp-file');
+  var file = fileInput && fileInput.files[0];
+  var statusEl = document.getElementById('gen-erp-status');
+  if (!file) {
+    statusEl.style.display = '';
+    statusEl.textContent = '파일을 선택해주세요';
+    return;
+  }
+  if (!window.XLSX) {
+    statusEl.style.display = '';
+    statusEl.textContent = 'SheetJS 로딩 중...';
+    return;
+  }
+  var mode = 'overwrite';
+  var radios = document.querySelectorAll('input[name="gen-erp-mode"]');
+  radios.forEach(function(r) { if (r.checked) mode = r.value; });
+  statusEl.style.display = '';
+  statusEl.textContent = '엑셀 읽는 중...';
+  _gpErpExtractCodes(file, function(err, codes) {
+    if (err) { statusEl.textContent = '엑셀 오류: ' + (err.message || err); return; }
+    if (!codes.length) { statusEl.textContent = '가져올 코드가 없습니다'; return; }
+    var existingByMc = {};
+    for (var i = 0; i < genProducts.length; i++) {
+      var mc = String(genProducts[i].manageCode || '').trim();
+      if (mc) existingByMc[mc] = i;
+    }
+    var newCount = 0, dupCount = 0;
+    for (var j = 0; j < codes.length; j++) {
+      if (existingByMc[codes[j].code2] != null) dupCount++;
+      else newCount++;
+    }
+    statusEl.style.display = 'none';
+    _gpErpShowConfirm(mode, { total: codes.length, newCount: newCount, dupCount: dupCount }, codes);
+  });
+}
+
+function _gpErpShowConfirm(mode, counts, codes) {
+  var modal = document.getElementById('gen-erp-confirm-modal');
+  var headerEl = document.getElementById('gen-erp-confirm-header');
+  var bodyEl = document.getElementById('gen-erp-confirm-body');
+  var goBtn = document.getElementById('gen-erp-confirm-go');
+  var totalStr = counts.total.toLocaleString();
+  var newStr = counts.newCount.toLocaleString();
+  var dupStr = counts.dupCount.toLocaleString();
+  if (mode === 'overwrite') {
+    headerEl.innerHTML =
+      '<h3 style="color:#1A1D23">⚠️ 가져오기 확인</h3>' +
+      '<button class="modal-close" onclick="document.getElementById(\'gen-erp-confirm-modal\').classList.remove(\'show\')">&times;</button>';
+    bodyEl.innerHTML =
+      '<div style="font-size:13px;line-height:1.7;color:#1A1D23;margin-bottom:14px">' +
+        '업로드된 관리코드: <strong>' + totalStr + '건</strong>' +
+        '<div style="margin:6px 0 0 8px;font-size:12px">' +
+          '• 신규: <strong style="color:#0F6E56">' + newStr + '건</strong><br>' +
+          '• 중복: <strong style="color:#BA7517">' + dupStr + '건</strong>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background:#FAEEDA;border-left:3px solid #BA7517;border-radius:6px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;color:#1A1D23">' +
+        '<div style="font-weight:600;margin-bottom:4px">🔄 덮어쓰기 모드</div>' +
+        '중복 ' + dupStr + '건이 경영박사 값으로 덮어쓰기 됩니다.<br>' +
+        '신규 ' + newStr + '건은 새로 추가됩니다.<br>' +
+        '사진/재고/IN/OUT/파레트/수입가/비고/입고날짜는 보존됩니다.' +
+      '</div>' +
+      '<div style="font-size:13px;color:#5A6070">진행하시겠습니까?</div>';
+    goBtn.style.background = '#185FA5';
+  } else {
+    headerEl.innerHTML =
+      '<h3 style="color:#1A1D23">✅ 가져오기 확인</h3>' +
+      '<button class="modal-close" onclick="document.getElementById(\'gen-erp-confirm-modal\').classList.remove(\'show\')">&times;</button>';
+    bodyEl.innerHTML =
+      '<div style="font-size:13px;line-height:1.7;color:#1A1D23;margin-bottom:14px">' +
+        '업로드된 관리코드: <strong>' + totalStr + '건</strong>' +
+        '<div style="margin:6px 0 0 8px;font-size:12px">' +
+          '• 신규 (가져옴): <strong style="color:#0F6E56">' + newStr + '건</strong><br>' +
+          '• 중복 (건너뜀): <strong style="color:#9BA3B2">' + dupStr + '건</strong>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background:#E1F5EE;border-left:3px solid #0F6E56;border-radius:6px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;color:#1A1D23">' +
+        '<div style="font-weight:600;margin-bottom:4px">🛡️ 제외하기 모드 — 기존 데이터 보호</div>' +
+        '이미 등록된 ' + dupStr + '건은 건너뜁니다.<br>' +
+        '신규 ' + newStr + '건만 새로 추가됩니다.<br>' +
+        '기존 데이터에는 영향이 없습니다.' +
+      '</div>' +
+      '<div style="font-size:13px;color:#5A6070">진행하시겠습니까?</div>';
+    goBtn.style.background = '#0F6E56';
+  }
+  goBtn.onclick = function() { _gpErpExecute(mode, codes); };
+  modal.classList.add('show');
+}
+
+async function _gpErpExecute(mode, codes) {
+  document.getElementById('gen-erp-confirm-modal').classList.remove('show');
+  var statusEl = document.getElementById('gen-erp-status');
+  statusEl.style.display = '';
+  statusEl.textContent = '경영박사 조회 중... (' + codes.length + '건)';
+  var code2List = codes.map(function(c) { return c.code2; });
+  var internalByCode2 = {};
+  codes.forEach(function(c) { internalByCode2[c.code2] = c.internalCode || ''; });
+  try {
+    var res = await fetch('/api/erp/select-item-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code2List: code2List })
+    });
+    var data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || ('HTTP ' + res.status));
+    statusEl.textContent = '데이터 적용 중... (' + (data.found_count || 0) + ' / ' + (data.total || codes.length) + ')';
+    var newAdded = 0, overwritten = 0, skipped = 0, notFound = 0;
+    var existingByMc = {};
+    for (var i = 0; i < genProducts.length; i++) {
+      var mc = String(genProducts[i].manageCode || '').trim();
+      if (mc) existingByMc[mc] = i;
+    }
+    var toIntKrw = function(v) {
+      var s = String(v == null ? '' : v).replace(/[,\s]/g, '');
+      var n = parseInt(s, 10);
+      return isNaN(n) ? 0 : n;
+    };
+    for (var j = 0; j < data.results.length; j++) {
+      var r = data.results[j];
+      if (!r.found) { notFound++; continue; }
+      var p = r.parsed || {};
+      var mapped = {
+        manageCode: String(p.CODE2 || r.code2 || '').trim(),
+        category: String(p.PARTCODE || '').trim(),
+        model: String(p.ITEM || '').trim(),
+        description: String(p.GYU || '').trim(),
+        cost: toIntKrw(p.INPR),
+        priceA: toIntKrw(p.OUTA),
+        priceNaver: toIntKrw(p.OUTH),
+        priceOpen: toIntKrw(p.OUTI),
+        priceSsg: toIntKrw(p.OUTG)
+      };
+      var existIdx = existingByMc[mapped.manageCode];
+      if (existIdx != null) {
+        if (mode === 'skip_existing') { skipped++; continue; }
+        var prod = genProducts[existIdx];
+        prod.manageCode = mapped.manageCode;
+        prod.category = mapped.category;
+        prod.model = mapped.model;
+        prod.description = mapped.description;
+        prod.cost = mapped.cost;
+        prod.priceA = mapped.priceA;
+        prod.priceNaver = mapped.priceNaver;
+        prod.priceOpen = mapped.priceOpen;
+        prod.priceSsg = mapped.priceSsg;
+        overwritten++;
+      } else {
+        var internalCode = internalByCode2[mapped.manageCode] || '';
+        genProducts.push({
+          code: internalCode,
+          manageCode: mapped.manageCode,
+          category: mapped.category,
+          model: mapped.model,
+          description: mapped.description,
+          supplyPrice: 0,
+          cost: mapped.cost,
+          priceA: mapped.priceA,
+          priceNaver: mapped.priceNaver,
+          priceOpen: mapped.priceOpen,
+          priceSsg: mapped.priceSsg,
+          memo: '',
+          source: 'general'
+        });
+        newAdded++;
+      }
+    }
+    localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+    if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_gen_products');
+    if (typeof renderGenProducts === 'function') renderGenProducts();
+    statusEl.textContent = '✅ 가져오기 완료 — 신규 ' + newAdded + '건, 덮어쓰기 ' + overwritten + '건, 제외 ' + skipped + '건, ERP 미등록 ' + notFound + '건';
+    if (typeof saveActionHistory === 'function') {
+      saveActionHistory('경영박사가져오기', '일반제품', newAdded + overwritten, null);
+    }
+    if (typeof toast === 'function') toast('경영박사 가져오기 완료');
+  } catch (err) {
+    statusEl.textContent = '오류: ' + (err && err.message ? err.message : err);
+    if (typeof toast === 'function') toast('경영박사 가져오기 실패');
+  }
 }
 
 function importGenExcel() {

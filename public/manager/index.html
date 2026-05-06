@@ -1192,10 +1192,15 @@ document.head.appendChild(s);
 <div class="modal-bg" id="gen-import-modal">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
-      <h3>📥 엑셀 데이터 가져오기</h3>
+      <h3>📥 데이터 가져오기</h3>
       <button class="modal-close" onclick="closeGenImportModal()">&times;</button>
     </div>
+    <div style="display:flex;border-bottom:1px solid #E5E8ED;background:#FAFBFC">
+      <button id="gen-import-tab-btn-excel" type="button" onclick="_gpImportSwitchTab('excel')" style="flex:1;padding:11px 12px;font-size:13px;font-weight:600;font-family:'Pretendard',-apple-system,sans-serif;background:#fff;color:#1A1D23;border:none;border-bottom:2px solid #185FA5;cursor:pointer">📊 엑셀 가져오기</button>
+      <button id="gen-import-tab-btn-erp" type="button" onclick="_gpImportSwitchTab('erp')" style="flex:1;padding:11px 12px;font-size:13px;font-weight:600;font-family:'Pretendard',-apple-system,sans-serif;background:#FAFBFC;color:#9BA3B2;border:none;border-bottom:2px solid transparent;cursor:pointer">🔌 경영박사 가져오기</button>
+    </div>
     <div class="modal-body">
+      <div id="gen-import-tab-excel">
       <div style="background:#E6F1FB;border-radius:8px;padding:14px 16px;margin-bottom:16px">
         <div style="font-size:13px;font-weight:600;color:#0C447C;margin-bottom:6px">STEP 1. 양식 다운로드</div>
         <p style="font-size:12px;color:#5A6070;margin-bottom:10px">아래 양식을 다운받아 데이터를 입력한 후 업로드하세요. 시트별 컬럼 구조가 맞아야 정상 인식됩니다.</p>
@@ -1219,10 +1224,55 @@ document.head.appendChild(s);
         </label>
       </div>
       <div id="gen-import-status" style="font-size:13px;color:#5A6070"></div>
+      </div>
+      <div id="gen-import-tab-erp" style="display:none">
+        <div style="background:#E1F5EE;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:600;color:#0F6E56;margin-bottom:6px">STEP 1. 관리코드 양식 다운로드</div>
+          <p style="font-size:11px;color:#5A6070;margin-bottom:10px;line-height:1.6">A열에 관리코드(CODE2), B열에 내부코드를 입력하세요.<br>B열은 선택사항입니다. 한 줄에 하나씩, 100개든 1,000개든 가능.</p>
+          <button type="button" onclick="downloadGenErpTemplate()" style="width:100%;background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">📄 관리코드 양식 다운로드 (.xlsx)</button>
+        </div>
+        <div style="background:#F4F6FA;border-radius:8px;padding:14px 16px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:600;color:#1A1D23;margin-bottom:6px">STEP 2. 관리코드 엑셀 업로드</div>
+          <input type="file" id="gen-erp-file" accept=".xlsx,.xls,.csv" style="font-size:13px">
+        </div>
+        <div style="margin:12px 0;padding:12px;background:#F4F6FA;border-radius:6px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#1A1D23">STEP 3. 중복 처리 방식</div>
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:8px;font-size:13px;line-height:1.5">
+            <input type="radio" name="gen-erp-mode" value="overwrite" checked style="accent-color:#0F6E56;margin-top:3px">
+            <span><strong>덮어쓰기 (overwrite)</strong><br><span style="font-size:11px;color:#5A6070">기존 일반제품에 같은 관리코드가 있으면 ERP 값으로 덮어씁니다. 신규는 추가.</span></span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;line-height:1.5">
+            <input type="radio" name="gen-erp-mode" value="skip_existing" style="accent-color:#0F6E56;margin-top:3px">
+            <span><strong>제외하기 (skip_existing)</strong><br><span style="font-size:11px;color:#5A6070">이미 등록된 제품은 건너뛰고, 신규만 가져옵니다.</span></span>
+          </label>
+        </div>
+        <div id="gen-erp-status" style="display:none;font-size:13px;color:#1A1D23;padding:10px 12px;background:#F4F6FA;border-radius:6px"></div>
+      </div>
     </div>
     <div class="modal-footer">
-      <button class="btn-secondary" onclick="closeGenImportModal()">취소</button>
-      <button class="btn-primary" onclick="importGenExcel()">가져오기</button>
+      <div id="gen-import-footer-excel" style="display:flex;gap:8px;justify-content:flex-end;width:100%">
+        <button class="btn-secondary" onclick="closeGenImportModal()">취소</button>
+        <button class="btn-primary" onclick="importGenExcel()">가져오기</button>
+      </div>
+      <div id="gen-import-footer-erp" style="display:none;gap:8px;justify-content:flex-end;width:100%">
+        <button class="btn-secondary" onclick="closeGenImportModal()">취소</button>
+        <button type="button" onclick="importFromErp()" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">🔌 경영박사에서 가져오기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gen ERP Confirm Modal -->
+<div class="modal-bg" id="gen-erp-confirm-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header" id="gen-erp-confirm-header">
+      <h3>가져오기 확인</h3>
+      <button class="modal-close" onclick="document.getElementById('gen-erp-confirm-modal').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body" id="gen-erp-confirm-body" style="font-size:13px;color:#1A1D23"></div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;width:100%">
+      <button class="btn-secondary" onclick="document.getElementById('gen-erp-confirm-modal').classList.remove('show')">취소</button>
+      <button id="gen-erp-confirm-go" type="button" style="background:#185FA5;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">계속 진행</button>
     </div>
   </div>
 </div>
