@@ -21413,8 +21413,8 @@ function _poRenderProductList() {
   h += '<th style="' + thS + '">코드</th>';
   h += '<th style="' + thS + '">관리코드</th>';
   h += '<th style="' + thS + '">브랜드</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">품명</th>';
-  h += '<th style="' + thS + '">모델명</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
+  h += '<th style="' + thS + '">품명</th>';
   h += '<th style="' + thS + '">1P</th>';
   h += '<th style="' + thS + '">가격$</th>';
   h += '<th style="' + thS + '">재고</th>';
@@ -22035,8 +22035,8 @@ function _poRenderCart(poId) {
   h += '<thead><tr>';
   h += '<th style="' + thS + '">브랜드</th>';
   h += '<th style="' + thS + '">관리코드</th>';   // [신규]
-  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">품명</th>';
-  h += '<th style="' + thS + '">모델명</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
+  h += '<th style="' + thS + '">품명</th>';
   h += '<th style="' + thS + '">1P</th>';
   h += '<th style="' + thS + '">낱개</th>';
   h += '<th style="' + thS + '">금액$</th>';
@@ -22260,8 +22260,8 @@ function _poPickerRenderList() {
   h += '<th style="' + thS + '"><input type="checkbox" id="po-picker-check-all" onchange="_poPickerToggleAll(this.checked)"></th>';
   h += '<th style="' + thS + '">코드</th>';
   h += '<th style="' + thS + '">관리코드</th>';
-  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">품명</th>';
-  h += '<th style="' + thS + '">모델명</th>';
+  h += '<th style="' + thS + 'text-align:left;padding-left:8px;">규격</th>';
+  h += '<th style="' + thS + '">품명</th>';
   h += '<th style="' + thS + '">1P</th>';
   h += '<th style="' + thS + '">수입가$</th>';
   h += '<th style="' + thS + '">재고</th>';
