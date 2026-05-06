@@ -22867,8 +22867,8 @@ function _poBuildPdfHtml(po, items) {
     return '<tr>' +
       '<td class="center">' + (idx + 1) + '</td>' +
       '<td class="center">' + _poEsc(it.brand || '-') + '</td>' +
-      '<td>' + _poEsc(it.model || '-') + '</td>' +
       '<td>' + _poEsc(it.product_name || '-') + '</td>' +
+      '<td>' + _poEsc(_poExtractModel(it.product_name) || '-') + '</td>' +
       '<td class="right">' + palletDisp + '</td>' +
       '<td class="right">' + qty.toLocaleString() + '</td>' +
       '<td class="right">$' + fob.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
@@ -22923,9 +22923,9 @@ function _poBuildPdfHtml(po, items) {
   h += '<table class="pdf-items-table">';
   h += '<thead><tr>';
   h += '<th style="width:40px;">No.</th>';
-  h += '<th style="width:72px;">브랜드</th>';
+  h += '<th style="width:72px;">품명</th>';
+  h += '<th>규격</th>';
   h += '<th style="width:120px;">모델명</th>';
-  h += '<th>품명</th>';
   h += '<th style="width:50px;">파렛</th>';
   h += '<th style="width:70px;">수량</th>';
   h += '<th style="width:84px;">단가(USD)</th>';
@@ -23014,7 +23014,7 @@ function _poExportExcel(poId) {
       });
 
       var data = [[
-        'No', '발주번호', '발주일', '모델명', '품명', '팔렛수', '팔렛당수량', '총수량'
+        'No', '발주번호', '발주일', '규격', '모델명', '팔렛수', '팔렛당수량', '총수량'
       ]];
 
       items.forEach(function(it, i) {
@@ -23025,8 +23025,8 @@ function _poExportExcel(poId) {
           i + 1,
           header.po_number || '',
           header.po_date || '',
-          it.model || '',
           it.product_name || '',
+          _poExtractModel(it.product_name) || '',
           palletCount,
           palletQty,
           qty
