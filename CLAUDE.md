@@ -7,7 +7,7 @@
 - 작업 폴더: ~/1.클로드/웹개발/daehan-platform
 - 기술 스택: Next.js App Router + TypeScript + Tailwind + Supabase + Vercel
 - Vercel: Pro 플랜, maxDuration 60초
-- 로그인: admin / admin1234
+- 로그인: admin / 219921
 - 사용자 3명: admin(Mac), hwon(Windows), jyoung(Windows) — 같은 데이터 공유
 
 ## 프로젝트 구조
@@ -787,5 +787,5 @@ Next.js 이전의 첫 사례로 채택됨 — 이는 **예외적 마이그레이
 
 ## 검증 정보
 - URL: https://daehantool.dev
-- 로그인: admin / admin1234
+- 로그인: admin / 219921
 - 검증 방법: 메인 CLAUDE.md의 "검증 단계" 참조
