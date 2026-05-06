@@ -12019,21 +12019,29 @@ function _genPhotoProcessAndUpload(idx, file) {
       canvas.toBlob(async function(blob) {
         if (!blob) { alert('이미지 변환 실패'); return; }
         try {
-          var res = await fetch('/api/products/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'image/png' },
-            body: blob
-          });
-          var json = await res.json();
-          if (!res.ok || !json.ok || !json.url) {
-            alert('업로드 실패: ' + (json.error || res.statusText));
+          if (typeof supabase === 'undefined' || !supabase.createClient) {
+            alert('Supabase 클라이언트 미초기화');
             return;
           }
-          if (json.url.indexOf('blob:') === 0) {
+          var SB_URL = 'https://skloeaxinaxzqmihfzet.supabase.co';
+          var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrbG9lYXhpbmF4enFtaWhmemV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MTA2NTUsImV4cCI6MjA5MzA4NjY1NX0._BkE0JLUXtX9F0-dKKiJ8aMfK-QxzoWjPp83p5x8XrE';
+          var sb = supabase.createClient(SB_URL, SB_ANON);
+          var fileName = 'product_' + Date.now() + '.png';
+          var uploadResult = await sb.storage.from('product-images').upload(fileName, blob, {
+            contentType: 'image/png',
+            upsert: true
+          });
+          if (uploadResult.error) {
+            alert('업로드 실패: ' + uploadResult.error.message);
+            return;
+          }
+          var urlResult = sb.storage.from('product-images').getPublicUrl(fileName);
+          var newUrl = (urlResult && urlResult.data && urlResult.data.publicUrl) || '';
+          if (!newUrl || newUrl.indexOf('blob:') === 0) {
             alert('업로드 URL 생성 실패');
             return;
           }
-          genProducts[idx].image_url = json.url;
+          genProducts[idx].image_url = newUrl;
           localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
           if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_gen_products');
           renderGenProducts();

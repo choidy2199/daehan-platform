@@ -10,37 +10,9 @@ const supabaseAdmin = createClient(
 
 const BUCKET = 'product-images';
 
-export async function POST(req: NextRequest) {
-  try {
-    const arrayBuffer = await req.arrayBuffer();
-    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-      return NextResponse.json({ ok: false, error: '빈 본문' }, { status: 400 });
-    }
-    const buffer = Buffer.from(arrayBuffer);
-
-    const fileName = `product_${Date.now()}.png`;
-
-    const { error: upErr } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .upload(fileName, buffer, { contentType: 'image/png', upsert: true });
-    if (upErr) {
-      console.error('[products/upload] upload error:', upErr);
-      return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
-    }
-
-    const { data: urlData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(fileName);
-    const newUrl = urlData?.publicUrl;
-    if (!newUrl || newUrl.startsWith('blob:')) {
-      console.error('[products/upload] invalid public url:', newUrl);
-      return NextResponse.json({ ok: false, error: 'public URL 생성 실패' }, { status: 500 });
-    }
-
-    return NextResponse.json({ ok: true, url: newUrl, fileName });
-  } catch (e: any) {
-    console.error('[products/upload] POST exception:', e);
-    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
-  }
-}
+// POST 핸들러 제거됨 (옵션 B-1: 클라이언트 직접 업로드로 전환).
+// 이전 라우트는 Vercel Function(iad1) ↔ Supabase(Sydney) 왕복으로 4초 소요 →
+// 클라(서울) ↔ Supabase(Sydney) 1-hop 직접 호출로 ~500~800ms로 단축.
 
 export async function DELETE(req: NextRequest) {
   try {
