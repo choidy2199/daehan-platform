@@ -21084,14 +21084,14 @@ function _poRenderList() {
     rows.forEach(function(r, i) {
       h += '<tr data-po-id="' + r.id + '" onmouseover="this.style.background=\'#FAFAF7\'" onmouseout="this.style.background=\'\'">';
       h += '<td style="' + tdS + 'color:#9BA3B2;">' + (i + 1) + '</td>';
-      h += '<td style="' + tdS + '"><span onclick="_poOnRowClick(\'' + r.id + '\')" style="color:#185FA5;cursor:pointer;font-family:monospace;font-size:12px;font-weight:600;">' + _poEsc(r.po_number) + '</span></td>';
+      h += '<td style="' + tdS + '"><span onclick="_poOnRowClick(\'' + r.id + '\')" style="color:#185FA5;cursor:pointer;font-size:12px;font-weight:600;">' + _poEsc(r.po_number) + '</span></td>';
       h += '<td style="' + tdS + 'color:#5A6070;">' + _poFormatDate(r.po_date) + '</td>';
       h += '<td style="' + tdS + '">' + (r.brand ? _poEsc(r.brand) : '<span style="color:#9BA3B2">-</span>') + '</td>';
       h += '<td style="' + tdS + 'text-align:right;padding-right:12px;">' + (Number(r.total_quantity || 0) > 0 ? (Number(r.total_quantity) + ' EA') : '<span style="color:#9BA3B2">0 EA</span>') + '</td>';
       h += '<td style="' + tdS + 'text-align:right;padding-right:12px;font-weight:500;">' + _poFormatUsd(r.total_fob_usd) + '</td>';
       h += '<td style="' + tdS + '">' + _poFormatStatusBadge(r.status) + '</td>';
       if (r.linked_invoice_id) {
-        h += '<td style="' + tdS + '"><span style="color:#185FA5;cursor:pointer;font-family:monospace;font-size:12px;">연결됨</span></td>';
+        h += '<td style="' + tdS + '"><span style="color:#185FA5;cursor:pointer;font-size:12px;">연결됨</span></td>';
       } else {
         h += '<td style="' + tdS + 'color:#9BA3B2;font-size:12px;">미연결</td>';
       }
@@ -21299,7 +21299,7 @@ function _poRenderDetail() {
   h += '<div class="pc-panel pc-panel-right">';
   h += '<div class="pc-panel-header">';
   h += '<div class="pc-panel-title">제품발주 <span class="pc-panel-count" id="po-cart-count">' + cartCount + '건</span>';
-  h += '<span style="font-size:11px;color:#aaa;font-weight:400;margin-left:8px;font-family:monospace;">' + poNumber + '</span>';
+  h += '<span style="font-size:11px;color:#aaa;font-weight:400;margin-left:8px;">' + poNumber + '</span>';
   h += '</div>';
   h += '<div class="pc-panel-actions">';
   h += '<button class="btn-mini po-allow-readonly" onclick="_poOpenPoListModal()"' + (hasError ? ' disabled' : '') + '>발주서 리스트</button>';
@@ -21441,7 +21441,7 @@ function _poRenderProductList() {
     if (!p) {
       h += '<tr style="background:#FAFBFC;">';
       h += '<td style="' + tdS + '"></td>';
-      h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;color:#9BA3B2;">' + codeEsc + '</td>';
+      h += '<td style="' + tdS + 'font-size:12px;color:#9BA3B2;font-variant-numeric:tabular-nums;">' + codeEsc + '</td>';
       h += '<td style="' + tdS + 'text-align:left;"><span class="po-mc-empty">—</span></td>';
       h += '<td style="' + tdS + 'color:#DDE1EB;">-</td>';
       h += '<td style="' + tdS + 'text-align:left;padding-left:8px;color:#9BA3B2;font-style:italic;" colspan="8">원본 삭제됨 — × 로 제거하세요</td>';
@@ -21470,15 +21470,15 @@ function _poRenderProductList() {
       : '<button class="po-cart-btn" title="장바구니에 추가" onclick="_poOnCartBtnClick(\'' + codeEsc + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button>';
     var mcRaw = (p.manageCode != null) ? String(p.manageCode).trim() : '';
     var mcCell = mcRaw
-      ? '<span style="font-family:var(--font-mono, ui-monospace, \'SF Mono\', Menlo, monospace);font-size:11px;">' + _poEsc(mcRaw) + '</span>'
+      ? '<span style="font-size:11px;font-variant-numeric:tabular-nums;">' + _poEsc(mcRaw) + '</span>'
       : '<span class="po-mc-empty">—</span>';
     h += '<tr' + rowClass + ' data-code="' + codeEsc + '">';
     h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '"' + cbAttr + '></td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + _poEsc(p.code || '') + '</td>';
+    h += '<td style="' + tdS + 'font-size:12px;font-variant-numeric:tabular-nums;">' + _poEsc(p.code || '') + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;">' + mcCell + '</td>';
     h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + descTxt + '</td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';
+    h += '<td style="' + tdS + 'font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + importP + '</td>';
     h += '<td style="' + tdS + '">' + stockHtml + '</td>';
@@ -22079,7 +22079,7 @@ function _poRenderCart(poId) {
     h += '<td style="' + tdS + 'font-size:12px;">' + brandTxt + '</td>';
     h += '<td style="' + tdS + 'font-family:inherit;font-size:12px;color:#5A6070;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums;" title="' + _poEsc(manageCode) + '">' + manageCellHtml + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + descTxt + '</td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';
+    h += '<td style="' + tdS + 'font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + modelTxt + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;font-weight:600;">' + unitCount.toLocaleString() + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + priceCell + '</td>';
@@ -22297,10 +22297,10 @@ function _poPickerRenderList() {
     var statusCell = isReg ? '<span class="po-registered-badge">이미 등록됨</span>' : '';
     h += '<tr' + rowStyle + '>';
     h += '<td style="' + tdS + '"><input type="checkbox" data-code="' + codeEsc + '" onchange="_poPickerToggleOne(\'' + codeEsc + '\', this.checked)"' + cbAttr + checked + '></td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;">' + codeEsc + '</td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:11px;">' + _poEsc(p.manageCode || '-') + '</td>';
+    h += '<td style="' + tdS + 'font-size:12px;font-variant-numeric:tabular-nums;">' + codeEsc + '</td>';
+    h += '<td style="' + tdS + 'font-size:11px;font-variant-numeric:tabular-nums;">' + _poEsc(p.manageCode || '-') + '</td>';
     h += '<td style="' + tdS + 'text-align:left;padding-left:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;">' + _poEsc(p.description || '-') + '</td>';
-    h += '<td style="' + tdS + 'font-family:monospace;font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + _poEsc(_poExtractModel(p.description) || '-') + '</td>';
+    h += '<td style="' + tdS + 'font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + _poEsc(_poExtractModel(p.description) || '-') + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + palletCell + '</td>';
     h += '<td style="' + tdS + 'font-variant-numeric:tabular-nums;">' + priceCell + '</td>';
     h += '<td style="' + tdS + '">' + stockHtml + '</td>';
@@ -23312,7 +23312,7 @@ function _poRenderPoListTable(list, currentId) {
       : '<span class="po-list-invoice-empty">-</span>';
     return '<tr class="' + cls + '">' +
       '<td class="po-list-td-check" onclick="event.stopPropagation();"><input type="checkbox" class="po-list-check" data-po-id="' + idEsc + '" onchange="_poListOnCheckChange()"></td>' +
-      '<td style="font-family:monospace;font-size:12px;"' + selAttr + '>' + _poEsc(p.po_number || '-') + '</td>' +
+      '<td style="font-size:12px;"' + selAttr + '>' + _poEsc(p.po_number || '-') + '</td>' +
       '<td' + selAttr + '>' + _poFormatDate(p.po_date) + '</td>' +
       '<td' + selAttr + '>' + brandTxt + '</td>' +
       '<td style="text-align:right;font-variant-numeric:tabular-nums;"' + selAttr + '>' + totalTxt + '</td>' +
