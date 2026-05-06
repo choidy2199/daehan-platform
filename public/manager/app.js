@@ -22939,7 +22939,7 @@ function _poBuildPdfHtml(po, items) {
   var poDateFmt = po && po.po_date ? String(po.po_date).replace(/-/g, '. ') : '-';
   items = Array.isArray(items) ? items : [];
 
-  // 사진 Phase B — mw_gen_products lookup (it.product_code → image_url)
+  // 사진 Phase B — mw_gen_products lookup (it.internal_code → image_url)
   var gpList = loadObj('mw_gen_products', []);
   var gpByCode = {};
   gpList.forEach(function(p) { if (p && p.code != null) gpByCode[String(p.code)] = p; });
@@ -22966,7 +22966,7 @@ function _poBuildPdfHtml(po, items) {
     var palletDisp = pCount > 0 ? pCount.toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'P' : '-';
     var fob = Number(it.fob_usd) || 0;
     var lineTotal = qty * fob;
-    var gp = gpByCode[String(it.product_code || '')];
+    var gp = gpByCode[String(it.internal_code || '')];
     var photoUrl = gp && gp.image_url ? String(gp.image_url).replace(/"/g, '&quot;') : '';
     var photoCellHtml = photoUrl
       ? '<td class="center"><img src="' + photoUrl + '" style="width:48px;height:48px;object-fit:contain;background:#F4F6FA;border-radius:3px" alt="" /></td>'
