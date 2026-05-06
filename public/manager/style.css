@@ -2633,7 +2633,7 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 .po-list-current-label { color:#9BA3B2; font-size:12px; font-style:italic; }
 .po-list-draft-label { color:#9BA3B2; font-size:12px; }
 .po-list-td-invoice { text-align:center; }
-.po-list-invoice-link { color:#185FA5; font-family:'SF Mono',Consolas,monospace; font-size:11px; font-weight:500; cursor:pointer; text-decoration:none; }
+.po-list-invoice-link { color:#185FA5; font-family:Pretendard,sans-serif; font-variant-numeric:tabular-nums; font-size:11px; font-weight:500; cursor:pointer; text-decoration:none; }
 .po-list-invoice-link:hover { text-decoration:underline; }
 .po-list-invoice-empty { color:#9BA3B2; font-size:11px; }
 

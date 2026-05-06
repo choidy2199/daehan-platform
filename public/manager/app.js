@@ -25041,10 +25041,10 @@ function _ipinv2RenderErpPreviewModalBody(data) {
   h += '<div style="background:#F4F6FA;border-radius:6px;padding:14px 16px;margin-bottom:14px;">';
   h += '<div style="font-size:11px;color:#6B7280;font-weight:600;margin-bottom:6px;">▼ 헤더 정보</div>';
   h += '<div style="display:grid;grid-template-columns:90px 1fr;row-gap:6px;column-gap:10px;font-size:12px;">';
-  h += '<div style="color:#6B7280;">거래처</div><div>' + _ipinv2Esc(header.customer_name || '-') + ' <span style="color:#9BA3B2;font-family:monospace;">(CODE2 ' + _ipinv2Esc(header.customer_code || '없음') + ')</span></div>';
+  h += '<div style="color:#6B7280;">거래처</div><div>' + _ipinv2Esc(header.customer_name || '-') + ' <span style="color:#9BA3B2;font-family:Pretendard,sans-serif;font-variant-numeric:tabular-nums;">(CODE2 ' + _ipinv2Esc(header.customer_code || '없음') + ')</span></div>';
   h += '<div style="color:#6B7280;">송장번호</div><div>' + _ipinv2Esc(header.invoice_number || '-') + '</div>';
   h += '<div style="color:#6B7280;">전표일자</div><div>' + todayYYMMDD + ' <span style="color:#9BA3B2;">(전송 시점 today)</span></div>';
-  h += '<div style="color:#6B7280;">비고</div><div style="font-family:monospace;font-size:11px;">' + _ipinv2Esc(header.memo || '') + '</div>';
+  h += '<div style="color:#6B7280;">비고</div><div style="font-family:Pretendard,sans-serif;font-size:11px;">' + _ipinv2Esc(header.memo || '') + '</div>';
   h += '</div></div>';
 
   // 라인 테이블
@@ -25072,7 +25072,7 @@ function _ipinv2RenderErpPreviewModalBody(data) {
   items.forEach(function(it) {
     var rowBg = it.has_code ? '#fff' : '#FEEFEF';
     var codeCell = it.has_code
-      ? '<span style="font-family:ui-monospace,Menlo,monospace;">' + _ipinv2Esc(it.code) + '</span>'
+      ? '<span style="font-family:Pretendard,sans-serif;font-variant-numeric:tabular-nums;">' + _ipinv2Esc(it.code) + '</span>'
       : '<span style="color:#CC2222;font-weight:600;">⚠️ 없음</span>';
     sumVat += Number(it.vat_amount || 0);
     h += '<tr style="background:' + rowBg + ';border-bottom:1px solid #EEF0F4;">';
@@ -26915,7 +26915,7 @@ function _ipinv2OpenPasteModal() {
   h += '</div>';
   h += '<div style="padding:16px 20px;">';
   h += '<div style="font-size:12px;color:#5A6070;margin-bottom:8px;">열 순서: <b>모델 / 품명 / 수량 / FOB 단가 / 팔렛</b></div>';
-  h += '<textarea id="ipinv2-paste-area" rows="10" placeholder="엑셀에서 복사한 내용을 여기에 붙여넣으세요..." style="width:100%;border:1px solid #DDE1EB;border-radius:6px;padding:8px 10px;font-size:12px;font-family:Menlo,Monaco,monospace;box-sizing:border-box;resize:vertical;"></textarea>';
+  h += '<textarea id="ipinv2-paste-area" rows="10" placeholder="엑셀에서 복사한 내용을 여기에 붙여넣으세요..." style="width:100%;border:1px solid #DDE1EB;border-radius:6px;padding:8px 10px;font-size:12px;font-family:Pretendard,sans-serif;box-sizing:border-box;resize:vertical;"></textarea>';
   h += '<div style="display:flex;justify-content:flex-end;margin-top:8px;">';
   h += '<button onclick="_ipinv2ParsePastedText()" style="font-size:12px;padding:6px 14px;border-radius:6px;background:#185FA5;color:#fff;border:none;cursor:pointer;font-family:Pretendard,sans-serif;">파싱 미리보기</button>';
   h += '</div>';
