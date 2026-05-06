@@ -21263,7 +21263,6 @@ function _poRenderDetail() {
   h += '<div class="pc-panel-header">';
   h += '<div class="pc-panel-title">제품목록 <span class="pc-panel-count" id="po-product-list-count">' + registeredCount + '건</span></div>';
   h += '<div class="pc-panel-actions">';
-  h += '<a href="#" class="po-col-reset-link" onclick="_poResetColWidths(event)">컬럼초기화</a>';
   h += '<button class="btn-mini" onclick="' + placeholderAlert + '"' + disabledAttr + '>템플릿</button>';
   h += '<button class="btn-mini" onclick="_poSaveTemplate()"' + disabledAttr + '>템플릿 저장</button>';
   h += '<button class="btn-mini btn-mini-p" onclick="_poOpenProductPicker()"' + disabledAttr + '>+ 제품등록</button>';
@@ -21446,7 +21445,7 @@ function _poRenderProductList() {
   h += '<col style="width:36px">';
   h += '</colgroup>';
   h += '<thead><tr>';
-  h += '<th style="' + thS + '"><input type="checkbox" disabled></th>';
+  h += '<th style="' + thS + '"><input type="checkbox" id="po-product-list-header-check" onclick="_poToggleAllProducts(this)"></th>';
   h += '<th style="' + thS + '">사진</th>';
   h += '<th style="' + thS + '">코드</th>';
   h += '<th style="' + thS + '">관리코드</th>';
@@ -22594,6 +22593,13 @@ async function _poSaveTemplate() {
   } catch (err) {
     alert('저장 실패: ' + (err && err.message ? err.message : err));
   }
+}
+
+// 헤더 전체체크박스 — 단순 토글 (행 → 헤더 자동 갱신은 미구현)
+function _poToggleAllProducts(headerCheckbox) {
+  var isChecked = headerCheckbox.checked;
+  var rowBoxes = document.querySelectorAll('#po-product-list-body input[type="checkbox"][data-code]');
+  rowBoxes.forEach(function(box) { box.checked = isChecked; });
 }
 
 // ===== 커밋 6 — 발주확정 =====
