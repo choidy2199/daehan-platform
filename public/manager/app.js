@@ -24846,7 +24846,7 @@ function _ipinv2ExportCostExcel() {
   if (!calc || !calc.items || calc.items.length === 0) return alert('출력할 데이터가 없습니다.');
   // [Stage 6 Phase B-2 Step 3 보정 2] 화면과 동일하게 단가(VAT포함)/금액(VAT포함)/단가(VAT별도)/금액(=단가×수량)/부가세 5컬럼
   var data = [[
-    'No.', '브랜드', '모델명', '코드', '관리코드', '품명', '수량', 'FOB ($)', '할인가 ($)', 'FOB$ 계',
+    'No.', '코드', '관리코드', '품명', '규격', '모델명', '수량', 'FOB ($)', '할인가 ($)', 'FOB$ 계',
     '배분 (%)', '배분 (₩)', '단가 (VAT포함)', '금액 (VAT포함)', '단가 (VAT별도)', '금액 (=단가×수량)', '부가세', '최종환율', '마진 (%)', '예상판매 (₩)'
   ]];
   var items = _ipinv2CurrentItems.filter(function(it) { return !it.is_pallet_line; });
@@ -24873,7 +24873,7 @@ function _ipinv2ExportCostExcel() {
     var vat = cost.vat_amount != null ? Number(cost.vat_amount) : '';
     var expected = unitCost != null ? Math.round(unitCost * (1 + _ipinv2MarginPct / 100)) : '';
     data.push([
-      i + 1, _ipinv2GetBrand(it), it.model || '', _ipinv2GetGenCode(it) || '', _ipinv2GetManageCode(it), it.name || '',
+      i + 1, _ipinv2GetGenCode(it) || '', _ipinv2GetManageCode(it), _ipinv2GetBrand(it), it.name || '', _poExtractModel(it.name) || it.model || '',
       qty, fobUsd, discCellVal, fobSum,
       ratioPct, allocAmt, unitCost == null ? '' : unitCost, supplyTotalN, goodsUnit, goodsAmt, vat,
       wavgRateX != null ? Number(wavgRateX.toFixed(4)) : '',
@@ -25854,11 +25854,11 @@ function _ipinv2RenderItemsTable() {
   h += '<table id="ipinv2-cost-table" class="ipinv2-cost-table">';
   h += '<colgroup>';
   h += '<col style="width:42px">';   // No
-  h += '<col style="width:85px">';   // 브랜드
-  h += '<col style="width:110px">';  // 모델명
   h += '<col style="width:80px">';   // 코드 (G코드, mw_gen_products lookup)
   h += '<col style="width:110px">';  // 관리코드 [B-3-2-2b I]
-  h += '<col style="width:240px">';  // 품명
+  h += '<col style="width:85px">';   // 품명 (=_ipinv2GetBrand, 데이터 그대로, 라벨만 변경)
+  h += '<col style="width:240px">';  // 규격 (=it.name, 데이터 그대로, 라벨만 변경)
+  h += '<col style="width:110px">';  // 모델명 (_poExtractModel(it.name) || it.model)
   h += '<col style="width:60px">';   // 수량
   h += '<col style="width:72px">';   // FOB$
   h += '<col style="width:85px">';   // 할인가($) [B-3-2-2c 3]
@@ -25875,11 +25875,11 @@ function _ipinv2RenderItemsTable() {
   h += '</colgroup>';
   h += '<thead><tr>';
   h += '<th>No<div class="col-resize-handle"></div></th>';
-  h += '<th>브랜드<div class="col-resize-handle"></div></th>';
-  h += '<th>모델명<div class="col-resize-handle"></div></th>';
   h += '<th>코드<div class="col-resize-handle"></div></th>';
   h += '<th>관리코드<div class="col-resize-handle"></div></th>';
   h += '<th>품명<div class="col-resize-handle"></div></th>';
+  h += '<th>규격<div class="col-resize-handle"></div></th>';
+  h += '<th>모델명<div class="col-resize-handle"></div></th>';
   h += '<th>수량<div class="col-resize-handle"></div></th>';
   h += '<th>FOB ($)<div class="col-resize-handle"></div></th>';
   h += '<th>할인가 ($)<div class="col-resize-handle"></div></th>';
@@ -25956,11 +25956,11 @@ function _ipinv2RenderItemsTable() {
 
       h += '<tr data-item-id="' + it.id + '"' + rowCls + '>';
       h += '<td class="center">' + (i + 1) + '</td>';
-      h += '<td class="left">' + _ipinv2Esc(_ipinv2GetBrand(it)) + '</td>';
-      h += '<td class="left model">' + _ipinv2Esc(_poExtractModel(it.name) || it.model || '') + (isOverflow ? ' <span style="color:#1D9E75;font-weight:500;">⚖</span>' : '') + '</td>';
       h += gcCell; // 코드 (G코드)
       h += mcCell; // [B-3-2-2b I] 관리코드
-      h += '<td class="left">' + _ipinv2Esc(it.name || '') + '</td>';
+      h += '<td class="left">' + _ipinv2Esc(_ipinv2GetBrand(it)) + '</td>';                // 품명 (= 브랜드 데이터)
+      h += '<td class="left">' + _ipinv2Esc(it.name || '') + '</td>';                       // 규격 (= name 데이터)
+      h += '<td class="left model">' + _ipinv2Esc(_poExtractModel(it.name) || it.model || '') + (isOverflow ? ' <span style="color:#1D9E75;font-weight:500;">⚖</span>' : '') + '</td>'; // 모델명
       h += '<td>' + _ipinv2Int(qty) + '</td>';
       // [B-3-2-2b F] FOB 단가: readonly (수입가격 고정값, input → 텍스트 셀)
       h += '<td>' + (fobUsd > 0 ? '$' + fobUsdTxt : '') + '</td>';
