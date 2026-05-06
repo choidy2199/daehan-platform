@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { selectItem } from '@/lib/erp';
+import { parseTablesFromXml } from '@/lib/erp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+
+const ERP_URL = process.env.ERP_URL || 'https://drws20.softcity.co.kr:1448/WS_shop.asmx';
+const ERP_USER_KEY = process.env.ERP_USER_KEY || '';
 
 const CHUNK_SIZE = 100;
 
@@ -11,11 +14,19 @@ const CHUNK_SIZE = 100;
  * POST /api/erp/select-item-bulk
  * Body: { code2List: string[] }
  *
- * 100건씩 청크 분할 → selectItem("'c1','c2',...") 순차 호출
- * 응답의 CODE2로 매칭하여 입력 순서대로 결과 반환
+ * 매뉴얼 §8 SelectItemUrlEnc — cUserKey + UrlEnc_WHERE form-urlencoded 호출
+ * (stock/route.ts와 동일 패턴)
+ * 100건씩 청크 분할 → 응답 CODE2로 매칭하여 입력 순서대로 결과 반환
  */
 export async function POST(request: NextRequest) {
   try {
+    if (!ERP_URL || !ERP_USER_KEY) {
+      return NextResponse.json(
+        { ok: false, error: 'ERP_URL 또는 ERP_USER_KEY 환경변수 누락' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const code2List = body?.code2List;
 
@@ -50,19 +61,46 @@ export async function POST(request: NextRequest) {
     // 청크 순차 처리 (병렬 X — ERP 부하 방지)
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      // 'c1','c2','c3' 형식 (홑따옴표 이스케이프)
-      const search = chunk.map((c) => `'${c.replace(/'/g, "''")}'`).join(',');
+      // 'c1','c2','c3' 형식 (매뉴얼 §8)
+      const whereValue = chunk.map((c) => `'${c.replace(/'/g, "''")}'`).join(',');
+      const formBody =
+        `cUserKey=${encodeURIComponent(ERP_USER_KEY)}` +
+        `&UrlEnc_WHERE=${encodeURIComponent(whereValue)}`;
+
       try {
-        console.log(`[select-item-bulk] chunk ${i + 1}/${chunks.length} (${chunk.length}건)`);
-        const rows = await selectItem(search);
-        console.log(`[select-item-bulk] chunk ${i + 1} 응답 ${rows.length}건`);
-        for (const row of rows) {
+        const response = await fetch(`${ERP_URL}/SelectItemUrlEnc`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formBody,
+        });
+
+        if (!response.ok) {
+          throw new Error(`ERP HTTP ${response.status} ${response.statusText}`);
+        }
+
+        const responseText = await response.text();
+
+        if (responseText.startsWith('Error:')) {
+          console.error(
+            `[select-item-bulk] chunk ${i + 1} ERP Error: ${responseText.substring(0, 200)}`
+          );
+          continue;
+        }
+
+        const tables = parseTablesFromXml(responseText);
+        console.log(
+          `[select-item-bulk] chunk ${i + 1}/${chunks.length} req=${chunk.length}건 res=${tables.length}건`
+        );
+
+        for (const row of tables) {
           const code2 = (row.CODE2 || '').trim();
           if (code2) parsedMap.set(code2, row);
         }
       } catch (err: any) {
-        console.error(`[select-item-bulk] chunk ${i + 1} 실패:`, err?.message || err);
-        // 실패 청크는 결과에 추가하지 않음 → 그 청크의 코드들은 found:false로 표시됨
+        console.error(
+          `[select-item-bulk] chunk ${i + 1} 실패:`,
+          err?.message || err
+        );
       }
     }
 
