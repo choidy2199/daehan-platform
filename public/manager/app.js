@@ -2622,6 +2622,23 @@ function _updateDdStars() {
 // ======================== TAB SWITCHING ========================
 var _renderedTabs = {};
 
+// === Hotfix v4 부가: _renderedTabs.catalog setter 후킹 (진범 stack trace 캡처) ===
+(function _hookCatalogMarking() {
+  var _catalogValue = undefined;
+  Object.defineProperty(_renderedTabs, 'catalog', {
+    configurable: true,
+    enumerable: true,
+    get: function() { return _catalogValue; },
+    set: function(v) {
+      if (v === true) {
+        console.warn('[MARK-HOOK] _renderedTabs.catalog = true');
+        console.trace('[MARK-HOOK] 마킹 호출 스택');
+      }
+      _catalogValue = v;
+    }
+  });
+})();
+
 // 신규 메뉴 ID → { contentId, render (기존 렌더링 키), placeholder? }
 var _tabIdMap = {
   'mw-price':         { contentId: 'tab-catalog',          render: 'catalog' },
@@ -15435,6 +15452,21 @@ async function init() {
   console.log('[PERF] init — step4 orderSheetButtons: ' + (performance.now() - _t).toFixed(0) + 'ms');
 
   console.log('[PERF] init 전체: ' + (performance.now() - _initStart).toFixed(0) + 'ms');
+
+  // === Hotfix v4: 강력한 catalog 자가복구 가드 ===
+  function _ensureCatalogRendered(label) {
+    var b = document.getElementById('catalog-body');
+    if (!b || b.innerHTML.length > 0) return;
+    if (!DB || !DB.products || DB.products.length === 0) return;
+    console.warn('[Final Guard ' + label + '] catalog 빈 상태 → 강제 렌더');
+    _lastRenderCatalog = 0;
+    if (typeof _renderedTabs !== 'undefined') _renderedTabs.catalog = false;
+    if (typeof renderCatalog === 'function') renderCatalog();
+  }
+  setTimeout(function(){ _ensureCatalogRendered('100ms'); }, 100);
+  setTimeout(function(){ _ensureCatalogRendered('500ms'); }, 500);
+  setTimeout(function(){ _ensureCatalogRendered('2s'); }, 2000);
+  setTimeout(function(){ _ensureCatalogRendered('5s'); }, 5000);
 }
 
 // ======================== 관리: 수수료 설정 ========================
