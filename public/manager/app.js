@@ -8993,19 +8993,23 @@ function _renderMwPricelistIoExportPreview() {
   const products = (typeof DB !== 'undefined' && DB && DB.products) || [];
   const sample = products[0] || {};
 
-  let headerHtml = '<div style="display:flex; background:#f3f4f6; font-size:11px; font-weight:600;">';
-  let rowHtml = '<div style="display:flex; font-size:11px; color:#6b7280; font-family:monospace;">';
+  let html = '<table style="width:100%; border-collapse:collapse; font-size:11px;">';
+  html += '<thead><tr style="background:#f3f4f6;">';
   selectedCols.forEach(function(col, idx) {
     const isLast = idx === selectedCols.length - 1;
     const borderRight = isLast ? '' : 'border-right:1px solid #e5e7eb;';
-    headerHtml += '<div style="padding:6px 8px;' + borderRight + ' flex-shrink:0; min-width:60px;">' + col.label + '</div>';
+    html += '<th style="padding:6px 8px;' + borderRight + ' font-weight:600; text-align:left; white-space:nowrap;">' + col.label + '</th>';
+  });
+  html += '</tr></thead><tbody><tr style="color:#6b7280; font-family:monospace;">';
+  selectedCols.forEach(function(col, idx) {
+    const isLast = idx === selectedCols.length - 1;
+    const borderRight = isLast ? '' : 'border-right:1px solid #e5e7eb;';
     var v = sample[col.id];
     if (v == null) v = '';
-    rowHtml += '<div style="padding:6px 8px;' + borderRight + ' flex-shrink:0; min-width:60px;">' + String(v).substring(0, 12) + '</div>';
+    html += '<td style="padding:6px 8px;' + borderRight + ' white-space:nowrap;">' + String(v).substring(0, 12) + '</td>';
   });
-  headerHtml += '</div>';
-  rowHtml += '</div>';
-  previewEl.innerHTML = headerHtml + rowHtml;
+  html += '</tr></tbody></table>';
+  previewEl.innerHTML = html;
 }
 
 function _updateMwPricelistIoExportSummary() {
