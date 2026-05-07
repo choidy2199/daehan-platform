@@ -12328,10 +12328,10 @@ function _gpImportSwitchTab(tab) {
 
 function downloadGenErpTemplate() {
   if (!window.XLSX) { toast('SheetJS 로딩 중...'); return; }
-  var data = [['관리코드', '내부코드 (선택)']];
-  data.push(['4892210237279', '']);
+  var data = [['관리코드']];
+  data.push(['4892210237279']);
   var ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 18 }, { wch: 14 }];
+  ws['!cols'] = [{ wch: 18 }];
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '관리코드');
   XLSX.writeFile(wb, '관리코드_양식.xlsx');
@@ -12423,10 +12423,10 @@ function _gpErpShowConfirm(mode, counts, codes) {
         '</div>' +
       '</div>' +
       '<div style="background:#FAEEDA;border-left:3px solid #BA7517;border-radius:6px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;color:#1A1D23">' +
-        '<div style="font-weight:600;margin-bottom:4px">🔄 덮어쓰기 모드</div>' +
-        '중복 ' + dupStr + '건이 경영박사 값으로 덮어쓰기 됩니다.<br>' +
+        '<div style="font-weight:600;margin-bottom:4px">🔄 덮어쓰기 모드 — 단가 5개만 갱신</div>' +
+        '중복 ' + dupStr + '건의 단가(원가/도매A/스토어팜/오픈마켓/SSG)가 ERP 최신값으로 갱신됩니다.<br>' +
         '신규 ' + newStr + '건은 새로 추가됩니다.<br>' +
-        '사진/재고/IN/OUT/파레트/수입가/비고/입고날짜는 보존됩니다.' +
+        '품명/규격/대분류 및 그 외 필드(사진/재고/IN/OUT/파레트/수입가/비고/입고날짜)는 모두 보존됩니다.' +
       '</div>' +
       '<div style="font-size:13px;color:#5A6070">진행하시겠습니까?</div>';
     goBtn.style.background = '#185FA5';
@@ -12443,9 +12443,9 @@ function _gpErpShowConfirm(mode, counts, codes) {
         '</div>' +
       '</div>' +
       '<div style="background:#E1F5EE;border-left:3px solid #0F6E56;border-radius:6px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;color:#1A1D23">' +
-        '<div style="font-weight:600;margin-bottom:4px">🛡️ 제외하기 모드 — 기존 데이터 보호</div>' +
+        '<div style="font-weight:600;margin-bottom:4px">🛡️ 제외하기 모드 — 신규만 추가</div>' +
         '이미 등록된 ' + dupStr + '건은 건너뜁니다.<br>' +
-        '신규 ' + newStr + '건만 새로 추가됩니다.<br>' +
+        '신규 ' + newStr + '건만 단가 5개로 새로 추가됩니다 (품명/규격은 빈 값).<br>' +
         '기존 데이터에는 영향이 없습니다.' +
       '</div>' +
       '<div style="font-size:13px;color:#5A6070">진행하시겠습니까?</div>';
@@ -12487,11 +12487,9 @@ async function _gpErpExecute(mode, codes) {
       var r = data.results[j];
       if (!r.found) { notFound++; continue; }
       var p = r.parsed || {};
+      // 단가 5개만 매핑 — 텍스트 마스터(category/model/description)는 ERP에 없으므로 제외
       var mapped = {
         manageCode: String(p.CODE2 || r.code2 || '').trim(),
-        category: String(p.PARTCODE || '').trim(),
-        model: String(p.ITEM || '').trim(),
-        description: String(p.GYU || '').trim(),
         cost: toIntKrw(p.INPR),
         priceA: toIntKrw(p.OUTA),
         priceNaver: toIntKrw(p.OUTH),
@@ -12501,11 +12499,8 @@ async function _gpErpExecute(mode, codes) {
       var existIdx = existingByMc[mapped.manageCode];
       if (existIdx != null) {
         if (mode === 'skip_existing') { skipped++; continue; }
+        // 덮어쓰기: 단가 5개만 갱신. category/model/description 및 그 외 필드 모두 보존
         var prod = genProducts[existIdx];
-        prod.manageCode = mapped.manageCode;
-        prod.category = mapped.category;
-        prod.model = mapped.model;
-        prod.description = mapped.description;
         prod.cost = mapped.cost;
         prod.priceA = mapped.priceA;
         prod.priceNaver = mapped.priceNaver;
@@ -12513,13 +12508,14 @@ async function _gpErpExecute(mode, codes) {
         prod.priceSsg = mapped.priceSsg;
         overwritten++;
       } else {
+        // 신규 push: 단가 5개만 채움. 텍스트 필드는 빈 문자열 (사용자가 후속 입력)
         var internalCode = internalByCode2[mapped.manageCode] || '';
         genProducts.push({
           code: internalCode,
           manageCode: mapped.manageCode,
-          category: mapped.category,
-          model: mapped.model,
-          description: mapped.description,
+          category: '',
+          model: '',
+          description: '',
           supplyPrice: 0,
           cost: mapped.cost,
           priceA: mapped.priceA,
@@ -12535,11 +12531,11 @@ async function _gpErpExecute(mode, codes) {
     localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
     if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_gen_products');
     if (typeof renderGenProducts === 'function') renderGenProducts();
-    statusEl.textContent = '✅ 가져오기 완료 — 신규 ' + newAdded + '건, 덮어쓰기 ' + overwritten + '건, 제외 ' + skipped + '건, ERP 미등록 ' + notFound + '건';
+    statusEl.textContent = '✅ 단가 동기화 완료 — 신규 ' + newAdded + '건, 덮어쓰기 ' + overwritten + '건, 제외 ' + skipped + '건, ERP 미등록 ' + notFound + '건';
     if (typeof saveActionHistory === 'function') {
-      saveActionHistory('경영박사가져오기', '일반제품', newAdded + overwritten, null);
+      saveActionHistory('ERP단가동기화', '일반제품', newAdded + overwritten, null);
     }
-    if (typeof toast === 'function') toast('경영박사 가져오기 완료');
+    if (typeof toast === 'function') toast('단가 동기화 완료');
   } catch (err) {
     statusEl.textContent = '오류: ' + (err && err.message ? err.message : err);
     if (typeof toast === 'function') toast('경영박사 가져오기 실패');

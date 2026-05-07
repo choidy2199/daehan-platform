@@ -1197,7 +1197,7 @@ document.head.appendChild(s);
     </div>
     <div style="display:flex;border-bottom:1px solid #E5E8ED;background:#FAFBFC">
       <button id="gen-import-tab-btn-excel" type="button" onclick="_gpImportSwitchTab('excel')" style="flex:1;padding:11px 12px;font-size:13px;font-weight:600;font-family:'Pretendard',-apple-system,sans-serif;background:#fff;color:#1A1D23;border:none;border-bottom:2px solid #185FA5;cursor:pointer">📊 엑셀 가져오기</button>
-      <button id="gen-import-tab-btn-erp" type="button" onclick="_gpImportSwitchTab('erp')" style="flex:1;padding:11px 12px;font-size:13px;font-weight:600;font-family:'Pretendard',-apple-system,sans-serif;background:#FAFBFC;color:#9BA3B2;border:none;border-bottom:2px solid transparent;cursor:pointer">🔌 경영박사 가져오기</button>
+      <button id="gen-import-tab-btn-erp" type="button" onclick="_gpImportSwitchTab('erp')" style="flex:1;padding:11px 12px;font-size:13px;font-weight:600;font-family:'Pretendard',-apple-system,sans-serif;background:#FAFBFC;color:#9BA3B2;border:none;border-bottom:2px solid transparent;cursor:pointer">🔌 단가 동기화</button>
     </div>
     <div class="modal-body">
       <div id="gen-import-tab-excel">
@@ -1226,9 +1226,13 @@ document.head.appendChild(s);
       <div id="gen-import-status" style="font-size:13px;color:#5A6070"></div>
       </div>
       <div id="gen-import-tab-erp" style="display:none">
+        <div style="background:#F4F6FA;border-left:3px solid #5A6070;border-radius:6px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.6;color:#1A1D23">
+          <div style="font-weight:600;margin-bottom:4px">ⓘ 이 탭은 단가 5개(원가/도매A/스토어팜/오픈마켓/SSG)를 ERP에서 일괄 갱신합니다.</div>
+          품명/규격/대분류는 ERP에서 가져올 수 없으므로, <strong>📊 엑셀 가져오기</strong> 탭을 사용하세요.
+        </div>
         <div style="background:#E1F5EE;border-radius:8px;padding:14px 16px;margin-bottom:16px">
           <div style="font-size:13px;font-weight:600;color:#0F6E56;margin-bottom:6px">STEP 1. 관리코드 양식 다운로드</div>
-          <p style="font-size:11px;color:#5A6070;margin-bottom:10px;line-height:1.6">A열에 관리코드(CODE2), B열에 내부코드를 입력하세요.<br>B열은 선택사항입니다. 한 줄에 하나씩, 100개든 1,000개든 가능.</p>
+          <p style="font-size:11px;color:#5A6070;margin-bottom:10px;line-height:1.6">A열에 관리코드(CODE2)만 입력하세요.<br>한 줄에 하나씩, 100개든 1,000개든 가능.</p>
           <button type="button" onclick="downloadGenErpTemplate()" style="width:100%;background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">📄 관리코드 양식 다운로드 (.xlsx)</button>
         </div>
         <div style="background:#F4F6FA;border-radius:8px;padding:14px 16px;margin-bottom:12px">
@@ -1239,11 +1243,11 @@ document.head.appendChild(s);
           <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#1A1D23">STEP 3. 중복 처리 방식</div>
           <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin-bottom:8px;font-size:13px;line-height:1.5">
             <input type="radio" name="gen-erp-mode" value="overwrite" checked style="accent-color:#0F6E56;margin-top:3px">
-            <span><strong>덮어쓰기 (overwrite)</strong><br><span style="font-size:11px;color:#5A6070">기존 일반제품에 같은 관리코드가 있으면 ERP 값으로 덮어씁니다. 신규는 추가.</span></span>
+            <span><strong>덮어쓰기 (overwrite)</strong><br><span style="font-size:11px;color:#5A6070">단가 5개(원가/도매A/스토어팜/오픈마켓/SSG)를 ERP 최신값으로 갱신합니다. 신규 코드는 추가.</span></span>
           </label>
           <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;line-height:1.5">
             <input type="radio" name="gen-erp-mode" value="skip_existing" style="accent-color:#0F6E56;margin-top:3px">
-            <span><strong>제외하기 (skip_existing)</strong><br><span style="font-size:11px;color:#5A6070">이미 등록된 제품은 건너뛰고, 신규만 가져옵니다.</span></span>
+            <span><strong>제외하기 (skip_existing)</strong><br><span style="font-size:11px;color:#5A6070">이미 등록된 제품은 건너뛰고, 신규 코드만 추가합니다.</span></span>
           </label>
         </div>
         <div id="gen-erp-status" style="display:none;font-size:13px;color:#1A1D23;padding:10px 12px;background:#F4F6FA;border-radius:6px"></div>
@@ -1256,7 +1260,7 @@ document.head.appendChild(s);
       </div>
       <div id="gen-import-footer-erp" style="display:none;gap:8px;justify-content:flex-end;width:100%">
         <button class="btn-secondary" onclick="closeGenImportModal()">취소</button>
-        <button type="button" onclick="importFromErp()" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">🔌 경영박사에서 가져오기</button>
+        <button type="button" onclick="importFromErp()" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">🔌 단가 동기화 시작</button>
       </div>
     </div>
   </div>

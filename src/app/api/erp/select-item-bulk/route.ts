@@ -14,9 +14,12 @@ const CHUNK_SIZE = 100;
  * POST /api/erp/select-item-bulk
  * Body: { code2List: string[] }
  *
- * 매뉴얼 §8 SelectItemUrlEnc — cUserKey + UrlEnc_WHERE form-urlencoded 호출
- * (stock/route.ts와 동일 패턴)
- * 100건씩 청크 분할 → 응답 CODE2로 매칭하여 입력 순서대로 결과 반환
+ * 단가 동기화 전용 — SelectItemUrlEncPrice 호출
+ * (ERP는 ITEM/GYU/PARTCODE 등 텍스트 마스터 read API 미제공.
+ *  단가 5개 + 재고만 노출되어 단가 동기화 용도로만 사용.)
+ *
+ * 응답 필드명 prefix `it` (itCODE2/itINPR/itOUTA 등) → 표준 키로 변환하여 반환
+ * 100건씩 청크 분할 → cUserKey + UrlEnc_WHERE form-urlencoded
  */
 export async function POST(request: NextRequest) {
   try {
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
         `&UrlEnc_WHERE=${encodeURIComponent(whereValue)}`;
 
       try {
-        const response = await fetch(`${ERP_URL}/SelectItemUrlEnc`, {
+        const response = await fetch(`${ERP_URL}/SelectItemUrlEncPrice`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: formBody,
@@ -92,9 +95,25 @@ export async function POST(request: NextRequest) {
           `[select-item-bulk] chunk ${i + 1}/${chunks.length} req=${chunk.length}건 res=${tables.length}건`
         );
 
+        // SelectItemUrlEncPrice 응답은 it* prefix → 프론트 호환을 위해 표준 키로 변환
         for (const row of tables) {
-          const code2 = (row.CODE2 || '').trim();
-          if (code2) parsedMap.set(code2, row);
+          const code2 = (row.itCODE2 || '').trim();
+          if (!code2) continue;
+          const normalized: Record<string, string> = {
+            CODE2: row.itCODE2 || '',
+            INPR: row.itINPR || '',
+            OUTPR: row.itOUTPR || '',
+            OUTA: row.itOUTA || '',
+            OUTB: row.itOUTB || '',
+            OUTC: row.itOUTC || '',
+            OUTD: row.itOUTD || '',
+            OUTE: row.itOUTE || '',
+            OUTF: row.itOUTF || '',
+            OUTG: row.itOUTG || '',
+            OUTH: row.itOUTH || '',
+            OUTI: row.itOUTI || '',
+          };
+          parsedMap.set(code2, normalized);
         }
       } catch (err: any) {
         console.error(
