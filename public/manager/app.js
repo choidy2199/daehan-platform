@@ -11342,6 +11342,80 @@ function deleteAllMwProducts() {
   toast('밀워키 전체 삭제 완료 (' + count + '건)');
 }
 
+// ======================== 일반단가표 편집 모드 ========================
+var _genEditMode = false;
+var _genCheckedIndices = new Set();
+
+function _enterGenEditMode() {
+  _genEditMode = true;
+  _genCheckedIndices.clear();
+  document.body.classList.add('gen-edit-active');
+  var cnt = document.getElementById('gen-count');
+  if (cnt) {
+    cnt.textContent = '0개 선택';
+    cnt.style.color = '#EF9F27';
+  }
+  renderGenProducts();
+}
+
+function _exitGenEditMode() {
+  _genEditMode = false;
+  _genCheckedIndices.clear();
+  document.body.classList.remove('gen-edit-active');
+  var cnt = document.getElementById('gen-count');
+  if (cnt) {
+    cnt.textContent = genProducts.length + '건';
+    cnt.style.color = '';
+  }
+  var master = document.getElementById('gen-edit-checkall');
+  if (master) { master.checked = false; master.indeterminate = false; }
+  renderGenProducts();
+}
+
+function toggleAllGenEditCheckbox(masterCb) {
+  if (masterCb.checked) {
+    document.querySelectorAll('.gen-edit-cb').forEach(function(cb) {
+      cb.checked = true;
+      _genCheckedIndices.add(parseInt(cb.value, 10));
+    });
+  } else {
+    document.querySelectorAll('.gen-edit-cb').forEach(function(cb) {
+      cb.checked = false;
+      _genCheckedIndices.delete(parseInt(cb.value, 10));
+    });
+  }
+  updateGenEditSelection();
+}
+
+function updateGenEditSelection() {
+  document.querySelectorAll('.gen-edit-cb').forEach(function(cb) {
+    var idx = parseInt(cb.value, 10);
+    if (cb.checked) _genCheckedIndices.add(idx);
+    else _genCheckedIndices.delete(idx);
+  });
+  var n = _genCheckedIndices.size;
+  var cnt = document.getElementById('gen-count');
+  if (cnt) cnt.textContent = n + '개 선택';
+  var master = document.getElementById('gen-edit-checkall');
+  var visibleAll = document.querySelectorAll('.gen-edit-cb');
+  var visibleChecked = document.querySelectorAll('.gen-edit-cb:checked');
+  if (master) {
+    if (visibleAll.length === 0) {
+      master.checked = false; master.indeterminate = false;
+    } else if (visibleChecked.length === visibleAll.length) {
+      master.checked = true; master.indeterminate = false;
+    } else if (visibleChecked.length === 0) {
+      master.checked = false; master.indeterminate = false;
+    } else {
+      master.checked = false; master.indeterminate = true;
+    }
+  }
+}
+
+function _genDeleteSelected() {
+  alert('삭제 기능은 Phase 3에서 구현됩니다 (' + _genCheckedIndices.size + '개 선택됨)');
+}
+
 function deleteAllGenProducts() {
   var count = genProducts.length;
   if (!count) { toast('삭제할 일반제품이 없습니다'); return; }
@@ -11962,9 +12036,10 @@ function renderGenProducts() {
     var photoCellInner = hasPhoto
       ? `<img class="gen-photo-thumb" src="${String(p.image_url).replace(/"/g,'&quot;')}" data-idx="${idx}" loading="lazy" alt="" />`
       : `<div class="gen-photo-empty" data-idx="${idx}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9BA3B2" stroke-width="1.5"><path d="M3 9 L7 9 L9 6 L15 6 L17 9 L21 9 L21 19 L3 19 Z"/><circle cx="12" cy="13" r="3.5"/></svg><span>업로드</span></div>`;
-    return `<tr>
-      <td>${p.code || '-'}</td>
+    var cbTd = `<td class="center gen-edit-only" style="width:36px"><input type="checkbox" class="gen-edit-cb" value="${idx}" ${_genCheckedIndices.has(idx) ? 'checked' : ''} onchange="updateGenEditSelection()"></td>`;
+    return `<tr>${cbTd}
       <td class="gen-photo-cell" data-idx="${idx}" style="text-align:center;padding:6px 4px">${photoCellInner}</td>
+      <td>${p.code || '-'}</td>
       <td>${p.manageCode || '-'}</td>
       <td>${p.category || '-'}</td>
       <td style="font-weight:500">${p.model || '-'}</td>
@@ -11981,13 +12056,18 @@ function renderGenProducts() {
       <td class="num" style="cursor:pointer" onclick="editGenImportPrice(${idx})">${p.importPrice != null ? '$' + Number(p.importPrice).toFixed(2) : '<span style="color:#DDE1EB">—</span>'}</td>
       <td><input value="${(p.memo || '').replace(/"/g,'&quot;')}" onchange="updateGenMemo(${idx},this.value)" placeholder="" style="width:100%;font-size:12px;border:1px solid #DDE1EB;border-radius:4px;padding:2px 6px;background:#fff;color:#1A1D23;text-align:left"></td>
       <td style="text-align:left;font-size:12px;cursor:pointer;white-space:nowrap;padding-left:8px" onclick="editGenInDate(${idx})">${p.inDate ? '<span style="color:#CC2222;margin-right:4px">●</span>' + p.inDate : '-'}</td>
-      <td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="editGenProduct(${idx})" style="padding:2px 8px;font-size:11px">수정</button> <button class="btn-danger btn-sm" onclick="removeGenProduct(${idx})" style="padding:2px 6px;font-size:11px">삭제</button></td>
     </tr>`;
   }).join('');
   if (!filtered.length) {
-    body.innerHTML = '<tr><td colspan="19"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
+    var emptyColspan = _genEditMode ? 19 : 18;
+    body.innerHTML = '<tr><td colspan="' + emptyColspan + '"><div class="empty-state"><p>일반제품이 없습니다</p><p style="font-size:12px;color:#9BA3B2">양식을 다운로드하여 업로드하거나, + 제품 추가를 이용하세요</p></div></td></tr>';
   }
-  document.getElementById('gen-count').textContent = `${genProducts.length}건`;
+  if (_genEditMode) {
+    document.getElementById('gen-count').textContent = _genCheckedIndices.size + '개 선택';
+  } else {
+    document.getElementById('gen-count').textContent = `${genProducts.length}건`;
+  }
+  if (typeof updateGenEditSelection === 'function' && _genEditMode) updateGenEditSelection();
   // 사진 셀 클릭 이벤트 위임 — gen-body에 1회만 등록 (idempotent)
   if (body && !body.__photoBound) {
     body.__photoBound = true;
