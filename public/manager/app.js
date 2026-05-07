@@ -3087,6 +3087,7 @@ function setCatalogFilter(mode) {
 }
 
 var _lastRenderCatalog = 0;
+var _catalogRetryDone = false;  // ← Hotfix v3 추가
 var _catalogRowNum = 0;
 function renderCatalog() {
   try {
@@ -3382,6 +3383,30 @@ function renderCatalog() {
     if (tabs[5]) tabs[5].textContent = '코드없음(' + nosku.length + ')';
   })();
   console.log('[PERF] renderCatalog 전체: ' + (performance.now() - _rc0).toFixed(0) + 'ms');
+
+  // === Hotfix v3: 자가복구 가드 + 진범 상태 로그 ===
+  var _hotfixBody = document.getElementById('catalog-body');
+  if (_hotfixBody && _hotfixBody.innerHTML.length === 0 && DB.products && DB.products.length > 0) {
+    var _hotfixState = {
+      mode: typeof catalogFilterMode !== 'undefined' ? catalogFilterMode : 'undef',
+      search: (document.getElementById('catalog-search') || {}).value || '',
+      cat: (document.getElementById('catalog-cat') || {}).value || '',
+      sub: (document.getElementById('catalog-sub') || {}).value || '',
+      dbLen: DB.products.length,
+      bodyLen: _hotfixBody.innerHTML.length
+    };
+    console.warn('[renderCatalog 빈결과]', _hotfixState);
+    var _hotfixNormalState = (_hotfixState.mode === 'all' || _hotfixState.mode === 'undef') &&
+                              !_hotfixState.search && !_hotfixState.cat && !_hotfixState.sub;
+    if (_hotfixNormalState && !_catalogRetryDone) {
+      _catalogRetryDone = true;
+      console.warn('[renderCatalog 자가복구] 250ms 후 1회 재시도');
+      setTimeout(function() {
+        _lastRenderCatalog = 0;
+        renderCatalog();
+      }, 250);
+    }
+  }
   } catch(e) { console.error('[renderCatalog] 에러:', e); }
 }
 
