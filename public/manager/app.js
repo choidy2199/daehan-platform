@@ -9121,19 +9121,45 @@ function _bindMwPricelistIoExportEvents() {
 // ======================== TEMPLATE DOWNLOAD ========================
 function downloadTemplate() {
   if (!window.XLSX) { toast('SheetJS 라이브러리 로딩 중...'); return; }
+
+  // Phase C-2: 사용자 컬럼 선택 상태 기반 양식 생성
+  const config = getMwPricelistIoConfig();
+  const selected = config.selectedFields;
+  const selectedCols = MW_PRICELIST_COLUMNS.filter(function(c) {
+    return selected.indexOf(c.id) >= 0;
+  });
+
+  // 헤더 1행 — selectedCols.label
+  const headers = selectedCols.map(function(c) { return c.label; });
+
+  // 안내 행 (2행) — 자동계산 대상에 "← 자동계산", 나머지는 빈 셀
+  const hintRow = selectedCols.map(function(c) {
+    const autoCalcIds = ['cost', 'costPriceP', 'priceA', 'priceRetail', 'priceNaver', 'priceOpen', 'priceSsg'];
+    return autoCalcIds.indexOf(c.id) >= 0 ? '← 자동계산' : '';
+  });
+
+  // 예시 데이터 2행 — mw_products의 처음 2개 제품에서 추출 (없으면 빈 양식)
+  const products = (typeof DB !== 'undefined' && DB && DB.products) || [];
+  const exampleRow1 = selectedCols.map(function(c) {
+    const v = products[0] ? products[0][c.id] : '';
+    return (v == null) ? '' : v;
+  });
+  const exampleRow2 = selectedCols.map(function(c) {
+    const v = products[1] ? products[1][c.id] : '';
+    return (v == null) ? '' : v;
+  });
+
+  const data = [headers, hintRow, exampleRow1, exampleRow2];
+
   const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = selectedCols.map(function() { return { wch: 14 }; });
+  XLSX.utils.book_append_sheet(wb, ws, '전체가격표');
 
-  const priceHeaders = [
-    [null, '코드', '관리코드', '대분류', '제품군', '제품구성', '프로모션No.', '제품번호', '모델명', '공급가', '원가', '원가P', 'A(도매)', '소매', '스토어팜', '오픈마켓', '재고', '본사가용', '입고날짜'],
-    [null, '', '', '', '', '', '', '', '', '', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '← 자동계산', '', '적정/임박/소진', '← 메모용'],
-    [null, 21815, '', '파워툴', '12V FUEL', '드릴 드라이버', 1093, 1093, 'M12 FDD2-0X / 12V FUEL 드릴 드라이버(GEN3) 베어툴', 139000, '', '', '', '', '', '', 5, '적정', '4월 중순 입고예정'],
-    [null, 21817, '', '파워툴', '12V FUEL', '해머드릴 드라이버', 1126, 18622019, 'M12 FPD2-0X / 12V FUEL 해머드릴 드라이버(GEN3) 베어툴', 153000, '', '', '', '', '', '', 3, '소진', '']
-  ];
-  const ws1 = XLSX.utils.aoa_to_sheet(priceHeaders);
-  ws1['!cols'] = [{wch:2},{wch:10},{wch:14},{wch:10},{wch:15},{wch:15},{wch:8},{wch:12},{wch:25},{wch:40},{wch:12},{wch:8},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:15}];
-  XLSX.utils.book_append_sheet(wb, ws1, '전체가격표');
+  const d = new Date();
+  const ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  XLSX.writeFile(wb, '밀워키_입력양식_' + ymd + '.xlsx');
 
-  XLSX.writeFile(wb, '밀워키_입력양식_' + new Date().toISOString().slice(0,10) + '.xlsx');
   toast('입력 양식 다운로드 완료');
 }
 
