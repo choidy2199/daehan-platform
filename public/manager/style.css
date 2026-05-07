@@ -591,11 +591,11 @@ body.window-mode .dd-context { background: #1A1D23; backdrop-filter: none; -webk
 #gen-table .gen-photo-thumb:hover { transform: scale(1.05); }
 
 /* 일반단가표 편집 모드 토글 */
-.gen-btn-normal { display: inline-flex; align-items: center; }
-body.gen-edit-active .gen-btn-normal { display: none !important; }
+.gen-btn-normal.gen-btn-normal { display: inline-flex !important; align-items: center; }
+body.gen-edit-active .gen-btn-normal.gen-btn-normal { display: none !important; }
 
-.gen-btn-edit { display: none; }
-body.gen-edit-active .gen-btn-edit { display: inline-flex !important; align-items: center; }
+.gen-btn-edit.gen-btn-edit { display: none !important; }
+body.gen-edit-active .gen-btn-edit.gen-btn-edit { display: inline-flex !important; align-items: center; }
 
 .gen-edit-only { display: none; }
 body.gen-edit-active th.gen-edit-only,
