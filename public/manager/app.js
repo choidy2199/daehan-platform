@@ -883,7 +883,7 @@ async function realtimeDownloadAndRefresh() {
 function refreshActiveTab() {
   try {
     // 어떤 메인 탭이 활성인지 확인
-    var activeTab = document.querySelector('.tab-content[style*="display: block"], .tab-content[style*="display:block"]');
+    var activeTab = document.querySelector('.tab-content.active');
     if (!activeTab) return;
     var tabId = activeTab.id;
 
@@ -15260,7 +15260,11 @@ async function init() {
   var _t = performance.now();
   populateCatalogFilters();
   renderCatalog();
-  _renderedTabs['catalog'] = true;
+  // Hotfix: 첫 렌더가 빈 결과면 마킹 안 함 → 후속 가드/refreshActiveTab이 재렌더하게
+  var _initCatalogBody = document.getElementById('catalog-body');
+  if (_initCatalogBody && _initCatalogBody.innerHTML.length > 0) {
+    _renderedTabs['catalog'] = true;
+  }
   updateStatus();
   console.log('[PERF] init — step0 즉시 렌더링: ' + (performance.now() - _t).toFixed(0) + 'ms');
 
