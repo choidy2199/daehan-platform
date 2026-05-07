@@ -30699,12 +30699,14 @@ const _tx = {
     _defaultConfig() {
       const vis = {};
       const widths = {};
+      const order = [];
       for (let i = 0; i < this.COLUMNS.length; i++) {
         const c = this.COLUMNS[i];
         vis[c.id] = c.defaultVisible;
         widths[c.id] = c.defaultWidth;
+        order.push(c.id);
       }
-      return { visibility: vis, widths: widths };
+      return { visibility: vis, widths: widths, order: order };
     },
 
     loadConfig() {
@@ -30719,6 +30721,16 @@ const _tx = {
               const c = this.COLUMNS[i];
               if (obj.visibility[c.id] === undefined) obj.visibility[c.id] = c.defaultVisible;
               if (obj.widths[c.id] === undefined) obj.widths[c.id] = c.defaultWidth;
+            }
+            // order 자동 보충 — 없으면 기본 순서, 있으면 잔재 제거 + 누락 끝에 추가
+            const validIds = this.COLUMNS.map(function(c) { return c.id; });
+            if (!Array.isArray(obj.order)) {
+              obj.order = validIds.slice();
+            } else {
+              obj.order = obj.order.filter(function(id) { return validIds.indexOf(id) >= 0; });
+              for (let i = 0; i < validIds.length; i++) {
+                if (obj.order.indexOf(validIds[i]) < 0) obj.order.push(validIds[i]);
+              }
             }
             this._config = obj;
             return;
@@ -30739,8 +30751,11 @@ const _tx = {
     _visibleColumns() {
       if (!this._config) this.loadConfig();
       const out = [];
-      for (let i = 0; i < this.COLUMNS.length; i++) {
-        const c = this.COLUMNS[i];
+      const order = Array.isArray(this._config.order) ? this._config.order : this.COLUMNS.map(function(c) { return c.id; });
+      for (let i = 0; i < order.length; i++) {
+        const id = order[i];
+        const c = this.COLUMNS.find(function(x) { return x.id === id; });
+        if (!c) continue;
         if (this._config.visibility[c.id] !== false) out.push(c);
       }
       return out;
@@ -31126,10 +31141,13 @@ const _tx = {
       html += '<button type="button" data-act="none">전체 해제</button>';
       html += '</div>';
       html += '<div class="tx-search-settings-list">';
-      for (let i = 0; i < this.COLUMNS.length; i++) {
-        const c = this.COLUMNS[i];
+      const _orderForRender = Array.isArray(this._config.order) ? this._config.order : this.COLUMNS.map(function(c) { return c.id; });
+      for (let i = 0; i < _orderForRender.length; i++) {
+        const c = this.COLUMNS.find(function(x) { return x.id === _orderForRender[i]; });
+        if (!c) continue;
         const checked = this._config.visibility[c.id] ? 'checked' : '';
-        html += '<label class="tx-search-settings-item">' +
+        html += '<label class="tx-search-settings-item tx-order-item" draggable="true" data-col-id="' + c.id + '">' +
+                '<span class="tx-drag-handle">⠿</span>' +
                 '<input type="checkbox" data-col-id="' + c.id + '" ' + checked + '>' +
                 '<span>' + c.label + '</span>' +
                 '</label>';
@@ -31150,12 +31168,13 @@ const _tx = {
           } else if (act === 'none') {
             for (let i = 0; i < self.COLUMNS.length; i++) self._config.visibility[self.COLUMNS[i].id] = false;
           } else if (act === 'reset') {
-            // 기본값 복원: visibility + widths 둘 다 초기화
+            // 기본값 복원: visibility + widths + order 모두 초기화
             for (let i = 0; i < self.COLUMNS.length; i++) {
               const c = self.COLUMNS[i];
               self._config.visibility[c.id] = c.defaultVisible;
               self._config.widths[c.id] = c.defaultWidth;
             }
+            self._config.order = self.COLUMNS.map(function(c) { return c.id; });
           }
           self.saveConfig();
           self._renderSettingsPopup();
@@ -31170,6 +31189,61 @@ const _tx = {
           self._rerender();
         });
       });
+
+      // === HTML5 드래그 정렬 (lineColumns bindDragSort 패턴 차용) ===
+      const _dragList = pop.querySelector('.tx-search-settings-list');
+      if (_dragList) {
+        let _dragged = null;
+        _dragList.addEventListener('dragstart', function(e) {
+          const item = e.target.closest('.tx-order-item');
+          if (!item) return;
+          _dragged = item;
+          item.classList.add('tx-dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        _dragList.addEventListener('dragend', function(e) {
+          const item = e.target.closest('.tx-order-item');
+          if (item) item.classList.remove('tx-dragging');
+          _dragList.querySelectorAll('.tx-drop-indicator-top, .tx-drop-indicator-bottom').forEach(function(el) {
+            el.classList.remove('tx-drop-indicator-top', 'tx-drop-indicator-bottom');
+          });
+          _dragged = null;
+        });
+        _dragList.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          const target = e.target.closest('.tx-order-item');
+          if (!target || target === _dragged) return;
+          const rect = target.getBoundingClientRect();
+          const isAfter = e.clientY > rect.top + rect.height / 2;
+          _dragList.querySelectorAll('.tx-drop-indicator-top, .tx-drop-indicator-bottom').forEach(function(el) {
+            el.classList.remove('tx-drop-indicator-top', 'tx-drop-indicator-bottom');
+          });
+          target.classList.add(isAfter ? 'tx-drop-indicator-bottom' : 'tx-drop-indicator-top');
+        });
+        _dragList.addEventListener('dragleave', function(e) {
+          const target = e.target.closest('.tx-order-item');
+          if (target) target.classList.remove('tx-drop-indicator-top', 'tx-drop-indicator-bottom');
+        });
+        _dragList.addEventListener('drop', function(e) {
+          e.preventDefault();
+          if (!_dragged) return;
+          const target = e.target.closest('.tx-order-item');
+          if (!target || target === _dragged) return;
+          const rect = target.getBoundingClientRect();
+          const isAfter = e.clientY > rect.top + rect.height / 2;
+          if (isAfter) target.parentNode.insertBefore(_dragged, target.nextSibling);
+          else target.parentNode.insertBefore(_dragged, target);
+          // DOM 순서 → _config.order 갱신
+          const newOrder = [];
+          _dragList.querySelectorAll('.tx-order-item').forEach(function(el) {
+            const id = el.getAttribute('data-col-id');
+            if (id) newOrder.push(id);
+          });
+          self._config.order = newOrder;
+          self.saveConfig();
+          self._rerender();
+        });
+      }
     },
 
     clear() {
