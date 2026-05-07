@@ -11501,7 +11501,17 @@ function updateGenEditSelection() {
 }
 
 function _genDeleteSelected() {
-  alert('삭제 기능은 Phase 3에서 구현됩니다 (' + _genCheckedIndices.size + '개 선택됨)');
+  if (_genCheckedIndices.size === 0) return;
+  var n = _genCheckedIndices.size;
+  if (!confirm('선택한 ' + n + '개의 제품을 삭제하시겠습니까?')) return;
+  // 인덱스 내림차순 정렬 (splice 시 인덱스 시프트 방지)
+  var indices = Array.from(_genCheckedIndices).sort(function(a, b) { return b - a; });
+  indices.forEach(function(idx) { genProducts.splice(idx, 1); });
+  _genCheckedIndices.clear();
+  localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+  autoSyncToSupabase('mw_gen_products');
+  renderGenProducts();
+  toast(n + '개 제품 삭제 완료');
 }
 
 // Phase 2: 인라인 편집 가능한 5개 컬럼의 데이터 타입
