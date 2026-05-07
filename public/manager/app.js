@@ -2634,6 +2634,26 @@ var _tabIdMap = {
   'setting':          { contentId: 'tab-manage',           render: 'manage' }
 };
 
+// 캐시 히트 시 DOM 살아있는지 검증할 본문 ID
+// 빈 ID('')는 검증 스킵 — 1차 범위는 사용자 보고된 3개만
+var _renderBodyIdMap = {
+  'catalog':         'catalog-body',
+  'order':           'tab-order-new',
+  'setbun':          'setbun-body-normal',
+  'general':         '',
+  'estimate':        '',
+  'sales':           '',
+  'promo':           '',
+  'manage':          '',
+  'kakao':           '',
+  'notice':          '',
+  'backorder':       '',
+  'importPoV2':      '',
+  'importInvoiceV2': '',
+  'importBatchV2':   '',
+  'tx':              ''
+};
+
 // 레거시 localStorage 값 호환 (catalog → mw-price 등)
 var _legacyTabIdMap = {
   'catalog':  'mw-price',
@@ -2709,8 +2729,22 @@ function switchTab(tab) {
 
   var renderKey = meta.render;
 
+  // DOM 검증 가드 — 캐시 마킹됐지만 본문 DOM이 비어있으면 강제 재렌더링
+  var _needRerender = !_renderedTabs[renderKey];
+  if (!_needRerender) {
+    var _bodyId = _renderBodyIdMap[renderKey];
+    if (_bodyId) {
+      var _bodyEl = document.getElementById(_bodyId);
+      if (_bodyEl && _bodyEl.innerHTML.length === 0) {
+        console.warn('[switchTab] ' + renderKey + ' 캐시 마킹됐지만 DOM 비어있음 — 강제 재렌더링');
+        _renderedTabs[renderKey] = false;
+        _needRerender = true;
+      }
+    }
+  }
+
   // 첫 방문 시만 렌더링, 이후는 CSS 전환만 (즉시)
-  if (!_renderedTabs[renderKey]) {
+  if (_needRerender) {
     // 무거운 렌더링을 requestAnimationFrame으로 지연 → UI 먼저 전환
     requestAnimationFrame(function() {
       if (renderKey === 'catalog') renderCatalog();
