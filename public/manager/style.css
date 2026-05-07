@@ -613,6 +613,16 @@ body.gen-edit-active .gen-cell-editable:hover {
   outline-offset: -1px;
 }
 
+/* 일반단가표 편집 모드 체크박스 크기 (헤더 + tbody 통일) */
+#gen-table .gen-cb-th input[type="checkbox"],
+#gen-table tbody tr td:first-child input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
 /* 발주서 사진 컬럼 (read-only) — 본 행/picker 80px, 장바구니 60px */
 .po-photo-cell { width: 80px; min-width: 80px; padding: 6px 4px !important; text-align: center; }
 .po-photo-cell-cart { width: 60px; min-width: 60px; padding: 6px 4px !important; text-align: center; }
