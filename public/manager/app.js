@@ -323,6 +323,12 @@ function _clearAuthStorage() {
     return;
   }
 
+  // 캐시 즉시 적용 — fetch 응답 기다리지 않고 window.currentUser 동기 세팅 (새로고침 깜빡임 제거)
+  var cachedRaw = localStorage.getItem('current_user');
+  if (cachedRaw) {
+    try { _applyCurrentUserUI(JSON.parse(cachedRaw)); } catch (_) {}
+  }
+
   try {
     var res = await fetch('/api/auth/check', {
       headers: { 'Authorization': 'Bearer ' + token }
