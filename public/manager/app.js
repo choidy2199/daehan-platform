@@ -29054,7 +29054,8 @@ const _tx = {
     item.code = code;
     item.manageCode = p.manageCode || '';
     item.name = p.model || p.name || '';
-    item.spec = (p.detail || p.spec) ? String(p.detail || p.spec) : null;
+    const _specRaw = (entry.source === 'general' ? p.description : p.detail) || p.spec;
+    item.spec = _specRaw ? String(_specRaw) : null;
     if (!item.qty || Number(item.qty) <= 0) item.qty = 1;
     item.productRef = entry;            // {source, data} 그대로 (그룹 ② Q2)
     item.source = entry.source;
@@ -29913,7 +29914,8 @@ const _tx = {
     const hit = this._findProduct(code);
     const name = this._productName(hit, opt.fallbackName);
     const defaultPrice = this._defaultUnitPrice(hit, this.state.docType, opt);
-    const spec = (hit && hit.data && hit.data.detail) ? String(hit.data.detail) : null;
+    const _specRaw = hit && hit.data ? ((hit.source === 'general' ? hit.data.description : hit.data.detail) || hit.data.spec) : null;
+    const spec = _specRaw ? String(_specRaw) : null;
 
     const item = {
       code: code,
