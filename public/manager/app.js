@@ -2448,7 +2448,7 @@ function _ieClose() {
   if (modal) modal.style.display = 'none';
 }
 
-// ESC 키로 현재 창 닫기
+// ESC 키로 모달/팝업만 닫기 (메뉴(창)는 닫지 않음)
 document.addEventListener('keydown', function(e) {
   if (e.key !== 'Escape') return;
   // 모달이 열려있으면 최상위 모달 1개만 닫고 뒤 화면으로 전파 차단
@@ -2465,7 +2465,6 @@ document.addEventListener('keydown', function(e) {
     var s = modals[i].style.display;
     if (s && s !== 'none') return;
   }
-  if (_activeWindow) closeWindow(_activeWindow);
 });
 
 // 윈도우 상태 localStorage 저장/복원
