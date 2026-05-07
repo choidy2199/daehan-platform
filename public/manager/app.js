@@ -30634,7 +30634,6 @@ const _tx = {
       { id: 'code',        label: '코드',     defaultWidth: 80,  defaultVisible: true  },
       { id: 'manageCode',  label: '관리코드', defaultWidth: 100, defaultVisible: false },
       { id: 'category',    label: '대분류',   defaultWidth: 100, defaultVisible: false },
-      { id: 'model',       label: '모델',     defaultWidth: 140, defaultVisible: true  },
       { id: 'spec',        label: '규격',     defaultWidth: 180, defaultVisible: false },
       { id: 'description', label: '품명',     defaultWidth: 220, defaultVisible: false },
       { id: 'stock',       label: '재고',     defaultWidth: 60,  defaultVisible: true  },
@@ -30828,9 +30827,8 @@ const _tx = {
         case 'code':        return esc(p.code || '-');
         case 'manageCode':  return esc(p.manageCode || '-');
         case 'category':    return esc(p.category || '-');
-        case 'model':       return esc(p.model || '-');
-        case 'spec':        return esc(p.detail || '-');
-        case 'description': return esc(p.description || '-');
+        case 'spec':        return esc((source === 'general' ? p.description : p.model) || '-');
+        case 'description': return esc((source === 'general' ? p.model : '밀워키') || '-');
         case 'stock': {
           let s;
           if (source === 'milwaukee' && typeof findStock === 'function') {
