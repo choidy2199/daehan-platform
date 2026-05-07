@@ -1093,12 +1093,20 @@ document.head.appendChild(s);
     </div>
     <!-- 탭 콘텐츠: 가져오기 -->
     <div id="pm-content-import" class="pm-content" style="padding:20px;max-height:calc(100vh - 220px);overflow-y:auto">
-      <div style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="background:#C62828;border:1px solid #C62828;border-radius:8px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-size:13px;font-weight:600;color:#1e3a8a;">TTI 제품연동</div>
-          <div style="font-size:11px;color:#6b7280;margin-top:2px;">크롬 확장에서 TTI 제품검색 데이터를 가져와 비교합니다</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:13px;font-weight:600;color:#FFFFFF;">TTI 제품연동</div>
+            <span style="background:#8B1A1A;color:#FFFFFF;font-size:10px;font-weight:500;padding:2px 7px;border-radius:3px;">권장</span>
+          </div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.88);margin-top:2px;">크롬 확장에서 TTI 제품검색 데이터를 가져와 비교합니다</div>
         </div>
-        <button onclick="startTtiProductScrape(); closeModal();" style="padding:8px 16px;border:none;border-radius:6px;background:#185FA5;color:white;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">TTI에서 가져오기</button>
+        <button onclick="startTtiProductScrape(); closeModal();" style="padding:8px 16px;border:none;border-radius:6px;background:#FFFFFF;color:#C62828;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">TTI에서 가져오기</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin:12px 0 14px 0;">
+        <div style="flex:1;height:1px;background:#E5E7EB;"></div>
+        <span style="font-size:11px;color:#9BA3B2;white-space:nowrap;">또는 엑셀 파일로 가져오기</span>
+        <div style="flex:1;height:1px;background:#E5E7EB;"></div>
       </div>
       <div style="margin-bottom:12px;text-align:right">
         <button onclick="downloadTemplate()" style="font-size:12px;padding:5px 12px;background:none;border:1px solid #cbd5e1;border-radius:6px;color:#64748b;cursor:pointer">📋 양식 다운로드</button>

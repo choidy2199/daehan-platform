@@ -8719,6 +8719,92 @@ function calcRebate(el) {
   }).join('');
 }
 
+// ======================== MILWAUKEE PRICELIST IO CONFIG (Phase A) ========================
+// 밀워키 단가표 입출력용 컬럼 정의 (Phase A)
+// 22개 = 고정 2 + 분류 5 + 식별 4 + 가격 8 + 재고·기타 3
+const MW_PRICELIST_COLUMNS = [
+  // 고정 (해제 불가, 매칭 키)
+  { id: 'code',         label: '코드',       group: 'fixed',   defaultOn: true,  fixed: true },
+  { id: 'manageCode',   label: '관리코드',   group: 'fixed',   defaultOn: true,  fixed: true },
+  // 분류
+  { id: 'category',     label: '대분류',     group: '분류',    defaultOn: true,  fixed: false },
+  { id: 'subcategory',  label: '중분류',     group: '분류',    defaultOn: false, fixed: false },
+  { id: 'detail',       label: '소분류',     group: '분류',    defaultOn: false, fixed: false },
+  { id: 'orderNum',     label: '프로모션No.',group: '분류',    defaultOn: false, fixed: false },
+  { id: 'discontinued', label: '단종',       group: '분류',    defaultOn: false, fixed: false },
+  // 식별
+  { id: 'ttiNum',       label: 'TTI#',       group: '식별',    defaultOn: false, fixed: false },
+  { id: 'model',        label: '모델명',     group: '식별',    defaultOn: true,  fixed: false },
+  { id: 'description',  label: '품명',       group: '식별',    defaultOn: false, fixed: false },
+  { id: 'spec',         label: '규격',       group: '식별',    defaultOn: false, fixed: false },
+  // 가격
+  { id: 'supplyPrice',  label: '공급가',     group: '가격',    defaultOn: true,  fixed: false },
+  { id: 'cost',         label: '원가',       group: '가격',    defaultOn: true,  fixed: false },
+  { id: 'costPriceP',   label: '원가P',      group: '가격',    defaultOn: false, fixed: false },
+  { id: 'priceA',       label: '도매A',      group: '가격',    defaultOn: true,  fixed: false },
+  { id: 'priceRetail',  label: '소매',       group: '가격',    defaultOn: true,  fixed: false },
+  { id: 'priceNaver',   label: '스토어팜',   group: '가격',    defaultOn: false, fixed: false },
+  { id: 'priceOpen',    label: '오픈마켓',   group: '가격',    defaultOn: false, fixed: false },
+  { id: 'priceSsg',     label: 'SSG',        group: '가격',    defaultOn: false, fixed: false },
+  // 재고·기타
+  { id: 'stock',        label: '재고',       group: '재고·기타', defaultOn: true,  fixed: false },
+  { id: 'inDate',       label: '입고날짜',   group: '재고·기타', defaultOn: false, fixed: false },
+  { id: 'memo',         label: '비고',       group: '재고·기타', defaultOn: true,  fixed: false },
+];
+
+function _mwPricelistIoConfigKey() {
+  var userId = (window.currentUser && window.currentUser.loginId) || 'default';
+  return 'mw_pricelist_io_config_' + userId;
+}
+
+function _mwPricelistIoDefaults() {
+  var defaults = MW_PRICELIST_COLUMNS.filter(function(c) { return c.defaultOn; }).map(function(c) { return c.id; });
+  return { selectedFields: defaults, extraSheets: { inventory: false, promotions: false } };
+}
+
+function _mwPricelistIoEnsureKeys(fields) {
+  var arr = Array.isArray(fields) ? fields.slice() : [];
+  if (arr.indexOf('code') < 0) arr.unshift('code');
+  if (arr.indexOf('manageCode') < 0) {
+    var codeIdx = arr.indexOf('code');
+    arr.splice(codeIdx + 1, 0, 'manageCode');
+  }
+  return arr;
+}
+
+function getMwPricelistIoConfig() {
+  var key = _mwPricelistIoConfigKey();
+  var saved = null;
+  try {
+    var raw = localStorage.getItem(key);
+    if (raw) saved = JSON.parse(raw);
+  } catch (e) {}
+  if (!saved || typeof saved !== 'object' || !Array.isArray(saved.selectedFields)) {
+    return _mwPricelistIoDefaults();
+  }
+  var extra = (saved.extraSheets && typeof saved.extraSheets === 'object') ? saved.extraSheets : { inventory: false, promotions: false };
+  return {
+    selectedFields: _mwPricelistIoEnsureKeys(saved.selectedFields),
+    extraSheets: { inventory: !!extra.inventory, promotions: !!extra.promotions }
+  };
+}
+
+function saveMwPricelistIoConfig(config) {
+  if (!config || !Array.isArray(config.selectedFields)) return;
+  var extra = (config.extraSheets && typeof config.extraSheets === 'object') ? config.extraSheets : { inventory: false, promotions: false };
+  var payload = {
+    selectedFields: _mwPricelistIoEnsureKeys(config.selectedFields),
+    extraSheets: { inventory: !!extra.inventory, promotions: !!extra.promotions }
+  };
+  try {
+    localStorage.setItem(_mwPricelistIoConfigKey(), JSON.stringify(payload));
+  } catch (e) {}
+}
+
+function resetMwPricelistIoConfig() {
+  try { localStorage.removeItem(_mwPricelistIoConfigKey()); } catch (e) {}
+}
+
 // ======================== TEMPLATE DOWNLOAD ========================
 function downloadTemplate() {
   if (!window.XLSX) { toast('SheetJS 라이브러리 로딩 중...'); return; }
