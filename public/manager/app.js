@@ -12286,6 +12286,7 @@ function openGenImportModal() {
   var radios = document.querySelectorAll('input[name="gen-import-mode"]');
   if (radios[0]) radios[0].checked = true;
   if (typeof _gpImportSwitchTab === 'function') _gpImportSwitchTab('excel');
+  if (typeof _gpExcelOnModeChange === 'function') _gpExcelOnModeChange();
 }
 
 function closeGenImportModal() {
@@ -12542,6 +12543,40 @@ async function _gpErpExecute(mode, codes) {
   }
 }
 
+function _gpExcelApplyPreset(preset) {
+  var presets = {
+    all: ['code','image_url','manageCode','category','model','description',
+          'stock','cost','priceA','priceNaver','priceOpen','priceSsg',
+          'inQty','inPrice','outQty','outPrice','palletQty','palletPrice',
+          'memo','inDate'],
+    basic: ['code','manageCode','category','model','description','memo'],
+    text_only: ['model','description'],
+    price_only: ['cost','priceA','priceNaver','priceOpen','priceSsg']
+  };
+  var target = presets[preset] || [];
+  var targetSet = {};
+  target.forEach(function(k) { targetSet[k] = true; });
+  var checkboxes = document.querySelectorAll('input[name="gen-excel-col"]');
+  checkboxes.forEach(function(cb) { cb.checked = !!targetSet[cb.value]; });
+}
+
+function _gpExcelOnModeChange() {
+  var modeEl = document.querySelector('input[name="gen-import-mode"]:checked');
+  var mode = modeEl ? modeEl.value : 'replace';
+  var colArea = document.getElementById('gen-excel-cols-area');
+  var msg = document.getElementById('gen-excel-cols-disabled-msg');
+  if (!colArea || !msg) return;
+  if (mode === 'replace') {
+    colArea.style.opacity = '0.4';
+    colArea.style.pointerEvents = 'none';
+    msg.style.display = 'block';
+  } else {
+    colArea.style.opacity = '1';
+    colArea.style.pointerEvents = 'auto';
+    msg.style.display = 'none';
+  }
+}
+
 function importGenExcel() {
   var fileInput = document.getElementById('gen-excel-file');
   var file = fileInput && fileInput.files[0];
@@ -12553,6 +12588,19 @@ function importGenExcel() {
   radios.forEach(function(r) { if (r.checked) mode = r.value; });
 
   var statusEl = document.getElementById('gen-import-status');
+
+  // 컬럼 선택 필터링 — replace 모드 외 적용 (replace는 전체 교체라 컬럼 선택 무시)
+  var selectedCols = null;
+  if (mode !== 'replace') {
+    var checkedBoxes = document.querySelectorAll('input[name="gen-excel-col"]:checked');
+    if (checkedBoxes.length === 0) {
+      statusEl.textContent = '가져올 컬럼을 1개 이상 선택하세요';
+      return;
+    }
+    selectedCols = {};
+    checkedBoxes.forEach(function(cb) { selectedCols[cb.value] = true; });
+  }
+
   statusEl.textContent = '파일 읽는 중...';
 
   var reader = new FileReader();
@@ -12599,6 +12647,16 @@ function importGenExcel() {
       if (!imported.length) {
         statusEl.textContent = '가져올 데이터가 없습니다 (1행은 헤더)';
         return;
+      }
+
+      // 컬럼 선택 필터링 — 체크 안 된 키 제거 (supplyPrice/source 시스템 필드는 보존)
+      if (selectedCols) {
+        imported.forEach(function(item) {
+          Object.keys(item).forEach(function(key) {
+            if (key === 'supplyPrice' || key === 'source') return;
+            if (!selectedCols[key]) delete item[key];
+          });
+        });
       }
 
       if (mode === 'replace') {
