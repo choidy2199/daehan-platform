@@ -6309,6 +6309,7 @@ function deleteCumulativePromo(index) {
 // ========================================
 // 커머셜 프로모션 모달 (D)
 // ========================================
+var _commFilterKey = 'all'; // 'all' | 'active' | 'sales' — 커머셜 프로모션 모달 필터 탭 상태
 function openCommercialPromoModal() {
   var promos = _getCommercialPromos();
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
@@ -6342,22 +6343,54 @@ function openCommercialPromoModal() {
   // 헤더
   h += '<div style="background:#1A1D23;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center">';
   h += '<span style="font-size:14px;font-weight:600">커머셜 프로모션 관리</span>';
-  h += '<button onclick="document.getElementById(\'commercial-promo-modal\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">✕</button></div>';
+  h += '<button onclick="_commFilterKey=\'all\';document.getElementById(\'commercial-promo-modal\').remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer">✕</button></div>';
 
   // 바디
   h += '<div style="padding:16px;overflow-y:auto;flex:1">';
   // 상단 요약 3칸
   h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">';
-  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">이번 달 총 매출</div><div style="font-size:15px;font-weight:700;color:#185FA5">' + fmtPO(totalSalesMonth) + '원</div></div>';
-  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">진행 중 프로모션</div><div style="font-size:15px;font-weight:700;color:#1D9E75">' + activeCount + '개</div></div>';
-  h += '<div style="background:#F4F6FA;border-radius:6px;padding:8px 10px"><div style="font-size:10px;color:#5A6070">등록 프로모션</div><div style="font-size:15px;font-weight:700;color:#5A6070">' + promos.length + '개</div></div>';
+  var _kSales = _commFilterKey === 'sales';
+  var _kActive = _commFilterKey === 'active';
+  var _kAll = _commFilterKey === 'all';
+  var _arrowSales = _kSales ? '<div style="position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #185FA5"></div>' : '';
+  var _arrowActive = _kActive ? '<div style="position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #1D9E75"></div>' : '';
+  var _arrowAll = _kAll ? '<div style="position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #5A6070"></div>' : '';
+  h += '<div onclick="_setCommFilterKey(\'sales\')" style="position:relative;cursor:pointer;background:' + (_kSales ? '#fff' : '#F4F6FA') + ';border-radius:6px;padding:8px 10px;border:1px solid ' + (_kSales ? '#185FA5' : 'transparent') + ';' + (_kSales ? 'box-shadow:0 0 0 1px #185FA5 inset;' : '') + '"><div style="font-size:10px;color:#5A6070">이번 달 총 매출</div><div style="font-size:15px;font-weight:700;color:#185FA5">' + fmtPO(totalSalesMonth) + '원</div>' + _arrowSales + '</div>';
+  h += '<div onclick="_setCommFilterKey(\'active\')" style="position:relative;cursor:pointer;background:' + (_kActive ? '#fff' : '#F4F6FA') + ';border-radius:6px;padding:8px 10px;border:1px solid ' + (_kActive ? '#1D9E75' : 'transparent') + ';' + (_kActive ? 'box-shadow:0 0 0 1px #1D9E75 inset;' : '') + '"><div style="font-size:10px;color:#5A6070">진행 중 프로모션</div><div style="font-size:15px;font-weight:700;color:#1D9E75">' + activeCount + '개</div>' + _arrowActive + '</div>';
+  h += '<div onclick="_setCommFilterKey(\'all\')" style="position:relative;cursor:pointer;background:' + (_kAll ? '#fff' : '#F4F6FA') + ';border-radius:6px;padding:8px 10px;border:1px solid ' + (_kAll ? '#5A6070' : 'transparent') + ';' + (_kAll ? 'box-shadow:0 0 0 1px #5A6070 inset;' : '') + '"><div style="font-size:10px;color:#5A6070">등록 프로모션</div><div style="font-size:15px;font-weight:700;color:#5A6070">' + promos.length + '개</div>' + _arrowAll + '</div>';
   h += '</div>';
 
   // 아코디언 리스트
   h += '<div id="comm-promo-list">';
+  var _today = new Date(); _today.setHours(0,0,0,0);
+  var _mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var _mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  var _filteredCount = 0;
   promos.forEach(function(promo, idx) {
-    h += _buildCommPromoAccordion(promo, idx, history);
+    var _show = true;
+    if (_commFilterKey === 'active') {
+      var _s1 = new Date(promo.startDate); _s1.setHours(0,0,0,0);
+      var _e1 = new Date(promo.endDate); _e1.setHours(23,59,59,999);
+      _show = _today >= _s1 && _today <= _e1;
+    } else if (_commFilterKey === 'sales') {
+      var _s2 = new Date(promo.startDate); _s2.setHours(0,0,0,0);
+      var _e2 = new Date(promo.endDate); _e2.setHours(23,59,59,999);
+      var _overlap = _s2 <= _mEnd && _e2 >= _mStart;
+      var _pSales = 0;
+      history.forEach(function(item) {
+        var d = new Date(item.date);
+        if (d >= _s2 && d <= _e2) _pSales += (item.amount || 0);
+      });
+      _show = _overlap && _pSales > 0;
+    }
+    if (_show) {
+      h += _buildCommPromoAccordion(promo, idx, history);
+      _filteredCount++;
+    }
   });
+  if (_filteredCount === 0) {
+    h += '<div style="padding:24px;text-align:center;font-size:12px;color:#9BA3B2">해당 조건의 프로모션이 없습니다</div>';
+  }
   h += '</div>';
 
   // 새 프로모션 추가 버튼
@@ -6367,7 +6400,7 @@ function openCommercialPromoModal() {
 
   // 하단 버튼
   h += '<div style="padding:12px 16px;border-top:1px solid #EAECF2;display:flex;justify-content:flex-end;gap:8px">';
-  h += '<button onclick="document.getElementById(\'commercial-promo-modal\').remove()" style="padding:6px 16px;border:1px solid #DDE1EB;border-radius:4px;background:#fff;color:#5A6070;font-size:12px;cursor:pointer">취소</button>';
+  h += '<button onclick="_commFilterKey=\'all\';document.getElementById(\'commercial-promo-modal\').remove()" style="padding:6px 16px;border:1px solid #DDE1EB;border-radius:4px;background:#fff;color:#5A6070;font-size:12px;cursor:pointer">취소</button>';
   h += '<button onclick="_saveCommercialPromoModal()" style="padding:6px 16px;border:none;border-radius:4px;background:#185FA5;color:#fff;font-size:12px;cursor:pointer;font-weight:600">저장</button>';
   h += '</div>';
 
@@ -6466,7 +6499,7 @@ function _buildCommPromoAccordion(promo, idx, history) {
   h += '</div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
   h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">적용조건</label><input type="text" class="comm-input" data-field="condition" data-idx="' + idx + '" value="' + (promo.condition || '') + '" placeholder="예: 디스플레이 제외" style="width:100%;padding:6px 10px;border:1px solid #DDE1EB;border-radius:4px;font-size:14px"></div>';
-  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">목표금액</label><input type="text" class="comm-input comm-money" id="comm-target-' + idx + '" data-field="targetAmount" data-idx="' + idx + '" value="' + fmtPO(promo.targetAmount || 0) + '" style="width:100%;padding:8px 12px;border:1px solid #DDE1EB;border-radius:4px;font-size:16px;font-weight:600;text-align:right"></div>';
+  h += '<div><label style="font-size:10px;color:#5A6070;display:block;margin-bottom:2px">목표금액</label><input type="text" class="comm-input comm-money" id="comm-target-' + idx + '" data-field="targetAmount" data-idx="' + idx + '" value="' + ((promo.targetAmount || 0) > 0 ? fmtPO(promo.targetAmount) : '') + '" placeholder="0" style="width:100%;padding:8px 12px;border:1px solid #DDE1EB;border-radius:4px;font-size:16px;font-weight:600;text-align:right"></div>';
   h += '</div>';
 
   // 현재 상태 박스
@@ -6479,7 +6512,7 @@ function _buildCommPromoAccordion(promo, idx, history) {
 
   // 구간별 혜택 테이블
   h += '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:6px">';
-  h += '<thead><tr style="background:#F4F6FA"><th style="padding:5px 4px;text-align:center;font-size:12px;border:1px solid #EAECF2;width:24px"></th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2">No</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (이상)</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (미만)</th><th style="padding:5px 6px;text-align:left;font-size:12px;border:1px solid #EAECF2">지급품목</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">할인율(%)</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2;min-width:50px">상태</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2"></th></tr></thead>';
+  h += '<thead><tr style="background:#F4F6FA"><th style="padding:5px 4px;text-align:center;font-size:12px;border:1px solid #EAECF2;width:24px"></th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2">No</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (미만)</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">매출기준 (이상)</th><th style="padding:5px 6px;text-align:left;font-size:12px;border:1px solid #EAECF2">지급품목</th><th style="padding:5px 6px;text-align:right;font-size:12px;border:1px solid #EAECF2">할인율(%)</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2;min-width:50px">상태</th><th style="padding:5px 6px;text-align:center;font-size:12px;border:1px solid #EAECF2"></th></tr></thead>';
   h += '<tbody id="comm-tiers-' + idx + '">';
   (promo.tiers || []).forEach(function(tier, ti) {
     var tierStatus = '';
@@ -6492,8 +6525,8 @@ function _buildCommPromoAccordion(promo, idx, history) {
     h += '<tr style="' + _targetBg + '">';
     h += '<td style="padding:4px 4px;text-align:center;border:1px solid #EAECF2"><span class="comm-target-icon" data-amount="' + (tier.minAmount || 0) + '" data-idx="' + idx + '" style="cursor:pointer;font-size:14px;opacity:' + (_isTarget ? '1' : '0.3') + ';color:' + (_isTarget ? '#185FA5' : '#9BA3B2') + '" title="이 금액을 목표금액으로 설정">🎯</span></td>';
     h += '<td style="padding:4px 6px;text-align:center;border:1px solid #EAECF2">' + (ti + 1) + '</td>';
-    h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="minAmount" value="' + fmtPO(tier.minAmount || 0) + '" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0;background:transparent"></td>';
     h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="maxAmount" value="' + (tier.maxAmount !== null ? fmtPO(tier.maxAmount) : '') + '" placeholder="무제한" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0"></td>';
+    h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input comm-money" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="minAmount" value="' + ((tier.minAmount || 0) > 0 ? fmtPO(tier.minAmount) : '') + '" placeholder="0" style="width:100%;border:none;font-size:13px;text-align:right;padding:2px 0;background:transparent"></td>';
     h += '<td style="padding:4px 6px;border:1px solid #EAECF2"><input type="text" class="comm-tier-input" data-promo="' + idx + '" data-tier="' + ti + '" data-tfield="benefit" value="' + (tier.benefit || '') + '" style="width:100%;border:none;font-size:13px;padding:2px 0"></td>';
     var _dtBadge = '';
     if (tier.rate !== null && tier.rate !== undefined) {
@@ -6527,6 +6560,11 @@ function _toggleCommAccordion(idx) {
   }
 }
 
+function _setCommFilterKey(k) {
+  _commFilterKey = k;
+  document.getElementById('commercial-promo-modal').remove();
+  openCommercialPromoModal();
+}
 function _addNewCommercialPromo() {
   var promos = _getCommercialPromos();
   var now = new Date();
