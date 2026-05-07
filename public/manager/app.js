@@ -11400,7 +11400,7 @@ function _enterGenEditMode() {
   if (headRow && !headRow.querySelector('.gen-cb-th')) {
     var cbTh = document.createElement('th');
     cbTh.className = 'center gen-cb-th';
-    cbTh.style.width = '36px';
+    cbTh.style.width = '24px';
     cbTh.innerHTML = '<input type="checkbox" id="gen-edit-checkall" onchange="toggleAllGenEditCheckbox(this)">';
     headRow.insertBefore(cbTh, headRow.firstChild);
   }

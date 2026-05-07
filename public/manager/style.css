@@ -623,6 +623,15 @@ body.gen-edit-active .gen-cell-editable:hover {
   vertical-align: middle;
 }
 
+/* 일반단가표 체크박스 컬럼 너비 축소 (헤더 + tbody 통일) */
+#gen-table .gen-cb-th,
+body.gen-edit-active #gen-table tbody tr td:first-child {
+  width: 24px !important;
+  min-width: 24px;
+  padding: 6px 4px !important;
+  text-align: center;
+}
+
 /* 발주서 사진 컬럼 (read-only) — 본 행/picker 80px, 장바구니 60px */
 .po-photo-cell { width: 80px; min-width: 80px; padding: 6px 4px !important; text-align: center; }
 .po-photo-cell-cart { width: 60px; min-width: 60px; padding: 6px 4px !important; text-align: center; }
