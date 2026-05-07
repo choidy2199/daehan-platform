@@ -30276,6 +30276,44 @@ const _tx = {
       case 'open':
         return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.priceOpen) || 0) + '</td>';
 
+      case 'code':
+        return '<td' + dataAttr + styleAttr + '>' + escape(item.code || '-') + '</td>';
+
+      case 'category':
+        return '<td' + dataAttr + styleAttr + '>' + escape((item.productRef && item.productRef.data && item.productRef.data.category) || '-') + '</td>';
+
+      case 'ssg':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.priceSsg) || 0) + '</td>';
+
+      case 'inQty':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.inQty) || 0) + '</td>';
+
+      case 'inPrice':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.inPrice) || 0) + '</td>';
+
+      case 'outQty':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.outQty) || 0) + '</td>';
+
+      case 'outPrice':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.outPrice) || 0) + '</td>';
+
+      case 'palletQty':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.palletQty) || 0) + '</td>';
+
+      case 'palletPrice':
+        return '<td' + dataAttr + styleAttr + '>' + fmt((item.productRef && item.productRef.data && item.productRef.data.palletPrice) || 0) + '</td>';
+
+      case 'inDate':
+        return '<td' + dataAttr + styleAttr + '>' + escape((item.productRef && item.productRef.data && item.productRef.data.inDate) || '-') + '</td>';
+
+      case 'importPrice': {
+        const _ip = item.productRef && item.productRef.data ? item.productRef.data.importPrice : null;
+        return '<td' + dataAttr + styleAttr + '>' + (_ip != null ? '$' + Number(_ip).toFixed(2) : '-') + '</td>';
+      }
+
+      case 'productMemo':
+        return '<td' + dataAttr + styleAttr + '>' + escape((item.productRef && item.productRef.data && item.productRef.data.memo) || '-') + '</td>';
+
       default:
         return '<td' + dataAttr + styleAttr + '>-</td>';
     }
@@ -30913,7 +30951,7 @@ const _tx = {
       { id: 'memo',         label: '적요',     width: 'flex', align: 'left',  resizable: true, flex: 1 }
     ],
 
-    // 선택 컬럼 (8개, ⚙ 모달에서 추가/숨김)
+    // 선택 컬럼 (20개, ⚙ 모달에서 추가/숨김)
     COLUMNS_OPTIONAL: [
       { id: 'spec',     label: '규격',     width: 100, align: 'left',   resizable: true },
       { id: 'remark',   label: '비고',     width: 100, align: 'left',   resizable: true },
@@ -30922,7 +30960,19 @@ const _tx = {
       { id: 'cost',     label: '원가',     width: 80,  align: 'right',  resizable: true },
       { id: 'priceA',   label: '도매A',    width: 80,  align: 'right',  resizable: true },
       { id: 'naver',    label: '스토어팜', width: 80,  align: 'right',  resizable: true },
-      { id: 'open',     label: '오픈마켓', width: 80,  align: 'right',  resizable: true }
+      { id: 'open',     label: '오픈마켓', width: 80,  align: 'right',  resizable: true },
+      { id: 'code',         label: '코드',        width: 90,  align: 'center', resizable: true },
+      { id: 'category',     label: '대분류',      width: 100, align: 'left',   resizable: true },
+      { id: 'ssg',          label: 'SSG',         width: 80,  align: 'right',  resizable: true },
+      { id: 'inQty',        label: 'IN수량',      width: 60,  align: 'center', resizable: true },
+      { id: 'inPrice',      label: 'IN단가',      width: 80,  align: 'right',  resizable: true },
+      { id: 'outQty',       label: 'OUT수량',     width: 60,  align: 'center', resizable: true },
+      { id: 'outPrice',     label: 'OUT단가',     width: 80,  align: 'right',  resizable: true },
+      { id: 'palletQty',    label: '파레트수량',  width: 70,  align: 'center', resizable: true },
+      { id: 'palletPrice',  label: '파레트단가',  width: 80,  align: 'right',  resizable: true },
+      { id: 'inDate',       label: '입고날짜',    width: 100, align: 'center', resizable: true },
+      { id: 'importPrice',  label: '수입가(USD)', width: 90,  align: 'right',  resizable: true },
+      { id: 'productMemo',  label: '메모',        width: 120, align: 'left',   resizable: true }
     ],
 
     _config: null,    // { visibility: {id: bool} }
