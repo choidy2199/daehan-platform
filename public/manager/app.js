@@ -15190,6 +15190,26 @@ function clearSearchInputs() {
 async function init() {
   var _initStart = performance.now();
 
+  // === 임시 디버깅 — catalog-body 비우는 진범 추적 (진범 캡처 후 제거 예정) ===
+  (function _debugCatalogBody() {
+    var bodyEl = null;
+    function watch() {
+      bodyEl = document.getElementById('catalog-body');
+      if (!bodyEl) { setTimeout(watch, 100); return; }
+      var prev = bodyEl.innerHTML.length;
+      new MutationObserver(function() {
+        var cur = bodyEl.innerHTML.length;
+        if (prev > 0 && cur === 0) {
+          console.warn('[DEBUG-WIPE] catalog-body 비워짐:', { prev: prev, cur: cur });
+          console.trace('[DEBUG-WIPE] 호출 스택');
+        }
+        prev = cur;
+      }).observe(bodyEl, { childList: true, subtree: false });
+      console.log('[DEBUG-WIPE] catalog-body MutationObserver 시작');
+    }
+    watch();
+  })();
+
   // 1회성 마이그레이션: SDS 드릴비트 대분류 수정
   (function migrateDrillbitCategory() {
     var flag = localStorage.getItem('_migration_drillbit_v1');
