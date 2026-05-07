@@ -8861,6 +8861,187 @@ function _bindMwPricelistIoColumnEvents() {
   }
 }
 
+// Phase C-1: 내보내기 탭 컬럼 선택 UI 렌더
+function _renderMwPricelistIoExportColumnSelector() {
+  const groupsEl = document.getElementById('mw-pl-io-export-col-groups');
+  if (!groupsEl) return;
+
+  const config = getMwPricelistIoConfig();
+  const selected = new Set(config.selectedFields);
+
+  const groups = {};
+  MW_PRICELIST_COLUMNS.forEach(function(col) {
+    if (col.fixed) return;
+    if (!groups[col.group]) groups[col.group] = [];
+    groups[col.group].push(col);
+  });
+
+  const groupOrder = ['분류', '식별', '가격', '재고·기타'];
+  let html = '';
+  groupOrder.forEach(function(groupName, idx) {
+    const cols = groups[groupName] || [];
+    if (cols.length === 0) return;
+    const borderTop = idx === 0 ? '' : 'border-top:1px dashed #e5e7eb; padding-top:8px;';
+    html += '<div style="margin-bottom:8px;' + borderTop + '">';
+    html += '<div style="font-size:11px; color:#6b7280; margin-bottom:5px; font-weight:600;">' + groupName + '</div>';
+    html += '<div style="display:flex; flex-wrap:wrap; gap:6px 18px;">';
+    cols.forEach(function(col) {
+      const checked = selected.has(col.id) ? 'checked' : '';
+      html += '<label style="display:flex; align-items:center; gap:6px; font-size:13px;">';
+      html += '<input type="checkbox" data-mw-pl-export-col="' + col.id + '" ' + checked + ' />';
+      html += '<span>' + col.label + '</span>';
+      html += '</label>';
+    });
+    html += '</div></div>';
+  });
+
+  groupsEl.innerHTML = html;
+  _updateMwPricelistIoExportColCount();
+  _renderMwPricelistIoExportPreview();
+  _updateMwPricelistIoExportSummary();
+  _restoreMwPricelistIoExportSheets();
+  _updateMwPricelistIoExportFilename();
+}
+
+function _updateMwPricelistIoExportColCount() {
+  const countEl = document.getElementById('mw-pl-io-export-col-count');
+  if (!countEl) return;
+  const checked = document.querySelectorAll('#mw-pl-io-export-col-groups input[type="checkbox"]:checked').length;
+  countEl.textContent = '(' + (checked + 2) + ' / 22)';
+}
+
+function _renderMwPricelistIoExportPreview() {
+  const previewEl = document.getElementById('mw-pl-io-export-preview');
+  if (!previewEl) return;
+
+  const config = getMwPricelistIoConfig();
+  const selected = new Set(config.selectedFields);
+  const selectedCols = MW_PRICELIST_COLUMNS.filter(function(c) { return selected.has(c.id); });
+
+  const products = (typeof DB !== 'undefined' && DB && DB.products) || [];
+  const sample = products[0] || {};
+
+  let headerHtml = '<div style="display:flex; background:#f3f4f6; font-size:11px; font-weight:600;">';
+  let rowHtml = '<div style="display:flex; font-size:11px; color:#6b7280; font-family:monospace;">';
+  selectedCols.forEach(function(col, idx) {
+    const isLast = idx === selectedCols.length - 1;
+    const borderRight = isLast ? '' : 'border-right:1px solid #e5e7eb;';
+    headerHtml += '<div style="padding:6px 8px;' + borderRight + ' flex-shrink:0; min-width:60px;">' + col.label + '</div>';
+    var v = sample[col.id];
+    if (v == null) v = '';
+    rowHtml += '<div style="padding:6px 8px;' + borderRight + ' flex-shrink:0; min-width:60px;">' + String(v).substring(0, 12) + '</div>';
+  });
+  headerHtml += '</div>';
+  rowHtml += '</div>';
+  previewEl.innerHTML = headerHtml + rowHtml;
+}
+
+function _updateMwPricelistIoExportSummary() {
+  const summaryEl = document.getElementById('mw-pl-io-export-summary');
+  const countEl = document.getElementById('mw-pl-io-export-count');
+  const config = getMwPricelistIoConfig();
+  const colCount = config.selectedFields.length;
+  const products = (typeof DB !== 'undefined' && DB && DB.products) || [];
+  let sheets = 1;
+  if (config.extraSheets && config.extraSheets.inventory) sheets++;
+  if (config.extraSheets && config.extraSheets.promotions) sheets++;
+  if (summaryEl) summaryEl.textContent = '시트 ' + sheets + '개 · ' + colCount + ' 컬럼 · ' + products.length + ' 행';
+  if (countEl) countEl.textContent = String(products.length);
+}
+
+function _restoreMwPricelistIoExportSheets() {
+  const config = getMwPricelistIoConfig();
+  const invEl = document.getElementById('mw-pl-io-export-sheet-inventory');
+  const proEl = document.getElementById('mw-pl-io-export-sheet-promotions');
+  if (invEl) invEl.checked = !!(config.extraSheets && config.extraSheets.inventory);
+  if (proEl) proEl.checked = !!(config.extraSheets && config.extraSheets.promotions);
+}
+
+function _updateMwPricelistIoExportFilename() {
+  const fnEl = document.getElementById('mw-pl-io-export-filename');
+  if (!fnEl) return;
+  const d = new Date();
+  const ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  fnEl.textContent = '밀워키_단가표_' + ymd + '.xlsx';
+}
+
+let _mwPricelistIoExportSaveTimer = null;
+function _scheduleMwPricelistIoExportSave() {
+  if (_mwPricelistIoExportSaveTimer) clearTimeout(_mwPricelistIoExportSaveTimer);
+  _mwPricelistIoExportSaveTimer = setTimeout(function() {
+    const checked = Array.from(
+      document.querySelectorAll('#mw-pl-io-export-col-groups input[type="checkbox"]:checked')
+    ).map(function(cb) { return cb.getAttribute('data-mw-pl-export-col'); });
+    const config = getMwPricelistIoConfig();
+    config.selectedFields = checked;
+    const invEl = document.getElementById('mw-pl-io-export-sheet-inventory');
+    const proEl = document.getElementById('mw-pl-io-export-sheet-promotions');
+    config.extraSheets = {
+      inventory: !!(invEl && invEl.checked),
+      promotions: !!(proEl && proEl.checked),
+    };
+    saveMwPricelistIoConfig(config);
+  }, 300);
+}
+
+function _bindMwPricelistIoExportEvents() {
+  const groupsEl = document.getElementById('mw-pl-io-export-col-groups');
+  if (groupsEl && groupsEl.dataset.mwPlExportBound !== '1') {
+    groupsEl.dataset.mwPlExportBound = '1';
+    groupsEl.addEventListener('change', function(e) {
+      if (e.target.matches('input[type="checkbox"][data-mw-pl-export-col]')) {
+        _updateMwPricelistIoExportColCount();
+        _renderMwPricelistIoExportPreview();
+        _updateMwPricelistIoExportSummary();
+        _scheduleMwPricelistIoExportSave();
+      }
+    });
+  }
+
+  const allBtn = document.getElementById('mw-pl-io-export-col-all');
+  if (allBtn && allBtn.dataset.mwPlExportBound !== '1') {
+    allBtn.dataset.mwPlExportBound = '1';
+    allBtn.addEventListener('click', function() {
+      if (!groupsEl) return;
+      groupsEl.querySelectorAll('input[type="checkbox"][data-mw-pl-export-col]').forEach(function(cb) { cb.checked = true; });
+      _updateMwPricelistIoExportColCount();
+      _renderMwPricelistIoExportPreview();
+      _updateMwPricelistIoExportSummary();
+      _scheduleMwPricelistIoExportSave();
+    });
+  }
+
+  const noneBtn = document.getElementById('mw-pl-io-export-col-none');
+  if (noneBtn && noneBtn.dataset.mwPlExportBound !== '1') {
+    noneBtn.dataset.mwPlExportBound = '1';
+    noneBtn.addEventListener('click', function() {
+      if (!groupsEl) return;
+      groupsEl.querySelectorAll('input[type="checkbox"][data-mw-pl-export-col]').forEach(function(cb) { cb.checked = false; });
+      _updateMwPricelistIoExportColCount();
+      _renderMwPricelistIoExportPreview();
+      _updateMwPricelistIoExportSummary();
+      _scheduleMwPricelistIoExportSave();
+    });
+  }
+
+  ['mw-pl-io-export-sheet-inventory', 'mw-pl-io-export-sheet-promotions'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el && el.dataset.mwPlExportBound !== '1') {
+      el.dataset.mwPlExportBound = '1';
+      el.addEventListener('change', function() {
+        _updateMwPricelistIoExportSummary();
+        _scheduleMwPricelistIoExportSave();
+      });
+    }
+  });
+
+  const exportBtn = document.getElementById('mw-pl-io-export-btn');
+  if (exportBtn && exportBtn.dataset.mwPlExportBound !== '1') {
+    exportBtn.dataset.mwPlExportBound = '1';
+    exportBtn.addEventListener('click', function() { exportAll(); });
+  }
+}
+
 // ======================== TEMPLATE DOWNLOAD ========================
 function downloadTemplate() {
   if (!window.XLSX) { toast('SheetJS 라이브러리 로딩 중...'); return; }
@@ -8898,6 +9079,19 @@ function showProductManageModal() {
   // Phase B-1: 컬럼 선택 UI 렌더 + 이벤트 바인딩
   _renderMwPricelistIoColumnSelector();
   _bindMwPricelistIoColumnEvents();
+  // Phase C-1: 내보내기 탭 컬럼 선택 UI 렌더 + 이벤트 바인딩
+  _renderMwPricelistIoExportColumnSelector();
+  _bindMwPricelistIoExportEvents();
+  // Phase C-1: 탭 전환 시 해당 탭 재렌더 (1회만 바인딩)
+  document.querySelectorAll('#import-modal .pm-tab').forEach(function(btn) {
+    if (btn.dataset.mwPlTabBound === '1') return;
+    btn.dataset.mwPlTabBound = '1';
+    btn.addEventListener('click', function() {
+      var tab = btn.getAttribute('data-pm-tab');
+      if (tab === 'import') _renderMwPricelistIoColumnSelector();
+      else if (tab === 'export') _renderMwPricelistIoExportColumnSelector();
+    });
+  });
 }
 
 // 탭 전환
@@ -11368,31 +11562,44 @@ function exportAll() {
   if (!window.XLSX) { toast('SheetJS 라이브러리 로딩 중...'); return; }
   const wb = XLSX.utils.book_new();
 
-  // Products
+  // Phase C-1: selectedFields 기반 컬럼 필터링 + extraSheets 옵션
+  const config = getMwPricelistIoConfig();
+  const selected = new Set(config.selectedFields);
+  const selectedCols = MW_PRICELIST_COLUMNS.filter(function(c) { return selected.has(c.id); });
+
+  // 전체가격표 (항상 출력) — 헤더 1행 + 빈 1행 + 데이터 N행 (parseImportWorkbook 호환)
   if (DB.products.length) {
-    const pData = [['단종', '코드', '관리코드', '대분류', '제품군', '제품구성', '프로모션No.', '제품번호', '모델명', '공급가', '원가', 'A(도매)', '소매', '스토어팜', '오픈마켓', 'SSG']];
-    DB.products.forEach(p => pData.push([p.discontinued, p.code, p.manageCode || '', p.category, p.subcategory, p.detail, p.orderNum, p.ttiNum, p.model, p.supplyPrice, p.cost, p.priceA, p.priceRetail, p.priceNaver, p.priceOpen, p.priceSsg || 0]));
+    const headers = selectedCols.map(function(c) { return c.label; });
+    const blankRow = selectedCols.map(function() { return ''; });
+    const pData = [headers, blankRow];
+    DB.products.forEach(function(p) {
+      const row = selectedCols.map(function(c) {
+        var v = p[c.id];
+        return (v == null) ? '' : v;
+      });
+      pData.push(row);
+    });
     const ws = XLSX.utils.aoa_to_sheet(pData);
-    ws['!cols'] = [{ wch: 6 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 8 }, { wch: 12 }, { wch: 25 }, { wch: 40 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+    ws['!cols'] = selectedCols.map(function() { return { wch: 14 }; });
     XLSX.utils.book_append_sheet(wb, ws, '전체가격표');
   }
 
-  // Inventory
-  if (DB.inventory.length) {
+  // 재고 시트 (옵션) — 기존 헤더/패턴 유지
+  if (config.extraSheets && config.extraSheets.inventory && DB.inventory.length) {
     const iData = [['코드', '재고', '비고1', '비고2']];
     DB.inventory.forEach(i => iData.push([i.code, i.stock, i.note1, i.note2]));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(iData), '재고');
   }
 
-  // Promotions
-  if (DB.promotions.length) {
+  // 프로모션 시트 (옵션) — 기존 헤더/패턴 유지
+  if (config.extraSheets && config.extraSheets.promotions && DB.promotions.length) {
     const prData = [['코드', '구분', '프로모션명', '모델명', '순번', '대리점가격', '프로모션금액', '할인율', '기간']];
     DB.promotions.forEach(p => prData.push([p.code, p.promoCode, p.promoName, p.model, p.orderNum, p.dealerPrice, p.promoPrice, p.discountRate, p.period]));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prData), '프로모션');
   }
 
-  XLSX.writeFile(wb, `밀워키_전체데이터_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  toast('전체 데이터 엑셀 파일 다운로드 완료');
+  XLSX.writeFile(wb, `밀워키_단가표_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  toast('엑셀 파일 다운로드 완료');
 }
 
 function exportGenProducts() {
