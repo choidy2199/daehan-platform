@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     // public.users에서 추가 정보 조회 (auth_id 매핑, is_active 체크)
     const { data: pubUser, error: pubErr } = await supabase
       .from('users')
-      .select('id, name, login_id, role, is_active')
+      .select('id, name, login_id, role, is_active, customer_id')
       .eq('auth_id', authData.user.id)
       .single();
     if (pubErr || !pubUser) {
@@ -79,6 +79,7 @@ export async function POST(request: Request) {
         name: pubUser.name,
         loginId: pubUser.login_id,
         role: pubUser.role,
+        customerId: pubUser.customer_id ?? null,
       },
     });
   } catch (e: any) {

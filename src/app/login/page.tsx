@@ -30,7 +30,7 @@ export default function LoginPage() {
         .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
         .then(({ ok, d }) => {
           if (ok && d.valid) {
-            window.location.href = "/";
+            window.location.href = d.user?.role === "customer" ? "/order" : "/";
           } else {
             // 토큰 무효 → 정리
             localStorage.removeItem("session_token");
@@ -96,7 +96,7 @@ export default function LoginPage() {
       // 사용자 정보 저장
       localStorage.setItem("current_user", JSON.stringify(data.user));
 
-      window.location.href = "/";
+      window.location.href = data.user?.role === "customer" ? "/order" : "/";
     } catch (err: any) {
       setError("서버 연결 오류");
       setLoading(false);

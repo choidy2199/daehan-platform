@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
     const { data: pubUser } = await supabase
       .from('users')
-      .select('id, name, login_id, role, is_active')
+      .select('id, name, login_id, role, is_active, customer_id')
       .eq('auth_id', data.user.id)
       .single();
     if (!pubUser || !pubUser.is_active) {
@@ -42,6 +42,7 @@ export async function GET(request: Request) {
         name: pubUser.name,
         loginId: pubUser.login_id,
         role: pubUser.role,
+        customerId: pubUser.customer_id ?? null,
       },
     });
   } catch {
