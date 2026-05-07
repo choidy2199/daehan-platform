@@ -3191,6 +3191,7 @@ function renderCatalog() {
       <td style="font-weight:500">${p.code}</td>
       <td>${p.manageCode || '-'}</td>
       <td><span style="background:${cc.bg};color:${cc.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${p.category || '-'}</span></td>
+      <td class="center">밀워키</td>
       <td>${p.subcategory || '-'}</td>
       <td>${p.detail || '-'}</td>
       <td class="center">${p.orderNum || '-'}</td>
