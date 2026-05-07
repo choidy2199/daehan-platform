@@ -11404,6 +11404,13 @@ function _enterGenEditMode() {
     cbTh.innerHTML = '<input type="checkbox" id="gen-edit-checkall" onchange="toggleAllGenEditCheckbox(this)">';
     headRow.insertBefore(cbTh, headRow.firstChild);
   }
+  // 옵션 D: colgroup <col> 동기화 — saved.length mismatch로 applyCols가 호출되지 않을 때 첫 col 직접 삽입
+  var cgEnter = document.querySelector('#gen-table colgroup.resize-cg');
+  if (cgEnter) {
+    var newCol = document.createElement('col');
+    newCol.style.width = '24px';
+    cgEnter.insertBefore(newCol, cgEnter.firstChild);
+  }
   renderGenProducts();
 }
 
@@ -11420,6 +11427,11 @@ function _exitGenEditMode() {
   if (master) { master.checked = false; master.indeterminate = false; }
   var cbTh = document.querySelector('#gen-table thead tr .gen-cb-th');
   if (cbTh) cbTh.parentNode.removeChild(cbTh);
+  // 옵션 D: colgroup <col> 동기화 — saved.length mismatch로 applyCols가 호출되지 않을 때 첫 col 직접 제거
+  var cgExit = document.querySelector('#gen-table colgroup.resize-cg');
+  if (cgExit && cgExit.firstChild) {
+    cgExit.removeChild(cgExit.firstChild);
+  }
   renderGenProducts();
 }
 
