@@ -302,12 +302,6 @@ function _applyCurrentUserUI(user) {
   if (nameEl) nameEl.textContent = (user.name || '') + '님';
   var ctUser = document.getElementById('ct-username');
   if (ctUser) ctUser.textContent = user.loginId || user.name || 'user';
-  // [D-1 fix] currentUser 확정 후 _tx.lineColumns 재로드 (init이 currentUser 미설정 시점에 'default' 키 로드한 케이스 보정)
-  if (typeof _tx !== 'undefined' && _tx._initialized && _tx.lineColumns && typeof _tx.lineColumns.loadConfig === 'function') {
-    _tx.lineColumns.loadConfig();
-    if (typeof _tx.lineColumns._renderThead === 'function') _tx.lineColumns._renderThead();
-    if (typeof _tx.renderItemsTable === 'function') _tx.renderItemsTable();
-  }
 }
 function _clearAuthStorage() {
   localStorage.removeItem('session_token');
@@ -28732,6 +28726,8 @@ const _tx = {
   // ---- 초기화 (_tabIdMap의 render: 'tx'로 호출됨) ----
   init() {
     if (this._initialized) return;
+    // currentUser 도착 polling — 도착 전엔 _initialized=false 유지
+    if (!window.currentUser) { setTimeout(() => this.init(), 50); return; }
     this._initialized = true;
 
     // 초기 상태 세팅
