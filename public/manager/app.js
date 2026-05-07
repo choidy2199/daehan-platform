@@ -3147,6 +3147,8 @@ function renderCatalog() {
     filtered = filtered.filter(function(p) { return !p.manageCode || p.manageCode.trim() === '' || p.manageCode === '-'; });
   } else if (catalogFilterMode === 'nosku') {
     filtered = filtered.filter(function(p) { return !p.code || p.code.trim() === '' || p.code === '-'; });
+  } else if (catalogFilterMode === 'nocategory') {
+    filtered = filtered.filter(function(p) { return !p.category || p.category.trim() === '' || p.category === '-'; });
   }
 
   // Sort: active items first (by subcategory), discontinued at bottom
@@ -3207,7 +3209,7 @@ function renderCatalog() {
       <td class="mw-no-col center" style="width:40px;min-width:40px;font-size:11px;color:#9BA3B2" data-idx="${idx}">${_catalogRowNum}</td>
       <td style="font-weight:500">${p.code}</td>
       <td>${p.manageCode || '-'}</td>
-      <td><span style="background:${cc.bg};color:${cc.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${p.category || '-'}</span></td>
+      <td class="mw-cat-cell" onclick="_catalogShowCatEditor(${idx}, this)" style="cursor:pointer"><span style="background:${cc.bg};color:${cc.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${p.category || '-'}</span></td>
       <td class="center">밀워키</td>
       <td>${p.subcategory || '-'}</td>
       <td>${p.detail || '-'}</td>
@@ -3389,6 +3391,7 @@ function renderCatalog() {
     var disc = all.filter(function(p) { return !!p.discontinued; });
     var nocode = all.filter(function(p) { return !p.manageCode || p.manageCode.trim() === '' || p.manageCode === '-'; });
     var nosku = all.filter(function(p) { return !p.code || p.code.trim() === '' || p.code === '-'; });
+    var nocat = all.filter(function(p) { return !p.category || p.category.trim() === '' || p.category === '-'; });
 
     var tabs = document.querySelectorAll('#catalog-filter-tabs .mw-filter-tab');
     if (tabs[0]) tabs[0].textContent = '전체제품(' + all.length + ')';
@@ -3397,6 +3400,7 @@ function renderCatalog() {
     if (tabs[3]) tabs[3].textContent = '단종(' + disc.length + ')';
     if (tabs[4]) tabs[4].textContent = '관리코드없음(' + nocode.length + ')';
     if (tabs[5]) tabs[5].textContent = '코드없음(' + nosku.length + ')';
+    if (tabs[6]) tabs[6].textContent = '대분류 없음(' + nocat.length + ')';
   })();
   console.log('[PERF] renderCatalog 전체: ' + (performance.now() - _rc0).toFixed(0) + 'ms');
 
@@ -3428,6 +3432,74 @@ function renderCatalog() {
 
 function toggleDiscontinued(idx, checked) {
   DB.products[idx].discontinued = checked ? '단종' : '';
+  save(KEYS.products, DB.products);
+  renderCatalog();
+}
+
+// 대분류 셀 클릭 → select 인라인 편집 시작
+function _catalogShowCatEditor(idx, cell) {
+  if (!cell || !DB.products[idx]) return;
+  // 이미 select가 열려있으면 무시 (중복 클릭 방지)
+  if (cell.querySelector('select')) return;
+
+  var p = DB.products[idx];
+
+  // DB에서 사용 중인 카테고리 동적 추출 (정렬, 빈/'-' 제외)
+  var allCats = [];
+  var seen = {};
+  DB.products.forEach(function(prod) {
+    var c = prod.category;
+    if (c && c.trim() && c !== '-' && !seen[c]) { seen[c] = 1; allCats.push(c); }
+  });
+  allCats.sort();
+
+  // select 생성
+  var sel = document.createElement('select');
+  sel.style.cssText = 'width:100%;padding:2px 4px;border:1px solid #185FA5;border-radius:4px;font-size:11px;font-family:Pretendard,sans-serif;outline:none;background:#fff';
+
+  // (없음) 옵션
+  var emptyOpt = document.createElement('option');
+  emptyOpt.value = '';
+  emptyOpt.textContent = '(없음)';
+  if (!p.category || p.category === '-') emptyOpt.selected = true;
+  sel.appendChild(emptyOpt);
+
+  // 각 카테고리 옵션
+  allCats.forEach(function(c) {
+    var opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c;
+    if (c === p.category) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  // 변경 추적 (변경 없이 blur되면 그냥 복원)
+  var changed = false;
+  sel.addEventListener('change', function() {
+    changed = true;
+    _catalogSaveCategory(idx, this.value);
+  });
+  sel.addEventListener('blur', function() {
+    if (!changed) renderCatalog(); // 변경 없이 빠져나간 경우 = 취소 → 원래 뱃지로 복원
+  });
+  sel.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') sel.blur(); // ESC = 취소
+  });
+
+  // 셀 비우고 select 삽입
+  cell.innerHTML = '';
+  cell.appendChild(sel);
+  sel.focus();
+  // 일부 브라우저에서 옵션 펼치기 (Chrome 92+ 지원, 미지원 브라우저는 그냥 스킵)
+  if (typeof sel.showPicker === 'function') {
+    try { sel.showPicker(); } catch(e) {}
+  }
+}
+
+// 대분류 변경 저장
+function _catalogSaveCategory(idx, val) {
+  if (!DB.products[idx]) return;
+  DB.products[idx].category = val;
   save(KEYS.products, DB.products);
   renderCatalog();
 }
