@@ -5086,26 +5086,28 @@ function switchPOSubTab(tabName) {
 // ========================================
 // 발주 리스트 탭 (6-A)
 // ========================================
+// 발주확정 화면 필터 = 스크래핑 날짜 범위 (모듈 변수 — 새로고침 시 자동 null → 오늘로 초기화)
+var _poConfFrom = null;
+var _poConfTo = null;
+
 function buildPOListPanel() {
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
-  var filterEl = localStorage.getItem('mw_po_list_filter') || 'today';
 
-  // 날짜 필터
+  // 오늘 날짜 (KST 기준, UTC+9)
   var now = new Date();
-  // KST 기준 날짜 (UTC+9)
   var todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-  var weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
-  var weekStartStr = weekStart.getFullYear() + '-' + String(weekStart.getMonth() + 1).padStart(2, '0') + '-' + String(weekStart.getDate()).padStart(2, '0');
-  var monthStartStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
 
+  // 달력 from/to (모듈 변수 — 첫 호출 또는 새로고침 후엔 null이므로 오늘로 초기화)
+  if (_poConfFrom === null) _poConfFrom = todayStr;
+  if (_poConfTo === null) _poConfTo = todayStr;
+  var _itemsDateFrom = _poConfFrom;
+  var _itemsDateTo = _poConfTo;
+
+  // 화면 표시 필터: 달력 from/to 범위
   var filtered = history.filter(function(item) {
-    // item.date를 KST 날짜로 변환
     var itemDate = new Date(item.date);
     var d = itemDate.getFullYear() + '-' + String(itemDate.getMonth() + 1).padStart(2, '0') + '-' + String(itemDate.getDate()).padStart(2, '0');
-    if (filterEl === 'today') return d === todayStr;
-    if (filterEl === 'week') return d >= weekStartStr;
-    if (filterEl === 'month') return d >= monthStartStr;
-    return true;
+    return d >= _itemsDateFrom && d <= _itemsDateTo;
   });
 
   // 요약 카드 계산
@@ -5117,24 +5119,13 @@ function buildPOListPanel() {
 
   var h = '';
 
-  // 아이템별 스크래핑용 날짜 범위 (새로고침 시 항상 오늘로 초기화)
-  var _todayKST = new Date();
-  var _todayStr = _todayKST.getFullYear() + '-' + String(_todayKST.getMonth() + 1).padStart(2, '0') + '-' + String(_todayKST.getDate()).padStart(2, '0');
-  var _itemsDateFrom = _todayStr;
-  var _itemsDateTo = _todayStr;
-
   h += '<div class="po-panel" style="flex:1;min-height:0">';
   h += '<div class="po-panel-header"><span>밀워키 발주확정</span><div style="display:flex;gap:6px;align-items:center">';
   h += '<button class="po-hdr-btn po-hdr-del" onclick="deleteSelectedPOHistory()">선택 삭제</button>';
-  h += '<select id="po-list-filter" class="po-hdr-select" onchange="changePOListFilter(this.value)">';
-  h += '<option value="today"' + (filterEl === 'today' ? ' selected' : '') + '>오늘</option>';
-  h += '<option value="week"' + (filterEl === 'week' ? ' selected' : '') + '>이번 주</option>';
-  h += '<option value="month"' + (filterEl === 'month' ? ' selected' : '') + '>이번 달</option>';
-  h += '</select>';
   // 아이템별 스크래핑 날짜 범위
-  h += '<input type="date" id="po-order-items-date-from" value="' + _itemsDateFrom + '" onchange="localStorage.setItem(\'mw_po_items_date_from\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
+  h += '<input type="date" id="po-order-items-date-from" value="' + _itemsDateFrom + '" onchange="_onPOItemsDateChange(\'from\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
   h += '<span style="color:rgba(255,255,255,0.6);font-size:11px">~</span>';
-  h += '<input type="date" id="po-order-items-date-to" value="' + _itemsDateTo + '" onchange="localStorage.setItem(\'mw_po_items_date_to\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
+  h += '<input type="date" id="po-order-items-date-to" value="' + _itemsDateTo + '" onchange="_onPOItemsDateChange(\'to\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
   h += '<button class="po-hdr-btn po-hdr-sync" onclick="startTtiOrderItemsSync()">↻ 밀워키 주문내역 동기화</button>';
   h += '<button id="po-save-btn" class="po-save-btn" onclick="savePoConfirmed()" style="background:#185FA5;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">💾 저장</button>';
 
@@ -5456,37 +5447,10 @@ function ttiReorder(item) {
   window.postMessage({ type: 'TTI_REORDER', orderNo: item.ttiOrderNo }, '*');
 }
 
-function changePOListFilter(val) {
-  localStorage.setItem('mw_po_list_filter', val);
+function _onPOItemsDateChange(which, val) {
+  if (which === 'from') _poConfFrom = val;
+  else _poConfTo = val;
 
-  // 선택값에 따라 날짜 input 연동 (KST 기준, toISOString 사용 금지 — 시차 오차 방지)
-  var _today = new Date();
-  var _fmt = function(d) {
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  };
-  var _todayStr = _fmt(_today);
-  var _dateFrom = _todayStr;
-  var _dateTo = _todayStr;
-  if (val === 'today') {
-    _dateFrom = _todayStr;
-    _dateTo = _todayStr;
-  } else if (val === 'week') {
-    // 이번주 월요일 ~ 오늘 (일요일=0 → 7로 변환)
-    var _dow = _today.getDay() || 7;
-    var _monday = new Date(_today);
-    _monday.setDate(_today.getDate() - _dow + 1);
-    _dateFrom = _fmt(_monday);
-    _dateTo = _todayStr;
-  } else if (val === 'month') {
-    // 이번달 1일 ~ 월 말일
-    _dateFrom = _today.getFullYear() + '-' + String(_today.getMonth() + 1).padStart(2, '0') + '-01';
-    var _lastDay = new Date(_today.getFullYear(), _today.getMonth() + 1, 0);
-    _dateTo = _fmt(_lastDay);
-  }
-  localStorage.setItem('mw_po_items_date_from', _dateFrom);
-  localStorage.setItem('mw_po_items_date_to', _dateTo);
-
-  // 밀워키 발주확정 영역만 재렌더링 (date input 값은 localStorage에서 복원)
   var listContent = document.getElementById('po-content-confirmed');
   if (listContent) {
     listContent.innerHTML = buildPOListPanel();
