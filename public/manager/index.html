@@ -684,7 +684,7 @@ document.head.appendChild(s);
         <span style="font-size:12px;font-weight:400;opacity:0.7" id="gen-count">0건</span>
         <button class="btn-action" onclick="addGenProduct()">+ 제품 추가</button>
         <button class="btn-action-sub" onclick="openGenImportModal()">📥 가져오기</button>
-        <button class="btn-export" onclick="exportGenProducts()">📤 내보내기</button>
+        <button class="btn-export" onclick="openGenExportModal()">📤 내보내기</button>
         <button onclick="deleteAllGenProducts()" style="background:#7F1D1D;color:#fff;border:2px solid #DC2626;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer">🗑 전체삭제</button>
       </div>
     </div>
@@ -1299,6 +1299,57 @@ document.head.appendChild(s);
         <button class="btn-secondary" onclick="closeGenImportModal()">취소</button>
         <button type="button" onclick="importFromErp()" style="background:#0F6E56;color:#fff;border:none;border-radius:6px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">🔌 단가 동기화 시작</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gen Export Modal -->
+<div class="modal-bg" id="gen-export-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3>📤 일반제품 엑셀 내보내기</h3>
+      <button class="modal-close" onclick="closeGenExportModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#F4F6FA;border-radius:8px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:600;color:#1A1D23;margin-bottom:8px">빠른 선택</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" onclick="_gpExportApplyPreset('all')" style="background:#fff;border:1px solid #185FA5;color:#185FA5;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">전체 (20개)</button>
+          <button type="button" onclick="_gpExportApplyPreset('customer')" style="background:#fff;border:1px solid #185FA5;color:#185FA5;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">거래처용</button>
+          <button type="button" onclick="_gpExportApplyPreset('price_table')" style="background:#fff;border:1px solid #185FA5;color:#185FA5;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">단가표만</button>
+          <button type="button" onclick="_gpExportApplyPreset('erp_format')" style="background:#fff;border:1px solid #185FA5;color:#185FA5;padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Pretendard',-apple-system,sans-serif">경영박사용</button>
+        </div>
+      </div>
+      <div style="background:#F4F6FA;border-radius:8px;padding:14px 16px">
+        <div style="font-size:13px;font-weight:600;color:#1A1D23;margin-bottom:10px">내보낼 컬럼 선택</div>
+        <div id="gen-export-cols-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:12px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="code" checked> 코드</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="image_url" checked> 사진</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="manageCode" checked> 관리코드</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="category" checked> 대분류</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="model" checked> 품명</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="description" checked> 규격</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="stock" checked> 재고</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="cost" checked> 원가</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="priceA" checked> 도매A</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="priceNaver" checked> 스토어팜</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="priceOpen" checked> 오픈마켓</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="priceSsg" checked> SSG</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="inQty" checked> IN수량</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="inPrice" checked> IN단가</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="outQty" checked> OUT수량</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="outPrice" checked> OUT단가</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="palletQty" checked> 파레트수량</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="palletPrice" checked> 파레트단가</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="memo" checked> 비고</label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-export-col" value="inDate" checked> 입고날짜</label>
+        </div>
+        <div id="gen-export-status" style="margin-top:10px;font-size:11px;color:#5A6070"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;width:100%">
+      <button class="btn-secondary" onclick="closeGenExportModal()">취소</button>
+      <button class="btn-primary" onclick="exportGenProductsSelected()">📤 내보내기</button>
     </div>
   </div>
 </div>

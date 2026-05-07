@@ -11163,6 +11163,76 @@ function exportGenProducts() {
   toast('일반제품 엑셀 다운로드 완료 (' + gp.length + '건)');
 }
 
+// ======================== 일반제품 내보내기 (컬럼 선택) ========================
+function openGenExportModal() {
+  document.getElementById('gen-export-modal').classList.add('show');
+  document.getElementById('gen-export-status').textContent = '';
+  _gpExportApplyPreset('all');
+}
+
+function closeGenExportModal() {
+  document.getElementById('gen-export-modal').classList.remove('show');
+}
+
+function _gpExportApplyPreset(preset) {
+  var presets = {
+    all: ['code','image_url','manageCode','category','model','description',
+          'stock','cost','priceA','priceNaver','priceOpen','priceSsg',
+          'inQty','inPrice','outQty','outPrice','palletQty','palletPrice',
+          'memo','inDate'],
+    customer: ['manageCode','model','description','priceA','priceNaver','priceOpen','memo'],
+    price_table: ['manageCode','model','priceA','priceNaver','priceOpen','priceSsg'],
+    erp_format: ['manageCode','category','model','description','memo','inDate']
+  };
+  var target = presets[preset] || [];
+  var targetSet = {};
+  target.forEach(function(k) { targetSet[k] = true; });
+  var checkboxes = document.querySelectorAll('input[name="gen-export-col"]');
+  checkboxes.forEach(function(cb) { cb.checked = !!targetSet[cb.value]; });
+}
+
+function exportGenProductsSelected() {
+  var statusEl = document.getElementById('gen-export-status');
+  if (!window.XLSX) { statusEl.textContent = 'SheetJS 로딩 중...'; return; }
+  var checkedBoxes = document.querySelectorAll('input[name="gen-export-col"]:checked');
+  if (checkedBoxes.length === 0) {
+    statusEl.textContent = '⚠ 내보낼 컬럼을 1개 이상 선택하세요';
+    return;
+  }
+  var gp = [];
+  try { gp = JSON.parse(localStorage.getItem('mw_gen_products') || '[]') || []; } catch(e) { gp = []; }
+  if (!gp.length) { statusEl.textContent = '내보낼 일반제품 데이터가 없습니다'; return; }
+  var selectedCols = Array.from(checkedBoxes).map(function(cb) { return cb.value; });
+  var labelMap = {
+    code: '코드', image_url: '사진', manageCode: '관리코드',
+    category: '대분류', model: '품명', description: '규격',
+    stock: '재고', cost: '원가', priceA: '도매A',
+    priceNaver: '스토어팜', priceOpen: '오픈마켓', priceSsg: 'SSG',
+    inQty: 'IN수량', inPrice: 'IN단가', outQty: 'OUT수량', outPrice: 'OUT단가',
+    palletQty: '파레트수량', palletPrice: '파레트단가',
+    memo: '비고', inDate: '입고날짜'
+  };
+  var headers = selectedCols.map(function(c) { return labelMap[c] || c; });
+  var data = [headers];
+  gp.forEach(function(p) {
+    var row = selectedCols.map(function(c) {
+      var val = p[c];
+      return (val === undefined || val === null) ? '' : val;
+    });
+    data.push(row);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '일반제품');
+  var dt = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, '일반제품_' + dt + '.xlsx');
+  closeGenExportModal();
+  if (typeof saveActionHistory === 'function') {
+    saveActionHistory('일반제품엑셀내보내기', '일반제품', gp.length, null);
+  }
+  if (typeof toast === 'function') toast('엑셀 다운로드 완료 (' + gp.length + '건, 컬럼 ' + selectedCols.length + '개)');
+}
+
 // ======================== 작업이력 ========================
 function getActionHistory() {
   try { return JSON.parse(localStorage.getItem('mw_action_history') || '[]'); } catch(e) { return []; }
