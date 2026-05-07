@@ -302,6 +302,12 @@ function _applyCurrentUserUI(user) {
   if (nameEl) nameEl.textContent = (user.name || '') + '님';
   var ctUser = document.getElementById('ct-username');
   if (ctUser) ctUser.textContent = user.loginId || user.name || 'user';
+  // [D-1 fix] currentUser 확정 후 _tx.lineColumns 재로드 (init이 currentUser 미설정 시점에 'default' 키 로드한 케이스 보정)
+  if (typeof _tx !== 'undefined' && _tx._initialized && _tx.lineColumns && typeof _tx.lineColumns.loadConfig === 'function') {
+    _tx.lineColumns.loadConfig();
+    if (typeof _tx.lineColumns._renderThead === 'function') _tx.lineColumns._renderThead();
+    if (typeof _tx.renderItemsTable === 'function') _tx.renderItemsTable();
+  }
 }
 function _clearAuthStorage() {
   localStorage.removeItem('session_token');
@@ -11389,6 +11395,14 @@ function _enterGenEditMode() {
     cnt.textContent = '0개 선택';
     cnt.style.color = '#EF9F27';
   }
+  var headRow = document.querySelector('#gen-table thead tr');
+  if (headRow && !headRow.querySelector('.gen-cb-th')) {
+    var cbTh = document.createElement('th');
+    cbTh.className = 'center gen-cb-th';
+    cbTh.style.width = '36px';
+    cbTh.innerHTML = '<input type="checkbox" id="gen-edit-checkall" onchange="toggleAllGenEditCheckbox(this)">';
+    headRow.insertBefore(cbTh, headRow.firstChild);
+  }
   renderGenProducts();
 }
 
@@ -11403,6 +11417,8 @@ function _exitGenEditMode() {
   }
   var master = document.getElementById('gen-edit-checkall');
   if (master) { master.checked = false; master.indeterminate = false; }
+  var cbTh = document.querySelector('#gen-table thead tr .gen-cb-th');
+  if (cbTh) cbTh.parentNode.removeChild(cbTh);
   renderGenProducts();
 }
 
