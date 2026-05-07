@@ -602,6 +602,17 @@ body.gen-edit-active th.gen-edit-only,
 body.gen-edit-active td.gen-edit-only { display: table-cell; }
 body.gen-edit-active span.gen-edit-only { display: inline; }
 
+/* Phase 2: 인라인 편집 셀 호버 (편집 모드 한정) */
+body.gen-edit-active .gen-cell-editable {
+  cursor: pointer;
+  position: relative;
+}
+body.gen-edit-active .gen-cell-editable:hover {
+  background: #FAEEDA;
+  outline: 1px solid #EF9F27;
+  outline-offset: -1px;
+}
+
 /* 발주서 사진 컬럼 (read-only) — 본 행/picker 80px, 장바구니 60px */
 .po-photo-cell { width: 80px; min-width: 80px; padding: 6px 4px !important; text-align: center; }
 .po-photo-cell-cart { width: 60px; min-width: 60px; padding: 6px 4px !important; text-align: center; }

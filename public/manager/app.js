@@ -11466,6 +11466,94 @@ function _genDeleteSelected() {
   alert('삭제 기능은 Phase 3에서 구현됩니다 (' + _genCheckedIndices.size + '개 선택됨)');
 }
 
+// Phase 2: 인라인 편집 가능한 5개 컬럼의 데이터 타입
+var _GEN_FIELD_TYPES = {
+  category: 'text',
+  model: 'text',
+  description: 'text',
+  cost: 'number',
+  priceA: 'number'
+};
+
+function _genCellEdit(cell) {
+  if (!_genEditMode) return;
+  if (cell.dataset.editing === '1') return;
+  var idx = parseInt(cell.dataset.idx, 10);
+  var field = cell.dataset.field;
+  var type = _GEN_FIELD_TYPES[field];
+  if (!type) return;
+  var p = genProducts[idx];
+  if (!p) return;
+
+  var origHtml = cell.innerHTML;
+  cell.dataset.editing = '1';
+
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'gen-cell-input';
+  var currentVal = p[field];
+  if (type === 'number') {
+    input.value = currentVal ? Number(currentVal).toLocaleString() : '';
+    input.style.textAlign = 'right';
+    input.setAttribute('inputmode', 'numeric');
+  } else {
+    input.value = currentVal == null ? '' : String(currentVal);
+    input.style.textAlign = 'left';
+  }
+  input.style.cssText += ';width:100%;border:1px solid #185FA5;border-radius:3px;padding:2px 4px;font-size:12px;font-family:inherit;background:#fff;outline:none;box-sizing:border-box';
+
+  cell.innerHTML = '';
+  cell.appendChild(input);
+  input.focus();
+  input.select();
+
+  var done = false;
+  var save = function() {
+    if (done) return;
+    done = true;
+    var newRaw = input.value.trim();
+    var newVal;
+
+    if (type === 'number') {
+      var clean = newRaw.replace(/,/g, '');
+      if (clean === '') {
+        newVal = 0;
+      } else {
+        var num = parseInt(clean, 10);
+        if (isNaN(num) || num < 0) {
+          cell.innerHTML = origHtml;
+          delete cell.dataset.editing;
+          alert('숫자만 입력 가능합니다 (음수 불가)');
+          return;
+        }
+        newVal = num;
+      }
+    } else {
+      newVal = newRaw;
+    }
+
+    p[field] = newVal;
+    localStorage.setItem('mw_gen_products', JSON.stringify(genProducts));
+    if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_gen_products');
+
+    delete cell.dataset.editing;
+    renderGenProducts();
+  };
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      done = true;
+      cell.innerHTML = origHtml;
+      delete cell.dataset.editing;
+    }
+  });
+}
+
 function deleteAllGenProducts() {
   var count = genProducts.length;
   if (!count) { toast('삭제할 일반제품이 없습니다'); return; }
@@ -12091,12 +12179,12 @@ function renderGenProducts() {
       <td class="gen-photo-cell" data-idx="${idx}" style="text-align:center;padding:6px 4px">${photoCellInner}</td>
       <td>${p.code || '-'}</td>
       <td>${p.manageCode || '-'}</td>
-      <td>${p.category || '-'}</td>
-      <td style="font-weight:500">${p.model || '-'}</td>
-      <td>${p.description || '-'}</td>
+      <td class="gen-cell-editable" data-idx="${idx}" data-field="category">${p.category || '-'}</td>
+      <td class="gen-cell-editable" data-idx="${idx}" data-field="model" style="font-weight:500">${p.model || '-'}</td>
+      <td class="gen-cell-editable" data-idx="${idx}" data-field="description">${p.description || '-'}</td>
       <td class="center">${p.stock != null && p.stock !== '' ? (p.stock > 0 ? '<span class="badge badge-green">' + p.stock + '</span>' : p.stock === 0 ? '<span class="badge badge-amber">0</span>' : '<span class="badge badge-red">' + p.stock + '</span>') : '<span class="badge badge-gray">-</span>'}</td>
-      <td class="num" style="color:#1D9E75">${fmt(p.cost || 0)}</td>
-      <td class="num">${fmt(p.priceA || 0)}</td>
+      <td class="num gen-cell-editable" data-idx="${idx}" data-field="cost" style="color:#1D9E75">${fmt(p.cost || 0)}</td>
+      <td class="num gen-cell-editable" data-idx="${idx}" data-field="priceA">${fmt(p.priceA || 0)}</td>
       <td class="num" style="padding:4px 3px">${marketBadge(p, 'naver')}</td>
       <td class="num" style="padding:4px 3px">${marketBadge(p, 'gmarket')}</td>
       <td class="num" style="padding:4px 3px">${marketBadge(p, 'ssg')}</td>
@@ -12127,6 +12215,17 @@ function renderGenProducts() {
       var ix = parseInt(cell.getAttribute('data-idx'), 10);
       if (isNaN(ix)) return;
       openGenPhotoLightbox(ix);
+    });
+  }
+  // Phase 2: 인라인 편집 셀 클릭 위임 (1회만 부착)
+  if (body && !body.__cellEditBound) {
+    body.__cellEditBound = true;
+    body.addEventListener('click', function(e) {
+      if (!_genEditMode) return;
+      var cell = e.target.closest('.gen-cell-editable');
+      if (!cell) return;
+      if (cell.dataset.editing === '1') return;
+      _genCellEdit(cell);
     });
   }
   initColumnResize('gen-table');
