@@ -5117,13 +5117,11 @@ function buildPOListPanel() {
 
   var h = '';
 
-  // 아이템별 스크래핑용 날짜 범위 (기본: 오늘)
+  // 아이템별 스크래핑용 날짜 범위 (새로고침 시 항상 오늘로 초기화)
   var _todayKST = new Date();
   var _todayStr = _todayKST.getFullYear() + '-' + String(_todayKST.getMonth() + 1).padStart(2, '0') + '-' + String(_todayKST.getDate()).padStart(2, '0');
-  var _itemsDateFrom = localStorage.getItem('mw_po_items_date_from') || _todayStr;
-  var _itemsDateTo = localStorage.getItem('mw_po_items_date_to') || _todayStr;
-  // 저장된 종료일이 오늘 이전이면 오늘로 갱신 (web-ui-patterns 1.3)
-  if (_itemsDateTo < _todayStr) _itemsDateTo = _todayStr;
+  var _itemsDateFrom = _todayStr;
+  var _itemsDateTo = _todayStr;
 
   h += '<div class="po-panel" style="flex:1;min-height:0">';
   h += '<div class="po-panel-header"><span>밀워키 발주확정</span><div style="display:flex;gap:6px;align-items:center">';
