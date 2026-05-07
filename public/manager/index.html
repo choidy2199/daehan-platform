@@ -1108,6 +1108,31 @@ document.head.appendChild(s);
         <span style="font-size:11px;color:#9BA3B2;white-space:nowrap;">또는 엑셀 파일로 가져오기</span>
         <div style="flex:1;height:1px;background:#E5E7EB;"></div>
       </div>
+      <div id="mw-pl-io-column-selector" style="margin-bottom:14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <span style="font-size:13px; font-weight:600;">
+            📋 컬럼 선택 <span id="mw-pl-io-col-count" style="color:#6b7280; font-weight:400; font-size:12px;">(10 / 22)</span>
+          </span>
+          <div style="display:flex; gap:4px; align-items:center;">
+            <button type="button" id="mw-pl-io-col-all" style="padding:3px 8px; font-size:11px; background:#f9fafb; border:1px solid #d1d5db; border-radius:4px; cursor:pointer;">전체</button>
+            <button type="button" id="mw-pl-io-col-none" style="padding:3px 8px; font-size:11px; background:#f9fafb; border:1px solid #d1d5db; border-radius:4px; cursor:pointer;">해제</button>
+            <span style="font-size:11px; color:#6b7280; margin-left:6px;">💾 자동저장</span>
+          </div>
+        </div>
+        <div style="background:#f3f4f6; border-radius:6px; padding:8px 12px; margin-bottom:8px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:#6b7280; font-weight:600;">🔒 고정 · 매칭키</span>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; opacity:0.65;">
+            <input type="checkbox" checked disabled />
+            <span style="font-weight:600;">코드</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; opacity:0.65;">
+            <input type="checkbox" checked disabled />
+            <span style="font-weight:600;">관리코드</span>
+          </label>
+          <span style="font-size:11px; color:#6b7280; margin-left:auto;">해제 불가</span>
+        </div>
+        <div id="mw-pl-io-col-groups" style="border:1px solid #e5e7eb; border-radius:6px; padding:10px 12px;"></div>
+      </div>
       <div style="margin-bottom:12px;text-align:right">
         <button onclick="downloadTemplate()" style="font-size:12px;padding:5px 12px;background:none;border:1px solid #cbd5e1;border-radius:6px;color:#64748b;cursor:pointer">📋 양식 다운로드</button>
       </div>

@@ -8804,6 +8804,101 @@ function resetMwPricelistIoConfig() {
   try { localStorage.removeItem(_mwPricelistIoConfigKey()); } catch (e) {}
 }
 
+// Phase B-1: 가져오기 탭 컬럼 선택 UI 렌더
+function _renderMwPricelistIoColumnSelector() {
+  const groupsEl = document.getElementById('mw-pl-io-col-groups');
+  if (!groupsEl) return;
+
+  const config = getMwPricelistIoConfig();
+  const selected = new Set(config.selectedFields);
+
+  const groups = {};
+  MW_PRICELIST_COLUMNS.forEach(function(col) {
+    if (col.fixed) return;
+    if (!groups[col.group]) groups[col.group] = [];
+    groups[col.group].push(col);
+  });
+
+  const groupOrder = ['분류', '식별', '가격', '재고·기타'];
+  let html = '';
+  groupOrder.forEach(function(groupName, idx) {
+    const cols = groups[groupName] || [];
+    if (cols.length === 0) return;
+    const borderTop = idx === 0 ? '' : 'border-top:1px dashed #e5e7eb; padding-top:8px;';
+    html += '<div style="margin-bottom:8px;' + borderTop + '">';
+    html += '<div style="font-size:11px; color:#6b7280; margin-bottom:5px; font-weight:600;">' + groupName + '</div>';
+    html += '<div style="display:flex; flex-wrap:wrap; gap:6px 18px;">';
+    cols.forEach(function(col) {
+      const checked = selected.has(col.id) ? 'checked' : '';
+      html += '<label style="display:flex; align-items:center; gap:6px; font-size:13px;">';
+      html += '<input type="checkbox" data-mw-pl-col="' + col.id + '" ' + checked + ' />';
+      html += '<span>' + col.label + '</span>';
+      html += '</label>';
+    });
+    html += '</div></div>';
+  });
+
+  groupsEl.innerHTML = html;
+  _updateMwPricelistIoColCount();
+}
+
+function _updateMwPricelistIoColCount() {
+  const countEl = document.getElementById('mw-pl-io-col-count');
+  if (!countEl) return;
+  const checked = document.querySelectorAll('#mw-pl-io-col-groups input[type="checkbox"]:checked').length;
+  countEl.textContent = '(' + (checked + 2) + ' / 22)';
+}
+
+let _mwPricelistIoSaveTimer = null;
+function _scheduleMwPricelistIoSave() {
+  if (_mwPricelistIoSaveTimer) clearTimeout(_mwPricelistIoSaveTimer);
+  _mwPricelistIoSaveTimer = setTimeout(function() {
+    const checked = Array.from(
+      document.querySelectorAll('#mw-pl-io-col-groups input[type="checkbox"]:checked')
+    ).map(function(cb) { return cb.getAttribute('data-mw-pl-col'); });
+    const config = getMwPricelistIoConfig();
+    config.selectedFields = checked;
+    saveMwPricelistIoConfig(config);
+  }, 300);
+}
+
+function _bindMwPricelistIoColumnEvents() {
+  const groupsEl = document.getElementById('mw-pl-io-col-groups');
+  if (!groupsEl || groupsEl.dataset.mwPlBound === '1') return;
+  groupsEl.dataset.mwPlBound = '1';
+
+  groupsEl.addEventListener('change', function(e) {
+    if (e.target.matches('input[type="checkbox"][data-mw-pl-col]')) {
+      _updateMwPricelistIoColCount();
+      _scheduleMwPricelistIoSave();
+    }
+  });
+
+  const allBtn = document.getElementById('mw-pl-io-col-all');
+  if (allBtn && !allBtn.dataset.mwPlBound) {
+    allBtn.dataset.mwPlBound = '1';
+    allBtn.addEventListener('click', function() {
+      groupsEl.querySelectorAll('input[type="checkbox"][data-mw-pl-col]').forEach(function(cb) {
+        cb.checked = true;
+      });
+      _updateMwPricelistIoColCount();
+      _scheduleMwPricelistIoSave();
+    });
+  }
+
+  const noneBtn = document.getElementById('mw-pl-io-col-none');
+  if (noneBtn && !noneBtn.dataset.mwPlBound) {
+    noneBtn.dataset.mwPlBound = '1';
+    noneBtn.addEventListener('click', function() {
+      groupsEl.querySelectorAll('input[type="checkbox"][data-mw-pl-col]').forEach(function(cb) {
+        cb.checked = false;
+      });
+      _updateMwPricelistIoColCount();
+      _scheduleMwPricelistIoSave();
+    });
+  }
+}
+
 // ======================== TEMPLATE DOWNLOAD ========================
 function downloadTemplate() {
   if (!window.XLSX) { toast('SheetJS 라이브러리 로딩 중...'); return; }
@@ -8838,6 +8933,9 @@ function showProductManageModal() {
   // 드래그 가능
   var _im = document.querySelector('#import-modal > .modal');
   if (_im && !_im._dragged) { var _imH = _im.querySelector('.modal-header'); if (_imH) _makeDraggable(_im, _imH); }
+  // Phase B-1: 컬럼 선택 UI 렌더 + 이벤트 바인딩
+  _renderMwPricelistIoColumnSelector();
+  _bindMwPricelistIoColumnEvents();
 }
 
 // 탭 전환
