@@ -10335,46 +10335,50 @@ function parseImportWorkbook(wb) {
   return rows;
 }
 
-// 기존 mw_products와 비교
+// Phase B-2: code AND manageCode 매칭 + 빈 행 skipped + selectedFields 기반 diffs
 function compareWithExisting(parsedRows) {
   var existing = DB.products || [];
-  var result = { changed: [], added: [], same: [] };
-  var byTti = {};
-  var byOrder = {};
-  var byModel = {};
-  existing.forEach(function(p, idx) {
-    if (p.ttiNum) byTti[String(p.ttiNum).trim()] = idx;
-    if (p.orderNum) byOrder[String(p.orderNum).trim()] = idx;
-    if (p.model) byModel[String(p.model).trim().toLowerCase()] = idx;
-  });
-  var matchedIndices = {};
+  var result = { changed: [], added: [], same: [], skipped: [], total: (parsedRows && parsedRows.length) || 0 };
 
-  parsedRows.forEach(function(newRow) {
+  var config = getMwPricelistIoConfig();
+  var allowedFields = new Set(config.selectedFields);
+
+  (parsedRows || []).forEach(function(newRow) {
+    var newCode = String((newRow && newRow.code) || '').trim();
+    var newManage = String((newRow && newRow.manageCode) || '').trim();
+
+    if (!newCode || !newManage) {
+      result.skipped.push(newRow);
+      return;
+    }
+
     var matchIdx = -1;
-    var tti = String(newRow.ttiNum || '').trim();
-    var order = String(newRow.orderNum || '').trim();
-    var model = String(newRow.model || '').trim().toLowerCase();
-    var matchedBy = '';
-
-    if (tti && byTti[tti] != null) { matchIdx = byTti[tti]; matchedBy = 'ttiNum'; }
-    else if (order && byOrder[order] != null) { matchIdx = byOrder[order]; matchedBy = 'orderNum'; }
-    else if (model && byModel[model] != null) { matchIdx = byModel[model]; matchedBy = 'model'; }
+    for (var idx = 0; idx < existing.length; idx++) {
+      var p = existing[idx];
+      if (!p) continue;
+      if (String(p.code || '').trim() === newCode && String(p.manageCode || '').trim() === newManage) {
+        matchIdx = idx;
+        break;
+      }
+    }
 
     if (matchIdx >= 0) {
-      matchedIndices[matchIdx] = true;
       var old = existing[matchIdx];
       var diffs = [];
-      if (String(old.ttiNum || '') !== String(newRow.ttiNum || '')) diffs.push('ttiNum');
-      if (String(old.orderNum || '') !== String(newRow.orderNum || '')) diffs.push('orderNum');
-      if (String(old.model || '') !== String(newRow.model || '')) diffs.push('model');
-      // description은 model에 통합됨
-      if (Number(old.supplyPrice || 0) !== Number(newRow.supplyPrice || 0)) diffs.push('supplyPrice');
-
-      if (diffs.length > 0) {
-        result.changed.push({ oldData: old, newData: newRow, diffs: diffs, matchedBy: matchedBy, checked: true });
-      } else {
-        result.same.push(old);
-      }
+      MW_PRICELIST_COLUMNS.forEach(function(col) {
+        if (col.fixed) return;
+        if (!allowedFields.has(col.id)) return;
+        var oldVal = old[col.id];
+        var newVal = newRow[col.id];
+        if (col.group === '가격') {
+          if (Number(oldVal || 0) !== Number(newVal || 0)) diffs.push(col.id);
+        } else {
+          var oldStr = (oldVal == null) ? '' : String(oldVal);
+          var newStr = (newVal == null) ? '' : String(newVal);
+          if (oldStr !== newStr) diffs.push(col.id);
+        }
+      });
+      result.changed.push({ oldData: old, newData: newRow, diffs: diffs, matchedBy: 'code+manageCode', checked: true });
     } else {
       result.added.push({ data: newRow, checked: true });
     }
@@ -10390,14 +10394,19 @@ function renderImportComparison(result) {
   if (result.debug) { console.log('[Import Debug]', result.debug); }
   if (result.changed && result.changed[0]) { console.log('비교결과 changed[0]:', JSON.stringify(result.changed[0], null, 2)); }
 
-  // 요약 카드
+  // Phase B-2: 4카운트 (총/업데이트/신규/무시)
   var summary = document.getElementById('import-summary');
+  var totalCnt = (result.total != null) ? result.total : (result.changed.length + result.added.length + ((result.skipped && result.skipped.length) || 0));
+  var skippedCnt = (result.skipped && result.skipped.length) || 0;
   summary.innerHTML =
-    '<div style="flex:1;text-align:center;padding:10px;background:#dbeafe;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#1d4ed8">' + result.changed.length + '</div><div style="font-size:11px;color:#3b82f6">변경</div></div>' +
+    '<div style="flex:1;text-align:center;padding:10px;background:#f1f5f9;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#1A1D23">' + totalCnt + '</div><div style="font-size:11px;color:#64748b">총</div></div>' +
+    '<div style="flex:1;text-align:center;padding:10px;background:#dbeafe;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#1d4ed8">' + result.changed.length + '</div><div style="font-size:11px;color:#3b82f6">업데이트</div></div>' +
     '<div style="flex:1;text-align:center;padding:10px;background:#d1fae5;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#065f46">' + result.added.length + '</div><div style="font-size:11px;color:#10b981">신규</div></div>' +
-    '<div style="flex:1;text-align:center;padding:10px;background:#f3f4f6;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#6b7280">' + result.same.length + '</div><div style="font-size:11px;color:#9ca3af">동일</div></div>';
+    '<div style="flex:1;text-align:center;padding:10px;background:#fef3c7;border-radius:6px"><div style="font-size:18px;font-weight:700;color:#92400e">' + skippedCnt + '</div><div style="font-size:11px;color:#d97706">무시</div></div>';
 
-  var fieldLabel = { ttiNum:'TTI#', orderNum:'순번', model:'모델명', description:'제품설명', supplyPrice:'공급가' };
+  // Phase B-2: 22개 컬럼 라벨 매핑 (selectedFields 기반 diffs를 위해)
+  var fieldLabel = {};
+  MW_PRICELIST_COLUMNS.forEach(function(col) { fieldLabel[col.id] = col.label; });
 
   // 변경 항목 (카드 형태)
   var changedEl = document.getElementById('import-changed-section');
@@ -10453,10 +10462,9 @@ function renderImportComparison(result) {
     newEl.innerHTML = newHeader + newCards;
   } else { newEl.style.display = 'none'; }
 
-  // 동일 항목
+  // Phase B-2: same 분류 미사용, 섹션 항상 숨김 (DOM은 유지)
   var sameEl = document.getElementById('import-same-section');
-  sameEl.style.display = result.same.length > 0 ? 'block' : 'none';
-  sameEl.innerHTML = '<div style="font-size:11px;color:#94a3b8">동일 항목 ' + result.same.length + '건 — 변경 없음</div>';
+  if (sameEl) sameEl.style.display = 'none';
 
   updateImportApplyBtn();
 }
@@ -10482,18 +10490,25 @@ function applyImportChanges() {
   if (!_importCompareResult) return;
   var applied = 0;
 
+  // Phase B-2: selectedFields 컬럼 필터링
+  var config = getMwPricelistIoConfig();
+  var allowedFields = new Set(config.selectedFields);
+
   // 변경 항목 적용
   var changedChecks = document.querySelectorAll('#import-changed-section input[data-type="changed"]:checked');
   changedChecks.forEach(function(cb) {
     var idx = parseInt(cb.dataset.idx);
     var item = _importCompareResult.changed[idx];
     if (!item) return;
-    // 기존 제품 찾아서 변경 필드만 업데이트
+    // 기존 제품 찾아서 변경 필드만 업데이트 (Phase B-2: selectedFields 컬럼만)
     var existIdx = DB.products.indexOf(item.oldData);
     if (existIdx >= 0) {
-      item.diffs.forEach(function(key) { DB.products[existIdx][key] = item.newData[key]; });
-      // 공급가 변경 시 원가 재계산
-      if (item.diffs.indexOf('supplyPrice') !== -1) {
+      item.diffs.forEach(function(key) {
+        if (!allowedFields.has(key)) return;
+        DB.products[existIdx][key] = item.newData[key];
+      });
+      // 공급가 변경 시 원가 재계산 (선택된 경우만)
+      if (item.diffs.indexOf('supplyPrice') !== -1 && allowedFields.has('supplyPrice')) {
         DB.products[existIdx].supplyPrice = item.newData.supplyPrice;
         DB.products[existIdx].cost = Math.round(calcCost(item.newData.supplyPrice, DB.products[existIdx].category || ''));
       }
@@ -10501,13 +10516,19 @@ function applyImportChanges() {
     }
   });
 
-  // 신규 항목 추가
+  // 신규 항목 추가 (Phase B-2: selectedFields 컬럼만 채움, 나머지 기본값)
   var addedChecks = document.querySelectorAll('#import-new-section input[data-type="added"]:checked');
   addedChecks.forEach(function(cb) {
     var idx = parseInt(cb.dataset.idx);
     var item = _importCompareResult.added[idx];
     if (!item) return;
-    DB.products.push(item.data);
+    var newItem = Object.assign({}, item.data);
+    MW_PRICELIST_COLUMNS.forEach(function(col) {
+      if (allowedFields.has(col.id)) return;
+      if (typeof newItem[col.id] === 'number') newItem[col.id] = 0;
+      else newItem[col.id] = '';
+    });
+    DB.products.push(newItem);
     applied++;
   });
 
