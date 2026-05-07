@@ -3210,11 +3210,11 @@ function renderCatalog() {
       <td style="font-weight:500">${p.code}</td>
       <td>${p.manageCode || '-'}</td>
       <td class="mw-cat-cell" onclick="_catalogShowCatEditor(${idx}, this)" style="cursor:pointer"><span style="background:${cc.bg};color:${cc.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500">${p.category || '-'}</span></td>
-      <td class="center">밀워키</td>
       <td>${p.subcategory || '-'}</td>
       <td>${p.detail || '-'}</td>
       <td class="center">${p.orderNum || '-'}</td>
       <td>${p.ttiNum || '-'}</td>
+      <td class="center">밀워키</td>
       <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.model || ''}">${(function(){ var m=p.model||''; var si=m.indexOf(' / '); if(si<0) return '<span style="font-weight:500">'+m+'</span>'; return '<span style="font-weight:500">'+m.substring(0,si)+'</span> <span style="color:#888">'+m.substring(si)+'</span>'; })()}</td>
       <td class="num">${fmt(p.supplyPrice)}</td>
       <td class="num">${fmt(p.cost)}</td>
@@ -4996,7 +4996,7 @@ function buildPOProductPanel() {
   // 테이블
   html += '<div class="po-panel-body" id="po-prod-scroll">';
   html += '<table class="po-table po-table-lg"><thead><tr>';
-  html += '<th class="center" style="width:36px">No</th><th class="center" style="width:36px">누적</th><th>프로모션번호</th><th>제품번호</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
+  html += '<th class="center" style="width:36px">No</th><th class="center" style="width:36px">누적</th><th>순번</th><th>TTi#</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
   html += '</tr></thead><tbody id="po-prod-body">';
   html += '</tbody></table></div></div>';
   return html;
@@ -5109,7 +5109,7 @@ function buildPOOrderPanel() {
   // 테이블 (po-panel-body가 스크롤 컨테이너 → thead sticky 동작)
   html += '<div class="po-panel-body">';
   html += '<table class="po-table"><thead><tr>';
-  html += '<th class="center" style="width:36px">누적</th><th>프로모션번호</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
+  html += '<th class="center" style="width:36px">누적</th><th>순번</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
   html += '</tr></thead><tbody id="po-cart-body">';
   html += '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   html += '</tbody></table></div>';
@@ -5987,7 +5987,7 @@ function _buildPromoLeftPanel(subtab, title, discountPct, items) {
   var _lim = PO_PROMO_LIMIT[subtab] || 99;
   h += '<div class="po-panel-header"><span>' + title + ' · ' + discountPct + '% 할인 · <span id="po-' + subtab + '-count">' + items.length + '</span>건 · <span class="po-limit-btn" onclick="_changePromoLimit(\'' + subtab + '\')" title="클릭하여 수정">제한: ' + _lim + '개</span></span></div>';
   h += '<div class="po-filter-row"><input type="search" placeholder="코드, 모델명 검색" id="po-' + subtab + '-search" autocomplete="off"></div>';
-  h += '<div class="po-table-wrap"><table class="po-table"><thead><tr><th>No</th><th>제품번호</th><th>모델명</th><th style="text-align:right">공급가</th><th style="text-align:right">할인가</th><th>재고</th><th style="width:50px">수량</th><th></th></tr></thead>';
+  h += '<div class="po-table-wrap"><table class="po-table"><thead><tr><th>No</th><th>TTi#</th><th>모델명</th><th style="text-align:right">공급가</th><th style="text-align:right">할인가</th><th>재고</th><th style="width:50px">수량</th><th></th></tr></thead>';
   h += '<tbody id="po-' + subtab + '-tbody">';
   items.forEach(function(item, i) {
     h += _buildPromoRow(item, i, subtab, discountPct);
@@ -6257,7 +6257,7 @@ function _buildKitTabContent() {
   // 데이터 있을 때 패키지와 동일 구조
   var left = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
   left += '<div class="po-panel-header"><span>키트구성 패키지 · ' + items.length + '건</span></div>';
-  left += '<div class="po-table-wrap"><table class="po-table"><thead><tr><th>No</th><th>제품번호</th><th>모델명</th><th style="text-align:right">공급가</th><th>재고</th><th></th></tr></thead>';
+  left += '<div class="po-table-wrap"><table class="po-table"><thead><tr><th>No</th><th>TTi#</th><th>모델명</th><th style="text-align:right">공급가</th><th>재고</th><th></th></tr></thead>';
   left += '<tbody>';
   items.forEach(function(item, i) {
     left += '<tr><td>' + (i + 1) + '</td><td>' + (item.productCode || '') + '</td><td>' + (item.modelName || '') + '</td><td style="text-align:right">' + fmtPO(item.supplyPrice || 0) + '</td><td>' + (item.stockStatus || '-') + '</td><td>🛒</td></tr>';
@@ -8801,10 +8801,10 @@ const MW_PRICELIST_COLUMNS = [
   { id: 'category',     label: '대분류',     group: '분류',    defaultOn: true,  fixed: false },
   { id: 'subcategory',  label: '중분류',     group: '분류',    defaultOn: false, fixed: false },
   { id: 'detail',       label: '소분류',     group: '분류',    defaultOn: false, fixed: false },
-  { id: 'orderNum',     label: '프로모션No.',group: '분류',    defaultOn: false, fixed: false },
+  { id: 'orderNum',     label: '순번',       group: '분류',    defaultOn: false, fixed: false },
   { id: 'discontinued', label: '단종',       group: '분류',    defaultOn: false, fixed: false },
   // 식별
-  { id: 'ttiNum',       label: 'TTI#',       group: '식별',    defaultOn: false, fixed: false },
+  { id: 'ttiNum',       label: 'TTi#',       group: '식별',    defaultOn: false, fixed: false },
   { id: 'model',        label: '모델명',     group: '식별',    defaultOn: true,  fixed: false },
   { id: 'description',  label: '품명',       group: '식별',    defaultOn: false, fixed: false },
   { id: 'spec',         label: '규격',       group: '식별',    defaultOn: false, fixed: false },
@@ -9824,7 +9824,7 @@ var _mwBulkOrigData = []; // 원본 데이터 (변경 감지용)
 var _mwBulkIndices = []; // DB.products 인덱스 배열
 var _mwBulkActiveIdx = 0;
 var _mwBulkFields = ['code','manageCode','category','subcategory','detail','orderNum','ttiNum','model','supplyPrice'];
-var _mwBulkLabels = ['코드','관리코드','대분류','중분류','소분류','프로모션No.','TTI#','모델명','공급가'];
+var _mwBulkLabels = ['코드','관리코드','대분류','중분류','소분류','순번','TTi#','모델명','공급가'];
 
 function _showMwBulkEditModal(indices) {
   var old = document.getElementById('mw-bulk-edit-modal');
