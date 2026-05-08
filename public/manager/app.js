@@ -4968,6 +4968,7 @@ var _poRenderedCount = 0;
 var _poTtiStockMap = {};
 
 function buildPOProductPanel() {
+  _ensureSetBearPairs();
   // TTI 재고 맵 (1회 빌드)
   _poTtiStockMap = {};
   try {
@@ -5004,7 +5005,7 @@ function buildPOProductPanel() {
   // 테이블
   html += '<div class="po-panel-body" id="po-prod-scroll">';
   html += '<table class="po-table po-table-lg"><thead><tr>';
-  html += '<th class="center" style="width:36px">No</th><th class="center" style="width:36px">누적</th><th>순번</th><th>TTi#</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
+  html += '<th class="center" style="width:36px">No</th><th class="center" style="width:36px">누적</th><th>순번</th><th>TTi#</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:42px">S</th><th class="center" style="width:42px">B</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
   html += '</tr></thead><tbody id="po-prod-body">';
   html += '</tbody></table></div></div>';
   return html;
@@ -5028,6 +5029,14 @@ function buildPOProductRow(p, rowIndex) {
   else if (stockStatus === 'b') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,2 12,11 2,11" fill="#F5A623"/></svg>';
   else if (stockStatus === 'c') stockIcon = '<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="3" x2="11" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="3" x2="3" y2="11" stroke="#E24B4A" stroke-width="2" stroke-linecap="round"/></svg>';
   else stockIcon = '<span style="color:#B4B2A9">-</span>';
+
+  // S재고/B재고 — 뱃지 스타일
+  var sb = _getPLStock(p);
+  var sHtml, bHtml;
+  if (sb.s === '-') { sHtml = '<span style="color:#999">-</span>'; }
+  else { var _sOp = parseInt(sb.s) === 0 ? 'opacity:0.5;' : ''; sHtml = '<span style="display:inline-block;background:#E1F5EE;color:#085041;font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;border:1px solid #9FE1CB;min-width:24px;text-align:center;' + _sOp + '">' + sb.s + '</span>'; }
+  if (sb.b === '-') { bHtml = '<span style="color:#999">-</span>'; }
+  else { var _bOp = parseInt(sb.b) === 0 ? 'opacity:0.5;' : ''; bHtml = '<span style="display:inline-block;background:#E6F1FB;color:#0C447C;font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;border:1px solid #85B7EB;min-width:24px;text-align:center;' + _bOp + '">' + sb.b + '</span>'; }
 
   // 누적프로모션 매칭 확인 (normalizeTtiCode로 앞자리0 해결)
   var promoBadge = '';
@@ -5062,6 +5071,8 @@ function buildPOProductRow(p, rowIndex) {
   tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
   tr += '<td class="center">' + stockIcon + '</td>';
+  tr += '<td class="center">' + sHtml + '</td>';
+  tr += '<td class="center">' + bHtml + '</td>';
   tr += '<td class="center"><input type="number" min="1" placeholder=""' + _qtyDisabled + ' data-code="' + (p.ttiNum || '') + '"></td>';
   tr += '<td class="center"><button class="po-cart-btn-dark"' + _btnDisabled + ' onclick="addToCart(\'' + (p.ttiNum || '') + '\')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1h1.5l1.2 6h7.6l1.2-4.5H4.5" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="12" r="1" fill="#fff"/><circle cx="10" cy="12" r="1" fill="#fff"/></svg></button></td>';
   tr += '</tr>';
@@ -5076,7 +5087,7 @@ function renderPOProductRows() {
   var html = '';
   for (var i = 0; i < _poRenderedCount; i++) { html += buildPOProductRow(_poFilteredProducts[i], i); }
   if (_poFilteredProducts.length === 0) {
-    html = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#9BA3B2">검색 결과가 없습니다</td></tr>';
+    html = '<tr><td colspan="11" style="text-align:center;padding:30px;color:#9BA3B2">검색 결과가 없습니다</td></tr>';
   }
   body.innerHTML = html;
   // 건수 업데이트
