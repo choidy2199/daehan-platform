@@ -9281,6 +9281,233 @@ function _mwPlBulkCompare(parsedRows) {
   return { changed: changed, added: added, same: same };
 }
 
+// ============================================
+// [제품일괄등록] Phase 3 — BEFORE/AFTER 미리보기 UI
+// ============================================
+
+// 모델명 + ' / ' + 제품설명 분리
+function _mwPlBulkSplitModel(modelStr) {
+  var s = String(modelStr == null ? '' : modelStr);
+  var idx = s.indexOf(' / ');
+  if (idx < 0) return { model: s, desc: '' };
+  return { model: s.substring(0, idx), desc: s.substring(idx + 3) };
+}
+
+// matchedBy 한글 라벨
+function _mwPlBulkMatchedByLabel(key) {
+  if (key === 'manageCode') return '관리코드 매칭';
+  if (key === 'code') return '코드 매칭';
+  if (key === 'ttiNum') return 'TTI# 매칭';
+  return '';
+}
+
+// HTML 안전 escape
+function _mwPlBulkEsc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// 가격 포맷 (콤마)
+function _mwPlBulkFmtPrice(n) {
+  if (n == null || n === '') return '';
+  var num = Number(n);
+  if (isNaN(num)) return _mwPlBulkEsc(n);
+  return num.toLocaleString('en-US');
+}
+
+// 카운트 박스 1개
+function _mwPlBulkRenderCountBox(num, label, bg, fg, sub) {
+  return '<div style="flex:1;text-align:center;padding:10px;background:' + bg + ';border-radius:6px;">'
+    + '<div style="font-size:18px;font-weight:700;color:' + fg + ';">' + num + '</div>'
+    + '<div style="font-size:11px;color:' + sub + ';">' + label + '</div>'
+    + '</div>';
+}
+
+// 미리보기 테이블 thead (변경/신규 공통)
+function _mwPlBulkRenderTableHead() {
+  return '<colgroup>'
+    + '<col style="width:100px;"><col style="width:70px;"><col style="width:110px;">'
+    + '<col style="width:90px;"><col><col><col style="width:100px;">'
+    + '</colgroup>'
+    + '<thead><tr style="background:#1A1D23;color:#fff;font-size:10.5px;">'
+    + '<th style="padding:7px 8px;text-align:left;">구분</th>'
+    + '<th style="padding:7px 8px;text-align:left;">코드</th>'
+    + '<th style="padding:7px 8px;text-align:left;">관리코드</th>'
+    + '<th style="padding:7px 8px;text-align:left;">TTi#</th>'
+    + '<th style="padding:7px 8px;text-align:left;">모델명</th>'
+    + '<th style="padding:7px 8px;text-align:left;">제품설명</th>'
+    + '<th style="padding:7px 8px;text-align:right;">대리점공급가</th>'
+    + '</tr></thead>';
+}
+
+// BEFORE 셀 (변경 셀이면 취소선)
+function _mwPlBulkBeforeCell(v, isDiff) {
+  var s = isDiff ? 'padding:6px 8px;vertical-align:top;text-decoration:line-through;color:#9ca3af;word-break:break-all;'
+                 : 'padding:6px 8px;vertical-align:top;color:#6b7280;word-break:break-all;';
+  return '<td style="' + s + '">' + _mwPlBulkEsc(v) + '</td>';
+}
+
+// AFTER 셀 (변경 셀이면 노란 강조)
+function _mwPlBulkAfterCell(v, isDiff) {
+  var s = isDiff ? 'padding:6px 8px;vertical-align:top;background:#fef3c7;color:#92400e;font-weight:500;word-break:break-all;'
+                 : 'padding:6px 8px;vertical-align:top;color:#1A1D23;word-break:break-all;';
+  return '<td style="' + s + '">' + _mwPlBulkEsc(v) + '</td>';
+}
+
+// BEFORE 가격 셀
+function _mwPlBulkBeforePriceCell(v, isDiff) {
+  var s = isDiff ? 'padding:6px 8px;vertical-align:top;text-align:right;text-decoration:line-through;color:#9ca3af;'
+                 : 'padding:6px 8px;vertical-align:top;text-align:right;color:#6b7280;';
+  return '<td style="' + s + '">' + _mwPlBulkFmtPrice(v) + '</td>';
+}
+
+// AFTER 가격 셀
+function _mwPlBulkAfterPriceCell(v, isDiff) {
+  var s = isDiff ? 'padding:6px 8px;vertical-align:top;text-align:right;background:#fef3c7;color:#92400e;font-weight:500;'
+                 : 'padding:6px 8px;vertical-align:top;text-align:right;color:#1A1D23;';
+  return '<td style="' + s + '">' + _mwPlBulkFmtPrice(v) + '</td>';
+}
+
+// 변경 1건 = BEFORE 행 + AFTER 행
+function _mwPlBulkRenderChangedRows(c) {
+  var diffs = c.diffs || [];
+  var oldP = c.existProduct || {};
+  var newP = c.newRow || {};
+  var oldSplit = _mwPlBulkSplitModel(oldP.model);
+  var newSplit = _mwPlBulkSplitModel(newP.model);
+  var matchedLabel = _mwPlBulkMatchedByLabel(c.matchedBy);
+
+  // BEFORE
+  var beforeRow = '<tr style="background:#F7F8FA;border-top:1px solid #DDE1EB;">'
+    + '<td style="padding:6px 8px;vertical-align:top;">'
+      + '<span style="display:inline-block;padding:2px 6px;background:#9BA3B2;color:#fff;font-size:9.5px;border-radius:3px;font-weight:500;">BEFORE</span>'
+      + (matchedLabel ? '<div style="font-size:9.5px;color:#9BA3B2;margin-top:2px;">' + matchedLabel + '</div>' : '')
+    + '</td>'
+    + _mwPlBulkBeforeCell(oldP.code, diffs.indexOf('code') !== -1)
+    + _mwPlBulkBeforeCell(oldP.manageCode, diffs.indexOf('manageCode') !== -1)
+    + _mwPlBulkBeforeCell(oldP.ttiNum, diffs.indexOf('ttiNum') !== -1)
+    + _mwPlBulkBeforeCell(oldSplit.model, diffs.indexOf('model') !== -1)
+    + _mwPlBulkBeforeCell(oldSplit.desc, diffs.indexOf('model') !== -1)
+    + _mwPlBulkBeforePriceCell(oldP.supplyPrice, diffs.indexOf('supplyPrice') !== -1)
+    + '</tr>';
+
+  // AFTER
+  var afterRow = '<tr style="background:#fff;">'
+    + '<td style="padding:6px 8px;vertical-align:top;">'
+      + '<span style="display:inline-block;padding:2px 6px;background:#185FA5;color:#fff;font-size:9.5px;border-radius:3px;font-weight:500;">AFTER</span>'
+    + '</td>'
+    + _mwPlBulkAfterCell(newP.code, diffs.indexOf('code') !== -1)
+    + _mwPlBulkAfterCell(newP.manageCode, diffs.indexOf('manageCode') !== -1)
+    + _mwPlBulkAfterCell(newP.ttiNum, diffs.indexOf('ttiNum') !== -1)
+    + _mwPlBulkAfterCell(newSplit.model, diffs.indexOf('model') !== -1)
+    + _mwPlBulkAfterCell(newSplit.desc, diffs.indexOf('model') !== -1)
+    + _mwPlBulkAfterPriceCell(newP.supplyPrice, diffs.indexOf('supplyPrice') !== -1)
+    + '</tr>';
+
+  return beforeRow + afterRow;
+}
+
+// 신규 1건 = 한 줄 (녹색)
+function _mwPlBulkRenderAddedRow(a) {
+  var p = a.newRow || {};
+  var sp = _mwPlBulkSplitModel(p.model);
+  return '<tr style="background:#f0fdf4;border-top:1px solid #bbf7d0;">'
+    + '<td style="padding:6px 8px;vertical-align:top;">'
+      + '<span style="display:inline-block;padding:2px 6px;background:#d1fae5;color:#065f46;font-size:9.5px;border-radius:3px;font-weight:500;">신규</span>'
+    + '</td>'
+    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(p.code) + '</td>'
+    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(p.manageCode) + '</td>'
+    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(p.ttiNum) + '</td>'
+    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(sp.model) + '</td>'
+    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(sp.desc) + '</td>'
+    + '<td style="padding:6px 8px;vertical-align:top;text-align:right;color:#065f46;font-weight:500;">' + _mwPlBulkFmtPrice(p.supplyPrice) + '</td>'
+    + '</tr>';
+}
+
+// 메인 렌더
+function _mwPlBulkRenderPreview(compareResult) {
+  var area = document.getElementById('mw-pl-bulk-result-area');
+  if (!area) return;
+  var changed = (compareResult && compareResult.changed) || [];
+  var added = (compareResult && compareResult.added) || [];
+  var same = (compareResult && compareResult.same) || [];
+  var total = changed.length + added.length + same.length;
+
+  // 모든 동일 케이스
+  if (changed.length === 0 && added.length === 0) {
+    area.innerHTML =
+      '<div style="padding:24px; text-align:center; background:#f1f5f9; border-radius:8px; color:#64748b; font-size:13px;">'
+      + '✅ 변경/신규 항목이 없습니다. 모든 데이터가 일치합니다.'
+      + '</div>';
+    area.style.display = 'block';
+    return;
+  }
+
+  var html = '';
+
+  // 1. 4카운트 요약바
+  html += '<div style="display:flex;gap:8px;margin-bottom:14px;">';
+  html += _mwPlBulkRenderCountBox(total, '전체', '#f1f5f9', '#1A1D23', '#64748b');
+  html += _mwPlBulkRenderCountBox(changed.length, '변경', '#dbeafe', '#1d4ed8', '#3b82f6');
+  html += _mwPlBulkRenderCountBox(added.length, '신규', '#d1fae5', '#065f46', '#10b981');
+  html += _mwPlBulkRenderCountBox(same.length, '동일', '#fef3c7', '#92400e', '#d97706');
+  html += '</div>';
+
+  // 2. 변경 테이블
+  if (changed.length > 0) {
+    html += '<div style="margin-bottom:16px;">';
+    html += '<div style="font-size:13px;font-weight:600;color:#1A1D23;margin-bottom:8px;">변경 ' + changed.length + '건</div>';
+    html += '<div style="max-height:350px;overflow-y:auto;border:0.5px solid #DDE1EB;border-radius:6px;">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">';
+    html += _mwPlBulkRenderTableHead();
+    html += '<tbody>';
+    for (var i = 0; i < changed.length; i++) {
+      html += _mwPlBulkRenderChangedRows(changed[i]);
+    }
+    html += '</tbody></table></div></div>';
+  }
+
+  // 3. 신규 테이블
+  if (added.length > 0) {
+    html += '<div style="margin-bottom:16px;">';
+    html += '<div style="font-size:13px;font-weight:600;color:#065f46;margin-bottom:8px;">신규 ' + added.length + '건</div>';
+    html += '<div style="max-height:250px;overflow-y:auto;border:0.5px solid #bbf7d0;border-radius:6px;background:#f0fdf4;">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">';
+    html += _mwPlBulkRenderTableHead();
+    html += '<tbody>';
+    for (var j = 0; j < added.length; j++) {
+      html += _mwPlBulkRenderAddedRow(added[j]);
+    }
+    html += '</tbody></table></div></div>';
+  }
+
+  // 4. 적용 버튼
+  var totalApply = changed.length + added.length;
+  var btnDisabled = totalApply === 0;
+  var btnStyle = 'padding:9px 20px;font-size:13px;color:#fff;border:none;border-radius:6px;font-weight:600;'
+    + (btnDisabled
+        ? 'background:#9BA3B2;cursor:not-allowed;opacity:0.6;'
+        : 'background:#185FA5;cursor:pointer;');
+  html += '<div style="display:flex;justify-content:flex-end;margin-top:14px;">';
+  html += '<button id="mw-pl-bulk-apply-btn" type="button" ' + (btnDisabled ? 'disabled ' : '') + 'style="' + btnStyle + '">';
+  html += '적용 (변경 ' + changed.length + '건 / 신규 ' + added.length + '건)';
+  html += '</button>';
+  html += '</div>';
+
+  area.innerHTML = html;
+  area.style.display = 'block';
+
+  // 적용 버튼 바인딩 (Phase 3 placeholder)
+  var applyBtn = document.getElementById('mw-pl-bulk-apply-btn');
+  if (applyBtn && !btnDisabled && applyBtn.dataset.mwPlBulkBound !== '1') {
+    applyBtn.dataset.mwPlBulkBound = '1';
+    applyBtn.addEventListener('click', function() {
+      alert('적용은 Phase 4에서 구현됩니다.');
+    });
+  }
+}
+
 function _mwPlBulkResetState() {
   // Phase 2~4에서 본 로직 추가됨 (파싱 데이터 초기화 등)
   var input = document.getElementById('mw-pl-bulk-file-input');
@@ -9330,14 +9557,7 @@ function _bindMwPlBulkEvents() {
         console.log('[제품일괄등록] 변경 상세 (앞 5건):', compareResult.changed.slice(0, 5));
         console.log('[제품일괄등록] 신규 상세 (앞 5건):', compareResult.added.slice(0, 5));
         window._mwPlBulkLastResult = { parseResult: parseResult, compareResult: compareResult };
-        alert(
-          '[Phase 2 검증] 콘솔 확인\n\n' +
-          '시트: ' + parseResult.sheetName + '\n' +
-          '전체: ' + summary.totalRows + '건\n' +
-          '변경: ' + summary.changed + '건\n' +
-          '신규: ' + summary.added + '건\n' +
-          '동일: ' + summary.same + '건'
-        );
+        _mwPlBulkRenderPreview(compareResult);
       });
     });
   }
