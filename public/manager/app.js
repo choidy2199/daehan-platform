@@ -9923,7 +9923,7 @@ function downloadTemplate() {
 
 // 제품등록및수정 탭 팝업 열기
 function showProductManageModal() {
-  switchPmTab('import');
+  switchPmTab('bulkreg');
   document.getElementById('import-modal').classList.add('show');
   resetImportFile();
   document.getElementById('import-replace-section').style.display = 'none';
