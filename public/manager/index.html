@@ -332,6 +332,10 @@ document.head.appendChild(s);
         <button id="mw-edit-toggle-btn" class="btn-u d-success mw-btn-normal" onclick="toggleMwEditMode()">✎ 수정</button>
         <button class="btn-u d-success mw-btn-edit" style="display:none" onclick="toggleMwEditMode()">✓ 확인</button>
 
+        <!-- ⚙ 설정 버튼 — 모드 무관 항상 표시 (mw-btn-* 클래스 부여 금지) -->
+        <span style="opacity:0.3;font-size:14px;padding:0 4px;color:#fff;">|</span>
+        <button id="catalog-settings-btn" onclick="showSettingsModal();switchSettingsTab('rebate');" title="설정 (리베이트·마진율)" style="background:#E24B4A;color:white;border:0;width:26px;height:26px;border-radius:4px;font-size:18px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;">⚙</button>
+
         <!-- 호환성: updateDeleteBtn() null 참조 방지용 영구 숨김 (DOM 유지) -->
         <button id="btn-delete-selected" onclick="deleteSelectedProducts()" style="display:none !important">선택 삭제</button>
       </div>
