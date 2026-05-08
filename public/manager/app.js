@@ -5044,6 +5044,10 @@ function buildPOProductRow(p, rowIndex) {
 
   // S재고/B재고 — 뱃지 스타일
   var sb = _getPLStock(p);
+  if (sb.s === '-' && sb.b === '-') {
+    var _self = findStock(p.code);
+    if (_self !== null) sb = { s: _self, b: '-' };
+  }
   var sHtml, bHtml;
   if (sb.s === '-') { sHtml = '<span style="color:#999">-</span>'; }
   else { var _sOp = parseInt(sb.s) === 0 ? 'opacity:0.5;' : ''; sHtml = '<span style="display:inline-block;background:#E1F5EE;color:#085041;font-size:11px;font-weight:600;padding:1px 6px;border-radius:3px;border:1px solid #9FE1CB;min-width:24px;text-align:center;' + _sOp + '">' + sb.s + '</span>'; }
