@@ -1043,6 +1043,17 @@ body.gen-edit-active #gen-table tbody tr td:first-child {
 .po-filter-row input, .po-filter-row select { height:32px; border:1px solid #DDE1EB; border-radius:4px; padding:0 8px; font-size:13px; font-family:'Pretendard',sans-serif; }
 .po-filter-row input { flex:1; }
 
+/* 일반주문 대분류 칩 */
+.po-cat-chip{height:30px;padding:0 14px;border:1px solid;border-radius:4px;font-size:12px;font-weight:500;font-family:inherit;background:#fff;cursor:pointer;line-height:1;display:inline-flex;align-items:center;}
+.po-cat-chip-power{color:#185FA5;border-color:#185FA5;}
+.po-cat-chip-power.po-cat-chip-active{background:#185FA5;color:#fff;}
+.po-cat-chip-hand{color:#1D9E75;border-color:#1D9E75;}
+.po-cat-chip-hand.po-cat-chip-active{background:#1D9E75;color:#fff;}
+.po-cat-chip-acc{color:#92400E;border-color:#92400E;}
+.po-cat-chip-acc.po-cat-chip-active{background:#92400E;color:#fff;}
+.po-cat-chip-pack{color:#D4537E;border-color:#D4537E;}
+.po-cat-chip-pack.po-cat-chip-active{background:#D4537E;color:#fff;}
+
 /* 제품등록 검색행 */
 .po-register-row { display:flex; gap:6px; padding:8px; align-items:center; border-bottom:1px solid #EAECF2; flex-shrink:0; }
 .po-register-row input { flex:1; height:32px; border:1px solid #DDE1EB; border-radius:6px; padding:0 10px; font-size:12px; font-family:'Pretendard',sans-serif; }

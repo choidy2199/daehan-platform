@@ -4942,6 +4942,7 @@ function renderPOTab() {
 
   // 초기 제품 행 렌더링 + 스크롤 이벤트
   renderPOProductRows();
+  setTimeout(function(){ if (typeof filterPOProducts === 'function') filterPOProducts(); }, 0);
   var scrollEl = document.getElementById('po-prod-scroll');
   if (scrollEl) scrollEl.addEventListener('scroll', onPOProductScroll);
 
@@ -4967,6 +4968,18 @@ var _poFilteredProducts = [];
 var _poRenderedCount = 0;
 var _poTtiStockMap = {};
 
+var _poActiveCat = '파워툴';
+try { _poActiveCat = localStorage.getItem('mw_po_active_cat') || '파워툴'; } catch(e) {}
+
+function setPOActiveCat(cat) {
+  _poActiveCat = cat;
+  try { localStorage.setItem('mw_po_active_cat', cat); } catch(e) {}
+  document.querySelectorAll('.po-cat-chip').forEach(function(b) {
+    b.classList.toggle('po-cat-chip-active', b.getAttribute('data-cat') === cat);
+  });
+  if (typeof filterPOProducts === 'function') filterPOProducts();
+}
+
 function buildPOProductPanel() {
   _ensureSetBearPairs();
   // TTI 재고 맵 (1회 빌드)
@@ -4990,16 +5003,15 @@ function buildPOProductPanel() {
 
   // 필터 행
   html += '<div class="po-filter-row">';
-  html += '<input type="search" placeholder="코드, 모델명 검색" id="po-prod-search" autocomplete="off">';
+  html += '<input type="search" placeholder="코드, 모델명 검색" id="po-prod-search" autocomplete="off" style="width:200px;flex:none">';
 
-  // 카테고리 select — 실제 카테고리에서 동적 생성
-  var cats = {};
-  (DB.products || []).forEach(function(p) { if (p.category) cats[p.category] = true; });
-  html += '<select id="po-prod-cat" onchange="filterPOProducts()" style="min-width:80px"><option value="">전체</option>';
-  Object.keys(cats).sort().forEach(function(c) { html += '<option value="' + c + '">' + c + '</option>'; });
-  html += '</select>';
-
-  html += '<select id="po-prod-stock" onchange="filterPOProducts()" style="min-width:80px"><option value="">본사전체</option><option value="a">적정</option><option value="b">임박</option><option value="c">소진</option></select>';
+  // 카테고리 칩 4개
+  var _poChips = ['파워툴', '수공구', '악세사리', '팩아웃'];
+  _poChips.forEach(function(c) {
+    var cls = 'po-cat-chip po-cat-chip-' + ({ '파워툴':'power', '수공구':'hand', '악세사리':'acc', '팩아웃':'pack' })[c];
+    if (c === _poActiveCat) cls += ' po-cat-chip-active';
+    html += '<button type="button" class="' + cls + '" data-cat="' + c + '" onclick="setPOActiveCat(\'' + c + '\')">' + c + '</button>';
+  });
   html += '</div>';
 
   // 테이블
@@ -7311,17 +7323,17 @@ function _removeSuccessFromCart() {
 // 제품 목록 필터
 function filterPOProducts() {
   var search = (document.getElementById('po-prod-search') || {}).value || '';
-  var cat = (document.getElementById('po-prod-cat') || {}).value || '';
-  var stock = (document.getElementById('po-prod-stock') || {}).value || '';
+  var cat = _poActiveCat || '파워툴';
   search = search.toLowerCase().trim();
 
   _poFilteredProducts = (DB.products || []).filter(function(p) {
     if (p.discontinued) return false;
-    if (cat && p.category !== cat) return false;
-    if (stock) {
-      var code = normalizeTtiCode(p.ttiNum);
-      var s = code && _poTtiStockMap[code] !== undefined ? _poTtiStockMap[code] : '';
-      if (s !== stock) return false;
+    if (cat) {
+      if (cat === '악세사리') {
+        if (p.category !== '악세사리' && p.category !== '액세서리') return false;
+      } else {
+        if (p.category !== cat) return false;
+      }
     }
     if (search) {
       var text = ((p.code || '') + ' ' + (p.ttiNum || '') + ' ' + (p.model || '') + ' ' + (p.detail || '') + ' ' + (p.category || '') + ' ' + (p.orderNum || '')).toLowerCase();
