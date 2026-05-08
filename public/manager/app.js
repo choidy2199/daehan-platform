@@ -9083,6 +9083,204 @@ function _updateMwPricelistIoExportFilterUI() {
   });
 }
 
+// ============================================
+// [제품일괄등록] Phase 2 — 파싱 + 매칭 + 비교
+// ============================================
+
+// 안전 문자열 변환
+function _mwPlBulkSafeStr(v) {
+  return String(v == null ? '' : v).trim();
+}
+
+// 매칭 키로 사용 불가능한 placeholder 판정
+function _mwPlBulkIsKeyEmpty(v) {
+  var s = _mwPlBulkSafeStr(v);
+  return s === '' || s === '-' || s === '0' || s === '단종';
+}
+
+// 셀 단위 동일성 비교
+function _mwPlBulkCellEq(oldVal, newVal, fieldType) {
+  if (fieldType === 'price') return Number(oldVal || 0) === Number(newVal || 0);
+  if (fieldType === 'tti') {
+    var oNorm = (typeof normalizeTtiCode === 'function') ? normalizeTtiCode(oldVal) : _mwPlBulkSafeStr(oldVal);
+    var nNorm = (typeof normalizeTtiCode === 'function') ? normalizeTtiCode(newVal) : _mwPlBulkSafeStr(newVal);
+    return oNorm === nNorm;
+  }
+  return _mwPlBulkSafeStr(oldVal) === _mwPlBulkSafeStr(newVal);
+}
+
+// 시트 → 행 배열 변환 (헤더 자동 매칭)
+function _mwPlBulkParseSheet(wb) {
+  if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
+    return { rows: [], errors: ['엑셀 시트를 찾을 수 없습니다'] };
+  }
+  var sheetName = wb.SheetNames.find(function(s) { return s.indexOf('가격표') !== -1; }) || wb.SheetNames[0];
+  var ws = wb.Sheets[sheetName];
+  if (!ws) return { rows: [], errors: ['시트 [' + sheetName + ']를 읽을 수 없습니다'] };
+
+  var data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+  if (!data || data.length < 2) return { rows: [], errors: ['데이터가 없습니다'] };
+
+  // 헤더 매칭
+  var col = {};
+  var header = data[0] || [];
+  for (var i = 0; i < header.length; i++) {
+    var key = _mwPlBulkSafeStr(header[i]).replace(/\s+/g, '').toLowerCase();
+    if (key === '코드') col.code = i;
+    else if (key === '관리코드') col.manageCode = i;
+    else if (key === '대분류') col.category = i;
+    else if (key === '중분류') col.subcategory = i;
+    else if (key === '소분류') col.detail = i;
+    else if (key === '순번') col.orderNum = i;
+    else if (key.indexOf('tti') !== -1) col.ttiNum = i;
+    else if (key === '모델명') col.model = i;
+    else if (key.indexOf('제품설명') !== -1) col.description = i;
+    else if (key.indexOf('공급가') !== -1) col.supplyPrice = i;
+  }
+
+  var errors = [];
+  var required = ['code', 'manageCode', 'ttiNum', 'model', 'supplyPrice'];
+  for (var ri = 0; ri < required.length; ri++) {
+    if (col[required[ri]] === undefined) errors.push('필수 컬럼 누락: ' + required[ri]);
+  }
+  if (errors.length) return { rows: [], errors: errors };
+
+  // 행 변환
+  var rows = [];
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r] || [];
+    if (row.every(function(v) { return v == null || _mwPlBulkSafeStr(v) === ''; })) continue;
+
+    var modelStr = _mwPlBulkSafeStr(row[col.model]);
+    var descStr = (col.description !== undefined) ? _mwPlBulkSafeStr(row[col.description]) : '';
+    var combinedModel = descStr ? (modelStr + ' / ' + descStr) : modelStr;
+
+    var supplyRaw = row[col.supplyPrice];
+    var supplyNum = 0;
+    if (supplyRaw != null) {
+      var s = _mwPlBulkSafeStr(supplyRaw).replace(/,/g, '');
+      var n = Number(s);
+      supplyNum = isNaN(n) ? 0 : n;
+    }
+
+    rows.push({
+      code:        _mwPlBulkSafeStr(row[col.code]),
+      manageCode:  _mwPlBulkSafeStr(row[col.manageCode]),
+      category:    _mwPlBulkSafeStr(row[col.category]),
+      subcategory: _mwPlBulkSafeStr(row[col.subcategory]),
+      detail:      _mwPlBulkSafeStr(row[col.detail]),
+      orderNum:    _mwPlBulkSafeStr(row[col.orderNum]),
+      ttiNum:      _mwPlBulkSafeStr(row[col.ttiNum]),
+      model:       combinedModel,
+      supplyPrice: supplyNum,
+      _excelRow:   r + 1
+    });
+  }
+  return { rows: rows, errors: [], sheetName: sheetName };
+}
+
+// 파일 → 파싱 (FileReader)
+function _mwPlBulkParseFile(file, callback) {
+  if (!file) { callback({ rows: [], errors: ['파일이 없습니다'] }); return; }
+  if (typeof XLSX === 'undefined') { callback({ rows: [], errors: ['XLSX 라이브러리 미로드'] }); return; }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      callback(_mwPlBulkParseSheet(wb));
+    } catch (err) {
+      callback({ rows: [], errors: ['엑셀 파싱 실패: ' + (err && err.message ? err.message : String(err))] });
+    }
+  };
+  reader.onerror = function() { callback({ rows: [], errors: ['파일 읽기 실패'] }); };
+  reader.readAsArrayBuffer(file);
+}
+
+// cascading 매칭 (manageCode → code → ttiNum)
+function _mwPlBulkFindMatch(newRow, existing) {
+  if (!existing || existing.length === 0) return { matchIdx: -1, matchedBy: null };
+
+  // 1순위: manageCode
+  if (!_mwPlBulkIsKeyEmpty(newRow.manageCode)) {
+    var key1 = _mwPlBulkSafeStr(newRow.manageCode);
+    for (var i = 0; i < existing.length; i++) {
+      if (_mwPlBulkIsKeyEmpty(existing[i].manageCode)) continue;
+      if (_mwPlBulkSafeStr(existing[i].manageCode) === key1) return { matchIdx: i, matchedBy: 'manageCode' };
+    }
+  }
+  // 2순위: code
+  if (!_mwPlBulkIsKeyEmpty(newRow.code)) {
+    var key2 = _mwPlBulkSafeStr(newRow.code);
+    for (var i2 = 0; i2 < existing.length; i2++) {
+      if (_mwPlBulkIsKeyEmpty(existing[i2].code)) continue;
+      if (_mwPlBulkSafeStr(existing[i2].code) === key2) return { matchIdx: i2, matchedBy: 'code' };
+    }
+  }
+  // 3순위: ttiNum (normalize 후 비교)
+  if (!_mwPlBulkIsKeyEmpty(newRow.ttiNum)) {
+    var norm = (typeof normalizeTtiCode === 'function') ? normalizeTtiCode(newRow.ttiNum) : _mwPlBulkSafeStr(newRow.ttiNum);
+    if (norm) {
+      for (var i3 = 0; i3 < existing.length; i3++) {
+        if (_mwPlBulkIsKeyEmpty(existing[i3].ttiNum)) continue;
+        var existNorm = (typeof normalizeTtiCode === 'function') ? normalizeTtiCode(existing[i3].ttiNum) : _mwPlBulkSafeStr(existing[i3].ttiNum);
+        if (existNorm === norm) return { matchIdx: i3, matchedBy: 'ttiNum' };
+      }
+    }
+  }
+  return { matchIdx: -1, matchedBy: null };
+}
+
+// 변경/신규/동일 분류
+function _mwPlBulkCompare(parsedRows) {
+  var existing = (typeof DB !== 'undefined' && DB && DB.products) ? DB.products : [];
+  var changed = [];
+  var added = [];
+  var same = [];
+
+  var compareFields = [
+    { key: 'code',        type: 'str' },
+    { key: 'manageCode',  type: 'str' },
+    { key: 'category',    type: 'str' },
+    { key: 'subcategory', type: 'str' },
+    { key: 'detail',      type: 'str' },
+    { key: 'ttiNum',      type: 'tti' },
+    { key: 'orderNum',    type: 'str' },
+    { key: 'model',       type: 'str' },
+    { key: 'supplyPrice', type: 'price' }
+  ];
+
+  for (var i = 0; i < parsedRows.length; i++) {
+    var newRow = parsedRows[i];
+    var match = _mwPlBulkFindMatch(newRow, existing);
+
+    if (match.matchIdx < 0) {
+      added.push({ newRow: newRow });
+      continue;
+    }
+
+    var existProduct = existing[match.matchIdx];
+    var diffs = [];
+    for (var f = 0; f < compareFields.length; f++) {
+      var fld = compareFields[f];
+      if (!_mwPlBulkCellEq(existProduct[fld.key], newRow[fld.key], fld.type)) {
+        diffs.push(fld.key);
+      }
+    }
+    if (diffs.length === 0) {
+      same.push({ existIdx: match.matchIdx, matchedBy: match.matchedBy });
+    } else {
+      changed.push({
+        existIdx: match.matchIdx,
+        matchedBy: match.matchedBy,
+        existProduct: existProduct,
+        newRow: newRow,
+        diffs: diffs
+      });
+    }
+  }
+  return { changed: changed, added: added, same: same };
+}
+
 function _mwPlBulkResetState() {
   // Phase 2~4에서 본 로직 추가됨 (파싱 데이터 초기화 등)
   var input = document.getElementById('mw-pl-bulk-file-input');
@@ -9112,8 +9310,35 @@ function _bindMwPlBulkEvents() {
   if (fileInput && fileInput.dataset.mwPlBulkBound !== '1') {
     fileInput.dataset.mwPlBulkBound = '1';
     fileInput.addEventListener('change', function() {
-      // Phase 2에서 파싱 로직 연결
-      console.log('[Phase 1] 파일 선택됨:', fileInput.files && fileInput.files[0] && fileInput.files[0].name);
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      _mwPlBulkParseFile(f, function(parseResult) {
+        if (parseResult.errors && parseResult.errors.length) {
+          console.error('[제품일괄등록] 파싱 오류:', parseResult.errors);
+          alert('엑셀 파싱 실패:\n' + parseResult.errors.join('\n'));
+          return;
+        }
+        var compareResult = _mwPlBulkCompare(parseResult.rows);
+        var summary = {
+          sheetName: parseResult.sheetName,
+          totalRows: parseResult.rows.length,
+          changed: compareResult.changed.length,
+          added: compareResult.added.length,
+          same: compareResult.same.length
+        };
+        console.log('[제품일괄등록] Phase 2 결과:', summary);
+        console.log('[제품일괄등록] 변경 상세 (앞 5건):', compareResult.changed.slice(0, 5));
+        console.log('[제품일괄등록] 신규 상세 (앞 5건):', compareResult.added.slice(0, 5));
+        window._mwPlBulkLastResult = { parseResult: parseResult, compareResult: compareResult };
+        alert(
+          '[Phase 2 검증] 콘솔 확인\n\n' +
+          '시트: ' + parseResult.sheetName + '\n' +
+          '전체: ' + summary.totalRows + '건\n' +
+          '변경: ' + summary.changed + '건\n' +
+          '신규: ' + summary.added + '건\n' +
+          '동일: ' + summary.same + '건'
+        );
+      });
     });
   }
 }
