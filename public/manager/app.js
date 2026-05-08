@@ -9083,6 +9083,41 @@ function _updateMwPricelistIoExportFilterUI() {
   });
 }
 
+function _mwPlBulkResetState() {
+  // Phase 2~4에서 본 로직 추가됨 (파싱 데이터 초기화 등)
+  var input = document.getElementById('mw-pl-bulk-file-input');
+  if (input) input.value = '';
+  var result = document.getElementById('mw-pl-bulk-result-area');
+  if (result) { result.style.display = 'none'; result.innerHTML = ''; }
+  _bindMwPlBulkEvents();
+}
+
+function _bindMwPlBulkEvents() {
+  var tmplBtn = document.getElementById('mw-pl-bulk-template-btn');
+  if (tmplBtn && tmplBtn.dataset.mwPlBulkBound !== '1') {
+    tmplBtn.dataset.mwPlBulkBound = '1';
+    tmplBtn.addEventListener('click', function() {
+      alert('양식 다운로드는 Phase 4에서 구현됩니다.');
+    });
+  }
+  var fileBtn = document.getElementById('mw-pl-bulk-file-btn');
+  if (fileBtn && fileBtn.dataset.mwPlBulkBound !== '1') {
+    fileBtn.dataset.mwPlBulkBound = '1';
+    fileBtn.addEventListener('click', function() {
+      var input = document.getElementById('mw-pl-bulk-file-input');
+      if (input) input.click();
+    });
+  }
+  var fileInput = document.getElementById('mw-pl-bulk-file-input');
+  if (fileInput && fileInput.dataset.mwPlBulkBound !== '1') {
+    fileInput.dataset.mwPlBulkBound = '1';
+    fileInput.addEventListener('change', function() {
+      // Phase 2에서 파싱 로직 연결
+      console.log('[Phase 1] 파일 선택됨:', fileInput.files && fileInput.files[0] && fileInput.files[0].name);
+    });
+  }
+}
+
 function _updateMwPricelistIoExportSummary() {
   const summaryEl = document.getElementById('mw-pl-io-export-summary');
   const countEl = document.getElementById('mw-pl-io-export-count');
@@ -9276,6 +9311,7 @@ function showProductManageModal() {
       var tab = btn.getAttribute('data-pm-tab');
       if (tab === 'import') _renderMwPricelistIoColumnSelector();
       else if (tab === 'export') { _mwPricelistIoExportFilter = 'all'; _renderMwPricelistIoExportColumnSelector(); }
+      else if (tab === 'bulkreg') _mwPlBulkResetState();
     });
   });
 }

@@ -1094,6 +1094,7 @@ document.head.appendChild(s);
       <button class="pm-tab active" data-pm-tab="import" onclick="switchPmTab('import')" style="background:none;border:none;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;color:#185FA5;border-bottom:2px solid #185FA5;margin-bottom:-2px;font-family:'Pretendard',sans-serif">가져오기</button>
       <button class="pm-tab" data-pm-tab="export" onclick="switchPmTab('export')" style="background:none;border:none;padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;color:#9BA3B2;border-bottom:2px solid transparent;margin-bottom:-2px;font-family:'Pretendard',sans-serif">내보내기</button>
       <button class="pm-tab" data-pm-tab="add" onclick="switchPmTab('add')" style="background:none;border:none;padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;color:#9BA3B2;border-bottom:2px solid transparent;margin-bottom:-2px;font-family:'Pretendard',sans-serif">+ 제품등록</button>
+      <button class="pm-tab" data-pm-tab="bulkreg" onclick="switchPmTab('bulkreg')" style="background:none;border:none;padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;color:#9BA3B2;border-bottom:2px solid transparent;margin-bottom:-2px;font-family:'Pretendard',sans-serif">제품일괄등록</button>
     </div>
     <!-- 탭 콘텐츠: 가져오기 -->
     <div id="pm-content-import" class="pm-content" style="padding:20px;max-height:calc(100vh - 220px);overflow-y:auto">
@@ -1275,6 +1276,28 @@ document.head.appendChild(s);
         <button class="btn-secondary" onclick="closeModal()">취소</button>
         <button class="btn-primary" onclick="saveProduct()">저장</button>
       </div>
+    </div>
+    <!-- 탭 콘텐츠: 제품일괄등록 -->
+    <div id="pm-content-bulkreg" class="pm-content" style="display:none; padding:20px;">
+      <!-- 안내 박스 -->
+      <div style="background:#E6F1FB; border:0.5px solid #B5D4F4; border-radius:8px; padding:12px 14px; margin-bottom:14px; font-size:12px; color:#0C447C; line-height:1.6;">
+        <div style="font-weight:500; margin-bottom:4px;">📊 제품일괄등록 안내</div>
+        <div>엑셀을 업로드하면 기존 제품과 자동 비교하여 <strong>변경분만 업데이트</strong>하고 <strong>신규 제품은 자동 추가</strong>합니다.</div>
+        <div>매칭 순서: 관리코드 → 코드 → TTI# (모두 안 맞으면 신규)</div>
+      </div>
+      <!-- 양식 다운로드 -->
+      <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+        <button id="mw-pl-bulk-template-btn" type="button" style="padding:7px 14px; font-size:12px; background:#fff; border:0.5px solid #DDE1EB; border-radius:8px; cursor:pointer;">📋 양식 다운로드</button>
+      </div>
+      <!-- 파일 업로드 영역 -->
+      <div id="mw-pl-bulk-upload-area" style="border:1px dashed #B5D4F4; border-radius:12px; padding:36px 20px; text-align:center; background:#F7FAFE;">
+        <div style="font-size:13px; color:#185FA5; margin-bottom:6px;">엑셀 파일을 업로드하세요</div>
+        <div style="font-size:11px; color:#9BA3B2; margin-bottom:14px;">.xlsx 파일 지원</div>
+        <button id="mw-pl-bulk-file-btn" type="button" style="padding:8px 18px; font-size:12.5px; background:#185FA5; color:#fff; border:none; border-radius:8px; font-weight:500; cursor:pointer;">파일 선택</button>
+        <input type="file" id="mw-pl-bulk-file-input" accept=".xlsx" style="display:none;">
+      </div>
+      <!-- 결과 영역 (Phase 3에서 채움) -->
+      <div id="mw-pl-bulk-result-area" style="display:none; margin-top:16px;"></div>
     </div>
   </div>
 </div>
