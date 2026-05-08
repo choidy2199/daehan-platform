@@ -2724,7 +2724,7 @@ body.gen-edit-active #gen-table tbody tr td:first-child {
 #po-list-modal .po-list-table td.po-list-td-actions { padding-right: 16px; }
 
 /* 필터 레이아웃 (상태 탭 + 날짜 필터) */
-.po-filter-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:10px 16px 0 16px; flex-wrap:wrap; position:relative; }
+#po-list-modal .po-filter-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:10px 16px 0 16px; flex-wrap:wrap; position:relative; }
 .po-list-filter-tabs { display:flex; gap:6px; flex-wrap:wrap; }
 
 /* 날짜 빠른 필터 */
