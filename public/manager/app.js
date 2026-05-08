@@ -516,7 +516,7 @@ async function forceUploadAll() {
   if (btn) btn.disabled = true;
   updateSyncStatus('동기화 중...');
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products','mw_price_collect','mw_price_collect_meta'];
   // 동적 키: mw_import_po_cart_{poId} — PO별 장바구니 (커밋 5)
   for (var _si = 0; _si < localStorage.length; _si++) {
     var _sk = localStorage.key(_si);
@@ -568,7 +568,7 @@ async function uploadAllToSupabase() {
   btn.style.background = '#888';
   btn.style.color = '#fff';
 
-  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products'];
+  var keys = ['mw_products','mw_gen_products','mw_inventory','mw_promotions','mw_settings','mw_rebate','mw_customers','mw_clients','mw_orders','mw_action_history','mw_sales_items','mw_setbun_items','mw_parts_prices','mw_bot_rooms','mw_bot_messages','mw_bot_templates','mw_bot_tracking','mw_bot_broadcasts','mw_import_po_products','mw_price_collect','mw_price_collect_meta'];
   // 동적 키: mw_import_po_cart_{poId} — PO별 장바구니 (커밋 5)
   for (var _si = 0; _si < localStorage.length; _si++) {
     var _sk = localStorage.key(_si);
@@ -703,6 +703,9 @@ function _bgSyncFromSupabase(activeTab) {
       _stockMap = null;
       if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gp = loadObj('mw_gen_products', []); for (var j = 0; j < _gp.length; j++) genProducts.push(_gp[j]); }
       if (typeof clientData !== 'undefined') { clientData.length = 0; var _cl = loadObj('mw_clients', []); for (var j = 0; j < _cl.length; j++) clientData.push(_cl[j]); }
+      _priceCollectMap = loadObj('mw_price_collect', null);
+      _priceCollectMeta = loadObj('mw_price_collect_meta', null);
+      _priceCollectStatsByMarket = (_priceCollectMeta && _priceCollectMeta.stats) || { naver: null, ssg: null, gmarket: null };
 
       // 변경된 키에 해당하는 탭만 리렌더링
       refreshActiveTab();
@@ -843,6 +846,9 @@ async function realtimeDownloadAndRefresh() {
       // 추가 글로벌 변수 재로드
       if (typeof genProducts !== 'undefined') { genProducts.length = 0; var _gpArr = loadObj('mw_gen_products', []); for (var j = 0; j < _gpArr.length; j++) genProducts.push(_gpArr[j]); }
       if (typeof clientData !== 'undefined') { clientData.length = 0; var _clArr = loadObj('mw_clients', []); for (var j = 0; j < _clArr.length; j++) clientData.push(_clArr[j]); }
+      _priceCollectMap = loadObj('mw_price_collect', null);
+      _priceCollectMeta = loadObj('mw_price_collect_meta', null);
+      _priceCollectStatsByMarket = (_priceCollectMeta && _priceCollectMeta.stats) || { naver: null, ssg: null, gmarket: null };
 
       // 현재 활성 탭 UI만 갱신
       refreshActiveTab();
@@ -9951,9 +9957,10 @@ document.addEventListener('click', function(e) {
 });
 
 // ===== 가격 수집 (Step 9/11) =====
-var _priceCollectMap = null; // { naver: {code: {price, status}}, ssg: {code: {price, status}} }
+var _priceCollectMap = loadObj('mw_price_collect', null); // { naver: {code: {price, status}}, ssg: {code: {price, status}} }
 var _priceCollectStats = { total: 0, match: 0, diff: 0, soldout: 0, sent: 0, notreg: 0, fail: 0 };
-var _priceCollectStatsByMarket = { naver: null, ssg: null, gmarket: null };
+var _priceCollectMeta = loadObj('mw_price_collect_meta', null); // { collectedAt, collectedBy, stats }
+var _priceCollectStatsByMarket = (_priceCollectMeta && _priceCollectMeta.stats) || { naver: null, ssg: null, gmarket: null };
 var _selectedPriceMarket = 'naver';
 
 function _computeStatsForChannel(channel, products, channelMap, failedFlag) {
@@ -10085,6 +10092,17 @@ async function _mwPriceCollect() {
     // 뱃지 카운트용: 전체 products 기준
     _priceCollectStatsByMarket[selectedMarket] = _computeStatsForChannel(selectedMarket, allProducts, _priceCollectMap[selectedMarket], marketFailed);
     _priceCollectStats = _priceCollectStatsByMarket[selectedMarket];
+
+    // localStorage + Supabase 동기화 (3명 공유)
+    try {
+      save('mw_price_collect', _priceCollectMap || {});
+      _priceCollectMeta = {
+        collectedAt: new Date().toISOString(),
+        collectedBy: (window.currentUser && window.currentUser.loginId) || 'unknown',
+        stats: _priceCollectStatsByMarket
+      };
+      save('mw_price_collect_meta', _priceCollectMeta);
+    } catch (e) { console.warn('[PriceCollect] 저장 실패:', e.message); }
 
     // 편집모드 체크박스 보존
     var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
