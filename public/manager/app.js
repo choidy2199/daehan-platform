@@ -1044,8 +1044,8 @@ function marketBadge(p, channel) {
   var feeRate = getMarketFeeRate(p, channel);
   // 상태 정보 (수집 후에만) — localPrice로 판정
   var info = _getBadgeStatusInfo(p.code, channel, localPrice);
-  // 표시 가격: 차이 상태일 때는 마켓 실제가, 그 외는 우리 등록가
-  var displayPrice = (info && info.status === 'diff' && info.marketPrice) ? info.marketPrice : localPrice;
+  // 표시 가격: 모드별 분기 ('calculated' = 항상 우리 등록가, 'collected' = 차이 시 마켓 실제가)
+  var displayPrice = (_priceDisplayMode !== 'calculated' && info && info.status === 'diff' && info.marketPrice) ? info.marketPrice : localPrice;
   var m = calcMargin(displayPrice, p.cost, feeRate);
   var mColor = m && m.profit >= 0 ? '#1D9E75' : '#CC2222';
   var mText = m ? (m.rate.toFixed(1) + '% ' + (m.profit >= 0 ? '+' : '') + fmt(m.profit)) : '';
@@ -9975,6 +9975,7 @@ var _priceCollectStats = { total: 0, match: 0, diff: 0, soldout: 0, sent: 0, not
 var _priceCollectMeta = loadObj('mw_price_collect_meta', null); // { collectedAt, collectedBy, stats }
 var _priceCollectStatsByMarket = (_priceCollectMeta && _priceCollectMeta.stats) || { naver: null, ssg: null, gmarket: null };
 var _selectedPriceMarket = 'naver';
+var _priceDisplayMode = localStorage.getItem('mw_price_display_mode') || 'collected';
 
 function _computeStatsForChannel(channel, products, channelMap, failedFlag) {
   var s = { total: 0, match: 0, diff: 0, soldout: 0, sent: 0, notreg: 0, fail: 0 };
@@ -10116,6 +10117,10 @@ async function _mwPriceCollect() {
       };
       save('mw_price_collect_meta', _priceCollectMeta);
     } catch (e) { console.warn('[PriceCollect] 저장 실패:', e.message); }
+
+    // 표시 모드: 수집 클릭 → 'collected'
+    _priceDisplayMode = 'collected';
+    try { localStorage.setItem('mw_price_display_mode', 'collected'); } catch (e) {}
 
     // 편집모드 체크박스 보존
     var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
@@ -11375,6 +11380,9 @@ function applySettings() {
   }
 
   save(KEYS.settings, DB.settings);
+  // 표시 모드: 적용 클릭 → 'calculated'
+  _priceDisplayMode = 'calculated';
+  try { localStorage.setItem('mw_price_display_mode', 'calculated'); } catch (e) {}
   recalcAll();
   closeSettingsModal();
   toast(`설정 적용 완료 — ${DB.products.length}건 재계산됨`);
