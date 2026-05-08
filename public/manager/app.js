@@ -5017,7 +5017,7 @@ function buildPOProductPanel() {
   // 테이블
   html += '<div class="po-panel-body" id="po-prod-scroll">';
   html += '<table class="po-table po-table-lg"><thead><tr>';
-  html += '<th class="center" style="width:36px">No</th><th class="center" style="width:36px">누적</th><th>순번</th><th>TTi#</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:42px">S</th><th class="center" style="width:42px">B</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
+  html += '<th class="center" style="width:36px">No</th><th class="center" style="width:36px">누적</th><th>순번</th><th>코드</th><th style="min-width:200px">모델명</th><th class="num">공급가</th><th class="center">가용수량</th><th class="center" style="width:42px">S</th><th class="center" style="width:42px">B</th><th class="center" style="width:50px">수량</th><th class="center" style="width:36px">주문</th>';
   html += '</tr></thead><tbody id="po-prod-body">';
   html += '</tbody></table></div></div>';
   return html;
@@ -5079,7 +5079,7 @@ function buildPOProductRow(p, rowIndex) {
   tr += '<td class="center" style="color:#9BA3B2">' + (rowIndex + 1) + '</td>';
   tr += '<td class="center">' + promoBadge + '</td>';
   tr += '<td>' + (p.orderNum || '-') + '</td>';
-  tr += '<td style="font-family:monospace;font-size:12px">' + (p.ttiNum || p.code || '-') + '</td>';
+  tr += '<td style="font-family:monospace;font-size:12px">' + (p.code || '-') + '</td>';
   tr += '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="' + (p.model || '').replace(/"/g, '&quot;') + '">' + (p.model || '-') + '</td>';
   tr += '<td class="num">' + (p.supplyPrice ? parseInt(p.supplyPrice).toLocaleString() : '-') + '</td>';
   tr += '<td class="center">' + stockIcon + '</td>';
@@ -5140,9 +5140,9 @@ function buildPOOrderPanel() {
   // 테이블 (po-panel-body가 스크롤 컨테이너 → thead sticky 동작)
   html += '<div class="po-panel-body">';
   html += '<table class="po-table"><thead><tr>';
-  html += '<th class="center" style="width:36px">누적</th><th>순번</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
+  html += '<th class="center" style="width:36px">누적</th><th>코드</th><th>순번</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
   html += '</tr></thead><tbody id="po-cart-body">';
-  html += '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
+  html += '<tr><td colspan="8" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   html += '</tbody></table></div>';
 
   // 합계
@@ -6915,7 +6915,7 @@ function renderPOCartTable() {
   if (!body) return;
 
   if (poCart.length === 0) {
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   } else {
     var h = '';
     poCart.forEach(function(c, i) {
@@ -6923,6 +6923,7 @@ function renderPOCartTable() {
       var _cumulBadge = c.promoName ? '<span style="background:#EEEDFE;color:' + (c.promoColor || '#3C3489') + ';font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px">누적</span>' : '';
       h += '<tr>';
       h += '<td class="center">' + _cumulBadge + '</td>';
+      h += '<td>' + (c.code || '-') + '</td>';
       h += '<td>' + (c.orderNum || '-') + '</td>';
       h += '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis" title="' + (c.model || '').replace(/"/g, '&quot;') + '">' + (c.model || '-') + '</td>';
       h += '<td class="num">' + fmtPO(c.supplyPrice) + '</td>';
@@ -14723,8 +14724,8 @@ function buildPLProductPanel() {
   html += '<table class="po-table" id="pl-prod-table" style="table-layout:fixed"><thead><tr>';
   html += '<th class="center" style="width:36px">No</th>';
   html += '<th class="center" style="width:36px">누적</th>';
-  html += '<th style="width:70px">프로모션번호</th>';
-  html += '<th style="width:64px">제품번호</th>';
+  html += '<th style="width:70px">순번</th>';
+  html += '<th style="width:64px">코드</th>';
   html += '<th style="min-width:180px">모델명</th>';
   html += '<th class="num" style="width:66px">공급가</th>';
   html += '<th class="center" style="width:42px">S재고</th>';
@@ -15006,7 +15007,7 @@ function buildPLOrderPanel() {
   // 테이블 (po-panel-body가 스크롤 컨테이너 → thead sticky 동작)
   html += '<div class="po-panel-body" style="padding:0">';
   html += '<table class="po-table"><thead><tr>';
-  html += '<th class="center" style="width:36px">누적</th><th>프로모션번호</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
+  html += '<th class="center" style="width:36px">누적</th><th>순번</th><th style="min-width:150px">모델명</th><th class="num">공급가</th><th class="center" style="width:50px">수량</th><th class="num">금액</th><th class="center" style="width:30px">✕</th>';
   html += '</tr></thead><tbody id="pl-cart-body">';
   html += '<tr><td colspan="7" style="text-align:center;padding:30px;color:#9BA3B2">왼쪽 제품에서 🛒 버튼으로 추가하세요</td></tr>';
   html += '</tbody></table></div>';
