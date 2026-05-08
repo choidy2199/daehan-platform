@@ -5690,7 +5690,7 @@ function downloadPoConfirmedExcel() {
 
     var qty = item.qty || 0;
     var costPrice = item.costPrice || 0;
-    var amount = item.ttiOrderAmount || (costPrice * qty);
+    var amount = costPrice * qty;
     var vat = Math.round(amount * 0.1);
     var jeokyo = _getJeokyoLabel(item.ttiPromotion, item.type);
 
