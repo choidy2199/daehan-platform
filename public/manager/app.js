@@ -1033,20 +1033,22 @@ function _getBadgeStatusInfo(code, channel, localPrice) {
   if (local === marketPrice) {
     return { status: 'sync', dotClass: 'ps-dot-sync', tagClass: 'ps-tag-sync', tagText: '일치' };
   }
-  return { status: 'diff', dotClass: 'ps-dot-diff', tagClass: 'ps-tag-diff', tagText: '차이' };
+  return { status: 'diff', dotClass: 'ps-dot-diff', tagClass: 'ps-tag-diff', tagText: '차이', marketPrice: marketPrice };
 }
 
 function marketBadge(p, channel) {
   var st = _marketBadgeStyles[channel];
   if (!st) return '';
-  var price = channel === 'naver' ? p.priceNaver : channel === 'gmarket' ? p.priceOpen : (p.priceSsg || 0);
-  if (!price) return '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
+  var localPrice = channel === 'naver' ? p.priceNaver : channel === 'gmarket' ? p.priceOpen : (p.priceSsg || 0);
+  if (!localPrice) return '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
   var feeRate = getMarketFeeRate(p, channel);
-  var m = calcMargin(price, p.cost, feeRate);
+  // 상태 정보 (수집 후에만) — localPrice로 판정
+  var info = _getBadgeStatusInfo(p.code, channel, localPrice);
+  // 표시 가격: 차이 상태일 때는 마켓 실제가, 그 외는 우리 등록가
+  var displayPrice = (info && info.status === 'diff' && info.marketPrice) ? info.marketPrice : localPrice;
+  var m = calcMargin(displayPrice, p.cost, feeRate);
   var mColor = m && m.profit >= 0 ? '#1D9E75' : '#CC2222';
   var mText = m ? (m.rate.toFixed(1) + '% ' + (m.profit >= 0 ? '+' : '') + fmt(m.profit)) : '';
-  // 상태 정보 (수집 후에만)
-  var info = _getBadgeStatusInfo(p.code, channel, price);
   var borderCls = info && info.borderClass ? ' ' + info.borderClass : '';
   var dotHtml = info ? '<div class="ps-dot ' + info.dotClass + '"></div>' : '';
   var tagHtml = info ? '<div class="ps-tag ' + info.tagClass + '">' + info.tagText + '</div>' : '';
@@ -1059,7 +1061,7 @@ function marketBadge(p, channel) {
     if (info && info.subText) {
       subHtml = '<div class="bs" style="font-size:11px;color:' + (info.subColor || mColor) + ';line-height:1;margin-top:2px">' + info.subText + '</div>';
     }
-    innerHtml = '<div class="bp" style="font-size:15px;font-weight:700;color:' + st.priceColor + ';line-height:1.2">' + fmt(price) + '</div>' + subHtml;
+    innerHtml = '<div class="bp" style="font-size:15px;font-weight:700;color:' + st.priceColor + ';line-height:1.2">' + fmt(displayPrice) + '</div>' + subHtml;
   }
   return '<div class="' + borderCls.trim() + '" onclick="openPriceDetail(\'' + (p.code || '') + '\',\'' + channel + '\')" data-mb-border="' + st.border + '" style="position:relative;cursor:pointer;background:' + st.bg + ';border-radius:6px;padding:4px 6px;text-align:center;border:1px solid ' + st.border + ';transition:border-color 0.15s" onmouseenter="this.style.borderColor=\'#1A1D23\'" onmouseleave="this.style.borderColor=this.getAttribute(\'data-mb-border\')">'
     + dotHtml
