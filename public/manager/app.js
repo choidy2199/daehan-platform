@@ -9503,9 +9503,132 @@ function _mwPlBulkRenderPreview(compareResult) {
   if (applyBtn && !btnDisabled && applyBtn.dataset.mwPlBulkBound !== '1') {
     applyBtn.dataset.mwPlBulkBound = '1';
     applyBtn.addEventListener('click', function() {
-      alert('적용은 Phase 4에서 구현됩니다.');
+      _mwPlBulkApply();
     });
   }
+}
+
+// ============================================
+// [제품일괄등록] Phase 4 — 적용 + 양식 다운로드
+// ============================================
+
+function _mwPlBulkApply() {
+  var last = window._mwPlBulkLastResult;
+  if (!last || !last.compareResult) {
+    if (typeof toast === 'function') toast('적용할 데이터가 없습니다');
+    return;
+  }
+  var changed = last.compareResult.changed || [];
+  var added = last.compareResult.added || [];
+  if (changed.length === 0 && added.length === 0) {
+    if (typeof toast === 'function') toast('적용할 변경/신규 항목이 없습니다');
+    return;
+  }
+
+  // confirm
+  var ok = window.confirm('변경 ' + changed.length + '건, 신규 ' + added.length + '건을 적용합니다.\n\n진행하시겠습니까?');
+  if (!ok) return;
+
+  // 안전 가드 — DB 존재 확인
+  if (typeof DB === 'undefined' || !DB || !Array.isArray(DB.products)) {
+    if (typeof toast === 'function') toast('데이터베이스 접근 실패');
+    return;
+  }
+
+  // 1. 변경 적용 — diffs에 있는 키만 update
+  for (var i = 0; i < changed.length; i++) {
+    var c = changed[i];
+    if (typeof c.existIdx !== 'number' || c.existIdx < 0 || c.existIdx >= DB.products.length) continue;
+    var diffs = c.diffs || [];
+    for (var d = 0; d < diffs.length; d++) {
+      var key = diffs[d];
+      DB.products[c.existIdx][key] = c.newRow[key];
+    }
+  }
+
+  // 2. 신규 추가 — description='밀워키' 명시 + 가격류 0 초기화
+  for (var j = 0; j < added.length; j++) {
+    var a = added[j];
+    var n = a.newRow || {};
+    DB.products.push({
+      code: n.code,
+      manageCode: n.manageCode,
+      category: n.category,
+      subcategory: n.subcategory,
+      detail: n.detail,
+      orderNum: n.orderNum,
+      ttiNum: n.ttiNum,
+      model: n.model,
+      supplyPrice: n.supplyPrice,
+      description: '밀워키',
+      productDC: 0,
+      cost: 0,
+      priceA: 0,
+      priceRetail: 0,
+      priceNaver: 0,
+      priceOpen: 0,
+      priceSsg: 0,
+      raisedPrice: 0,
+      raiseRate: 0,
+      discontinued: '',
+      inDate: ''
+    });
+  }
+
+  // 3. 가격 재계산 + 저장 + 렌더 (recalcAll이 모두 처리)
+  if (typeof recalcAll === 'function') recalcAll();
+
+  // 4. 액션 히스토리
+  if (typeof saveActionHistory === 'function') {
+    saveActionHistory('일괄등록', '밀워키', changed.length + added.length, null);
+  }
+
+  // 5. 알림
+  if (typeof toast === 'function') {
+    toast('일괄등록 완료: 변경 ' + changed.length + '건 / 신규 ' + added.length + '건');
+  }
+
+  // 6. 모달 닫기 + 상태 초기화
+  if (typeof closeModal === 'function') closeModal();
+  window._mwPlBulkLastResult = null;
+  if (typeof _mwPlBulkResetState === 'function') _mwPlBulkResetState();
+}
+
+function _mwPlBulkDownloadTemplate() {
+  if (typeof XLSX === 'undefined' || !XLSX) {
+    if (typeof toast === 'function') toast('SheetJS 라이브러리 로딩 중...');
+    return;
+  }
+
+  var headers = [
+    '코드',
+    '관리코드',
+    '대분류',
+    '중분류',
+    '소분류',
+    'TTi#',
+    '순번',
+    '모델명',
+    '제품 설명',
+    '대리점공급가'
+  ];
+
+  var data = [headers]; // 헤더만 1행
+
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = headers.map(function() { return { wch: 14 }; });
+  XLSX.utils.book_append_sheet(wb, ws, '전체가격표');
+
+  // 파일명 YYYY-MM-DD
+  var now = new Date();
+  var ymd = now.getFullYear() + '-'
+    + String(now.getMonth() + 1).padStart(2, '0') + '-'
+    + String(now.getDate()).padStart(2, '0');
+
+  XLSX.writeFile(wb, '밀워키_일괄등록양식_' + ymd + '.xlsx');
+
+  if (typeof toast === 'function') toast('입력 양식 다운로드 완료');
 }
 
 function _mwPlBulkResetState() {
@@ -9522,7 +9645,7 @@ function _bindMwPlBulkEvents() {
   if (tmplBtn && tmplBtn.dataset.mwPlBulkBound !== '1') {
     tmplBtn.dataset.mwPlBulkBound = '1';
     tmplBtn.addEventListener('click', function() {
-      alert('양식 다운로드는 Phase 4에서 구현됩니다.');
+      _mwPlBulkDownloadTemplate();
     });
   }
   var fileBtn = document.getElementById('mw-pl-bulk-file-btn');
