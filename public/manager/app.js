@@ -5094,7 +5094,7 @@ function onPOProductScroll() {
 
 // 오른쪽 패널 — 주문 목록
 function buildPOOrderPanel() {
-  var html = '<div class="po-panel" style="max-height:calc(100vh - 260px)">';
+  var html = '<div class="po-panel" style="align-self:start;max-height:calc(100vh - 260px)">';
   html += '<div class="po-panel-header"><span>주문 목록<span class="po-header-count">0건</span></span>';
   html += '<button style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="clearPOCart()">비우기</button>';
   html += '</div>';
@@ -14877,7 +14877,7 @@ function switchPLCat(cat) {
 
 // 우측 패널: 주문 목록 (일반주문 buildPOOrderPanel과 100% 동일 구조)
 function buildPLOrderPanel() {
-  var html = '<div class="po-panel" style="font-family:\'Pretendard\',-apple-system,sans-serif">';
+  var html = '<div class="po-panel" style="align-self:start;font-family:\'Pretendard\',-apple-system,sans-serif">';
   html += '<div class="po-panel-header"><span>주문 목록<span class="po-header-count" id="pl-cart-count-header">0건</span></span>';
   html += '<button style="background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer" onclick="clearPLCart()">비우기</button>';
   html += '</div>';
