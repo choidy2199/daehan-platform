@@ -8793,6 +8793,7 @@ function calcRebate(el) {
 // ======================== MILWAUKEE PRICELIST IO CONFIG (Phase A) ========================
 // 밀워키 단가표 입출력용 컬럼 정의 (Phase A)
 // 22개 = 고정 2 + 분류 5 + 식별 4 + 가격 8 + 재고·기타 3
+let _mwPricelistIoExportFilter = 'all';
 const MW_PRICELIST_COLUMNS = [
   // 고정 (해제 불가, 매칭 키)
   { id: 'code',         label: '코드',       group: 'fixed',   defaultOn: true,  fixed: true },
@@ -9028,7 +9029,7 @@ function _renderMwPricelistIoExportPreview() {
   const selected = new Set(config.selectedFields);
   const selectedCols = MW_PRICELIST_COLUMNS.filter(function(c) { return selected.has(c.id); });
 
-  const products = (typeof DB !== 'undefined' && DB && DB.products) || [];
+  const products = _getFilteredMwExportProducts();
   const sample = products[0] || {};
 
   let html = '<table style="width:100%; border-collapse:collapse; font-size:11px;">';
@@ -9050,17 +9051,50 @@ function _renderMwPricelistIoExportPreview() {
   previewEl.innerHTML = html;
 }
 
+function _getFilteredMwExportProducts() {
+  const products = (typeof DB !== 'undefined' && DB && DB.products) || [];
+  const mode = _mwPricelistIoExportFilter || 'all';
+  if (mode === 'nocode') {
+    return products.filter(function(p) { return !p.code || String(p.code).trim() === '' || p.code === '-'; });
+  } else if (mode === 'nomanage') {
+    return products.filter(function(p) { return !p.manageCode || String(p.manageCode).trim() === '' || p.manageCode === '-'; });
+  } else if (mode === 'nocategory') {
+    return products.filter(function(p) { return !p.category || String(p.category).trim() === '' || p.category === '-'; });
+  }
+  return products;
+}
+
+function _updateMwPricelistIoExportFilterUI() {
+  const products = (typeof DB !== 'undefined' && DB && DB.products) || [];
+  const counts = {
+    all: products.length,
+    nocode: products.filter(function(p) { return !p.code || String(p.code).trim() === '' || p.code === '-'; }).length,
+    nomanage: products.filter(function(p) { return !p.manageCode || String(p.manageCode).trim() === '' || p.manageCode === '-'; }).length,
+    nocategory: products.filter(function(p) { return !p.category || String(p.category).trim() === '' || p.category === '-'; }).length
+  };
+  ['all','nocode','nomanage','nocategory'].forEach(function(k) {
+    const el = document.getElementById('mw-pl-io-export-filter-count-' + k);
+    if (el) el.textContent = String(counts[k]);
+    const btn = document.getElementById('mw-pl-io-export-filter-' + k);
+    if (btn) {
+      if (_mwPricelistIoExportFilter === k) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+}
+
 function _updateMwPricelistIoExportSummary() {
   const summaryEl = document.getElementById('mw-pl-io-export-summary');
   const countEl = document.getElementById('mw-pl-io-export-count');
   const config = getMwPricelistIoConfig();
   const colCount = config.selectedFields.length;
-  const products = (typeof DB !== 'undefined' && DB && DB.products) || [];
+  const products = _getFilteredMwExportProducts();
   let sheets = 1;
   if (config.extraSheets && config.extraSheets.inventory) sheets++;
   if (config.extraSheets && config.extraSheets.promotions) sheets++;
   if (summaryEl) summaryEl.textContent = '시트 ' + sheets + '개 · ' + colCount + ' 컬럼 · ' + products.length + ' 행';
   if (countEl) countEl.textContent = String(products.length);
+  _updateMwPricelistIoExportFilterUI();
 }
 
 function _restoreMwPricelistIoExportSheets() {
@@ -9154,6 +9188,18 @@ function _bindMwPricelistIoExportEvents() {
     exportBtn.dataset.mwPlExportBound = '1';
     exportBtn.addEventListener('click', function() { exportAll(); });
   }
+
+  ['all','nocode','nomanage','nocategory'].forEach(function(k) {
+    const btn = document.getElementById('mw-pl-io-export-filter-' + k);
+    if (btn && btn.dataset.mwPlFilterBound !== '1') {
+      btn.dataset.mwPlFilterBound = '1';
+      btn.addEventListener('click', function() {
+        _mwPricelistIoExportFilter = k;
+        _updateMwPricelistIoExportSummary();
+        if (typeof _renderMwPricelistIoExportPreview === 'function') _renderMwPricelistIoExportPreview();
+      });
+    }
+  });
 }
 
 // ======================== TEMPLATE DOWNLOAD ========================
@@ -9229,7 +9275,7 @@ function showProductManageModal() {
     btn.addEventListener('click', function() {
       var tab = btn.getAttribute('data-pm-tab');
       if (tab === 'import') _renderMwPricelistIoColumnSelector();
-      else if (tab === 'export') _renderMwPricelistIoExportColumnSelector();
+      else if (tab === 'export') { _mwPricelistIoExportFilter = 'all'; _renderMwPricelistIoExportColumnSelector(); }
     });
   });
 }
@@ -11708,11 +11754,12 @@ function exportAll() {
   const selectedCols = MW_PRICELIST_COLUMNS.filter(function(c) { return selected.has(c.id); });
 
   // 전체가격표 (항상 출력) — 헤더 1행 + 빈 1행 + 데이터 N행 (parseImportWorkbook 호환)
-  if (DB.products.length) {
+  const filteredProducts = _getFilteredMwExportProducts();
+  if (filteredProducts.length) {
     const headers = selectedCols.map(function(c) { return c.label; });
     const blankRow = selectedCols.map(function() { return ''; });
     const pData = [headers, blankRow];
-    DB.products.forEach(function(p) {
+    filteredProducts.forEach(function(p) {
       const row = selectedCols.map(function(c) {
         var v = p[c.id];
         return (v == null) ? '' : v;

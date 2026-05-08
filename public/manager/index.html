@@ -11,7 +11,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 <link rel="stylesheet" href="/manager/style.css">
-<style>.sidebar{visibility:hidden;width:220px}.sidebar.collapsed{width:52px}.app-layout{display:flex;height:100vh}</style>
+<style>.sidebar{visibility:hidden;width:220px}.sidebar.collapsed{width:52px}.app-layout{display:flex;height:100vh}
+.mw-pl-io-export-filter-btn{font-family:'Pretendard',sans-serif;font-size:12px;font-weight:500;padding:7px 14px;border:0.5px solid #DDE1EB;border-radius:8px;background:#fff;color:#1A1D23;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:all 0.15s}
+.mw-pl-io-export-filter-btn:hover{background:#F4F6FA}
+.mw-pl-io-export-filter-btn.active{background:#185FA5;color:#fff;border-color:#185FA5;font-weight:600}</style>
 <script>
 (function(){try{if(localStorage.getItem('mw_sidebar_collapsed')==='1'){
 var s=document.createElement('style');
@@ -1188,6 +1191,12 @@ document.head.appendChild(s);
         <span style="font-size:18px; font-weight:600; color:#185FA5;" id="mw-pl-io-export-count">0</span>
         <span style="font-size:12px; color:#6b7280;">건 · 전체 제품</span>
         <span id="mw-pl-io-export-filename" style="margin-left:auto; font-size:11px; color:#6b7280; font-family:monospace;">밀워키_단가표_.xlsx</span>
+      </div>
+      <div id="mw-pl-io-export-filter" style="display:flex; gap:6px; flex-wrap:wrap; padding:10px 14px; background:#FAFAFA; border:0.5px solid #E5E5E5; border-radius:8px; margin:8px 0 16px 0;">
+        <button type="button" id="mw-pl-io-export-filter-all" class="mw-pl-io-export-filter-btn active" data-filter="all">전제품 <span id="mw-pl-io-export-filter-count-all" style="opacity:0.85;">0</span></button>
+        <button type="button" id="mw-pl-io-export-filter-nocode" class="mw-pl-io-export-filter-btn" data-filter="nocode">코드 없는 제품 <span id="mw-pl-io-export-filter-count-nocode" style="opacity:0.85;">0</span></button>
+        <button type="button" id="mw-pl-io-export-filter-nomanage" class="mw-pl-io-export-filter-btn" data-filter="nomanage">관리코드 없는 제품 <span id="mw-pl-io-export-filter-count-nomanage" style="opacity:0.85;">0</span></button>
+        <button type="button" id="mw-pl-io-export-filter-nocategory" class="mw-pl-io-export-filter-btn" data-filter="nocategory">대분류 없는 제품 <span id="mw-pl-io-export-filter-count-nocategory" style="opacity:0.85;">0</span></button>
       </div>
       <div id="mw-pl-io-export-column-selector" style="margin-bottom:14px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
