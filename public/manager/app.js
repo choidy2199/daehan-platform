@@ -9293,6 +9293,21 @@ function _mwPlBulkSplitModel(modelStr) {
   return { model: s.substring(0, idx), desc: s.substring(idx + 3) };
 }
 
+// 컬럼 한글 라벨 매핑
+function _mwPlBulkFieldLabel(key) {
+  if (key === 'code') return '코드';
+  if (key === 'manageCode') return '관리코드';
+  if (key === 'category') return '대분류';
+  if (key === 'subcategory') return '중분류';
+  if (key === 'detail') return '소분류';
+  if (key === 'ttiNum') return 'TTi#';
+  if (key === 'orderNum') return '순번';
+  if (key === 'model') return '모델명';
+  if (key === 'description') return '제품 설명';
+  if (key === 'supplyPrice') return '대리점공급가';
+  return key;
+}
+
 // matchedBy 한글 라벨
 function _mwPlBulkMatchedByLabel(key) {
   if (key === 'manageCode') return '관리코드 매칭';
@@ -9324,23 +9339,6 @@ function _mwPlBulkRenderCountBox(num, label, bg, fg, sub) {
     + '</div>';
 }
 
-// 미리보기 테이블 thead (변경/신규 공통)
-function _mwPlBulkRenderTableHead() {
-  return '<colgroup>'
-    + '<col style="width:100px;"><col style="width:70px;"><col style="width:110px;">'
-    + '<col style="width:90px;"><col><col><col style="width:100px;">'
-    + '</colgroup>'
-    + '<thead><tr style="background:#1A1D23;color:#fff;font-size:10.5px;">'
-    + '<th style="padding:7px 8px;text-align:left;">구분</th>'
-    + '<th style="padding:7px 8px;text-align:left;">코드</th>'
-    + '<th style="padding:7px 8px;text-align:left;">관리코드</th>'
-    + '<th style="padding:7px 8px;text-align:left;">TTi#</th>'
-    + '<th style="padding:7px 8px;text-align:left;">모델명</th>'
-    + '<th style="padding:7px 8px;text-align:left;">제품설명</th>'
-    + '<th style="padding:7px 8px;text-align:right;">대리점공급가</th>'
-    + '</tr></thead>';
-}
-
 // BEFORE 셀 (변경 셀이면 취소선)
 function _mwPlBulkBeforeCell(v, isDiff) {
   var s = isDiff ? 'padding:6px 8px;vertical-align:top;text-decoration:line-through;color:#9ca3af;word-break:break-all;'
@@ -9369,60 +9367,137 @@ function _mwPlBulkAfterPriceCell(v, isDiff) {
   return '<td style="' + s + '">' + _mwPlBulkFmtPrice(v) + '</td>';
 }
 
-// 변경 1건 = BEFORE 행 + AFTER 행
-function _mwPlBulkRenderChangedRows(c) {
+// 변경 1건 = 카드 (변경된 행만 미니 테이블)
+function _mwPlBulkRenderChangedCard(c) {
   var diffs = c.diffs || [];
   var oldP = c.existProduct || {};
   var newP = c.newRow || {};
   var oldSplit = _mwPlBulkSplitModel(oldP.model);
   var newSplit = _mwPlBulkSplitModel(newP.model);
+
+  // 변경된 행 목록 (model은 분리 처리)
+  var rows = [];
+  for (var i = 0; i < diffs.length; i++) {
+    var key = diffs[i];
+    if (key === 'model') {
+      if (oldSplit.model !== newSplit.model) {
+        rows.push({ label: '모델명', oldVal: oldSplit.model, newVal: newSplit.model, isPrice: false });
+      }
+      if (oldSplit.desc !== newSplit.desc) {
+        rows.push({ label: '제품 설명', oldVal: oldSplit.desc, newVal: newSplit.desc, isPrice: false });
+      }
+    } else {
+      rows.push({
+        label: _mwPlBulkFieldLabel(key),
+        oldVal: oldP[key],
+        newVal: newP[key],
+        isPrice: (key === 'supplyPrice')
+      });
+    }
+  }
+
+  // 카드 헤더 정보
+  var headerModel = oldSplit.model || newSplit.model || '(모델명 없음)';
+  var headerManage = !_mwPlBulkIsKeyEmpty(oldP.manageCode) ? oldP.manageCode : '';
   var matchedLabel = _mwPlBulkMatchedByLabel(c.matchedBy);
 
-  // BEFORE
-  var beforeRow = '<tr style="background:#F7F8FA;border-top:1px solid #DDE1EB;">'
-    + '<td style="padding:6px 8px;vertical-align:top;">'
-      + '<span style="display:inline-block;padding:2px 6px;background:#9BA3B2;color:#fff;font-size:9.5px;border-radius:3px;font-weight:500;">BEFORE</span>'
-      + (matchedLabel ? '<div style="font-size:9.5px;color:#9BA3B2;margin-top:2px;">' + matchedLabel + '</div>' : '')
-    + '</td>'
-    + _mwPlBulkBeforeCell(oldP.code, diffs.indexOf('code') !== -1)
-    + _mwPlBulkBeforeCell(oldP.manageCode, diffs.indexOf('manageCode') !== -1)
-    + _mwPlBulkBeforeCell(oldP.ttiNum, diffs.indexOf('ttiNum') !== -1)
-    + _mwPlBulkBeforeCell(oldSplit.model, diffs.indexOf('model') !== -1)
-    + _mwPlBulkBeforeCell(oldSplit.desc, diffs.indexOf('model') !== -1)
-    + _mwPlBulkBeforePriceCell(oldP.supplyPrice, diffs.indexOf('supplyPrice') !== -1)
-    + '</tr>';
+  var html = '<div style="border:0.5px solid #DDE1EB;border-radius:6px;background:#fff;margin-bottom:8px;overflow:hidden;">';
+  html += '<div style="padding:8px 12px;background:#F7F8FA;border-bottom:0.5px solid #DDE1EB;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">';
+  html += '<div style="font-size:11.5px;color:#1A1D23;">';
+  html += '<span style="font-weight:600;">' + _mwPlBulkEsc(headerModel) + '</span>';
+  if (headerManage) {
+    html += '<span style="color:#9BA3B2;margin-left:8px;font-size:10.5px;">관리코드 ' + _mwPlBulkEsc(headerManage) + '</span>';
+  }
+  if (matchedLabel) {
+    html += '<span style="color:#6B7280;margin-left:8px;font-size:10px;">· ' + matchedLabel + '</span>';
+  }
+  html += '</div>';
+  html += '<span style="background:#FEF3C7;color:#92400e;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:500;">변경 ' + rows.length + '개</span>';
+  html += '</div>';
 
-  // AFTER
-  var afterRow = '<tr style="background:#fff;">'
-    + '<td style="padding:6px 8px;vertical-align:top;">'
-      + '<span style="display:inline-block;padding:2px 6px;background:#185FA5;color:#fff;font-size:9.5px;border-radius:3px;font-weight:500;">AFTER</span>'
-    + '</td>'
-    + _mwPlBulkAfterCell(newP.code, diffs.indexOf('code') !== -1)
-    + _mwPlBulkAfterCell(newP.manageCode, diffs.indexOf('manageCode') !== -1)
-    + _mwPlBulkAfterCell(newP.ttiNum, diffs.indexOf('ttiNum') !== -1)
-    + _mwPlBulkAfterCell(newSplit.model, diffs.indexOf('model') !== -1)
-    + _mwPlBulkAfterCell(newSplit.desc, diffs.indexOf('model') !== -1)
-    + _mwPlBulkAfterPriceCell(newP.supplyPrice, diffs.indexOf('supplyPrice') !== -1)
-    + '</tr>';
+  // 미니 테이블
+  html += '<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">';
+  html += '<colgroup><col style="width:140px;"><col><col style="width:30px;"><col></colgroup>';
+  html += '<thead><tr style="background:#FAFBFC;color:#6B7280;font-size:10px;">';
+  html += '<th style="padding:5px 12px;text-align:left;font-weight:500;">컬럼</th>';
+  html += '<th style="padding:5px 12px;text-align:left;font-weight:500;">기존</th>';
+  html += '<th style="padding:5px 0;"></th>';
+  html += '<th style="padding:5px 12px;text-align:left;font-weight:500;">변경</th>';
+  html += '</tr></thead><tbody>';
 
-  return beforeRow + afterRow;
+  for (var r = 0; r < rows.length; r++) {
+    var row = rows[r];
+    var oldDisplay = row.isPrice ? _mwPlBulkFmtPrice(row.oldVal) : _mwPlBulkEsc(row.oldVal);
+    var newDisplay = row.isPrice ? _mwPlBulkFmtPrice(row.newVal) : _mwPlBulkEsc(row.newVal);
+    var oldAlign = row.isPrice ? 'text-align:right;' : '';
+    var newAlign = row.isPrice ? 'text-align:right;' : '';
+    html += '<tr style="border-top:0.5px solid #F1EFE8;">';
+    html += '<td style="padding:6px 12px;color:#6B7280;">' + row.label + '</td>';
+    html += '<td style="padding:6px 12px;color:#9CA3AF;text-decoration:line-through;word-break:break-all;' + oldAlign + '">' + oldDisplay + '</td>';
+    html += '<td style="padding:6px 0;text-align:center;color:#9BA3B2;font-size:11px;">→</td>';
+    html += '<td style="padding:6px 12px;background:#FEF3C7;color:#422006;font-weight:500;word-break:break-all;' + newAlign + '">' + newDisplay + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
 }
 
-// 신규 1건 = 한 줄 (녹색)
-function _mwPlBulkRenderAddedRow(a) {
-  var p = a.newRow || {};
-  var sp = _mwPlBulkSplitModel(p.model);
-  return '<tr style="background:#f0fdf4;border-top:1px solid #bbf7d0;">'
-    + '<td style="padding:6px 8px;vertical-align:top;">'
-      + '<span style="display:inline-block;padding:2px 6px;background:#d1fae5;color:#065f46;font-size:9.5px;border-radius:3px;font-weight:500;">신규</span>'
-    + '</td>'
-    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(p.code) + '</td>'
-    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(p.manageCode) + '</td>'
-    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(p.ttiNum) + '</td>'
-    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(sp.model) + '</td>'
-    + '<td style="padding:6px 8px;vertical-align:top;color:#065f46;word-break:break-all;">' + _mwPlBulkEsc(sp.desc) + '</td>'
-    + '<td style="padding:6px 8px;vertical-align:top;text-align:right;color:#065f46;font-weight:500;">' + _mwPlBulkFmtPrice(p.supplyPrice) + '</td>'
-    + '</tr>';
+// 신규 1건 = 카드 (11행 미니 테이블)
+function _mwPlBulkRenderAddedCard(a) {
+  var n = a.newRow || {};
+  var newSplit = _mwPlBulkSplitModel(n.model);
+
+  var rows = [
+    { label: '코드', val: n.code, isPrice: false },
+    { label: '관리코드', val: n.manageCode, isPrice: false },
+    { label: '대분류', val: n.category, isPrice: false },
+    { label: '중분류', val: n.subcategory, isPrice: false },
+    { label: '소분류', val: n.detail, isPrice: false },
+    { label: 'TTi#', val: n.ttiNum, isPrice: false },
+    { label: '순번', val: n.orderNum, isPrice: false },
+    { label: '모델명', val: newSplit.model, isPrice: false },
+    { label: '제품 설명', val: newSplit.desc, isPrice: false },
+    { label: '품명', val: '밀워키', isPrice: false, autoFilled: true },
+    { label: '대리점공급가', val: n.supplyPrice, isPrice: true }
+  ];
+
+  var headerModel = newSplit.model || '(모델명 없음)';
+  var headerManage = !_mwPlBulkIsKeyEmpty(n.manageCode) ? n.manageCode : '';
+
+  var html = '<div style="border:0.5px solid #bbf7d0;border-radius:6px;background:#f0fdf4;margin-bottom:8px;overflow:hidden;">';
+  html += '<div style="padding:8px 12px;background:#f0fdf4;border-bottom:0.5px solid #bbf7d0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">';
+  html += '<div style="font-size:11.5px;color:#065f46;">';
+  html += '<span style="font-weight:600;">' + _mwPlBulkEsc(headerModel) + '</span>';
+  if (headerManage) {
+    html += '<span style="color:#6B7280;margin-left:8px;font-size:10.5px;">관리코드 ' + _mwPlBulkEsc(headerManage) + '</span>';
+  }
+  html += '</div>';
+  html += '<span style="background:#D1FAE5;color:#065f46;font-size:10px;padding:2px 7px;border-radius:3px;font-weight:500;">신규</span>';
+  html += '</div>';
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:11px;background:#fff;table-layout:fixed;">';
+  html += '<colgroup><col style="width:140px;"><col><col style="width:30px;"><col></colgroup>';
+  html += '<thead><tr style="background:#FAFBFC;color:#6B7280;font-size:10px;">';
+  html += '<th style="padding:5px 12px;text-align:left;font-weight:500;">컬럼</th>';
+  html += '<th style="padding:5px 12px;text-align:left;font-weight:500;">기존</th>';
+  html += '<th style="padding:5px 0;"></th>';
+  html += '<th style="padding:5px 12px;text-align:left;font-weight:500;">변경</th>';
+  html += '</tr></thead><tbody>';
+
+  for (var r = 0; r < rows.length; r++) {
+    var row = rows[r];
+    var newDisplay = row.isPrice ? _mwPlBulkFmtPrice(row.val) : _mwPlBulkEsc(row.val);
+    var newAlign = row.isPrice ? 'text-align:right;' : '';
+    var labelExtra = row.autoFilled ? '<span style="color:#9CA3AF;font-size:9.5px;margin-left:4px;">(자동)</span>' : '';
+    html += '<tr style="border-top:0.5px solid #F1EFE8;">';
+    html += '<td style="padding:6px 12px;color:#6B7280;">' + row.label + labelExtra + '</td>';
+    html += '<td style="padding:6px 12px;color:#D1D5DB;">—</td>';
+    html += '<td style="padding:6px 0;text-align:center;color:#9BA3B2;font-size:11px;">→</td>';
+    html += '<td style="padding:6px 12px;background:#ECFDF5;color:#065f46;font-weight:500;word-break:break-all;' + newAlign + '">' + newDisplay + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
 }
 
 // 메인 렌더
@@ -9454,32 +9529,26 @@ function _mwPlBulkRenderPreview(compareResult) {
   html += _mwPlBulkRenderCountBox(same.length, '동일', '#fef3c7', '#92400e', '#d97706');
   html += '</div>';
 
-  // 2. 변경 테이블
+  // 2. 변경 카드 컨테이너
   if (changed.length > 0) {
     html += '<div style="margin-bottom:16px;">';
     html += '<div style="font-size:13px;font-weight:600;color:#1A1D23;margin-bottom:8px;">변경 ' + changed.length + '건</div>';
-    html += '<div style="max-height:350px;overflow-y:auto;border:0.5px solid #DDE1EB;border-radius:6px;">';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">';
-    html += _mwPlBulkRenderTableHead();
-    html += '<tbody>';
+    html += '<div style="max-height:500px;overflow-y:auto;padding:2px;">';
     for (var i = 0; i < changed.length; i++) {
-      html += _mwPlBulkRenderChangedRows(changed[i]);
+      html += _mwPlBulkRenderChangedCard(changed[i]);
     }
-    html += '</tbody></table></div></div>';
+    html += '</div></div>';
   }
 
-  // 3. 신규 테이블
+  // 3. 신규 카드 컨테이너
   if (added.length > 0) {
     html += '<div style="margin-bottom:16px;">';
     html += '<div style="font-size:13px;font-weight:600;color:#065f46;margin-bottom:8px;">신규 ' + added.length + '건</div>';
-    html += '<div style="max-height:250px;overflow-y:auto;border:0.5px solid #bbf7d0;border-radius:6px;background:#f0fdf4;">';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">';
-    html += _mwPlBulkRenderTableHead();
-    html += '<tbody>';
+    html += '<div style="max-height:500px;overflow-y:auto;padding:2px;">';
     for (var j = 0; j < added.length; j++) {
-      html += _mwPlBulkRenderAddedRow(added[j]);
+      html += _mwPlBulkRenderAddedCard(added[j]);
     }
-    html += '</tbody></table></div></div>';
+    html += '</div></div>';
   }
 
   // 4. 적용 버튼
