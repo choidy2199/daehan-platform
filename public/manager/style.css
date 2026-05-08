@@ -1045,7 +1045,7 @@ body.gen-edit-active #gen-table tbody tr td:first-child {
 
 /* 일반주문 대분류 칩 */
 .po-cat-chip{height:30px;padding:0 14px;border:1px solid;border-radius:4px;font-size:12px;font-weight:500;font-family:inherit;background:#fff;cursor:pointer;line-height:1;display:inline-flex;align-items:center;}
-.po-cat-chip-power{color:#185FA5;border-color:#185FA5;}
+.po-cat-chip-power{margin-left:auto;color:#185FA5;border-color:#185FA5;}
 .po-cat-chip-power.po-cat-chip-active{background:#185FA5;color:#fff;}
 .po-cat-chip-hand{color:#1D9E75;border-color:#1D9E75;}
 .po-cat-chip-hand.po-cat-chip-active{background:#1D9E75;color:#fff;}
