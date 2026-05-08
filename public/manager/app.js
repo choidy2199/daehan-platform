@@ -5223,7 +5223,12 @@ function buildPOListPanel() {
   var h = '';
 
   h += '<div class="po-panel" style="flex:1;min-height:0">';
-  h += '<div class="po-panel-header"><span>밀워키 발주확정</span><div style="display:flex;gap:6px;align-items:center">';
+  h += '<div class="po-panel-header"><div style="display:flex;align-items:center;gap:10px"><span>밀워키 발주확정</span>';
+  h += '<div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.18);border-radius:5px;padding:3px 10px">';
+  h += '<span style="color:rgba(255,255,255,0.6);font-size:11px">거래처코드:</span>';
+  h += '<input type="text" id="po-erp-dealer-code" value="' + (localStorage.getItem('mw_erp_dealer_code') || '').replace(/"/g, '&quot;') + '" oninput="localStorage.setItem(\'mw_erp_dealer_code\', this.value)" style="background:transparent;border:none;color:#fff;font-size:11px;font-weight:500;width:120px;padding:0;outline:none">';
+  h += '</div></div>';
+  h += '<div style="display:flex;gap:6px;align-items:center">';
   h += '<button class="po-hdr-btn po-hdr-del" onclick="deleteSelectedPOHistory()">선택 삭제</button>';
   // 아이템별 스크래핑 날짜 범위
   h += '<input type="date" id="po-order-items-date-from" value="' + _itemsDateFrom + '" onchange="_onPOItemsDateChange(\'from\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
@@ -5631,13 +5636,13 @@ function savePoConfirmed() {
     listBody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:#9BA3B2;font-size:13px">저장 완료. 새 데이터를 동기화하세요.</td></tr>';
   }
 
-  // Step 6: 저장 버튼 → "경영박사 매입입력" 으로 변경
+  // Step 6: 저장 버튼 → "📥 엑셀 다운로드" 로 변경
   var saveBtn = document.getElementById('po-save-btn');
   if (saveBtn) {
-    saveBtn.textContent = '경영박사 매입입력';
-    saveBtn.style.background = '#6C47B8';
+    saveBtn.textContent = '📥 엑셀 다운로드';
+    saveBtn.style.background = '#1D9E75';
     saveBtn.onclick = function() {
-      alert('경영박사 매입전표 등록은 준비 중입니다');
+      downloadPoConfirmedExcel();
       if (_erpReminderTimer) { clearTimeout(_erpReminderTimer); _erpReminderTimer = null; }
     };
   }
@@ -5652,6 +5657,64 @@ function savePoConfirmed() {
   // Step 8: alert (사용자 확인까지 유지)
   alert('저장되었습니다. 경영박사에 매입전표 입력하세요.');
 }
+
+function downloadPoConfirmedExcel() {
+  if (!window.XLSX) { toast('SheetJS 라이브러리 로딩 중입니다'); return; }
+
+  var dealerCode = (localStorage.getItem('mw_erp_dealer_code') || '').trim();
+  if (!dealerCode) { alert('거래처코드를 입력해주세요'); return; }
+
+  var items = window._poListItems || [];
+  if (items.length === 0) { alert('다운로드할 데이터가 없습니다'); return; }
+
+  function _getJeokyoLabel(ttiPromotion, type) {
+    if (ttiPromotion) return ttiPromotion;
+    if (type === 'foc') return 'FOC';
+    if (type === 'normal') return '';
+    return type || '';
+  }
+
+  var rows = [];
+  var skipped = 0;
+  items.forEach(function(item) {
+    var pCode = item.ttiNum || item.manageCode || '';
+    var normCode = normalizeTtiCode(pCode);
+    var matched = (DB.products || []).find(function(pr) {
+      return (pr.ttiNum && normalizeTtiCode(pr.ttiNum) === normCode) || (pr.code && pr.code === pCode);
+    });
+    if (!matched || !matched.code) { skipped++; return; }
+
+    var qty = item.qty || 0;
+    var costPrice = item.costPrice || 0;
+    var amount = item.ttiOrderAmount || (costPrice * qty);
+    var vat = Math.round(amount * 0.1);
+    var jeokyo = _getJeokyoLabel(item.ttiPromotion, item.type);
+
+    rows.push([dealerCode, matched.code, qty, costPrice, amount, vat, jeokyo]);
+  });
+
+  if (rows.length === 0) { alert('다운로드할 데이터가 없습니다'); return; }
+  if (skipped > 0) toast('매칭 안 된 ' + skipped + '건 제외됨');
+
+  var header = ['거래처코드', '코드', '수량', '매입원가', '금액', '부가세', '적요'];
+  var data = [header].concat(rows);
+
+  var now = new Date();
+  var yyyy = now.getFullYear();
+  var mm = String(now.getMonth() + 1).padStart(2, '0');
+  var dd = String(now.getDate()).padStart(2, '0');
+  var hh = String(now.getHours()).padStart(2, '0');
+  var mi = String(now.getMinutes()).padStart(2, '0');
+  var filename = '밀워키매입_' + yyyy + mm + dd + '_' + hh + mi + '.xlsx';
+
+  var ws = XLSX.utils.aoa_to_sheet(data);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '밀워키매입');
+  XLSX.writeFile(wb, filename);
+
+  toast('엑셀 다운로드 완료 (' + rows.length + '건)');
+}
+
 var _erpReminderTimer = null;
 
 // ====== 발주확정 테이블 컬럼 표시 설정 ======
