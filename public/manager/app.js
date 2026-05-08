@@ -5212,6 +5212,10 @@ function buildPOListPanel() {
 
   // 화면 표시 필터: 달력 from/to 범위
   var filtered = history.filter(function(item) {
+    // 조회 모드: 특정 batch만 표시 (날짜 필터 무시)
+    if (window._poViewBatchId) return item.poBatchId === window._poViewBatchId;
+    // 저장된 row는 발주확정 화면에서 숨김
+    if (item.poSaved) return false;
     var itemDate = new Date(item.date);
     var d = itemDate.getFullYear() + '-' + String(itemDate.getMonth() + 1).padStart(2, '0') + '-' + String(itemDate.getDate()).padStart(2, '0');
     return d >= _itemsDateFrom && d <= _itemsDateTo;
@@ -5225,6 +5229,14 @@ function buildPOListPanel() {
   var erpDone = filtered.filter(function(i) { return i.erpStatus === 'done'; }).length;
 
   var h = '';
+
+  // 조회 모드 배너
+  if (window._poViewBatchId) {
+    h += '<div style="background:#FEF3C7;color:#92400E;padding:6px 14px;font-size:12px;display:flex;justify-content:space-between;align-items:center;border-radius:6px 6px 0 0">' +
+      '<span>📌 조회 모드: ' + window._poViewBatchId + '</span>' +
+      '<span onclick="exitPoViewMode()" style="cursor:pointer;font-weight:500">✕ 일반 모드로 복귀</span>' +
+    '</div>';
+  }
 
   h += '<div class="po-panel" style="flex:1;min-height:0">';
   h += '<div class="po-panel-header"><div style="display:flex;align-items:center;gap:10px"><span>밀워키 발주확정</span>';
@@ -5240,6 +5252,7 @@ function buildPOListPanel() {
   h += '<input type="date" id="po-order-items-date-to" value="' + _itemsDateTo + '" onchange="_onPOItemsDateChange(\'to\', this.value)" style="background:#1A1D23;color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer">';
   h += '<button class="po-hdr-btn po-hdr-sync" onclick="startTtiOrderItemsSync()">↻ 밀워키 주문내역 동기화</button>';
   h += '<button id="po-save-btn" class="po-save-btn" onclick="savePoConfirmed()" style="background:#185FA5;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">💾 저장</button>';
+  h += '<button id="po-saved-list-btn" onclick="openPoSavedListModal()" style="background:#2A4A8C;color:#fff;border:none;padding:7px 12px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><span style="font-size:13px">📋</span>발주리스트</button>';
 
   // ⚙ 컬럼 표시 설정 (드롭다운 컨테이너 — position:relative)
   var _poCols = [
@@ -5630,6 +5643,34 @@ function savePoConfirmed() {
     prodUpdated++;
   });
 
+  // Step 3.5: poBatchId 부여 (이번 사이클에 저장되는 row들)
+  var nowDate = new Date();
+  var batchDateStr = nowDate.getFullYear() +
+    String(nowDate.getMonth() + 1).padStart(2, '0') +
+    String(nowDate.getDate()).padStart(2, '0');
+  var maxSeq = 0;
+  history.forEach(function(it) {
+    if (it.poBatchId && it.poBatchId.indexOf(batchDateStr + '-') === 0) {
+      var seq = parseInt(it.poBatchId.split('-')[1], 10);
+      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    }
+  });
+  var newBatchId = batchDateStr + '-' + String(maxSeq + 1).padStart(3, '0');
+  var savedAt = nowDate.toISOString();
+  var batchCount = 0;
+  history.forEach(function(it) {
+    if (!it.poSaved) {
+      it.poSaved = true;
+      it.poBatchId = newBatchId;
+      it.poSavedAt = savedAt;
+      batchCount++;
+    }
+  });
+  if (batchCount === 0) {
+    toast('새로 저장할 발주가 없습니다');
+    return;
+  }
+
   // Step 4: 저장
   save('mw_po_history', history);
   if (prodUpdated > 0) save(KEYS.products, DB.products);
@@ -5717,6 +5758,135 @@ function downloadPoConfirmedExcel() {
   XLSX.writeFile(wb, filename);
 
   toast('엑셀 다운로드 완료 (' + rows.length + '건)');
+}
+
+function openPoSavedListModal() {
+  var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
+  var savedRows = history.filter(function(it) { return it.poSaved; });
+
+  if (savedRows.length === 0) {
+    toast('저장된 발주가 없습니다');
+    return;
+  }
+
+  var groups = {};
+  savedRows.forEach(function(it) {
+    var bid = it.poBatchId || 'UNKNOWN';
+    if (!groups[bid]) {
+      groups[bid] = { batchId: bid, savedAt: it.poSavedAt, rows: [], catCount: {} };
+    }
+    groups[bid].rows.push(it);
+
+    var matched = (DB.products || []).find(function(pr) {
+      return (pr.ttiNum && normalizeTtiCode(pr.ttiNum) === normalizeTtiCode(it.ttiNum || '')) ||
+             (pr.code && pr.code === it.code);
+    });
+    var cat = matched ? (matched.category || '') : (it.category || '');
+    if (cat === '악세서리' || cat === '액세서리') cat = '악세사리';
+    if (cat) {
+      groups[bid].catCount[cat] = (groups[bid].catCount[cat] || 0) + 1;
+    }
+  });
+
+  var groupList = Object.keys(groups).map(function(bid) {
+    var g = groups[bid];
+    var totalAmount = 0;
+    g.rows.forEach(function(r) {
+      totalAmount += (r.costPrice || 0) * (r.qty || 0);
+    });
+
+    var topCat = '-';
+    var maxCnt = 0;
+    Object.keys(g.catCount).forEach(function(c) {
+      if (g.catCount[c] > maxCnt) { maxCnt = g.catCount[c]; topCat = c; }
+    });
+    var catLabel = topCat === '-' ? '-' : (Object.keys(g.catCount).length > 1 ? topCat + ' 외' : topCat);
+
+    var dateStr = '-';
+    if (g.savedAt) {
+      var d = new Date(g.savedAt);
+      dateStr = d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+
+    var seq = bid.split('-')[1] || '000';
+
+    return {
+      batchId: bid,
+      dateStr: dateStr,
+      seqLabel: '#' + seq,
+      catLabel: catLabel,
+      totalAmount: totalAmount,
+      sortKey: bid
+    };
+  });
+
+  groupList.sort(function(a, b) { return b.sortKey.localeCompare(a.sortKey); });
+
+  var rowHtml = groupList.map(function(g) {
+    return '<div onclick="loadPoBatch(\'' + g.batchId + '\')" style="padding:12px 16px;border-bottom:0.5px solid #E5E7EB;cursor:pointer;display:grid;grid-template-columns:90px 60px 1fr 110px;gap:12px;align-items:center" onmouseover="this.style.background=\'#F8F7F2\'" onmouseout="this.style.background=\'transparent\'">' +
+      '<span style="font-size:12px;color:#6B7280;font-family:monospace">' + g.dateStr + '</span>' +
+      '<span style="font-size:13px;font-weight:500;color:#111">' + g.seqLabel + '</span>' +
+      '<span style="font-size:12px;color:#6B7280">' + g.catLabel + '</span>' +
+      '<span style="font-size:13px;font-weight:500;text-align:right;color:#111">' + g.totalAmount.toLocaleString() + '원</span>' +
+    '</div>';
+  }).join('');
+
+  var modalHtml = '<div class="modal-bg show" id="mw-po-saved-list-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);z-index:300;display:flex;align-items:center;justify-content:center">' +
+    '<div class="modal" id="mw-po-saved-list-inner" style="background:#fff;width:540px;max-width:90vw;border-radius:12px;overflow:hidden;border:0.5px solid #E5E7EB">' +
+      '<div class="modal-header" style="background:#1A1D23;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:move">' +
+        '<div style="color:#fff;font-size:14px;font-weight:500">📋 발주리스트</div>' +
+        '<span onclick="closePoSavedListModal()" style="color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer">✕</span>' +
+      '</div>' +
+      '<div style="padding:4px 0;max-height:360px;overflow-y:auto">' +
+        rowHtml +
+      '</div>' +
+      '<div style="background:#F8F7F2;padding:8px 16px;font-size:11px;color:#6B7280;border-top:0.5px solid #E5E7EB">ℹ️ 항목 클릭 → 발주확정 테이블에 해당 발주 row들 표시 (조회 모드)</div>' +
+    '</div>' +
+  '</div>';
+
+  var div = document.createElement('div');
+  div.innerHTML = modalHtml;
+  var modalEl = div.firstChild;
+  document.body.appendChild(modalEl);
+
+  modalEl.addEventListener('click', function(e) {
+    if (e.target === modalEl) closePoSavedListModal();
+  });
+
+  var innerEl = document.getElementById('mw-po-saved-list-inner');
+  var headerEl = innerEl ? innerEl.querySelector('.modal-header') : null;
+  if (innerEl && headerEl && typeof _makeDraggable === 'function') {
+    _makeDraggable(innerEl, headerEl);
+  }
+}
+
+function closePoSavedListModal() {
+  var el = document.getElementById('mw-po-saved-list-modal');
+  if (el) el.remove();
+}
+
+function loadPoBatch(batchId) {
+  window._poViewBatchId = batchId;
+  closePoSavedListModal();
+
+  var confirmedContent = document.getElementById('po-content-confirmed');
+  if (confirmedContent) {
+    confirmedContent.innerHTML = buildPOListPanel();
+    if (typeof initColumnResize === 'function') initColumnResize('po-list-table');
+  }
+
+  toast('조회 모드: ' + batchId);
+}
+
+function exitPoViewMode() {
+  window._poViewBatchId = null;
+  var confirmedContent = document.getElementById('po-content-confirmed');
+  if (confirmedContent) {
+    confirmedContent.innerHTML = buildPOListPanel();
+    if (typeof initColumnResize === 'function') initColumnResize('po-list-table');
+  }
 }
 
 var _erpReminderTimer = null;
