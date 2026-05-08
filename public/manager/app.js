@@ -5643,33 +5643,48 @@ function savePoConfirmed() {
     prodUpdated++;
   });
 
-  // Step 3.5: poBatchId 부여 (이번 사이클에 저장되는 row들)
+  // Step 3.5: poBatchId 부여 (B안: 프로모션 그룹별 별도 batch + 월별 리셋)
   var nowDate = new Date();
-  var batchDateStr = nowDate.getFullYear() +
-    String(nowDate.getMonth() + 1).padStart(2, '0') +
-    String(nowDate.getDate()).padStart(2, '0');
+  var monthStr = nowDate.getFullYear() + String(nowDate.getMonth() + 1).padStart(2, '0');
+  var savedAt = nowDate.toISOString();
+  // 프로모션 그룹 키 추출 함수
+  function _getPromoGroupKey(it) {
+    if (it.ttiPromotion) return it.ttiPromotion;
+    if (it.type === 'foc') return 'FOC';
+    return '일반';
+  }
+  // 1) 미저장 row들을 프로모션 그룹별로 분류
+  var newRows = history.filter(function(it) { return !it.poSaved; });
+  if (newRows.length === 0) {
+    toast('새로 저장할 발주가 없습니다');
+    return;
+  }
+  var groupedRows = {};
+  newRows.forEach(function(it) {
+    var key = _getPromoGroupKey(it);
+    if (!groupedRows[key]) groupedRows[key] = [];
+    groupedRows[key].push(it);
+  });
+  // 2) 이번 달의 기존 최대 seq 찾기 (YYYYMM- 접두사)
   var maxSeq = 0;
   history.forEach(function(it) {
-    if (it.poBatchId && it.poBatchId.indexOf(batchDateStr + '-') === 0) {
+    if (it.poBatchId && it.poBatchId.indexOf(monthStr + '-') === 0) {
       var seq = parseInt(it.poBatchId.split('-')[1], 10);
       if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
     }
   });
-  var newBatchId = batchDateStr + '-' + String(maxSeq + 1).padStart(3, '0');
-  var savedAt = nowDate.toISOString();
-  var batchCount = 0;
-  history.forEach(function(it) {
-    if (!it.poSaved) {
+  // 3) 그룹별로 별도 batchId 부여 (그룹 키 알파벳 순 안정화)
+  var groupKeys = Object.keys(groupedRows).sort();
+  groupKeys.forEach(function(key) {
+    maxSeq++;
+    var batchId = monthStr + '-' + String(maxSeq).padStart(3, '0');
+    groupedRows[key].forEach(function(it) {
       it.poSaved = true;
-      it.poBatchId = newBatchId;
+      it.poBatchId = batchId;
       it.poSavedAt = savedAt;
-      batchCount++;
-    }
+    });
   });
-  if (batchCount === 0) {
-    toast('새로 저장할 발주가 없습니다');
-    return;
-  }
+  var batchCount = newRows.length;
 
   // Step 4: 저장
   save('mw_po_history', history);
@@ -5769,16 +5784,25 @@ function openPoSavedListModal() {
     return;
   }
 
+  // 프로모션 색상 뱃지 매핑
+  var promoColors = {
+    '일반': { bg: '#F1EFE8', color: '#444441' },
+    'PACKAGE': { bg: '#E1F5EE', color: '#0F6E56' },
+    'T6': { bg: '#FAEEDA', color: '#633806' },
+    '신제품': { bg: '#FBEAF0', color: '#993556' },
+    'FOC': { bg: '#FCEBEB', color: '#A32D2D' }
+  };
+
   var groups = {};
   savedRows.forEach(function(it) {
     var bid = it.poBatchId || 'UNKNOWN';
     if (!groups[bid]) {
-      groups[bid] = { batchId: bid, savedAt: it.poSavedAt, rows: [], catCount: {} };
+      groups[bid] = { batchId: bid, savedAt: it.poSavedAt, rows: [], catCount: {}, promoSet: {} };
     }
     groups[bid].rows.push(it);
 
     var matched = (DB.products || []).find(function(pr) {
-      return (pr.ttiNum && normalizeTtiCode(pr.ttiNum) === normalizeTtiCode(it.ttiNum || '')) ||
+      return (pr.ttiNum && normalizeTtiCode(pr.ttiNum) === normalizeTtiCode(it.ttiNum)) ||
              (pr.code && pr.code === it.code);
     });
     var cat = matched ? (matched.category || '') : (it.category || '');
@@ -5786,6 +5810,10 @@ function openPoSavedListModal() {
     if (cat) {
       groups[bid].catCount[cat] = (groups[bid].catCount[cat] || 0) + 1;
     }
+
+    // 프로모션 키 (단일 batch는 단일 그룹이지만 안전하게 set으로 관리)
+    var promoKey = it.ttiPromotion || (it.type === 'foc' ? 'FOC' : '일반');
+    groups[bid].promoSet[promoKey] = true;
   });
 
   var groupList = Object.keys(groups).map(function(bid) {
@@ -5812,48 +5840,61 @@ function openPoSavedListModal() {
 
     var seq = bid.split('-')[1] || '000';
 
+    var promoKeys = Object.keys(g.promoSet);
+    var promoKey = promoKeys[0] || '일반';
+    var promoLabel = promoKeys.length > 1 ? promoKey + ' 외' : promoKey;
+    var promoStyle = promoColors[promoKey] || { bg: '#F1EFE8', color: '#444441' };
+
     return {
       batchId: bid,
       dateStr: dateStr,
       seqLabel: '#' + seq,
       catLabel: catLabel,
+      promoLabel: promoLabel,
+      promoStyle: promoStyle,
       totalAmount: totalAmount,
-      sortKey: bid
+      sortKey: (g.savedAt || '') + bid  // savedAt + batchId로 정렬 (월별 리셋 + 일별 정렬 안정)
     };
   });
 
-  groupList.sort(function(a, b) { return b.sortKey.localeCompare(a.sortKey); });
+  // 정렬: savedAt desc (최신 순)
+  groupList.sort(function(a, b) {
+    return b.sortKey.localeCompare(a.sortKey);
+  });
 
   var rowHtml = groupList.map(function(g) {
-    return '<div onclick="loadPoBatch(\'' + g.batchId + '\')" style="padding:12px 16px;border-bottom:0.5px solid #E5E7EB;cursor:pointer;display:grid;grid-template-columns:90px 60px 1fr 110px;gap:12px;align-items:center" onmouseover="this.style.background=\'#F8F7F2\'" onmouseout="this.style.background=\'transparent\'">' +
-      '<span style="font-size:12px;color:#6B7280;font-family:monospace">' + g.dateStr + '</span>' +
+    return '<div onclick="loadPoBatch(\'' + g.batchId + '\')" style="padding:12px 18px;border-bottom:0.5px solid #E5E7EB;cursor:pointer;display:grid;grid-template-columns:110px 70px 130px 1fr 130px;gap:14px;align-items:center" onmouseover="this.style.background=\'#F8F7F2\'" onmouseout="this.style.background=\'transparent\'">' +
+      '<span style="font-size:12px;color:#6B7280">' + g.dateStr + '</span>' +
       '<span style="font-size:13px;font-weight:500;color:#111">' + g.seqLabel + '</span>' +
       '<span style="font-size:12px;color:#6B7280">' + g.catLabel + '</span>' +
+      '<span style="font-size:11px;padding:2px 8px;background:' + g.promoStyle.bg + ';color:' + g.promoStyle.color + ';border-radius:4px;display:inline-block;width:fit-content">' + g.promoLabel + '</span>' +
       '<span style="font-size:13px;font-weight:500;text-align:right;color:#111">' + g.totalAmount.toLocaleString() + '원</span>' +
     '</div>';
   }).join('');
 
-  var modalHtml = '<div class="modal-bg show" id="mw-po-saved-list-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);z-index:300;display:flex;align-items:center;justify-content:center">' +
-    '<div class="modal" id="mw-po-saved-list-inner" style="background:#fff;width:540px;max-width:90vw;border-radius:12px;overflow:hidden;border:0.5px solid #E5E7EB">' +
-      '<div class="modal-header" style="background:#1A1D23;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;cursor:move">' +
+  var modalHtml = '<div class="modal-bg show" id="mw-po-saved-list-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);z-index:300;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)closePoSavedListModal()">' +
+    '<div class="modal" id="mw-po-saved-list-inner" style="background:#fff;width:720px;max-width:90vw;border-radius:12px;overflow:hidden;border:0.5px solid #E5E7EB;font-family:Pretendard,sans-serif">' +
+      '<div class="modal-header" style="background:#1A1D23;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;cursor:move">' +
         '<div style="color:#fff;font-size:14px;font-weight:500">📋 발주리스트</div>' +
         '<span onclick="closePoSavedListModal()" style="color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer">✕</span>' +
       '</div>' +
-      '<div style="padding:4px 0;max-height:360px;overflow-y:auto">' +
+      '<div style="padding:10px 18px 6px;background:#FAFAF7;font-size:11px;color:#6B7280;display:grid;grid-template-columns:110px 70px 130px 1fr 130px;gap:14px;align-items:center;border-bottom:0.5px solid #E5E7EB;font-weight:500">' +
+        '<span>날짜</span>' +
+        '<span>발주번호</span>' +
+        '<span>대분류</span>' +
+        '<span>프로모션</span>' +
+        '<span style="text-align:right">총금액</span>' +
+      '</div>' +
+      '<div style="padding:4px 0;max-height:400px;overflow-y:auto">' +
         rowHtml +
       '</div>' +
-      '<div style="background:#F8F7F2;padding:8px 16px;font-size:11px;color:#6B7280;border-top:0.5px solid #E5E7EB">ℹ️ 항목 클릭 → 발주확정 테이블에 해당 발주 row들 표시 (조회 모드)</div>' +
+      '<div style="background:#F8F7F2;padding:8px 18px;font-size:11px;color:#6B7280;border-top:0.5px solid #E5E7EB">ℹ️ 항목 클릭 → 발주확정 테이블에 해당 발주 row들 표시 (조회 모드) · 발주번호: 월별 리셋</div>' +
     '</div>' +
   '</div>';
 
   var div = document.createElement('div');
   div.innerHTML = modalHtml;
-  var modalEl = div.firstChild;
-  document.body.appendChild(modalEl);
-
-  modalEl.addEventListener('click', function(e) {
-    if (e.target === modalEl) closePoSavedListModal();
-  });
+  document.body.appendChild(div.firstChild);
 
   var innerEl = document.getElementById('mw-po-saved-list-inner');
   var headerEl = innerEl ? innerEl.querySelector('.modal-header') : null;
