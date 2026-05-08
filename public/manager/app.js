@@ -9911,6 +9911,8 @@ function showProductManageModal() {
       else if (tab === 'bulkreg') _mwPlBulkResetState();
     });
   });
+  try { if (typeof _mwPlBulkResetState === 'function') _mwPlBulkResetState(); } catch(e) {}
+  try { if (typeof _bindMwPlBulkEvents === 'function') _bindMwPlBulkEvents(); } catch(e) {}
 }
 
 // 탭 전환
