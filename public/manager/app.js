@@ -9794,6 +9794,8 @@ function _bindMwPricelistIoExportEvents() {
 
 // ======================== PRODUCT CRUD ========================
 
+function closeModal() { document.getElementById('import-modal').classList.remove('show'); }
+
 // 제품등록및수정 탭 팝업 열기
 function showProductManageModal() {
   switchPmTab('bulkreg');
