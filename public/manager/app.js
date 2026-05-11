@@ -10522,10 +10522,6 @@ function mwEditAction(action) {
       alert('오픈마켓 가격 전송은 아직 지원되지 않습니다.');
       return;
     }
-    if (selectedMarket === 'ssg') {
-      alert('SSG 가격 전송은 아직 지원되지 않습니다.');
-      return;
-    }
 
     // 네이버: 헬퍼로 대상 결정 + confirm (requireSelection: true)
     var resolved = _resolvePriceActionTargets({
@@ -10612,8 +10608,11 @@ async function _startPriceSync(productsParam) {
   var products = modal._products || [];
   if (products.length === 0) return;
 
-  var naver = document.getElementById('ps-naver');
-  if (!naver || !naver.checked) { alert('전송할 마켓을 선택하세요'); return; }
+  var selectedMarket = window._selectedPriceMarket || 'naver';
+  if (selectedMarket !== 'naver' && selectedMarket !== 'ssg') {
+    alert('전송할 마켓을 선택하세요');
+    return;
+  }
 
   _priceSyncCancelled = false;
   var total = products.length;
@@ -10639,42 +10638,80 @@ async function _startPriceSync(productsParam) {
     if (_priceSyncCancelled) break;
     var p = products[i];
     var code = String(p.code || '').trim();
-    var price = p.priceNaver || 0;
+    var price = selectedMarket === 'ssg' ? (p.priceSsg || 0) : (p.priceNaver || 0);
 
     document.getElementById('ps-current').textContent = (p.model || code) + ' (' + (i + 1) + '/' + total + ')';
     document.getElementById('ps-bar').style.width = Math.round(((i) / total) * 100) + '%';
     document.getElementById('ps-progress-text').textContent = i + ' / ' + total;
     document.getElementById('ps-percent').textContent = Math.round((i / total) * 100) + '%';
 
-    console.log('[PriceSync] 제품:', code, '모델:', p.model, 'priceNaver:', price, '타입:', typeof price);
+    console.log('[PriceSync] 제품:', code, '모델:', p.model, '마켓:', selectedMarket, '가격:', price);
     if (!code) { failed.push({ code: code, model: p.model, reason: '코드 없음' }); _updatePsCounters(success, failed); continue; }
-    if (!price || price <= 0) { failed.push({ code: code, model: p.model, reason: '스토어팜 가격 없음 (' + price + ')' }); _updatePsCounters(success, failed); continue; }
+    if (!price || price <= 0) {
+      var _noPriceReason = selectedMarket === 'ssg' ? 'SSG 가격 없음 (' + price + ')' : '스토어팜 가격 없음 (' + price + ')';
+      failed.push({ code: code, model: p.model, reason: _noPriceReason });
+      _updatePsCounters(success, failed);
+      continue;
+    }
 
     try {
-      // 1. 판매자코드로 네이버 상품 조회
-      var searchRes = await fetch('/api/naver/products?code=' + encodeURIComponent(code));
-      var searchData = await searchRes.json();
-      if (!searchData.success || !searchData.product) {
-        failed.push({ code: code, model: p.model, reason: '네이버 상품 미등록' });
-        _updatePsCounters(success, failed);
-        await _psDelay(2000);
-        continue;
-      }
-
-      // 2. 가격 수정 전송
-      var putRes = await fetch('/api/naver/products', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: price, channelProductNo: searchData.product.channelProductNo }),
-      });
-      var putData = await putRes.json();
-      console.log('[PriceSync] PUT 응답:', JSON.stringify(putData));
-      if (putData.success) {
-        success.push({ code: code, model: p.model });
-      } else if (putData.reason === 'OUT_OF_STOCK') {
-        failed.push({ code: code, model: p.model, reason: '품절 상품', outOfStock: true });
+      if (selectedMarket === 'ssg') {
+        // SSG: 2-step (GET splprc/mrgrt → POST sellprc)
+        var ssgGetRes = await fetch('/api/ssg/price?code=' + encodeURIComponent(code));
+        var ssgGetData = await ssgGetRes.json();
+        if (!ssgGetData.success) {
+          failed.push({ code: code, model: p.model, reason: 'SSG 상품 미등록' });
+          _updatePsCounters(success, failed);
+          await _psDelay(2000);
+          continue;
+        }
+        var ssgCurPrice = ssgGetData.price || {};
+        var ssgSplprc = Number(ssgCurPrice.splprc);
+        var ssgMrgrt = Number(ssgCurPrice.mrgrt);
+        if (!ssgSplprc || !ssgMrgrt) {
+          failed.push({ code: code, model: p.model, reason: '공급가/마진율 정보 없음' });
+          _updatePsCounters(success, failed);
+          await _psDelay(2000);
+          continue;
+        }
+        var ssgPutRes = await fetch('/api/ssg/price', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code, sellprc: price, splprc: ssgSplprc, mrgrt: ssgMrgrt }),
+        });
+        var ssgPutData = await ssgPutRes.json();
+        console.log('[PriceSync SSG] PUT 응답:', JSON.stringify(ssgPutData));
+        if (ssgPutData.success) {
+          success.push({ code: code, model: p.model });
+        } else {
+          failed.push({ code: code, model: p.model, reason: ssgPutData.message || ssgPutData.error || '전송 실패' });
+        }
       } else {
-        failed.push({ code: code, model: p.model, reason: putData.error || '전송 실패' });
+        // 1. 판매자코드로 네이버 상품 조회
+        var searchRes = await fetch('/api/naver/products?code=' + encodeURIComponent(code));
+        var searchData = await searchRes.json();
+        if (!searchData.success || !searchData.product) {
+          failed.push({ code: code, model: p.model, reason: '네이버 상품 미등록' });
+          _updatePsCounters(success, failed);
+          await _psDelay(2000);
+          continue;
+        }
+
+        // 2. 가격 수정 전송
+        var putRes = await fetch('/api/naver/products', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ originProductNo: searchData.product.originProductNo, newPrice: price, channelProductNo: searchData.product.channelProductNo }),
+        });
+        var putData = await putRes.json();
+        console.log('[PriceSync] PUT 응답:', JSON.stringify(putData));
+        if (putData.success) {
+          success.push({ code: code, model: p.model });
+        } else if (putData.reason === 'OUT_OF_STOCK') {
+          failed.push({ code: code, model: p.model, reason: '품절 상품', outOfStock: true });
+        } else {
+          failed.push({ code: code, model: p.model, reason: putData.error || '전송 실패' });
+        }
       }
     } catch (e) {
       failed.push({ code: code, model: p.model, reason: e.message || '네트워크 오류' });
@@ -10708,7 +10745,8 @@ async function _startPriceSync(productsParam) {
     });
     resultHtml += '</tbody></table></div>';
     if (_oosCount > 0) {
-      resultHtml += '<div style="margin-top:8px;padding:8px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px;font-size:12px;color:#9A3412">품절 상품은 네이버에서 상태를 변경한 후 다시 전송하세요.</div>';
+      var _oosMarketName = selectedMarket === 'ssg' ? 'SSG' : '네이버';
+      resultHtml += '<div style="margin-top:8px;padding:8px 12px;background:#FFF7ED;border:1px solid #FDBA74;border-radius:6px;font-size:12px;color:#9A3412">품절 상품은 ' + _oosMarketName + '에서 상태를 변경한 후 다시 전송하세요.</div>';
     }
   } else if (!_priceSyncCancelled) {
     resultHtml += '<div style="text-align:center;color:#1D9E75;font-size:13px">모든 제품의 가격이 성공적으로 전송되었습니다</div>';
