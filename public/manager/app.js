@@ -8622,11 +8622,9 @@ function renderOnlineSales() {
     html += '<tr'+(naver.profit<0||open.profit<0?' style="background:#FFF5F5"':'')+'>';
     html += '<td><span class="os-date">'+(item.date||'-')+'</span></td>';
     html += '<td>'+(item.code||'-')+'</td>';
-    if (editable) {
-      html += '<td><input class="os-input os-input-text" type="search" name="search_naf_os_model" autocomplete="nope" data-form-type="other" data-lpignore="true" value="'+(item.model||'')+'" placeholder="코드, 모델명 검색..." oninput="showAC(this, function(code){ onOsProductSelect('+ri+',code); })" onfocus="if(this.value) showAC(this, function(code){ onOsProductSelect('+ri+',code); })" onchange="updateOsField('+ri+',\'model\',this.value)" style="font-weight:500;min-width:160px"></td>';
-    } else {
-      html += '<td style="text-align:left;font-weight:500">'+(item.model||'-')+'</td>';
-    }
+    // 모델 셀은 항상 텍스트로 표시 (편집 input 제거)
+    // 신규 행 추가/검색은 상단 [+ 행 추가] 버튼과 검색창에서 처리
+    html += '<td style="text-align:left;font-weight:500;padding-left:8px">'+(item.model||'-')+'</td>';
     html += '<td class="center">'+osStockHtml(stockNum)+'</td>';
     if (editable) {
       html += '<td><input class="os-input os-input-text os-vendor-input" value="'+(item.vendor||'')+'" onchange="updateOsField('+ri+',\'vendor\',this.value)"></td>';
