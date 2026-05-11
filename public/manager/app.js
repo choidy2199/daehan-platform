@@ -8696,7 +8696,10 @@ function addOnlineSalesRow(){
 }
 
 function removeOsRow(idx){
-  if(!confirm('이 항목을 삭제하시겠습니까?'))return;
+  var row = onlineSalesData[idx];
+  var isCumul = row && row.promoMonth;
+  var msg = isCumul ? '삭제하기전에, 이전가격으로 복구하셨나요?' : '이 항목을 삭제하시겠습니까?';
+  if(!confirm(msg))return;
   onlineSalesData.splice(idx,1);saveOnlineSales();renderOnlineSales();
 }
 
@@ -8706,50 +8709,99 @@ function insertOsRowAfter(idx) {
   saveOnlineSales();renderOnlineSales();
 }
 
+function _findCodeByCumulProduct(pp) {
+  if (!pp || !DB.products || !DB.products.length) return null;
+  if (pp.ttiNum) {
+    var normTti = typeof normalizeTtiCode === 'function'
+      ? normalizeTtiCode(pp.ttiNum)
+      : String(pp.ttiNum).replace(/^0+/, '');
+    var byTti = DB.products.find(function(p) {
+      var pTti = typeof normalizeTtiCode === 'function'
+        ? normalizeTtiCode(p.ttiNum)
+        : String(p.ttiNum || '').replace(/^0+/, '');
+      return pTti && pTti === normTti;
+    });
+    if (byTti && byTti.code) return byTti.code;
+  }
+  if (pp.orderNum) {
+    var byOrder = DB.products.find(function(p) {
+      return String(p.orderNum || '') === String(pp.orderNum);
+    });
+    if (byOrder && byOrder.code) return byOrder.code;
+  }
+  if (pp.model) {
+    var modelLower = String(pp.model).toLowerCase().trim();
+    var byModel = DB.products.find(function(p) {
+      return String(p.model || '').toLowerCase().trim() === modelLower;
+    });
+    if (byModel && byModel.code) return byModel.code;
+  }
+  return null;
+}
+
+function _extractPromoMonth(periodStart) {
+  if (!periodStart) return '';
+  var m = String(periodStart).match(/^\d{4}-(\d{2})/);
+  if (!m) return '';
+  return parseInt(m[1], 10) + '월';
+}
+
 function importOnlineSalesCumul() {
-  var added=0, skipped=0, foundCodes={};
-
-  // 1차: poOrderData (발주 확정 전)
-  poOrderData.forEach(function(item) {
-    var hasCumul = (String(item.promoNo||'').indexOf('누적')>=0) || (String(item.promoName||'').indexOf('누적')>=0);
-    if (!hasCumul) return;
-    var code = String(item.code||'');
-    if (!code || code==='-') return;
-    if (foundCodes[code]) return;
-    foundCodes[code] = true;
-    if (onlineSalesData.some(function(d){return String(d.code)===code})) { skipped++; return; }
-    var p = DB.products.find(function(pr){return String(pr.code)===code});
-    var stock = findStock(code);
-    var ec = getEffectiveCost(code);
-    onlineSalesData.push({
-      date:todayStr(), code:code, model:item.model||(p?p.model:''), stock:stock!=null?stock:0,
-      vendor:'', price:p?(p.supplyPrice||0):(item.basePrice||0), promoCost:ec.cost||item.promoPrice||0,
-      naverPrice:0, openPrice:0, promoName:item.promoName||''
-    });
-    added++;
+  var promos = _getCumulPromos();
+  if (!promos || !promos.length) {
+    toast('등록된 누적 프로모션이 없습니다. 발주 > 누적프로모션에 먼저 등록하세요.');
+    return;
+  }
+  var added = 0;
+  var skipped = 0;
+  var unmatched = 0;
+  var existingCodes = {};
+  onlineSalesData.forEach(function(row) {
+    if (row && row.code) existingCodes[String(row.code)] = true;
   });
-
-  // 2차: DB.promotions (발주 확정 후)
-  DB.promotions.forEach(function(promo) {
-    var hasCumul = (String(promo.promoCode||'').indexOf('누적')>=0) || (String(promo.promoName||'').indexOf('누적')>=0);
-    if (!hasCumul) return;
-    var code = String(promo.code);
-    if (foundCodes[code]) return;
-    foundCodes[code] = true;
-    if (onlineSalesData.some(function(d){return String(d.code)===code})) { skipped++; return; }
-    var p = DB.products.find(function(pr){return String(pr.code)===code});
-    var stock = findStock(code);
-    onlineSalesData.push({
-      date:todayStr(), code:code, model:promo.model||(p?p.model:''), stock:stock!=null?stock:0,
-      vendor:'', price:p?(p.supplyPrice||0):0, promoCost:promo.cost||promo.promoPrice||0,
-      naverPrice:0, openPrice:0, promoName:promo.promoName||''
+  promos.forEach(function(promo) {
+    if (!promo || !promo.products || !promo.products.length) return;
+    var autoDC = parseFloat(promo.autoDiscountRate);
+    if (!autoDC || isNaN(autoDC)) {
+      autoDC = (promo.targetAmount > 0 && promo.benefitAmount > 0)
+        ? (promo.benefitAmount / promo.targetAmount * 100)
+        : 0;
+    }
+    var promoMonth = _extractPromoMonth(promo.periodStart);
+    var promoName = promo.name || '누적프로모션';
+    promo.products.forEach(function(pp) {
+      var code = _findCodeByCumulProduct(pp);
+      if (!code) { unmatched++; return; }
+      if (existingCodes[String(code)]) { skipped++; return; }
+      existingCodes[String(code)] = true;
+      var dbProd = findProduct(code);
+      var stock = findStock(code);
+      var supplyPrice = (pp.supplyPrice && pp.supplyPrice > 0)
+        ? pp.supplyPrice
+        : (dbProd ? (dbProd.supplyPrice || 0) : 0);
+      var expectedPrice = autoDC > 0
+        ? Math.round(supplyPrice * (1 - autoDC / 100))
+        : 0;
+      onlineSalesData.push({
+        date: todayStr(),
+        code: String(code),
+        model: pp.model || (dbProd ? dbProd.model : ''),
+        stock: stock != null ? stock : 0,
+        vendor: '',
+        price: supplyPrice,
+        promoCost: supplyPrice,
+        naverPrice: 0,
+        openPrice: 0,
+        promoName: promoName,
+        expectedPrice: expectedPrice,
+        promoMonth: promoMonth
+      });
+      added++;
     });
-    added++;
   });
-
-  if (!added && !skipped) { toast('누적 프로모션 제품이 없습니다. 발주 > 프로모션 > 프로모션 발주에 먼저 등록하세요.'); return; }
-  saveOnlineSales(); renderOnlineSales();
-  toast(added+'건 누적P 불러오기 완료'+(skipped>0?' ('+skipped+'건 중복 제외)':''));
+  saveOnlineSales();
+  renderOnlineSales();
+  toast('추가 ' + added + '건 · 이미 있음 ' + skipped + '건 · 매칭실패 ' + unmatched + '건');
 }
 
 function importOnlineSalesProducts(){
