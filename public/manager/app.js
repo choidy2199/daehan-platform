@@ -1512,6 +1512,7 @@ function _pdApplyPrice(code, channel) {
         });
       }
       renderCatalog();
+      if (typeof renderOnlineSales === 'function') renderOnlineSales();
       // 편집 모드 복원
       if (_wasEditMode) {
         _mwEditMode = false;  // toggleMwEditMode가 true로 전환하도록
@@ -10524,6 +10525,7 @@ async function _mwPriceCollect() {
     _priceCollectStats = stats;
     var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
     if (typeof renderCatalog === 'function') renderCatalog();
+    if (typeof renderOnlineSales === 'function') renderOnlineSales();
     if (_mwEditMode) {
       _enterMwEditMode();
       if (_savedChecked && _savedChecked.length) {
@@ -10620,6 +10622,7 @@ async function _mwPriceCollect() {
     // 편집모드 체크박스 보존
     var _savedChecked = _mwEditMode ? _getCheckedProductIndices() : null;
     if (typeof renderCatalog === 'function') renderCatalog();
+    if (typeof renderOnlineSales === 'function') renderOnlineSales();
     if (_mwEditMode) {
       _enterMwEditMode();
       if (_savedChecked && _savedChecked.length) {
@@ -11988,6 +11991,7 @@ function recalcAll() {
   save(KEYS.inventory, DB.inventory);
   populateCatalogFilters();
   renderCatalog();
+  if (typeof renderOnlineSales === 'function') renderOnlineSales();
 }
 
 // ======================== PROMO CRUD ========================
