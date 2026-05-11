@@ -829,7 +829,7 @@ body.gen-edit-active #gen-table tbody tr td:first-child {
 .os-sum-card { flex:1; background:#F4F6FA; border-radius:4px; padding:6px 10px; text-align:center; }
 .os-sum-label { font-size:10px; color:#5A6070; }
 .os-sum-val { font-size:13px; font-weight:600; color:#1A1D23; }
-.os-date { color:#9BA3B2; font-size:10px; }
+.os-date { color:#9BA3B2; font-size:13px; }
 
 /* Toast */
 .toast { position: fixed; top: 60px; right: 20px; background: #1A1D23; color: white; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 500; z-index: 300; transform: translateX(120%); transition: transform 0.3s; }

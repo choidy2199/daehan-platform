@@ -8548,7 +8548,7 @@ function getOsData() { return isCurrentMonth() ? onlineSalesData : (onlineSalesA
 function buildOsPromoFilters() {
   var container = document.getElementById('os-promo-filters');
   if (!container) return;
-  var data = getOsData();
+  var data = onlineSalesData;
   var promos = [];
   data.forEach(function(item) { if (item.promoName && promos.indexOf(item.promoName)===-1) promos.push(item.promoName); });
   var html = '<span class="os-filter-pill ' + (osPromoFilter==='all'?'active':'') + '" onclick="setOsPromoFilter(\'all\')">전체</span>';
@@ -8578,15 +8578,15 @@ function osStockHtml(stock) {
 }
 
 function renderOnlineSales() {
-  buildOsMonthSelect();
+  migrateOnlineSalesArchive();
   buildOsPromoFilters();
   var s = DB.settings;
   var naverFee = s.naverFee || 0.0663;
   var openFee = s.openElecFee || 0.13;
   var ssgFee = s.ssgFee || 0.13;
-  var data = getOsData();
+  var data = onlineSalesData;
   var filtered = osPromoFilter==='all' ? data : data.filter(function(item){return item.promoName===osPromoFilter;});
-  var editable = isCurrentMonth();
+  var editable = true;
   var body = document.getElementById('os-body');
   if (!body) return;
   var html = '';
@@ -8772,7 +8772,7 @@ function importOnlineSalesProducts(){
 
 function exportOnlineSalesExcel(){
   if(typeof XLSX==='undefined'){toast('XLSX 라이브러리 필요');return;}
-  var s=DB.settings,naverFee=s.naverFee||0.0663,openFee=s.openElecFee||0.13,ssgFee=s.ssgFee||0.13,data=getOsData();
+  var s=DB.settings,naverFee=s.naverFee||0.0663,openFee=s.openElecFee||0.13,ssgFee=s.ssgFee||0.13,data=onlineSalesData;
   var rows=[['날짜','코드','모델','재고','업체명','판매가','원가P','예상적용가','스토어팜판매가','스토어팜이익','스토어팜이익률','오픈마켓판매가','오픈마켓이익','오픈마켓이익률','SSG판매가','SSG이익','SSG이익률','프로모션']];
   data.forEach(function(item){
     var xProd=item.code?findProduct(item.code):null;var xCat=xProd?(xProd.category||''):'';var xCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,xCat)):0;
@@ -8783,7 +8783,7 @@ function exportOnlineSalesExcel(){
   });
   var ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'온라인판매관리');
-  XLSX.writeFile(wb,'온라인판매관리_'+onlineSalesMonth+'.xlsx');
+  XLSX.writeFile(wb,'온라인판매관리_'+(new Date().toISOString().slice(0,10))+'.xlsx');
 }
 
 function archiveOnlineSales(){
@@ -8796,6 +8796,40 @@ function archiveOnlineSales(){
   onlineSalesData=[];onlineSalesMonth=nextMonth;
   saveOnlineSales();localStorage.setItem(OS_MONTH_KEY,JSON.stringify(onlineSalesMonth));
   renderOnlineSales();toast('아카이브 완료! 새 월('+nextMonth+') 시작');
+}
+
+function migrateOnlineSalesArchive() {
+  var MIGRATION_FLAG = 'mw_online_sales_unified_migration_v1';
+  if (localStorage.getItem(MIGRATION_FLAG) === 'true') return;
+  var archive = loadObj(OS_ARCHIVE_KEY, {});
+  var monthKeys = Object.keys(archive);
+  if (monthKeys.length === 0) {
+    localStorage.setItem(MIGRATION_FLAG, 'true');
+    return;
+  }
+  var today = new Date().toISOString().slice(0, 10);
+  var backupKey = 'mw_online_sales_archive_backup_' + today;
+  localStorage.setItem(backupKey, JSON.stringify(archive));
+  var existingCodes = {};
+  onlineSalesData.forEach(function(row) {
+    if (row && row.code) existingCodes[String(row.code)] = true;
+  });
+  var addedCount = 0;
+  monthKeys.forEach(function(month) {
+    (archive[month] || []).forEach(function(row) {
+      if (!row) return;
+      if (row.code && existingCodes[String(row.code)]) return;
+      onlineSalesData.push(row);
+      if (row.code) existingCodes[String(row.code)] = true;
+      addedCount++;
+    });
+  });
+  saveOnlineSales();
+  var now = new Date();
+  onlineSalesMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  localStorage.setItem(OS_MONTH_KEY, JSON.stringify(onlineSalesMonth));
+  localStorage.setItem(MIGRATION_FLAG, 'true');
+  console.log('[온라인판매] archive 통합 완료: ' + addedCount + '건 (백업: ' + backupKey + ')');
 }
 
 // 헤더 자동완성 검색 (mw_products + mw_gen_products 통합)
@@ -8830,7 +8864,7 @@ function showOsSearchAC(inputEl) {
   results.forEach(function(r){
     var src = r.source === 'gen'
       ? '<span style="background:#534AB7;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;margin-right:6px">일반</span>'
-      : '<span style="background:#0F6E56;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;margin-right:6px">MW</span>';
+      : '<span style="background:#CC2222;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;margin-right:6px">MW</span>';
     h += '<div class="os-ac-item" data-code="'+String(r.code||'').replace(/"/g,'&quot;')+'" data-source="'+r.source+'" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #F4F6FA;display:flex;align-items:center;gap:8px">';
     h += src;
     h += '<span style="font-weight:600;color:#185FA5;min-width:60px">'+(r.code||'')+'</span>';

@@ -456,13 +456,10 @@ document.head.appendChild(s);
         <button class="btn-primary" onclick="importOnlineSalesCumul()" style="padding:5px 12px;font-size:12px">밀워키 누적P 불러오기</button>
         <button class="btn-primary" onclick="addOnlineSalesRow()" style="padding:5px 12px;font-size:12px">+ 행 추가</button>
         <button class="btn-action-sub" onclick="exportOnlineSalesExcel()" style="padding:5px 12px;font-size:12px">엑셀 내보내기</button>
-        <button class="btn-setting" onclick="archiveOnlineSales()" style="padding:5px 12px;font-size:12px;background:#1D9E75;color:#FFF;border:none;border-radius:6px;cursor:pointer">월 마감</button>
       </div>
     </div>
     <div class="section-body" style="padding:0">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #F0F2F7;flex-wrap:wrap">
-        <select id="os-month-select" class="input" style="width:180px;height:30px;font-size:12px;font-weight:600" onchange="loadOnlineSalesMonth(this.value)"></select>
-        <div style="width:1px;height:20px;background:#DDE1EB"></div>
         <input type="search" id="os-search-input" placeholder="제품 검색 (코드 / 모델 / 품명)" oninput="showOsSearchAC(this)" autocomplete="off" style="width:280px;padding:6px 10px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;">
         <div style="width:1px;height:20px;background:#DDE1EB"></div>
         <div id="os-promo-filters" style="display:flex;gap:4px;flex-wrap:wrap"></div>
