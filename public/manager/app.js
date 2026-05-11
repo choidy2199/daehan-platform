@@ -8578,24 +8578,18 @@ function osStockHtml(stock) {
   return '<div class="os-stock-cell"><span class="os-stock-danger">0</span><span class="os-stock-alert os-stock-alert-danger">재발주</span></div>';
 }
 
-// 예상적용가 기반 마켓 가격 시뮬레이션 (단가표 recalcAll 공식과 100% 동일, cost 대신 expectedPrice)
-// 단가표 본문은 절대 수정 X — 같은 공식을 별도로 계산
-function _calcExpectedMarketPrices(expectedPrice, category) {
-  if (!expectedPrice || expectedPrice <= 0) return { naver: 0, open: 0, ssg: 0 };
-  var s = (typeof DB !== 'undefined' && DB.settings) ? DB.settings : {};
-  var isElec = (category === '파워툴');
-  var naverFee = s.naverFee || 0.0663;
-  var openFee  = isElec ? (s.openElecFee || 0.13)  : (s.openHandFee || 0.176);
-  var openRate = isElec ? (s.mkOpenElec   || 0.5)  : (s.mkOpenHand   || 0.5);
-  var ssgFee   = isElec ? (s.ssgElecFee   || 0.13) : (s.ssgHandFee   || 0.13);
-  var ssgRate  = isElec ? (s.mkSsgElec    || 0.5)  : (s.mkSsgHand    || 0.5);
-  var naverDenom = 10/11 - naverFee - (s.mkNaver || 1) / 100;
-  var openDenom  = 10/11 - openFee  - openRate / 100;
-  var ssgDenom   = 10/11 - ssgFee   - ssgRate / 100;
+// 예상 마켓가 = 단가표 마켓가 × (예상적용가 / 단가표 cost)
+// 단가표가 이미 cost + 수수료 + 마진을 적용해서 priceNaver/priceOpen/priceSsg를 계산함 (recalcAll)
+// → 예상적용가와 단가표 cost의 비율로 단가표 마켓가에 직접 적용 (수동 수정/카테고리 분기 모두 자동 반영)
+function _calcExpectedMarketPrices(expectedPrice, dbProd) {
+  if (!expectedPrice || expectedPrice <= 0 || !dbProd || !dbProd.cost || dbProd.cost <= 0) {
+    return { naver: 0, open: 0, ssg: 0 };
+  }
+  var ratio = expectedPrice / dbProd.cost;
   return {
-    naver: naverDenom > 0 ? Math.ceil(expectedPrice / naverDenom / 100) * 100 : 0,
-    open:  openDenom  > 0 ? Math.ceil(expectedPrice / openDenom  / 100) * 100 : 0,
-    ssg:   ssgDenom   > 0 ? Math.ceil(expectedPrice / ssgDenom   / 100) * 100 : 0
+    naver: dbProd.priceNaver > 0 ? Math.ceil(dbProd.priceNaver * ratio / 100) * 100 : 0,
+    open:  dbProd.priceOpen  > 0 ? Math.ceil(dbProd.priceOpen  * ratio / 100) * 100 : 0,
+    ssg:   dbProd.priceSsg   > 0 ? Math.ceil(dbProd.priceSsg   * ratio / 100) * 100 : 0
   };
 }
 
@@ -8653,8 +8647,7 @@ function renderOnlineSales() {
       var genArr = (typeof genProducts !== 'undefined' && genProducts) ? genProducts : [];
       osProdForBadge = genArr.find(function(g) { return String(g.code) === String(item.code); }) || null;
     }
-    var _osCategory = osProdForBadge ? (osProdForBadge.category || '') : '';
-    var _osExpected = _calcExpectedMarketPrices(item.expectedPrice || 0, _osCategory);
+    var _osExpected = _calcExpectedMarketPrices(item.expectedPrice || 0, osProdForBadge);
     var naverCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'naver') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var openCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'gmarket') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var ssgCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'ssg') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
