@@ -8593,6 +8593,19 @@ function _calcExpectedMarketPrices(expectedPrice, dbProd) {
   };
 }
 
+// 적용 상태 판단 (Step 5-A) — Step 5-B에서 marketBadge 분기에 사용
+// 반환: { status: 'pending'|'applied'|'lowerAvailable', appliedPrice: number }
+//   - pending: 아직 마켓 미전송 (applied 가격 없음)
+//   - applied: 적용 가격과 현재 예상 가격 일치 (또는 예상이 더 높음)
+//   - lowerAvailable: 현재 예상이 적용 가격보다 낮음 → 인하 가능
+function _getOsAppliedStatus(appliedPrice, expectedPrice) {
+  var ap = Number(appliedPrice) || 0;
+  var ep = Number(expectedPrice) || 0;
+  if (ap <= 0) return { status: 'pending', appliedPrice: 0 };
+  if (ep > 0 && ep < ap) return { status: 'lowerAvailable', appliedPrice: ap };
+  return { status: 'applied', appliedPrice: ap };
+}
+
 function renderOnlineSales() {
   migrateOnlineSalesArchive();
   buildOsPromoFilters();
