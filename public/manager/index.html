@@ -463,6 +463,8 @@ document.head.appendChild(s);
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #F0F2F7;flex-wrap:wrap">
         <select id="os-month-select" class="input" style="width:180px;height:30px;font-size:12px;font-weight:600" onchange="loadOnlineSalesMonth(this.value)"></select>
         <div style="width:1px;height:20px;background:#DDE1EB"></div>
+        <input type="search" id="os-search-input" placeholder="제품 검색 (코드 / 모델 / 품명)" oninput="showOsSearchAC(this)" autocomplete="off" style="width:280px;padding:6px 10px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;">
+        <div style="width:1px;height:20px;background:#DDE1EB"></div>
         <div id="os-promo-filters" style="display:flex;gap:4px;flex-wrap:wrap"></div>
         <div style="width:1px;height:20px;background:#DDE1EB"></div>
         <span id="os-archive-hint" style="font-size:10px;color:#9BA3B2"></span>
@@ -478,12 +480,18 @@ document.head.appendChild(s);
               <th style="width:80px">업체명</th>
               <th style="width:90px" class="num">판매가</th>
               <th style="width:90px" class="num">원가P</th>
-              <th style="width:90px;background:rgba(29,158,117,0.08);color:#0F6E56" class="num">스토어팜</th>
-              <th style="width:80px;background:rgba(29,158,117,0.08);color:#0F6E56" class="center">이익</th>
-              <th style="width:90px;background:rgba(24,95,165,0.08);color:#0C447C" class="num">오픈마켓</th>
-              <th style="width:80px;background:rgba(24,95,165,0.08);color:#0C447C" class="center">이익</th>
+              <th style="width:100px;background:#534AB7;color:#fff" class="num">예상적용가</th>
+              <th style="width:90px;background:#0F6E56;color:#fff" class="num">스토어팜판매가</th>
+              <th style="width:80px;background:#0F6E56;color:#fff" class="center">스토어팜이익</th>
+              <th style="width:70px;background:#0F6E56;color:#fff" class="center">스토어팜이익률</th>
+              <th style="width:90px;background:#185FA5;color:#fff" class="num">오픈마켓판매가</th>
+              <th style="width:80px;background:#185FA5;color:#fff" class="center">오픈마켓이익</th>
+              <th style="width:70px;background:#185FA5;color:#fff" class="center">오픈마켓이익률</th>
+              <th style="width:90px;background:#BA7517;color:#fff" class="num">SSG판매가</th>
+              <th style="width:80px;background:#BA7517;color:#fff" class="center">SSG이익</th>
+              <th style="width:70px;background:#BA7517;color:#fff" class="center">SSG이익률</th>
               <th style="min-width:140px">프로모션</th>
-              <th style="width:60px" class="center"></th>
+              <th style="width:50px" class="center"></th>
             </tr>
           </thead>
           <tbody id="os-body"></tbody>

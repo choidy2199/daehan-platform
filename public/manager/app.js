@@ -8515,7 +8515,7 @@ var osPromoFilter = 'all';
   }
 })();
 
-function saveOnlineSales() { localStorage.setItem(OS_KEY, JSON.stringify(onlineSalesData)); }
+function saveOnlineSales() { localStorage.setItem(OS_KEY, JSON.stringify(onlineSalesData)); autoSyncToSupabase('mw_online_sales'); }
 function todayStr() { var d = new Date(); return d.getFullYear() + '.' + (d.getMonth()+1) + '.' + d.getDate(); }
 
 function buildOsMonthSelect() {
@@ -8583,6 +8583,7 @@ function renderOnlineSales() {
   var s = DB.settings;
   var naverFee = s.naverFee || 0.0663;
   var openFee = s.openElecFee || 0.13;
+  var ssgFee = s.ssgFee || 0.13;
   var data = getOsData();
   var filtered = osPromoFilter==='all' ? data : data.filter(function(item){return item.promoName===osPromoFilter;});
   var editable = isCurrentMonth();
@@ -8598,6 +8599,7 @@ function renderOnlineSales() {
     var costP = item.promoCost ? Math.round(calcOrderCost(item.promoCost, osPdc)) : 0;
     var naver = calcOsProfit(item.naverPrice||0, costP||0, naverFee);
     var open = calcOsProfit(item.openPrice||0, costP||0, openFee);
+    var ssg = calcOsProfit(item.ssgPrice||0, costP||0, ssgFee);
     var pCls = function(v){return v>=0?'fc-positive':'fc-negative';};
 
     var pSign = function(v){return v>=0?'+':'';};
@@ -8618,26 +8620,45 @@ function renderOnlineSales() {
       html += '<td class="num">'+(item.price?item.price.toLocaleString():'-')+'</td>';
     }
     html += '<td class="num" style="font-weight:600;color:#185FA5">'+(costP?costP.toLocaleString():'-')+'</td>';
+    var expPrice = item.expectedPrice || 0;
+    if (expPrice > 0) {
+      html += '<td class="num" style="color:#534AB7;font-weight:500">'+Math.round(expPrice).toLocaleString()+'</td>';
+    } else {
+      html += '<td class="num" style="color:#9BA3B2">-</td>';
+    }
     if (editable) {
       html += '<td><input class="os-input os-input-num" value="'+(item.naverPrice?item.naverPrice.toLocaleString():'')+'" onchange="updateOsNumField('+ri+',\'naverPrice\',this.value)" style="width:80px"></td>';
     } else { html += '<td class="num">'+(item.naverPrice?item.naverPrice.toLocaleString():'-')+'</td>'; }
     html += '<td class="center">';
-    if (item.naverPrice && costP) { html += '<div style="font-weight:600" class="'+pCls(naver.profit)+'">'+pSign(naver.profit)+naver.profit.toLocaleString()+'</div><div style="font-size:10px;color:#CC2222">'+naver.rate.toFixed(1)+'%</div>'; }
+    if (item.naverPrice && costP) { html += '<div style="font-weight:600" class="'+pCls(naver.profit)+'">'+pSign(naver.profit)+naver.profit.toLocaleString()+'</div>'; }
+    else { html += '-'; }
+    html += '</td>';
+    html += '<td class="center">';
+    if (item.naverPrice && costP) { html += '<div style="font-size:10px;color:#CC2222">'+naver.rate.toFixed(1)+'%</div>'; }
     else { html += '-'; }
     html += '</td>';
     if (editable) {
       html += '<td><input class="os-input os-input-num" value="'+(item.openPrice?item.openPrice.toLocaleString():'')+'" onchange="updateOsNumField('+ri+',\'openPrice\',this.value)" style="width:80px"></td>';
     } else { html += '<td class="num">'+(item.openPrice?item.openPrice.toLocaleString():'-')+'</td>'; }
     html += '<td class="center">';
-    if (item.openPrice && costP) { html += '<div style="font-weight:600" class="'+pCls(open.profit)+'">'+pSign(open.profit)+open.profit.toLocaleString()+'</div><div style="font-size:10px;color:#CC2222">'+open.rate.toFixed(1)+'%</div>'; }
+    if (item.openPrice && costP) { html += '<div style="font-weight:600" class="'+pCls(open.profit)+'">'+pSign(open.profit)+open.profit.toLocaleString()+'</div>'; }
     else { html += '-'; }
     html += '</td>';
-    html += '<td style="text-align:left"><span class="os-promo-badge">'+(item.promoName||'-')+'</span></td>';
-    if (editable) { html += '<td class="center" style="white-space:nowrap"><button class="btn-edit" onclick="insertOsRowAfter('+ri+')" style="padding:2px 8px;font-size:11px;margin-right:3px">추가</button><button class="btn-danger btn-sm" onclick="removeOsRow('+ri+')" style="padding:2px 8px;font-size:11px">삭제</button></td>'; }
+    html += '<td class="center">';
+    if (item.openPrice && costP) { html += '<div style="font-size:10px;color:#CC2222">'+open.rate.toFixed(1)+'%</div>'; }
+    else { html += '-'; }
+    html += '</td>';
+    html += '<td class="num">'+(item.ssgPrice||0).toLocaleString()+'</td>';
+    html += '<td class="center" style="color:#BA7517;font-weight:600">'+ ((item.ssgPrice||0) && costP ? pSign(ssg.profit) + ssg.profit.toLocaleString() : '-') +'</td>';
+    html += '<td class="center" style="color:#BA7517;font-size:10px">'+ ((item.ssgPrice||0) && costP ? ssg.rate.toFixed(1) + '%' : '-') +'</td>';
+    var promoTxt = item.promoName || '';
+    var monthBadge = item.promoMonth ? '<span style="display:inline-block;padding:1px 6px;background:#1A1D23;color:#fff;border-radius:3px;font-size:10px;font-weight:500;margin-left:4px;">' + item.promoMonth + '</span>' : '';
+    html += '<td style="text-align:left"><span class="os-promo-badge">'+ (promoTxt || '-') +'</span>' + monthBadge + '</td>';
+    if (editable) { html += '<td class="center"><button onclick="removeOsRow('+ri+')" style="background:#CC2222;color:#fff;border:none;padding:3px 7px;border-radius:3px;font-size:11px;cursor:pointer;line-height:1;font-weight:500;">×</button></td>'; }
     else { html += '<td></td>'; }
     html += '</tr>';
   });
-  if (!filtered.length) html = '<tr><td colspan="13"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
+  if (!filtered.length) html = '<tr><td colspan="19"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
   body.innerHTML = html;
   renderOsSummary(filtered, naverFee, openFee);
   initColumnResize('os-table');
@@ -8765,13 +8786,14 @@ function importOnlineSalesProducts(){
 
 function exportOnlineSalesExcel(){
   if(typeof XLSX==='undefined'){toast('XLSX 라이브러리 필요');return;}
-  var s=DB.settings,naverFee=s.naverFee||0.0663,openFee=s.openElecFee||0.13,data=getOsData();
-  var rows=[['날짜','코드','모델','재고','업체명','판매가','원가P','스토어팜판매가','스토어팜이익','스토어팜이익률','오픈마켓판매가','오픈마켓이익','오픈마켓이익률','프로모션']];
+  var s=DB.settings,naverFee=s.naverFee||0.0663,openFee=s.openElecFee||0.13,ssgFee=s.ssgFee||0.13,data=getOsData();
+  var rows=[['날짜','코드','모델','재고','업체명','판매가','원가P','예상적용가','스토어팜판매가','스토어팜이익','스토어팜이익률','오픈마켓판매가','오픈마켓이익','오픈마켓이익률','SSG판매가','SSG이익','SSG이익률','프로모션']];
   data.forEach(function(item){
     var xProd=item.code?findProduct(item.code):null;var xCat=xProd?(xProd.category||''):'';var xCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,xCat)):0;
     var naver=calcOsProfit(item.naverPrice||0,xCostP||0,naverFee);
     var open=calcOsProfit(item.openPrice||0,xCostP||0,openFee);
-    rows.push([item.date,item.code,item.model,item.stock,item.vendor,item.price,xCostP,item.naverPrice,naver.profit,Math.round(naver.rate*10)/10,item.openPrice,open.profit,Math.round(open.rate*10)/10,item.promoName]);
+    var ssg=calcOsProfit(item.ssgPrice||0,xCostP||0,ssgFee);
+    rows.push([item.date,item.code,item.model,item.stock,item.vendor,item.price,xCostP,Math.round(item.expectedPrice||0),item.naverPrice,naver.profit,Math.round(naver.rate*10)/10,item.openPrice,open.profit,Math.round(open.rate*10)/10,item.ssgPrice||0,ssg.profit,Math.round(ssg.rate*10)/10,item.promoName]);
   });
   var ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'온라인판매관리');
@@ -8788,6 +8810,114 @@ function archiveOnlineSales(){
   onlineSalesData=[];onlineSalesMonth=nextMonth;
   saveOnlineSales();localStorage.setItem(OS_MONTH_KEY,JSON.stringify(onlineSalesMonth));
   renderOnlineSales();toast('아카이브 완료! 새 월('+nextMonth+') 시작');
+}
+
+// 헤더 자동완성 검색 (mw_products + mw_gen_products 통합)
+function showOsSearchAC(inputEl) {
+  var val = String(inputEl.value || '').trim().toLowerCase();
+  var dropdownId = 'os-search-ac-dropdown';
+  var existing = document.getElementById(dropdownId);
+  if (existing) existing.remove();
+  if (val.length < 2) return;
+
+  var keywords = val.split(/\s+/).filter(function(k){return k.length>0;});
+  var mwResults = (DB.products||[]).filter(function(p){
+    var text = (String(p.code||'') + ' ' + String(p.model||'') + ' ' + String(p.description||'')).toLowerCase();
+    return keywords.every(function(kw){return text.indexOf(kw)!==-1;});
+  }).slice(0,8).map(function(p){return {code:p.code, model:p.model||'', desc:(p.description||'').slice(0,30), source:'mw'};});
+
+  var genList = (typeof genProducts !== 'undefined') ? (genProducts||[]) : [];
+  var genResults = genList.filter(function(p){
+    var text = (String(p.code||'') + ' ' + String(p.model||'') + ' ' + String(p.description||'')).toLowerCase();
+    return keywords.every(function(kw){return text.indexOf(kw)!==-1;});
+  }).slice(0,8).map(function(p){return {code:p.code, model:p.model||'', desc:(p.description||'').slice(0,30), source:'gen'};});
+
+  var results = mwResults.concat(genResults);
+  if (results.length === 0) return;
+
+  var rect = inputEl.getBoundingClientRect();
+  var dropdown = document.createElement('div');
+  dropdown.id = dropdownId;
+  dropdown.style.cssText = 'position:absolute;top:'+(rect.bottom+window.scrollY+2)+'px;left:'+(rect.left+window.scrollX)+'px;width:'+Math.max(rect.width, 360)+'px;max-height:320px;overflow-y:auto;background:#fff;border:1px solid #DDE1EB;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,0.1);z-index:9999;font-size:12px;';
+
+  var h = '';
+  results.forEach(function(r){
+    var src = r.source === 'gen'
+      ? '<span style="background:#534AB7;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;margin-right:6px">일반</span>'
+      : '<span style="background:#0F6E56;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;margin-right:6px">MW</span>';
+    h += '<div class="os-ac-item" data-code="'+String(r.code||'').replace(/"/g,'&quot;')+'" data-source="'+r.source+'" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #F4F6FA;display:flex;align-items:center;gap:8px">';
+    h += src;
+    h += '<span style="font-weight:600;color:#185FA5;min-width:60px">'+(r.code||'')+'</span>';
+    h += '<span style="flex:1;color:#1A1D23">'+(r.model||'')+'</span>';
+    h += '<span style="color:#9BA3B2;font-size:11px">'+(r.desc||'')+'</span>';
+    h += '</div>';
+  });
+  dropdown.innerHTML = h;
+  document.body.appendChild(dropdown);
+
+  dropdown.querySelectorAll('.os-ac-item').forEach(function(el){
+    el.addEventListener('mouseenter', function(){el.style.background='#F4F6FA';});
+    el.addEventListener('mouseleave', function(){el.style.background='#fff';});
+    el.addEventListener('click', function(){
+      var code = el.getAttribute('data-code');
+      var source = el.getAttribute('data-source');
+      addOsRowFromSearch(code, source);
+      inputEl.value = '';
+      dropdown.remove();
+    });
+  });
+
+  setTimeout(function(){
+    var outsideHandler = function(e){
+      if (!dropdown.contains(e.target) && e.target !== inputEl) {
+        dropdown.remove();
+        document.removeEventListener('click', outsideHandler, true);
+      }
+    };
+    document.addEventListener('click', outsideHandler, true);
+  }, 10);
+
+  if (!inputEl._osAcEscBound) {
+    inputEl.addEventListener('keydown', function(e){
+      if (e.key === 'Escape') {
+        var d = document.getElementById(dropdownId);
+        if (d) d.remove();
+      }
+    });
+    inputEl._osAcEscBound = true;
+  }
+}
+
+function addOsRowFromSearch(code, sourceType) {
+  if (onlineSalesData.some(function(d){return String(d.code)===String(code);})) {
+    toast('이미 추가됨');
+    return;
+  }
+  var p;
+  if (sourceType === 'gen') {
+    var list = (typeof genProducts !== 'undefined') ? (genProducts||[]) : [];
+    p = list.find(function(x){return String(x.code)===String(code);});
+  } else {
+    p = findProduct(code);
+  }
+  if (!p) { toast('제품 정보를 찾을 수 없습니다'); return; }
+  var stock = findStock(code);
+  var ec = getEffectiveCost(code);
+  onlineSalesData.push({
+    date: todayStr(),
+    code: String(code),
+    model: p.model || '',
+    stock: stock != null ? stock : 0,
+    vendor: '',
+    price: p.supplyPrice || 0,
+    promoCost: ec.cost || 0,
+    naverPrice: 0,
+    openPrice: 0,
+    promoName: ec.isPromo ? ec.promoName : ''
+  });
+  saveOnlineSales();
+  renderOnlineSales();
+  toast('추가됨: ' + (p.model || code));
 }
 
 // ======================== 수수료 계산기 ========================
