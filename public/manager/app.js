@@ -8800,11 +8800,15 @@ function importOnlineSalesCumul() {
       var supplyPrice = (pp.supplyPrice && pp.supplyPrice > 0)
         ? pp.supplyPrice
         : (dbProd ? (dbProd.supplyPrice || 0) : 0);
-      // 예상적용가 = 단가표 원가 × (1 - autoDC/100)
-      // 단가표 cost는 이미 분기/연간/AR/물량 차감됨 → 누적P 자동할인을 추가로 적용
-      var baseCost = (dbProd && dbProd.cost) ? dbProd.cost : 0;
-      var expectedPrice = (baseCost > 0 && autoDC > 0)
-        ? Math.round(baseCost * (1 - autoDC / 100))
+      // 예상적용가 = 원가P - (공급가 × autoDC / (100 + autoDC))
+      // 단가표 원가P(다른 프로모션 적용 결과)를 신뢰하고, 누적P만 추가 차감
+      // 누적P 차감 = 밀워키 프로모션 원가 계산기 공식 (N+1 역산 방식)
+      var cumulDeduction = (supplyPrice > 0 && autoDC > 0)
+        ? Math.round(supplyPrice * autoDC / (100 + autoDC))
+        : 0;
+      var costP = (dbProd && dbProd.cost) ? dbProd.cost : 0;
+      var expectedPrice = (costP > 0 && cumulDeduction > 0)
+        ? (costP - cumulDeduction)
         : 0;
       onlineSalesData.push({
         date: todayStr(),
