@@ -8626,31 +8626,17 @@ function renderOnlineSales() {
     } else {
       html += '<td class="num" style="color:#9BA3B2">-</td>';
     }
-    if (editable) {
-      html += '<td><input class="os-input os-input-num" value="'+(item.naverPrice?item.naverPrice.toLocaleString():'')+'" onchange="updateOsNumField('+ri+',\'naverPrice\',this.value)" style="width:80px"></td>';
-    } else { html += '<td class="num">'+(item.naverPrice?item.naverPrice.toLocaleString():'-')+'</td>'; }
-    html += '<td class="center">';
-    if (item.naverPrice && costP) { html += '<div style="font-weight:600" class="'+pCls(naver.profit)+'">'+pSign(naver.profit)+naver.profit.toLocaleString()+'</div>'; }
-    else { html += '-'; }
-    html += '</td>';
-    html += '<td class="center">';
-    if (item.naverPrice && costP) { html += '<div style="font-size:10px;color:#CC2222">'+naver.rate.toFixed(1)+'%</div>'; }
-    else { html += '-'; }
-    html += '</td>';
-    if (editable) {
-      html += '<td><input class="os-input os-input-num" value="'+(item.openPrice?item.openPrice.toLocaleString():'')+'" onchange="updateOsNumField('+ri+',\'openPrice\',this.value)" style="width:80px"></td>';
-    } else { html += '<td class="num">'+(item.openPrice?item.openPrice.toLocaleString():'-')+'</td>'; }
-    html += '<td class="center">';
-    if (item.openPrice && costP) { html += '<div style="font-weight:600" class="'+pCls(open.profit)+'">'+pSign(open.profit)+open.profit.toLocaleString()+'</div>'; }
-    else { html += '-'; }
-    html += '</td>';
-    html += '<td class="center">';
-    if (item.openPrice && costP) { html += '<div style="font-size:10px;color:#CC2222">'+open.rate.toFixed(1)+'%</div>'; }
-    else { html += '-'; }
-    html += '</td>';
-    html += '<td class="num">'+(item.ssgPrice||0).toLocaleString()+'</td>';
-    html += '<td class="center" style="color:#BA7517;font-weight:600">'+ ((item.ssgPrice||0) && costP ? pSign(ssg.profit) + ssg.profit.toLocaleString() : '-') +'</td>';
-    html += '<td class="center" style="color:#BA7517;font-size:10px">'+ ((item.ssgPrice||0) && costP ? ssg.rate.toFixed(1) + '%' : '-') +'</td>';
+    var osProdForBadge = osProd;
+    if (!osProdForBadge && item.code) {
+      var genArr = (typeof genProducts !== 'undefined' && genProducts) ? genProducts : [];
+      osProdForBadge = genArr.find(function(g) { return String(g.code) === String(item.code); }) || null;
+    }
+    var naverCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'naver') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
+    var openCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'gmarket') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
+    var ssgCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'ssg') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
+    html += '<td style="padding:4px 4px;text-align:center">' + naverCardHtml + '</td>';
+    html += '<td style="padding:4px 4px;text-align:center">' + openCardHtml + '</td>';
+    html += '<td style="padding:4px 4px;text-align:center">' + ssgCardHtml + '</td>';
     var promoTxt = item.promoName || '';
     var monthBadge = item.promoMonth ? '<span style="display:inline-block;padding:1px 6px;background:#1A1D23;color:#fff;border-radius:3px;font-size:10px;font-weight:500;margin-left:4px;">' + item.promoMonth + '</span>' : '';
     html += '<td style="text-align:left"><span class="os-promo-badge">'+ (promoTxt || '-') +'</span>' + monthBadge + '</td>';
@@ -8658,7 +8644,7 @@ function renderOnlineSales() {
     else { html += '<td></td>'; }
     html += '</tr>';
   });
-  if (!filtered.length) html = '<tr><td colspan="19"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
+  if (!filtered.length) html = '<tr><td colspan="13"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
   body.innerHTML = html;
   renderOsSummary(filtered, naverFee, openFee);
   initColumnResize('os-table');
