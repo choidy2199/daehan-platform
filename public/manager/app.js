@@ -8578,6 +8578,27 @@ function osStockHtml(stock) {
   return '<div class="os-stock-cell"><span class="os-stock-danger">0</span><span class="os-stock-alert os-stock-alert-danger">재발주</span></div>';
 }
 
+// 예상적용가 기반 마켓 가격 시뮬레이션 (단가표 recalcAll 공식과 100% 동일, cost 대신 expectedPrice)
+// 단가표 본문은 절대 수정 X — 같은 공식을 별도로 계산
+function _calcExpectedMarketPrices(expectedPrice, category) {
+  if (!expectedPrice || expectedPrice <= 0) return { naver: 0, open: 0, ssg: 0 };
+  var s = (typeof DB !== 'undefined' && DB.settings) ? DB.settings : {};
+  var isElec = (category === '파워툴');
+  var naverFee = s.naverFee || 0.0663;
+  var openFee  = isElec ? (s.openElecFee || 0.13)  : (s.openHandFee || 0.176);
+  var openRate = isElec ? (s.mkOpenElec   || 0.5)  : (s.mkOpenHand   || 0.5);
+  var ssgFee   = isElec ? (s.ssgElecFee   || 0.13) : (s.ssgHandFee   || 0.13);
+  var ssgRate  = isElec ? (s.mkSsgElec    || 0.5)  : (s.mkSsgHand    || 0.5);
+  var naverDenom = 10/11 - naverFee - (s.mkNaver || 1) / 100;
+  var openDenom  = 10/11 - openFee  - openRate / 100;
+  var ssgDenom   = 10/11 - ssgFee   - ssgRate / 100;
+  return {
+    naver: naverDenom > 0 ? Math.ceil(expectedPrice / naverDenom / 100) * 100 : 0,
+    open:  openDenom  > 0 ? Math.ceil(expectedPrice / openDenom  / 100) * 100 : 0,
+    ssg:   ssgDenom   > 0 ? Math.ceil(expectedPrice / ssgDenom   / 100) * 100 : 0
+  };
+}
+
 function renderOnlineSales() {
   migrateOnlineSalesArchive();
   buildOsPromoFilters();
@@ -8632,12 +8653,18 @@ function renderOnlineSales() {
       var genArr = (typeof genProducts !== 'undefined' && genProducts) ? genProducts : [];
       osProdForBadge = genArr.find(function(g) { return String(g.code) === String(item.code); }) || null;
     }
+    var _osCategory = osProdForBadge ? (osProdForBadge.category || '') : '';
+    var _osExpected = _calcExpectedMarketPrices(item.expectedPrice || 0, _osCategory);
     var naverCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'naver') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var openCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'gmarket') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var ssgCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'ssg') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
-    html += '<td style="padding:4px 4px;text-align:center">' + naverCardHtml + '</td>';
-    html += '<td style="padding:4px 4px;text-align:center">' + openCardHtml + '</td>';
-    html += '<td style="padding:4px 4px;text-align:center">' + ssgCardHtml + '</td>';
+    var _chipStyle = 'display:block;margin-top:3px;font-size:11px;color:#534AB7;font-weight:500;text-align:center;';
+    var _naverChip = _osExpected.naver > 0 ? '<div style="' + _chipStyle + '">예상 ' + _osExpected.naver.toLocaleString() + '</div>' : '';
+    var _openChip  = _osExpected.open  > 0 ? '<div style="' + _chipStyle + '">예상 ' + _osExpected.open.toLocaleString()  + '</div>' : '';
+    var _ssgChip   = _osExpected.ssg   > 0 ? '<div style="' + _chipStyle + '">예상 ' + _osExpected.ssg.toLocaleString()   + '</div>' : '';
+    html += '<td style="padding:4px 4px;text-align:center">' + naverCardHtml + _naverChip + '</td>';
+    html += '<td style="padding:4px 4px;text-align:center">' + openCardHtml + _openChip + '</td>';
+    html += '<td style="padding:4px 4px;text-align:center">' + ssgCardHtml + _ssgChip + '</td>';
     var promoTxt = item.promoName || '';
     var monthBadge = item.promoMonth ? '<span style="display:inline-block;padding:1px 6px;background:#1A1D23;color:#fff;border-radius:3px;font-size:10px;font-weight:500;margin-left:4px;">' + item.promoMonth + '</span>' : '';
     html += '<td style="text-align:left"><span class="os-promo-badge">'+ (promoTxt || '-') +'</span>' + monthBadge + '</td>';
