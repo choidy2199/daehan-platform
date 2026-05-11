@@ -13929,7 +13929,6 @@ function openGenImportModal() {
   var radios = document.querySelectorAll('input[name="gen-import-mode"]');
   if (radios[0]) radios[0].checked = true;
   if (typeof _gpImportSwitchTab === 'function') _gpImportSwitchTab('excel');
-  if (typeof _gpExcelOnModeChange === 'function') _gpExcelOnModeChange();
 }
 
 function closeGenImportModal() {
@@ -14203,46 +14202,27 @@ function _gpExcelApplyPreset(preset) {
   checkboxes.forEach(function(cb) { cb.checked = !!targetSet[cb.value]; });
 }
 
-function _gpExcelOnModeChange() {
-  var modeEl = document.querySelector('input[name="gen-import-mode"]:checked');
-  var mode = modeEl ? modeEl.value : 'replace';
-  var colArea = document.getElementById('gen-excel-cols-area');
-  var msg = document.getElementById('gen-excel-cols-disabled-msg');
-  if (!colArea || !msg) return;
-  if (mode === 'replace') {
-    colArea.style.opacity = '0.4';
-    colArea.style.pointerEvents = 'none';
-    msg.style.display = 'block';
-  } else {
-    colArea.style.opacity = '1';
-    colArea.style.pointerEvents = 'auto';
-    msg.style.display = 'none';
-  }
-}
-
 function importGenExcel() {
   var fileInput = document.getElementById('gen-excel-file');
   var file = fileInput && fileInput.files[0];
   if (!file) { toast('파일을 선택해주세요'); return; }
   if (!window.XLSX) { toast('SheetJS 로딩 중...'); return; }
 
-  var mode = 'replace';
+  var mode = 'merge';
   var radios = document.querySelectorAll('input[name="gen-import-mode"]');
   radios.forEach(function(r) { if (r.checked) mode = r.value; });
 
   var statusEl = document.getElementById('gen-import-status');
 
-  // 컬럼 선택 필터링 — replace 모드 외 적용 (replace는 전체 교체라 컬럼 선택 무시)
+  // 컬럼 선택 필터링
   var selectedCols = null;
-  if (mode !== 'replace') {
-    var checkedBoxes = document.querySelectorAll('input[name="gen-excel-col"]:checked');
-    if (checkedBoxes.length === 0) {
-      statusEl.textContent = '가져올 컬럼을 1개 이상 선택하세요';
-      return;
-    }
-    selectedCols = {};
-    checkedBoxes.forEach(function(cb) { selectedCols[cb.value] = true; });
+  var checkedBoxes = document.querySelectorAll('input[name="gen-excel-col"]:checked');
+  if (checkedBoxes.length === 0) {
+    statusEl.textContent = '가져올 컬럼을 1개 이상 선택하세요';
+    return;
   }
+  selectedCols = {};
+  checkedBoxes.forEach(function(cb) { selectedCols[cb.value] = true; });
 
   statusEl.textContent = '파일 읽는 중...';
 
@@ -14302,11 +14282,7 @@ function importGenExcel() {
         });
       }
 
-      if (mode === 'replace') {
-        genProducts.length = 0;
-        imported.forEach(function(item) { genProducts.push(item); });
-        statusEl.textContent = '전체 교체: ' + imported.length + '건 등록';
-      } else if (mode === 'merge') {
+      if (mode === 'merge') {
         var updated = 0, added = 0;
         imported.forEach(function(item) {
           var idx = genProducts.findIndex(function(p) { return String(p.code) === String(item.code); });
@@ -14339,9 +14315,7 @@ function importGenExcel() {
 
       localStorage.setItem('mw_gen_products', JSON.stringify(genProducts)); autoSyncToSupabase('mw_gen_products');
       renderGenProducts();
-      var genActionName = mode === 'merge' ? '코드매칭'
-                        : mode === 'new_only' ? '신규추가'
-                        : '전체교체';
+      var genActionName = mode === 'merge' ? '코드매칭' : '신규추가';
       var genCount = mode === 'new_only' ? added : imported.length;
       saveActionHistory(genActionName, '일반제품', genCount, null);
       toast('일반제품 가져오기 완료 (' + imported.length + '건)');

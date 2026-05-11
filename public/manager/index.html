@@ -1241,13 +1241,10 @@ document.head.appendChild(s);
       <div style="margin:12px 0;padding:12px;background:#F4F6FA;border-radius:6px">
         <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#1A1D23">STEP 3. 업로드 모드</div>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;font-size:13px">
-          <input type="radio" name="gen-import-mode" value="replace" checked onchange="_gpExcelOnModeChange()" style="accent-color:#185FA5"> 전체 교체 — 기존 데이터 삭제 후 새로 등록 (최초 업로드)
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px;font-size:13px">
-          <input type="radio" name="gen-import-mode" value="merge" onchange="_gpExcelOnModeChange()"> 코드 매칭 업데이트 — 기존 제품은 덮어쓰기, 신규는 추가 (부분 수정용)
+          <input type="radio" name="gen-import-mode" value="merge" checked style="accent-color:#185FA5"> 코드 매칭 업데이트 — 기존 제품은 덮어쓰기, 신규는 추가 (부분 수정용)
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-          <input type="radio" name="gen-import-mode" value="new_only" onchange="_gpExcelOnModeChange()"> 신규만 추가 (중복 코드는 기존 값 유지)
+          <input type="radio" name="gen-import-mode" value="new_only"> 신규만 추가 (중복 코드는 기존 값 유지)
         </label>
       </div>
       <div id="gen-excel-cols-area" style="margin:12px 0;padding:12px;background:#F4F6FA;border-radius:6px">
@@ -1283,9 +1280,6 @@ document.head.appendChild(s);
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="gen-excel-col" value="inDate"> 입고날짜</label>
         </div>
         <div style="font-size:11px;color:#5A6070;margin-top:8px;line-height:1.5">ⓘ 체크된 컬럼만 엑셀 값으로 덮어씁니다. 체크 안 된 컬럼은 기존 값을 유지합니다.</div>
-      </div>
-      <div id="gen-excel-cols-disabled-msg" style="display:none;margin:12px 0;padding:10px 12px;background:#FAEEDA;border-left:3px solid #BA7517;border-radius:6px;font-size:12px;line-height:1.6;color:#1A1D23">
-        ⚠️ "전체 교체" 모드에서는 모든 컬럼이 새 데이터로 교체됩니다. 컬럼 선택은 무시됩니다.
       </div>
       <div id="gen-import-status" style="font-size:13px;color:#5A6070"></div>
       </div>
