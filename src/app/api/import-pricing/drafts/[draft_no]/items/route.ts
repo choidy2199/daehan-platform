@@ -186,3 +186,48 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
+
+// DELETE /api/import-pricing/drafts/[draft_no]/items
+// body: { id: number }
+// 단일 item 삭제. draft_no 일치 확인 후 delete.
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ draft_no: string }> }
+) {
+  try {
+    const { draft_no } = await params;
+    const body = await request.json().catch(() => ({}));
+    const id = body?.id;
+
+    if (typeof id !== 'number') {
+      return NextResponse.json(
+        { success: false, error: 'id (number) required' },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('import_pricing_drafts')
+      .delete()
+      .eq('id', id)
+      .eq('draft_no', draft_no)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { success: false, error: 'item not found' },
+          { status: 404 }
+        );
+      }
+      throw error;
+    }
+
+    return NextResponse.json({ success: true, data });
+  } catch (err: unknown) {
+    console.error('[ImportPricing Items DELETE]', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
+}
