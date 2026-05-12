@@ -8623,18 +8623,15 @@ function _getOsAppliedStatus(appliedPrice, expectedPrice) {
 function _saveOsAppliedPrice(rowIndex, channel, price) {
   var p = Number(price) || 0;
   if (p <= 0) return false;
-  var list;
-  try { list = JSON.parse(localStorage.getItem('mw_online_sales') || '[]'); } catch(e) { list = []; }
-  if (!Array.isArray(list) || rowIndex < 0 || rowIndex >= list.length) return false;
-  var row = list[rowIndex];
+  if (!Array.isArray(onlineSalesData) || rowIndex < 0 || rowIndex >= onlineSalesData.length) return false;
+  var row = onlineSalesData[rowIndex];
   if (!row) return false;
   var fieldMap = { naver: 'appliedNaverPrice', open: 'appliedOpenPrice', ssg: 'appliedSsgPrice' };
   var field = fieldMap[channel];
   if (!field) return false;
   row[field] = p;
   row.appliedAt = new Date().toISOString();
-  localStorage.setItem('mw_online_sales', JSON.stringify(list));
-  if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_online_sales');
+  if (typeof saveOnlineSales === 'function') saveOnlineSales();
   return true;
 }
 
