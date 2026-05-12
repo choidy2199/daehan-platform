@@ -1548,6 +1548,7 @@ function _pdApplyPrice(code, channel, callback) {
   }
   toast('가격이 저장되었습니다');
   if (typeof callback === 'function') callback(newPrice);
+  try { window.dispatchEvent(new CustomEvent('osPriceApplied', { detail: { code: code, channel: channel, price: newPrice } })); } catch(e) {}
 }
 
 function _pdRefreshFee(code, channel, price) {
