@@ -226,7 +226,7 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
   const fmtNum = (n: number | null) =>
     n == null ? '' : n.toLocaleString();
 
-  function renderEditableCell(item: PricingItem, field: EditableField, align: 'left' | 'right' = 'right') {
+  function renderEditableCell(item: PricingItem, field: EditableField) {
     const isEditing = editingCell?.id === item.id && editingCell.field === field;
     const isPrice = PRICE_FIELDS.includes(field);
     const val = item[field];
@@ -237,13 +237,13 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
         <td
           style={{
             ...tdStyle,
-            textAlign: align,
             background: '#FFFFFF',
             padding: 0,
           }}
         >
           <input
             ref={inputRef}
+            className="pricing-body-input"
             type={isPrice ? 'number' : 'text'}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
@@ -256,17 +256,29 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
                 cancelEdit();
               }
             }}
-            onBlur={commitEdit}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#185FA5';
+              e.currentTarget.style.boxShadow = '0 0 0 3px #E6F1FB';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#DDE1EB';
+              e.currentTarget.style.boxShadow = 'none';
+              commitEdit();
+            }}
             style={{
               width: '100%',
-              height: 26,
-              padding: '0 8px',
-              border: '1px solid #185FA5',
-              borderRadius: 2,
-              fontSize: 11,
+              minWidth: 0,
+              height: 36,
+              padding: '0 10px',
+              border: '1px solid #DDE1EB',
+              borderRadius: 6,
+              fontSize: 13,
               fontFamily: 'inherit',
-              textAlign: align,
+              textAlign: 'center',
+              color: '#1A1D23',
               outline: 'none',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
               boxSizing: 'border-box',
               background: '#FFFFFF',
             }}
@@ -285,7 +297,6 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
         style={{
           ...tdStyle,
           ...monoStyle,
-          textAlign: align,
           background: '#FFFEF7',
           cursor: 'pointer',
         }}
@@ -307,6 +318,16 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
 
   return (
     <>
+      <style>{`
+        .pricing-body-input[type=number]::-webkit-inner-spin-button,
+        .pricing-body-input[type=number]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .pricing-body-input[type=number] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
       <div style={{
         border: '0.5px solid #DDE1EB',
         borderTop: 'none',
@@ -320,7 +341,7 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
             width: '100%',
             borderCollapse: 'collapse',
             tableLayout: 'fixed',
-            fontSize: 11,
+            fontSize: 13,
             fontVariantNumeric: 'tabular-nums',
           }}>
             <colgroup>
@@ -329,44 +350,45 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
               ))}
             </colgroup>
             <thead>
-              <tr style={{ background: '#F1EFE8', color: '#444441' }}>
-                {renderTh(0, '#', { textAlign: 'center' })}
-                {renderTh(1, '사진', { textAlign: 'center' })}
-                {renderTh(2, '관리코드', { color: '#185FA5' })}
+              <tr style={{ background: '#EAECF2', color: '#5A6070' }}>
+                {renderTh(0, '#')}
+                {renderTh(1, '사진')}
+                {renderTh(2, '관리코드')}
                 {renderTh(3, '분류')}
                 {renderTh(4, '품명')}
                 {renderTh(5, '규격')}
-                {renderTh(6, '원가', { textAlign: 'right' })}
-                {renderTh(7, '가격A', { textAlign: 'right', color: '#185FA5' })}
-                {renderTh(8, '가격B', { textAlign: 'right', color: '#185FA5' })}
-                {renderTh(9, '가격C', { textAlign: 'right', color: '#185FA5' })}
-                {renderTh(10, '시장가', { textAlign: 'right', color: '#185FA5' })}
-                {renderTh(11, '선물', { textAlign: 'center' })}
-                {renderTh(12, '비고', { color: '#185FA5' })}
+                {renderTh(6, '원가')}
+                {renderTh(7, '가격A')}
+                {renderTh(8, '가격B')}
+                {renderTh(9, '가격C')}
+                {renderTh(10, '시장가')}
+                {renderTh(11, '선물')}
+                {renderTh(12, '비고')}
                 {renderTh(13, '')}
               </tr>
             </thead>
             <tbody>
-              {items.map((it) => {
+              {items.map((it, rowIdx) => {
                 const isEditingRow = editingCell?.id === it.id;
+                const baseBg = rowIdx % 2 === 1 ? '#FAFBFC' : '#FFFFFF';
                 return (
                   <tr
                     key={it.id}
                     style={{
-                      borderBottom: '0.5px solid #EEF0F3',
-                      background: '#FFFFFF',
+                      borderBottom: '1px solid #F0F2F7',
+                      background: baseBg,
                     }}
                     onMouseEnter={(e) => {
                       if (!isEditingRow) (e.currentTarget as HTMLTableRowElement).style.background = '#F4F6FA';
                     }}
                     onMouseLeave={(e) => {
-                      if (!isEditingRow) (e.currentTarget as HTMLTableRowElement).style.background = '#FFFFFF';
+                      if (!isEditingRow) (e.currentTarget as HTMLTableRowElement).style.background = baseBg;
                     }}
                   >
-                    <td style={{ ...tdStyle, textAlign: 'center', color: '#9BA3B2' }}>
+                    <td style={{ ...tdStyle, color: '#9BA3B2' }}>
                       {it.sort_order + 1}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <td style={tdStyle}>
                       {it.photo_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -384,22 +406,22 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
                         </div>
                       )}
                     </td>
-                    {renderEditableCell(it, 'management_code', 'left')}
+                    {renderEditableCell(it, 'management_code')}
                     <td style={{ ...tdStyle, color: '#5F5E5A' }}>{it.category || ''}</td>
                     <td style={tdStyle}>{it.name || ''}</td>
                     <td style={{ ...tdStyle, color: '#5F5E5A' }}>{it.spec || ''}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    <td style={tdStyle}>
                       {it.cost == null ? (
                         <span style={{ color: '#9BA3B2' }}>—</span>
                       ) : fmtNum(it.cost)}
                     </td>
-                    {renderEditableCell(it, 'price_a', 'right')}
-                    {renderEditableCell(it, 'price_b', 'right')}
-                    {renderEditableCell(it, 'price_c', 'right')}
-                    {renderEditableCell(it, 'price_market', 'right')}
-                    <td style={{ ...tdStyle, textAlign: 'center', color: '#9BA3B2' }}>—</td>
-                    {renderEditableCell(it, 'remark', 'left')}
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    {renderEditableCell(it, 'price_a')}
+                    {renderEditableCell(it, 'price_b')}
+                    {renderEditableCell(it, 'price_c')}
+                    {renderEditableCell(it, 'price_market')}
+                    <td style={{ ...tdStyle, color: '#9BA3B2' }}>—</td>
+                    {renderEditableCell(it, 'remark')}
+                    <td style={tdStyle}>
                       <button
                         type="button"
                         onClick={() => setDeleteTargetId(it.id)}
@@ -478,16 +500,17 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
 }
 
 const thStyle: React.CSSProperties = {
-  padding: '7px 8px',
-  textAlign: 'left',
-  fontSize: 11,
-  fontWeight: 500,
-  borderBottom: '0.5px solid #DDE1EB',
+  padding: '8px 12px',
+  textAlign: 'center',
+  fontSize: 12,
+  fontWeight: 600,
+  borderBottom: '1px solid #DDE1EB',
 };
 
 const tdStyle: React.CSSProperties = {
-  padding: '5px 8px',
-  fontSize: 11,
+  padding: '8px 12px',
+  textAlign: 'center',
+  fontSize: 13,
   color: '#1A1D23',
   verticalAlign: 'middle',
   borderRight: '0.5px solid #EEF0F3',
