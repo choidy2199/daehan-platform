@@ -8630,7 +8630,41 @@ function _saveOsAppliedPrice(rowIndex, channel, price) {
   return true;
 }
 
+// osPriceApplied 이벤트 listener 초기화 (Step 5-C2′-b)
+// 단가표 ▲가격수정 팝업에서 가격 적용 시 발화되는 이벤트를 받아
+// mw_online_sales의 해당 code 행들에 적용 가격을 저장
+function _initOsPriceAppliedListener() {
+  if (window._osPriceAppliedListenerInited) return;
+  window._osPriceAppliedListenerInited = true;
+  window.addEventListener('osPriceApplied', function(e) {
+    try {
+      var detail = e && e.detail;
+      if (!detail) return;
+      var code = detail.code;
+      var rawChannel = detail.channel;
+      var price = Number(detail.price) || 0;
+      if (!code || price <= 0) return;
+      // channel 명명 통일: marketBadge는 'gmarket' 사용, _saveOsAppliedPrice는 'open' 사용
+      var channel = (rawChannel === 'gmarket') ? 'open' : rawChannel;
+      if (channel !== 'naver' && channel !== 'open' && channel !== 'ssg') return;
+      var list;
+      try { list = JSON.parse(localStorage.getItem('mw_online_sales') || '[]'); } catch(err) { list = []; }
+      if (!Array.isArray(list)) return;
+      var changed = false;
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].code === code) {
+          if (typeof _saveOsAppliedPrice === 'function') {
+            if (_saveOsAppliedPrice(i, channel, price)) changed = true;
+          }
+        }
+      }
+      if (changed && typeof renderOnlineSales === 'function') renderOnlineSales();
+    } catch(err) {}
+  });
+}
+
 function renderOnlineSales() {
+  if (typeof _initOsPriceAppliedListener === 'function') _initOsPriceAppliedListener();
   migrateOnlineSalesArchive();
   buildOsPromoFilters();
   var s = DB.settings;
