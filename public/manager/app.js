@@ -1299,6 +1299,7 @@ async function _pdPriceSyncSsg(code, btn, marketName) {
     btn.style.opacity = '1';
     btn.textContent = '전송완료 ✓';
     alert(marketName + ' 가격수정이 정상적으로 반영되었습니다.');
+    try { window.dispatchEvent(new CustomEvent('osPriceApplied', { detail: { code: code, channel: 'ssg', price: sellprc } })); } catch(e) {}
     restore();
   } catch (e) {
     btn.style.background = '#CC2222';
@@ -1354,6 +1355,7 @@ async function _pdPriceSync(code, channel) {
       btn.style.opacity = '1';
       btn.textContent = '전송완료 ✓';
       alert(marketName + ' 가격수정이 정상적으로 반영되었습니다.');
+      try { window.dispatchEvent(new CustomEvent('osPriceApplied', { detail: { code: code, channel: channel, price: price } })); } catch(e) {}
     }
     setTimeout(function() {
       var cur = document.getElementById('pd-btn-sync');
