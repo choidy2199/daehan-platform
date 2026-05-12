@@ -1301,7 +1301,7 @@ async function _pdPriceSyncSsg(code, btn, marketName) {
     alert(marketName + ' 가격수정이 정상적으로 반영되었습니다.');
     try { if (typeof _priceCollectMap !== 'undefined' && _priceCollectMap && _priceCollectMap.ssg) { _priceCollectMap.ssg[code] = Object.assign({}, _priceCollectMap.ssg[code] || {}, { price: sellprc, status: 'SALE' }); } } catch(e) {}
     try { if (typeof renderOnlineSales === 'function') renderOnlineSales(); } catch(e) {}
-    try { if (typeof renderCatalog === 'function') renderCatalog(); } catch(e) {}
+    try { _lastRenderCatalog = 0; if (typeof renderCatalog === 'function') renderCatalog(); } catch(e) {}
     try { window.dispatchEvent(new CustomEvent('osPriceApplied', { detail: { code: code, channel: 'ssg', price: sellprc } })); } catch(e) {}
     restore();
   } catch (e) {
@@ -1360,7 +1360,7 @@ async function _pdPriceSync(code, channel) {
       alert(marketName + ' 가격수정이 정상적으로 반영되었습니다.');
       try { if (typeof _priceCollectMap !== 'undefined' && _priceCollectMap && _priceCollectMap.naver) { _priceCollectMap.naver[code] = Object.assign({}, _priceCollectMap.naver[code] || {}, { price: price, status: 'SALE' }); } } catch(e) {}
       try { if (typeof renderOnlineSales === 'function') renderOnlineSales(); } catch(e) {}
-      try { if (typeof renderCatalog === 'function') renderCatalog(); } catch(e) {}
+      try { _lastRenderCatalog = 0; if (typeof renderCatalog === 'function') renderCatalog(); } catch(e) {}
       try { window.dispatchEvent(new CustomEvent('osPriceApplied', { detail: { code: code, channel: channel, price: price } })); } catch(e) {}
     }
     setTimeout(function() {
