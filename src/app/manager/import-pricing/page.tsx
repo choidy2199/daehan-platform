@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import DarkBar from './components/DarkBar';
+import SaveDraftModal from './components/SaveDraftModal';
+import HistoryModal from './components/HistoryModal';
+import type { DraftMeta, TabId } from './types';
 
-type TabId = 'pricing' | 'promotion';
 const STORAGE_KEY = 'import-pricing-active-tab';
 
 const TABS: { id: TabId; label: string }[] = [
@@ -12,6 +15,12 @@ const TABS: { id: TabId; label: string }[] = [
 
 export default function ImportPricingPage() {
   const [activeTab, setActiveTab] = useState<TabId>('pricing');
+  const [currentDraftByTab, setCurrentDraftByTab] = useState<Record<TabId, DraftMeta | null>>({
+    pricing: null,
+    promotion: null,
+  });
+  const [showSave, setShowSave] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -25,20 +34,40 @@ export default function ImportPricingPage() {
     localStorage.setItem(STORAGE_KEY, id);
   };
 
+  const currentDraft = currentDraftByTab[activeTab];
+
+  const handleSaveClick = () => setShowSave(true);
+  const handleHistoryClick = () => setShowHistory(true);
+
+  const handleSaved = (draftNo: string, draftName: string | null) => {
+    const u = JSON.parse(localStorage.getItem('current_user') || 'null');
+    const newDraft: DraftMeta = {
+      draft_no: draftNo,
+      draft_name: draftName,
+      tab_type: activeTab,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: u?.loginId || 'admin',
+    };
+    setCurrentDraftByTab((prev) => ({ ...prev, [activeTab]: newDraft }));
+    setShowSave(false);
+  };
+
+  const handlePick = (draft: DraftMeta) => {
+    setCurrentDraftByTab((prev) => ({ ...prev, [activeTab]: draft }));
+    setShowHistory(false);
+  };
+
   return (
     <div style={{
-      padding: '24px',
+      padding: 24,
       fontFamily: "'Pretendard', -apple-system, sans-serif",
       color: '#1A1D23',
       background: '#FFFFFF',
       minHeight: '100vh',
       boxSizing: 'border-box',
     }}>
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        marginBottom: '16px',
-      }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -51,9 +80,9 @@ export default function ImportPricingPage() {
                 background: isActive ? '#185FA5' : '#FFFFFF',
                 color: isActive ? '#FFFFFF' : '#5A6070',
                 border: `1px solid ${isActive ? '#185FA5' : '#DDE1EB'}`,
-                borderRadius: '6px',
+                borderRadius: 6,
                 padding: '6px 14px',
-                fontSize: '13px',
+                fontSize: 13,
                 fontWeight: 500,
                 fontFamily: "'Pretendard', -apple-system, sans-serif",
                 cursor: 'pointer',
@@ -66,18 +95,38 @@ export default function ImportPricingPage() {
         })}
       </div>
 
-      <div>
-        {activeTab === 'pricing' && (
-          <p style={{ fontSize: '13px', color: '#5A6070', margin: 0 }}>
-            Stage 3에서 책정안 테이블 UI 추가 예정
-          </p>
-        )}
-        {activeTab === 'promotion' && (
-          <p style={{ fontSize: '13px', color: '#5A6070', margin: 0 }}>
-            Stage 8에서 프로모션 시뮬레이션 UI 추가 예정
-          </p>
-        )}
+      <div style={{
+        background: '#FFFFFF',
+        borderRadius: 8,
+        overflow: 'hidden',
+        border: '0.5px solid #DDE1EB',
+      }}>
+        <DarkBar
+          tabType={activeTab}
+          currentDraft={currentDraft}
+          onSaveClick={handleSaveClick}
+          onHistoryClick={handleHistoryClick}
+        />
+        <div style={{ padding: '48px 24px', textAlign: 'center', color: '#9BA3B2', fontSize: 12 }}>
+          {activeTab === 'pricing'
+            ? '14컬럼 본문 테이블 — Stage 3-1c·4 작업 범위'
+            : '프로모션 시뮬레이션 본문 — Stage 8 작업 범위'}
+        </div>
       </div>
+
+      <SaveDraftModal
+        show={showSave}
+        tabType={activeTab}
+        onClose={() => setShowSave(false)}
+        onSaved={handleSaved}
+      />
+      <HistoryModal
+        show={showHistory}
+        tabType={activeTab}
+        currentDraftNo={currentDraft?.draft_no || null}
+        onClose={() => setShowHistory(false)}
+        onPick={handlePick}
+      />
     </div>
   );
 }
