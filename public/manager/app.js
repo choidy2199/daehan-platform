@@ -8663,6 +8663,31 @@ function _initOsPriceAppliedListener() {
   });
 }
 
+// 적용 상태 칩 뱃지 HTML 생성 (Step 5-D)
+// _getOsAppliedStatus 결과에 따라 3가지 상태 칩 반환
+// pending: 보라 "예상 N" / applied: 녹색 "✓ N 적용" / lowerAvailable: 보라 "▼ 예상 N"
+function _renderOsAppliedBadge(appliedPrice, expectedPrice) {
+  var info = (typeof _getOsAppliedStatus === 'function')
+    ? _getOsAppliedStatus(appliedPrice, expectedPrice)
+    : { status: 'pending', appliedPrice: 0 };
+  var ep = Number(expectedPrice) || 0;
+  var fmt = function(n) { return (Number(n) || 0).toLocaleString(); };
+  var base = 'display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:500;';
+  var purple = base + 'background:#EEEDFE;color:#3C3489;';
+  var green = base + 'background:#EAF3DE;color:#27500A;';
+  if (info.status === 'applied') {
+    return '<span style="' + green + '">✓ ' + fmt(info.appliedPrice) + ' 적용</span>';
+  }
+  if (info.status === 'lowerAvailable') {
+    return '<span style="' + purple + '">▼ 예상 ' + fmt(ep) + '</span>';
+  }
+  // pending
+  if (ep > 0) {
+    return '<span style="' + purple + '">예상 ' + fmt(ep) + '</span>';
+  }
+  return '';
+}
+
 function renderOnlineSales() {
   if (typeof _initOsPriceAppliedListener === 'function') _initOsPriceAppliedListener();
   migrateOnlineSalesArchive();
@@ -8721,9 +8746,9 @@ function renderOnlineSales() {
     var openCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'gmarket') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var ssgCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'ssg') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var _chipStyle = 'display:block;margin-top:3px;font-size:11px;color:#534AB7;font-weight:500;text-align:center;';
-    var _naverChip = _osExpected.naver > 0 ? '<div style="' + _chipStyle + '">예상 ' + _osExpected.naver.toLocaleString() + '</div>' : '';
-    var _openChip  = _osExpected.open  > 0 ? '<div style="' + _chipStyle + '">예상 ' + _osExpected.open.toLocaleString()  + '</div>' : '';
-    var _ssgChip   = _osExpected.ssg   > 0 ? '<div style="' + _chipStyle + '">예상 ' + _osExpected.ssg.toLocaleString()   + '</div>' : '';
+    var _naverChip = _renderOsAppliedBadge(item.appliedNaverPrice, _osExpected.naver);
+    var _openChip  = _renderOsAppliedBadge(item.appliedOpenPrice, _osExpected.open);
+    var _ssgChip   = _renderOsAppliedBadge(item.appliedSsgPrice, _osExpected.ssg);
     html += '<td style="padding:4px 4px;text-align:center">' + naverCardHtml + _naverChip + '</td>';
     html += '<td style="padding:4px 4px;text-align:center">' + openCardHtml + _openChip + '</td>';
     html += '<td style="padding:4px 4px;text-align:center">' + ssgCardHtml + _ssgChip + '</td>';
