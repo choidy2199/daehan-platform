@@ -8606,6 +8606,28 @@ function _getOsAppliedStatus(appliedPrice, expectedPrice) {
   return { status: 'applied', appliedPrice: ap };
 }
 
+// 적용 가격 저장 (Step 5-B) — Step 5-C에서 _pdApplyPrice 콜백으로 호출
+// rowIndex: mw_online_sales 배열 인덱스
+// channel: 'naver' | 'open' | 'ssg'
+// price: 적용 가격 (>0)
+function _saveOsAppliedPrice(rowIndex, channel, price) {
+  var p = Number(price) || 0;
+  if (p <= 0) return false;
+  var list;
+  try { list = JSON.parse(localStorage.getItem('mw_online_sales') || '[]'); } catch(e) { list = []; }
+  if (!Array.isArray(list) || rowIndex < 0 || rowIndex >= list.length) return false;
+  var row = list[rowIndex];
+  if (!row) return false;
+  var fieldMap = { naver: 'appliedNaverPrice', open: 'appliedOpenPrice', ssg: 'appliedSsgPrice' };
+  var field = fieldMap[channel];
+  if (!field) return false;
+  row[field] = p;
+  row.appliedAt = new Date().toISOString();
+  localStorage.setItem('mw_online_sales', JSON.stringify(list));
+  if (typeof autoSyncToSupabase === 'function') autoSyncToSupabase('mw_online_sales');
+  return true;
+}
+
 function renderOnlineSales() {
   migrateOnlineSalesArchive();
   buildOsPromoFilters();
