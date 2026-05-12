@@ -12481,6 +12481,7 @@ function recalcAll() {
   var reason = '가격 재계산';
   DB.products.forEach(function(p) {
     if (!p.code) return;
+    if (p.discontinued === '단종') return;
     var old = _oldPrices[p.code];
     if (!old) return;
     if (old.naver !== (p.priceNaver || 0)) recordPriceChange(p.code, 'naver', old.naver, p.priceNaver || 0, reason);
@@ -12755,6 +12756,11 @@ function importExcel() {
         var modeRadios = document.querySelectorAll('input[name="import-mode"]');
         modeRadios.forEach(function(r) { if (r.checked) importMode = r.value; });
 
+        if (col.코드 == null) {
+          alert('엑셀에서 "코드" 컬럼을 찾을 수 없습니다. 헤더를 확인해주세요.');
+          return;
+        }
+
         if (importMode === 'replace') {
           DB.products = [];
         }
@@ -12765,7 +12771,7 @@ function importExcel() {
         const dataStart = headerRow + 2;
         for (let i = dataStart; i < data.length; i++) {
           const row = data[i];
-          const code = row && row[col.코드 ?? 2];
+          const code = row && row[col.코드];
           if (!code && !(row[col.모델명 ?? 8])) continue;
 
           const supplyPrice = row[col.공급가 ?? 10] || 0;
@@ -12773,8 +12779,9 @@ function importExcel() {
           const costVal = row[col.원가 ?? (is26 ? 14 : 12)] || 0;
           const cost = costVal || calcCost(supplyPrice, importCategory);
 
+          const danjongVal = col.단종 != null ? row[col.단종] : '';
           var newItem = {
-            discontinued: (String(row[col.단종 ?? 1] || '').trim() === '단종') ? '단종' : '',
+            discontinued: (String(danjongVal || '').trim() === '단종') ? '단종' : '',
             code: String(code || ''),
             manageCode: col.관리코드 != null ? String(row[col.관리코드] || '') : '',
             category: row[col.대분류 ?? 3] || '',
