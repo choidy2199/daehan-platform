@@ -34,11 +34,104 @@ interface Props {
 type EditableField = 'management_code' | 'price_a' | 'price_b' | 'price_c' | 'price_market' | 'remark';
 const PRICE_FIELDS: EditableField[] = ['price_a', 'price_b', 'price_c', 'price_market'];
 
+const STORAGE_KEY = 'pricing-body-column-widths';
+const DEFAULT_WIDTHS = [36, 42, 90, 96, 140, 140, 78, 78, 78, 78, 78, 60, 120, 36];
+
 export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted }: Props) {
   const [editingCell, setEditingCell] = useState<{ id: number; field: EditableField } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [colWidths, setColWidths] = useState<number[]>(DEFAULT_WIDTHS);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const resizingRef = useRef<{ colIdx: number; startX: number; startW: number } | null>(null);
+  const isFirstWidthsRender = useRef(true);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === DEFAULT_WIDTHS.length) {
+          setColWidths(parsed);
+        }
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (isFirstWidthsRender.current) {
+      isFirstWidthsRender.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(colWidths));
+    } catch {}
+  }, [colWidths]);
+
+  function handleResizeMove(e: MouseEvent) {
+    if (!resizingRef.current) return;
+    const { colIdx, startX, startW } = resizingRef.current;
+    const delta = e.clientX - startX;
+    const next = Math.max(40, Math.min(600, startW + delta));
+    setColWidths((prev) => {
+      if (prev[colIdx] === next) return prev;
+      const arr = [...prev];
+      arr[colIdx] = next;
+      return arr;
+    });
+  }
+
+  function handleResizeEnd() {
+    resizingRef.current = null;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    window.removeEventListener('mousemove', handleResizeMove);
+    window.removeEventListener('mouseup', handleResizeEnd);
+  }
+
+  function handleResizeStart(e: React.MouseEvent, colIdx: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    resizingRef.current = {
+      colIdx,
+      startX: e.clientX,
+      startW: colWidths[colIdx],
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleResizeMove);
+    window.addEventListener('mouseup', handleResizeEnd);
+  }
+
+  function renderTh(idx: number, label: string, extra: React.CSSProperties = {}) {
+    const isLast = idx === colWidths.length - 1;
+    return (
+      <th style={{
+        ...thStyle,
+        ...extra,
+        position: 'relative',
+        borderRight: isLast ? undefined : '0.5px solid #EEF0F3',
+        whiteSpace: 'nowrap',
+      }}>
+        {label}
+        {!isLast && (
+          <div
+            onMouseDown={(e) => handleResizeStart(e, idx)}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 4,
+              cursor: 'col-resize',
+              userSelect: 'none',
+              zIndex: 1,
+            }}
+          />
+        )}
+      </th>
+    );
+  }
 
   useEffect(() => {
     if (editingCell && inputRef.current) {
@@ -220,46 +313,37 @@ export default function PricingBodyTable({ draftNo, items, onPatched, onDeleted 
         borderRadius: '0 0 8px 8px',
         overflow: 'hidden',
         background: '#FFFFFF',
+        fontFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
       }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{
             width: '100%',
             borderCollapse: 'collapse',
+            tableLayout: 'fixed',
             fontSize: 11,
             fontVariantNumeric: 'tabular-nums',
           }}>
             <colgroup>
-              <col style={{ width: 36 }} />
-              <col style={{ width: 42 }} />
-              <col style={{ width: 90 }} />
-              <col style={{ width: 96 }} />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 140 }} />
-              <col style={{ width: 78 }} />
-              <col style={{ width: 78 }} />
-              <col style={{ width: 78 }} />
-              <col style={{ width: 78 }} />
-              <col style={{ width: 78 }} />
-              <col style={{ width: 60 }} />
-              <col style={{ width: 120 }} />
-              <col style={{ width: 36 }} />
+              {colWidths.map((w, i) => (
+                <col key={i} style={{ width: `${w}px` }} />
+              ))}
             </colgroup>
             <thead>
               <tr style={{ background: '#F1EFE8', color: '#444441' }}>
-                <th style={{ ...thStyle, textAlign: 'center' }}>#</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}>사진</th>
-                <th style={{ ...thStyle, color: '#185FA5' }}>관리코드</th>
-                <th style={thStyle}>분류</th>
-                <th style={thStyle}>품명</th>
-                <th style={thStyle}>규격</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>원가</th>
-                <th style={{ ...thStyle, textAlign: 'right', color: '#185FA5' }}>가격A</th>
-                <th style={{ ...thStyle, textAlign: 'right', color: '#185FA5' }}>가격B</th>
-                <th style={{ ...thStyle, textAlign: 'right', color: '#185FA5' }}>가격C</th>
-                <th style={{ ...thStyle, textAlign: 'right', color: '#185FA5' }}>시장가</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}>선물</th>
-                <th style={{ ...thStyle, color: '#185FA5' }}>비고</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}></th>
+                {renderTh(0, '#', { textAlign: 'center' })}
+                {renderTh(1, '사진', { textAlign: 'center' })}
+                {renderTh(2, '관리코드', { color: '#185FA5' })}
+                {renderTh(3, '분류')}
+                {renderTh(4, '품명')}
+                {renderTh(5, '규격')}
+                {renderTh(6, '원가', { textAlign: 'right' })}
+                {renderTh(7, '가격A', { textAlign: 'right', color: '#185FA5' })}
+                {renderTh(8, '가격B', { textAlign: 'right', color: '#185FA5' })}
+                {renderTh(9, '가격C', { textAlign: 'right', color: '#185FA5' })}
+                {renderTh(10, '시장가', { textAlign: 'right', color: '#185FA5' })}
+                {renderTh(11, '선물', { textAlign: 'center' })}
+                {renderTh(12, '비고', { color: '#185FA5' })}
+                {renderTh(13, '')}
               </tr>
             </thead>
             <tbody>
@@ -406,4 +490,8 @@ const tdStyle: React.CSSProperties = {
   fontSize: 11,
   color: '#1A1D23',
   verticalAlign: 'middle',
+  borderRight: '0.5px solid #EEF0F3',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 };
