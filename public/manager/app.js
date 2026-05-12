@@ -8700,7 +8700,66 @@ function _renderOsAppliedBadge(appliedPrice, expectedPrice, currentMarketPrice) 
   return '';
 }
 
+// _osColumns: 온라인판매관리 컬럼 정의 + 헤더 동적 렌더 (Step1 — refactor only)
+var _osColumns = {
+  COLUMNS_REQUIRED: [
+    { id: 'date',          label: '날짜',       width: 70,  align: 'left',   locked: true },
+    { id: 'code',          label: '코드',       width: 60,  align: 'left',   locked: true },
+    { id: 'model',         label: '모델',       minWidth: 160, align: 'left', locked: true },
+    { id: 'stock',         label: '재고',       width: 60,  align: 'center', locked: true },
+    { id: 'costP',         label: '원가P',      width: 90,  align: 'right',  locked: true },
+    { id: 'expectedPrice', label: '예상적용가', width: 100, align: 'right',  locked: true, headerStyle: 'background:#534AB7;color:#fff' },
+    { id: 'naver',         label: '스토어팜',   width: 120, align: 'center', locked: true, headerStyle: 'background:#0F6E56;color:#fff;text-align:center' },
+    { id: 'gmarket',       label: '오픈마켓',   width: 120, align: 'center', locked: true, headerStyle: 'background:#185FA5;color:#fff;text-align:center' },
+    { id: 'ssg',           label: 'SSG',        width: 120, align: 'center', locked: true, headerStyle: 'background:#BA7517;color:#fff;text-align:center' },
+    { id: 'promo',         label: '프로모션',   minWidth: 140, align: 'left', locked: true },
+    { id: 'delete',        label: '',           width: 50,  align: 'center', locked: true }
+  ],
+  COLUMNS_OPTIONAL: [],
+  CONFIG_KEY: 'mw_os_columns',
+  _config: null,
+  _defaultConfig: function() {
+    return {
+      version: 1,
+      order: this.COLUMNS_REQUIRED.map(function(c) { return c.id; }),
+      hidden: this.COLUMNS_OPTIONAL.map(function(c) { return c.id; })
+    };
+  },
+  loadConfig: function() {
+    this._config = this._defaultConfig();
+  },
+  getVisibleColumns: function() {
+    if (!this._config) this.loadConfig();
+    var all = this.COLUMNS_REQUIRED.concat(this.COLUMNS_OPTIONAL);
+    var map = {};
+    all.forEach(function(c) { map[c.id] = c; });
+    return this._config.order.map(function(id) { return map[id]; }).filter(Boolean);
+  },
+  _renderThead: function() {
+    var table = document.getElementById('os-table');
+    if (!table) return;
+    var thead = table.querySelector('thead');
+    if (!thead) return;
+    var cols = this.getVisibleColumns();
+    var html = '<tr>';
+    cols.forEach(function(c) {
+      var styleParts = [];
+      if (c.width)    styleParts.push('width:' + c.width + 'px');
+      if (c.minWidth) styleParts.push('min-width:' + c.minWidth + 'px');
+      if (c.headerStyle) styleParts.push(c.headerStyle);
+      var styleAttr = styleParts.length ? ' style="' + styleParts.join(';') + '"' : '';
+      var classAttr = '';
+      if (c.align === 'center' && !c.headerStyle) classAttr = ' class="center"';
+      else if (c.align === 'right') classAttr = ' class="num"';
+      html += '<th' + styleAttr + classAttr + '>' + (c.label || '') + '</th>';
+    });
+    html += '</tr>';
+    thead.innerHTML = html;
+  }
+};
+
 function renderOnlineSales() {
+  _osColumns._renderThead();
   if (typeof _initOsPriceAppliedListener === 'function') _initOsPriceAppliedListener();
   migrateOnlineSalesArchive();
   buildOsPromoFilters();
