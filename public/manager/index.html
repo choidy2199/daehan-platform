@@ -98,6 +98,7 @@ document.head.appendChild(s);
       <div class="sidebar-sub">
         <div class="sidebar-sub-item" data-tab="tab-import-po-v2" data-window="발주서V2" onclick="_sidebarOpenWindow('발주서V2')"><span>수입발주서</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('발주서V2')">★</button></div>
         <div class="sidebar-sub-item" data-tab="tab-import-invoice-v2" data-window="인보이스V2" onclick="_sidebarOpenWindow('인보이스V2')"><span>수입인보이스</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('인보이스V2')">★</button></div>
+        <div class="sidebar-sub-item" data-tab="tab-import-pricing" data-window="제품금액책정" onclick="_sidebarOpenWindow('제품금액책정')"><span>제품금액 책정</span><button class="sidebar-fav-btn" onclick="event.stopPropagation();_toggleSidebarFav('제품금액책정')">★</button></div>
       </div>
     </div>
 
@@ -1075,6 +1076,7 @@ document.head.appendChild(s);
 </div>
 <div id="tab-import-po-v2" class="tab-content"></div>
 <div id="tab-import-invoice-v2" class="tab-content"></div>
+<div id="tab-import-pricing" class="tab-content"><iframe src="/manager/import-pricing" style="width:100%;height:100%;border:none;"></iframe></div>
 <div id="tab-notice" class="tab-content"></div>
 <div id="tab-backorder" class="tab-content"></div>
 <div id="tab-delivery" class="tab-content">
