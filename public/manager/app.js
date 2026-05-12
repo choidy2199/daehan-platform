@@ -8705,20 +8705,35 @@ function _renderOsAppliedBadge(appliedPrice, expectedPrice, currentMarketPrice) 
 // _osColumns: 온라인판매관리 컬럼 정의 + 헤더 동적 렌더 (Step1 — refactor only)
 var _osColumns = {
   COLUMNS_REQUIRED: [
-    { id: 'date',          label: '날짜',       width: 70,  align: 'left',   locked: true },
-    { id: 'code',          label: '코드',       width: 60,  align: 'left',   locked: true },
-    { id: 'model',         label: '모델',       minWidth: 160, align: 'left', locked: true },
-    { id: 'stock',         label: '재고',       width: 60,  align: 'center', locked: true },
-    { id: 'costP',         label: '원가P',      width: 90,  align: 'right',  locked: true },
-    { id: 'expectedPrice', label: '예상적용가', width: 100, align: 'right',  locked: true, headerStyle: 'background:#534AB7;color:#fff' },
-    { id: 'naver',         label: '스토어팜',   width: 120, align: 'center', locked: true, headerStyle: 'background:#0F6E56;color:#fff;text-align:center' },
-    { id: 'gmarket',       label: '오픈마켓',   width: 120, align: 'center', locked: true, headerStyle: 'background:#185FA5;color:#fff;text-align:center' },
-    { id: 'ssg',           label: 'SSG',        width: 120, align: 'center', locked: true, headerStyle: 'background:#BA7517;color:#fff;text-align:center' },
-    { id: 'promo',         label: '프로모션',   minWidth: 140, align: 'left', locked: true },
-    { id: 'delete',        label: '',           width: 50,  align: 'center', locked: true }
+    { id: 'date',          label: '날짜',       width: 70,  align: 'left',   locked: true,
+      excel: { headers: ['날짜'], values: function(item, ctx) { return [item.date]; } } },
+    { id: 'code',          label: '코드',       width: 60,  align: 'left',   locked: true,
+      excel: { headers: ['코드'], values: function(item, ctx) { return [item.code]; } } },
+    { id: 'model',         label: '모델',       minWidth: 160, align: 'left', locked: true,
+      excel: { headers: ['모델'], values: function(item, ctx) { return [item.model]; } } },
+    { id: 'stock',         label: '재고',       width: 60,  align: 'center', locked: true,
+      excel: { headers: ['재고'], values: function(item, ctx) { return [item.stock]; } } },
+    { id: 'costP',         label: '원가P',      width: 90,  align: 'right',  locked: true,
+      excel: { headers: ['원가P'], values: function(item, ctx) { return [ctx.xCostP]; } } },
+    { id: 'expectedPrice', label: '예상적용가', width: 100, align: 'right',  locked: true, headerStyle: 'background:#534AB7;color:#fff',
+      excel: { headers: ['예상적용가'], values: function(item, ctx) { return [Math.round(item.expectedPrice || 0)]; } } },
+    { id: 'naver',         label: '스토어팜',   width: 120, align: 'center', locked: true, headerStyle: 'background:#0F6E56;color:#fff;text-align:center',
+      excel: { headers: ['스토어팜판매가', '스토어팜이익', '스토어팜이익률'],
+        values: function(item, ctx) { return [item.naverPrice, ctx.naver.profit, Math.round(ctx.naver.rate * 10) / 10]; } } },
+    { id: 'gmarket',       label: '오픈마켓',   width: 120, align: 'center', locked: true, headerStyle: 'background:#185FA5;color:#fff;text-align:center',
+      excel: { headers: ['오픈마켓판매가', '오픈마켓이익', '오픈마켓이익률'],
+        values: function(item, ctx) { return [item.openPrice, ctx.open.profit, Math.round(ctx.open.rate * 10) / 10]; } } },
+    { id: 'ssg',           label: 'SSG',        width: 120, align: 'center', locked: true, headerStyle: 'background:#BA7517;color:#fff;text-align:center',
+      excel: { headers: ['SSG판매가', 'SSG이익', 'SSG이익률'],
+        values: function(item, ctx) { return [item.ssgPrice || 0, ctx.ssg.profit, Math.round(ctx.ssg.rate * 10) / 10]; } } },
+    { id: 'promo',         label: '프로모션',   minWidth: 140, align: 'left', locked: true,
+      excel: { headers: ['프로모션'], values: function(item, ctx) { return [item.promoName]; } } },
+    { id: 'delete',        label: '',           width: 50,  align: 'center', locked: true,
+      excel: null }
   ],
   COLUMNS_OPTIONAL: [
-    { id: 'manageCode', label: '관리코드', width: 130, align: 'left' }
+    { id: 'manageCode', label: '관리코드', width: 130, align: 'left',
+      excel: { headers: ['관리코드'], values: function(item, ctx) { return [ctx.osProd ? (ctx.osProd.manageCode || '') : '']; } } }
   ],
   CONFIG_KEY: 'mw_os_columns',
   _config: null,
@@ -8854,6 +8869,28 @@ var _osColumns = {
       default:
         return '<td></td>';
     }
+  },
+  _getExcelHeaders: function() {
+    this._config = null; this.loadConfig();
+    var cols = this.getVisibleColumns();
+    var headers = [];
+    cols.forEach(function(c) {
+      if (c.excel && Array.isArray(c.excel.headers)) {
+        c.excel.headers.forEach(function(h) { headers.push(h); });
+      }
+    });
+    return headers;
+  },
+  _getExcelRow: function(item, ctx) {
+    var cols = this.getVisibleColumns();
+    var row = [];
+    cols.forEach(function(c) {
+      if (c.excel && typeof c.excel.values === 'function') {
+        var vals = c.excel.values(item, ctx);
+        if (Array.isArray(vals)) vals.forEach(function(v) { row.push(v); });
+      }
+    });
+    return row;
   },
   openSettingsModal: function() {
     var self = this;
@@ -9311,20 +9348,28 @@ function importOnlineSalesProducts(){
   toast(added+'건 추가'+(codes.length-added>0?' ('+(codes.length-added)+'건 중복/미존재)':''));
 }
 
-function exportOnlineSalesExcel(){
-  if(typeof XLSX==='undefined'){toast('XLSX 라이브러리 필요');return;}
-  var s=DB.settings,naverFee=s.naverFee||0.0663,openFee=s.openElecFee||0.13,ssgFee=s.ssgFee||0.13,data=onlineSalesData;
-  var rows=[['날짜','코드','모델','재고','원가P','예상적용가','스토어팜판매가','스토어팜이익','스토어팜이익률','오픈마켓판매가','오픈마켓이익','오픈마켓이익률','SSG판매가','SSG이익','SSG이익률','프로모션']];
-  data.forEach(function(item){
-    var xProd=item.code?findProduct(item.code):null;var xCat=xProd?(xProd.category||''):'';var xCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,xCat)):0;
-    var naver=calcOsProfit(item.naverPrice||0,xCostP||0,naverFee);
-    var open=calcOsProfit(item.openPrice||0,xCostP||0,openFee);
-    var ssg=calcOsProfit(item.ssgPrice||0,xCostP||0,ssgFee);
-    rows.push([item.date,item.code,item.model,item.stock,xCostP,Math.round(item.expectedPrice||0),item.naverPrice,naver.profit,Math.round(naver.rate*10)/10,item.openPrice,open.profit,Math.round(open.rate*10)/10,item.ssgPrice||0,ssg.profit,Math.round(ssg.rate*10)/10,item.promoName]);
+function exportOnlineSalesExcel() {
+  if (typeof XLSX === 'undefined') { toast('XLSX 라이브러리 필요'); return; }
+  var s = DB.settings;
+  var naverFee = s.naverFee || 0.0663;
+  var openFee = s.openElecFee || 0.13;
+  var ssgFee = s.ssgFee || 0.13;
+  var data = onlineSalesData;
+  var rows = [_osColumns._getExcelHeaders()];
+  data.forEach(function(item) {
+    var xProd = item.code ? findProduct(item.code) : null;
+    var xCat = xProd ? (xProd.category || '') : '';
+    var xCostP = item.promoCost ? Math.round(calcOrderCost(item.promoCost, xCat)) : 0;
+    var naver = calcOsProfit(item.naverPrice || 0, xCostP || 0, naverFee);
+    var open = calcOsProfit(item.openPrice || 0, xCostP || 0, openFee);
+    var ssg = calcOsProfit(item.ssgPrice || 0, xCostP || 0, ssgFee);
+    var ctx = { xCostP: xCostP, osProd: xProd, naver: naver, open: open, ssg: ssg };
+    rows.push(_osColumns._getExcelRow(item, ctx));
   });
-  var ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'온라인판매관리');
-  XLSX.writeFile(wb,'온라인판매관리_'+(new Date().toISOString().slice(0,10))+'.xlsx');
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '온라인판매관리');
+  XLSX.writeFile(wb, '온라인판매관리_' + (new Date().toISOString().slice(0,10)) + '.xlsx');
 }
 
 function archiveOnlineSales(){
