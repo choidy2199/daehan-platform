@@ -67,6 +67,7 @@ export default function ImportPricingPage() {
       minHeight: '100vh',
       boxSizing: 'border-box',
     }}>
+      <style>{`.content { width: 100% !important; }`}</style>
       <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
