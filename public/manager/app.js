@@ -8728,7 +8728,58 @@ var _osColumns = {
     };
   },
   loadConfig: function() {
+    var raw = null;
+    try { raw = localStorage.getItem(this.CONFIG_KEY); } catch (e) {}
+    if (raw) {
+      try {
+        var saved = JSON.parse(raw);
+        if (saved && Array.isArray(saved.order)) {
+          // 안전망 1: 정의되지 않은 컬럼 id 제거
+          var validIds = {};
+          this.COLUMNS_REQUIRED.concat(this.COLUMNS_OPTIONAL).forEach(function(c) { validIds[c.id] = true; });
+          saved.order = saved.order.filter(function(id) { return validIds[id]; });
+          saved.hidden = (saved.hidden || []).filter(function(id) { return validIds[id]; });
+          // 안전망 2: 필수 컬럼이 빠져 있으면 끝에 추가 (locked는 항상 visible)
+          var inOrderSet = {};
+          saved.order.forEach(function(id) { inOrderSet[id] = true; });
+          this.COLUMNS_REQUIRED.forEach(function(c) {
+            if (!inOrderSet[c.id]) saved.order.push(c.id);
+          });
+          // 안전망 3: 신규 OPTIONAL 컬럼이 추가되었으면 hidden에 자동 포함
+          var inHiddenSet = {};
+          saved.hidden.forEach(function(id) { inHiddenSet[id] = true; });
+          this.COLUMNS_OPTIONAL.forEach(function(c) {
+            if (!inOrderSet[c.id] && !inHiddenSet[c.id]) saved.hidden.push(c.id);
+          });
+          // 안전망 4: hidden에 있는 컬럼은 order에서 제거 (중복 방지)
+          var hiddenSet = {};
+          saved.hidden.forEach(function(id) { hiddenSet[id] = true; });
+          saved.order = saved.order.filter(function(id) { return !hiddenSet[id]; });
+          saved.version = 1;
+          this._config = saved;
+          return;
+        }
+      } catch (e) {}
+    }
     this._config = this._defaultConfig();
+  },
+  saveConfig: function() {
+    if (this._config) save(this.CONFIG_KEY, this._config);
+  },
+  resetToDefault: function() {
+    this._config = this._defaultConfig();
+    this.saveConfig();
+  },
+  findColumn: function(id) {
+    var all = this.COLUMNS_REQUIRED.concat(this.COLUMNS_OPTIONAL);
+    for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
+    return null;
+  },
+  isRequired: function(id) {
+    for (var i = 0; i < this.COLUMNS_REQUIRED.length; i++) {
+      if (this.COLUMNS_REQUIRED[i].id === id) return true;
+    }
+    return false;
   },
   getVisibleColumns: function() {
     if (!this._config) this.loadConfig();
@@ -8738,6 +8789,7 @@ var _osColumns = {
     return this._config.order.map(function(id) { return map[id]; }).filter(Boolean);
   },
   _renderThead: function() {
+    this._config = null; this.loadConfig();
     var table = document.getElementById('os-table');
     if (!table) return;
     var thead = table.querySelector('thead');
@@ -8759,6 +8811,7 @@ var _osColumns = {
     thead.innerHTML = html;
   },
   _renderBodyCells: function(item, ri, ctx) {
+    this._config = null; this.loadConfig();
     var cols = this.getVisibleColumns();
     var html = '';
     for (var i = 0; i < cols.length; i++) {
@@ -8799,6 +8852,212 @@ var _osColumns = {
       default:
         return '<td></td>';
     }
+  },
+  openSettingsModal: function() {
+    var self = this;
+    if (!self._config) self.loadConfig();
+    // 기존 모달 있으면 제거 (중복 방지)
+    var existing = document.querySelector('.os-cols-modal-backdrop-container');
+    if (existing) existing.remove();
+    // snapshot (취소 시 복원용)
+    var snapshot = JSON.parse(JSON.stringify(self._config));
+    function escHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+    function renderVisibleHtml() {
+      var html = '';
+      self._config.order.forEach(function(id) {
+        var c = self.findColumn(id);
+        if (!c) return;
+        var locked = self.isRequired(id);
+        var lockedClass = locked ? ' tx-locked' : '';
+        var cbAttr = 'checked' + (locked ? ' disabled' : '');
+        var lockIcon = locked ? '<span class="tx-lock-icon" aria-hidden="true">🔒</span>' : '';
+        html += '<div class="tx-order-item' + lockedClass + '" draggable="true" data-col-id="' + escHtml(id) + '">' +
+          '<span class="tx-drag-handle" aria-hidden="true">⠿</span>' +
+          '<input type="checkbox" ' + cbAttr + '>' +
+          '<span class="tx-label-text">' + escHtml(c.label || id) + '</span>' +
+          lockIcon +
+          '</div>';
+      });
+      return html;
+    }
+    function renderHiddenHtml() {
+      var html = '';
+      self._config.hidden.forEach(function(id) {
+        var c = self.findColumn(id);
+        if (!c) return;
+        html += '<div class="tx-order-item" draggable="true" data-col-id="' + escHtml(id) + '">' +
+          '<span class="tx-drag-handle" aria-hidden="true">⠿</span>' +
+          '<input type="checkbox">' +
+          '<span class="tx-label-text">' + escHtml(c.label || id) + '</span>' +
+          '</div>';
+      });
+      return html;
+    }
+    var backdrop = document.createElement('div');
+    backdrop.className = 'tx-code-modal-backdrop os-cols-modal-backdrop-container';
+    backdrop.innerHTML =
+      '<div class="tx-cols-modal" role="dialog" aria-modal="true">' +
+        '<h4>온라인판매관리 컬럼 설정</h4>' +
+        '<div class="tx-cols-modal-desc">표시할 컬럼을 선택하고 순서를 조정하세요.</div>' +
+        '<div class="tx-cols-modal-tip">⠿ 핸들을 드래그하여 순서를 바꿀 수 있습니다 (필수 + 선택 모두)</div>' +
+        '<div class="tx-cols-modal-section">' +
+          '<div class="tx-cols-modal-section-title tx-order-section-title">' +
+            '<span>표시 컬럼 (드래그로 순서 변경)</span>' +
+            '<span class="tx-count" id="os-visible-count"></span>' +
+          '</div>' +
+          '<div class="tx-order-list" id="os-visible-list">' + renderVisibleHtml() + '</div>' +
+        '</div>' +
+        '<div class="tx-cols-modal-section">' +
+          '<div class="tx-cols-modal-section-title tx-order-section-title">' +
+            '<span>숨김 컬럼 (체크하면 표시 가능)</span>' +
+            '<span class="tx-count" id="os-hidden-count"></span>' +
+          '</div>' +
+          '<div class="tx-order-list" id="os-hidden-list">' + renderHiddenHtml() + '</div>' +
+        '</div>' +
+        '<div class="tx-cols-modal-actions">' +
+          '<button class="tx-cols-modal-reset" type="button" data-action="reset">기본값으로 초기화</button>' +
+          '<div class="tx-cols-modal-buttons">' +
+            '<button class="tx-cols-modal-btn" type="button" data-action="cancel">취소</button>' +
+            '<button class="tx-cols-modal-btn tx-primary" type="button" data-action="apply">적용</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(backdrop);
+    function updateCounts() {
+      var vis = backdrop.querySelector('#os-visible-list').children.length;
+      var hid = backdrop.querySelector('#os-hidden-list').children.length;
+      var visCount = backdrop.querySelector('#os-visible-count');
+      var hidCount = backdrop.querySelector('#os-hidden-count');
+      if (visCount) visCount.textContent = vis + '개';
+      if (hidCount) hidCount.textContent = hid + '개';
+    }
+    updateCounts();
+    // 체크박스 toggle: 체크 해제 → hidden으로 이동, 체크 → visible로 이동
+    function bindCheckboxMove(listEl, targetListEl, makeVisible) {
+      listEl.addEventListener('change', function(e) {
+        var cb = e.target;
+        if (cb.tagName !== 'INPUT' || cb.type !== 'checkbox') return;
+        var item = cb.closest('.tx-order-item');
+        if (!item) return;
+        if (item.classList.contains('tx-locked')) {
+          cb.checked = true;  // 잠금은 해제 불가
+          return;
+        }
+        if (makeVisible) {
+          // hidden → visible
+          cb.checked = true;
+          targetListEl.appendChild(item);
+        } else {
+          // visible → hidden
+          cb.checked = false;
+          targetListEl.appendChild(item);
+        }
+        updateCounts();
+      });
+    }
+    var visibleList = backdrop.querySelector('#os-visible-list');
+    var hiddenList = backdrop.querySelector('#os-hidden-list');
+    bindCheckboxMove(visibleList, hiddenList, false);
+    bindCheckboxMove(hiddenList, visibleList, true);
+    // 드래그 정렬 (의존 0 — 거래명세서 패턴 그대로)
+    function bindDragSort(list) {
+      var dragged = null;
+      list.addEventListener('dragstart', function(e) {
+        var item = e.target.closest && e.target.closest('.tx-order-item');
+        if (!item) return;
+        dragged = item;
+        item.classList.add('tx-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      list.addEventListener('dragend', function(e) {
+        var item = e.target.closest && e.target.closest('.tx-order-item');
+        if (item) item.classList.remove('tx-dragging');
+        list.querySelectorAll('.tx-drop-indicator-top, .tx-drop-indicator-bottom').forEach(function(el) {
+          el.classList.remove('tx-drop-indicator-top', 'tx-drop-indicator-bottom');
+        });
+        dragged = null;
+      });
+      list.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        var target = e.target.closest && e.target.closest('.tx-order-item');
+        if (!target || target === dragged) return;
+        var rect = target.getBoundingClientRect();
+        var isAfter = e.clientY > rect.top + rect.height / 2;
+        list.querySelectorAll('.tx-drop-indicator-top, .tx-drop-indicator-bottom').forEach(function(el) {
+          el.classList.remove('tx-drop-indicator-top', 'tx-drop-indicator-bottom');
+        });
+        target.classList.add(isAfter ? 'tx-drop-indicator-bottom' : 'tx-drop-indicator-top');
+      });
+      list.addEventListener('drop', function(e) {
+        e.preventDefault();
+        if (!dragged) return;
+        var target = e.target.closest && e.target.closest('.tx-order-item');
+        if (!target || target === dragged) return;
+        var rect = target.getBoundingClientRect();
+        var isAfter = e.clientY > rect.top + rect.height / 2;
+        if (isAfter) target.parentNode.insertBefore(dragged, target.nextSibling);
+        else target.parentNode.insertBefore(dragged, target);
+      });
+    }
+    bindDragSort(visibleList);
+    bindDragSort(hiddenList);
+    // 닫기 함수 (cleanup)
+    function cleanupAndClose() {
+      document.removeEventListener('keydown', onKeyDown);
+      backdrop.remove();
+    }
+    // 적용
+    function applyChanges() {
+      var newOrder = [];
+      visibleList.querySelectorAll('.tx-order-item').forEach(function(el) {
+        newOrder.push(el.getAttribute('data-col-id'));
+      });
+      var newHidden = [];
+      hiddenList.querySelectorAll('.tx-order-item').forEach(function(el) {
+        newHidden.push(el.getAttribute('data-col-id'));
+      });
+      self._config = { version: 1, order: newOrder, hidden: newHidden };
+      self.saveConfig();
+      self._renderThead();
+      if (typeof renderOnlineSales === 'function') renderOnlineSales();
+      cleanupAndClose();
+    }
+    // 취소
+    function cancelChanges() {
+      self._config = snapshot;
+      cleanupAndClose();
+    }
+    // 기본값
+    function resetChanges() {
+      self.resetToDefault();
+      self._renderThead();
+      if (typeof renderOnlineSales === 'function') renderOnlineSales();
+      cleanupAndClose();
+    }
+    // 액션 버튼 바인딩
+    backdrop.querySelectorAll('[data-action]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var action = btn.getAttribute('data-action');
+        if (action === 'apply') applyChanges();
+        else if (action === 'cancel') cancelChanges();
+        else if (action === 'reset') resetChanges();
+      });
+    });
+    // 백드롭 클릭 시 취소
+    backdrop.addEventListener('click', function(e) {
+      if (e.target === backdrop) cancelChanges();
+    });
+    // Escape 키 취소
+    function onKeyDown(e) {
+      if (e.key === 'Escape') cancelChanges();
+    }
+    document.addEventListener('keydown', onKeyDown);
   }
 };
 
