@@ -1477,7 +1477,7 @@ function _pdCalcLive(code, channel) {
 }
 
 // 로컬 저장만 — 네이버 API 호출하지 않음
-function _pdApplyPrice(code, channel) {
+function _pdApplyPrice(code, channel, callback) {
   var st = _marketBadgeStyles[channel];
   var inp = document.getElementById('pd-new-price');
   if (!inp) return;
@@ -1547,6 +1547,7 @@ function _pdApplyPrice(code, channel) {
     }
   }
   toast('가격이 저장되었습니다');
+  if (typeof callback === 'function') callback(newPrice);
 }
 
 function _pdRefreshFee(code, channel, price) {
