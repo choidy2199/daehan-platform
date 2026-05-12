@@ -8608,10 +8608,17 @@ function _calcExpectedMarketPrices(expectedPrice, dbProd) {
 //   - pending: 아직 마켓 미전송 (applied 가격 없음)
 //   - applied: 적용 가격과 현재 예상 가격 일치 (또는 예상이 더 높음)
 //   - lowerAvailable: 현재 예상이 적용 가격보다 낮음 → 인하 가능
-function _getOsAppliedStatus(appliedPrice, expectedPrice) {
+function _getOsAppliedStatus(appliedPrice, expectedPrice, currentMarketPrice) {
   var ap = Number(appliedPrice) || 0;
   var ep = Number(expectedPrice) || 0;
-  if (ap <= 0) return { status: 'pending', appliedPrice: 0 };
+  var cp = Number(currentMarketPrice) || 0;
+  if (ap <= 0) {
+    // 자동 일치: 현재 마켓가 == 예상가 (완전 일치) → applied
+    if (cp > 0 && ep > 0 && cp === ep) {
+      return { status: 'applied', appliedPrice: cp };
+    }
+    return { status: 'pending', appliedPrice: 0 };
+  }
   if (ep > 0 && ep < ap) return { status: 'lowerAvailable', appliedPrice: ap };
   return { status: 'applied', appliedPrice: ap };
 }
@@ -8671,9 +8678,9 @@ function _initOsPriceAppliedListener() {
 // 적용 상태 칩 뱃지 HTML 생성 (Step 5-D)
 // _getOsAppliedStatus 결과에 따라 3가지 상태 칩 반환
 // pending: 보라 "예상 N" / applied: 녹색 "✓ N 적용" / lowerAvailable: 보라 "▼ 예상 N"
-function _renderOsAppliedBadge(appliedPrice, expectedPrice) {
+function _renderOsAppliedBadge(appliedPrice, expectedPrice, currentMarketPrice) {
   var info = (typeof _getOsAppliedStatus === 'function')
-    ? _getOsAppliedStatus(appliedPrice, expectedPrice)
+    ? _getOsAppliedStatus(appliedPrice, expectedPrice, currentMarketPrice)
     : { status: 'pending', appliedPrice: 0 };
   var ep = Number(expectedPrice) || 0;
   var fmt = function(n) { return (Number(n) || 0).toLocaleString(); };
@@ -8751,9 +8758,11 @@ function renderOnlineSales() {
     var openCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'gmarket') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var ssgCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'ssg') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var _chipStyle = 'display:block;margin-top:3px;font-size:11px;color:#534AB7;font-weight:500;text-align:center;';
-    var _naverChip = _renderOsAppliedBadge(item.appliedNaverPrice, _osExpected.naver);
-    var _openChip  = _renderOsAppliedBadge(item.appliedOpenPrice, _osExpected.open);
-    var _ssgChip   = _renderOsAppliedBadge(item.appliedSsgPrice, _osExpected.ssg);
+    var _curNaver = (typeof _priceCollectMap !== 'undefined' && _priceCollectMap && _priceCollectMap.naver && _priceCollectMap.naver[item.code]) ? _priceCollectMap.naver[item.code].price : 0;
+    var _curSsg   = (typeof _priceCollectMap !== 'undefined' && _priceCollectMap && _priceCollectMap.ssg   && _priceCollectMap.ssg[item.code])   ? _priceCollectMap.ssg[item.code].price   : 0;
+    var _naverChip = _renderOsAppliedBadge(item.appliedNaverPrice, _osExpected.naver, _curNaver);
+    var _openChip  = _renderOsAppliedBadge(item.appliedOpenPrice, _osExpected.open, 0);
+    var _ssgChip   = _renderOsAppliedBadge(item.appliedSsgPrice, _osExpected.ssg, _curSsg);
     html += '<td style="padding:4px 4px;text-align:center">' + naverCardHtml + _naverChip + '</td>';
     html += '<td style="padding:4px 4px;text-align:center">' + openCardHtml + _openChip + '</td>';
     html += '<td style="padding:4px 4px;text-align:center">' + ssgCardHtml + _ssgChip + '</td>';
