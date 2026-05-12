@@ -8735,11 +8735,7 @@ function renderOnlineSales() {
     html += '<td style="text-align:left;font-weight:500;padding-left:8px">'+(item.model||'-')+'</td>';
     html += '<td class="center">'+osStockHtml(stockNum)+'</td>';
     if (editable) {
-      html += '<td><input class="os-input os-input-text os-vendor-input" value="'+(item.vendor||'')+'" onchange="updateOsField('+ri+',\'vendor\',this.value)"></td>';
-      html += '<td><input class="os-input os-input-num" value="'+(item.price?item.price.toLocaleString():'')+'" onchange="updateOsNumField('+ri+',\'price\',this.value)" style="width:80px"></td>';
     } else {
-      html += '<td>'+(item.vendor||'-')+'</td>';
-      html += '<td class="num">'+(item.price?item.price.toLocaleString():'-')+'</td>';
     }
     html += '<td class="num" style="font-weight:600;color:#185FA5">'+(costP?costP.toLocaleString():'-')+'</td>';
     var expPrice = item.expectedPrice || 0;
@@ -8773,7 +8769,7 @@ function renderOnlineSales() {
     else { html += '<td></td>'; }
     html += '</tr>';
   });
-  if (!filtered.length) html = '<tr><td colspan="13"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
+  if (!filtered.length) html = '<tr><td colspan="11"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
   body.innerHTML = html;
   renderOsSummary(filtered, naverFee, openFee);
   initColumnResize('os-table');
@@ -8963,13 +8959,13 @@ function importOnlineSalesProducts(){
 function exportOnlineSalesExcel(){
   if(typeof XLSX==='undefined'){toast('XLSX 라이브러리 필요');return;}
   var s=DB.settings,naverFee=s.naverFee||0.0663,openFee=s.openElecFee||0.13,ssgFee=s.ssgFee||0.13,data=onlineSalesData;
-  var rows=[['날짜','코드','모델','재고','업체명','판매가','원가P','예상적용가','스토어팜판매가','스토어팜이익','스토어팜이익률','오픈마켓판매가','오픈마켓이익','오픈마켓이익률','SSG판매가','SSG이익','SSG이익률','프로모션']];
+  var rows=[['날짜','코드','모델','재고','원가P','예상적용가','스토어팜판매가','스토어팜이익','스토어팜이익률','오픈마켓판매가','오픈마켓이익','오픈마켓이익률','SSG판매가','SSG이익','SSG이익률','프로모션']];
   data.forEach(function(item){
     var xProd=item.code?findProduct(item.code):null;var xCat=xProd?(xProd.category||''):'';var xCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,xCat)):0;
     var naver=calcOsProfit(item.naverPrice||0,xCostP||0,naverFee);
     var open=calcOsProfit(item.openPrice||0,xCostP||0,openFee);
     var ssg=calcOsProfit(item.ssgPrice||0,xCostP||0,ssgFee);
-    rows.push([item.date,item.code,item.model,item.stock,item.vendor,item.price,xCostP,Math.round(item.expectedPrice||0),item.naverPrice,naver.profit,Math.round(naver.rate*10)/10,item.openPrice,open.profit,Math.round(open.rate*10)/10,item.ssgPrice||0,ssg.profit,Math.round(ssg.rate*10)/10,item.promoName]);
+    rows.push([item.date,item.code,item.model,item.stock,xCostP,Math.round(item.expectedPrice||0),item.naverPrice,naver.profit,Math.round(naver.rate*10)/10,item.openPrice,open.profit,Math.round(open.rate*10)/10,item.ssgPrice||0,ssg.profit,Math.round(ssg.rate*10)/10,item.promoName]);
   });
   var ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'온라인판매관리');
