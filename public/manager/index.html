@@ -450,7 +450,7 @@ document.head.appendChild(s);
     <button class="sub-tab" onclick="switchSalesSub('calc')">수수료계산기</button>
   </div>
   <div id="sales-sub-manage">
-  <div class="section">
+  <div class="section" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:visible">
     <div class="section-header">
       <span>온라인판매관리</span>
       <div style="display:flex;gap:6px">
@@ -460,7 +460,7 @@ document.head.appendChild(s);
         <button id="os-cols-btn" class="btn-action-sub" onclick="_osColumns.openSettingsModal()" style="padding:5px 12px;font-size:12px" title="컬럼 설정">⚙ 컬럼</button>
       </div>
     </div>
-    <div class="section-body" style="padding:0">
+    <div class="section-body" style="padding:0;flex:1;display:flex;flex-direction:column;min-height:0">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #F0F2F7;flex-wrap:wrap">
         <input type="search" id="os-search-input" placeholder="제품 검색 (코드 / 모델 / 품명)" oninput="showOsSearchAC(this)" autocomplete="off" style="width:280px;padding:6px 10px;border:1px solid #DDE1EB;border-radius:4px;font-size:13px;">
         <div style="width:1px;height:20px;background:#DDE1EB"></div>
@@ -468,7 +468,7 @@ document.head.appendChild(s);
         <div style="width:1px;height:20px;background:#DDE1EB"></div>
         <span id="os-archive-hint" style="font-size:10px;color:#9BA3B2"></span>
       </div>
-      <div class="table-scroll" style="overflow-x:auto">
+      <div class="table-scroll" style="flex:1;overflow-y:auto;overflow-x:auto;min-height:0">
         <table class="data-table" id="os-table" style="width:100%">
           <thead id="os-thead"></thead>
           <tbody id="os-body"></tbody>
