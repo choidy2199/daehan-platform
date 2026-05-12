@@ -9163,29 +9163,8 @@ function renderOnlineSales() {
   });
   if (!filtered.length) html = '<tr><td colspan="' + _osColumns.getVisibleColumns().length + '"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
   body.innerHTML = html;
-  renderOsSummary(filtered, naverFee, openFee);
   initColumnResize('os-table');
   initStickyHeader('os-table');
-}
-
-function renderOsSummary(data, naverFee, openFee) {
-  var c = document.getElementById('os-summary');
-  if (!c) return;
-  var promos=[],nRates=[],oRates=[],warn=0;
-  data.forEach(function(item){
-    if(item.promoName&&promos.indexOf(item.promoName)===-1)promos.push(item.promoName);
-    var sProd=item.code?findProduct(item.code):null;var sCat=sProd?(sProd.category||''):'';var sCostP=item.promoCost?Math.round(calcOrderCost(item.promoCost,sCat)):0;
-    if(item.naverPrice&&sCostP){var n=calcOsProfit(item.naverPrice,sCostP,naverFee);nRates.push(n.rate);}
-    if(item.openPrice&&sCostP){var o=calcOsProfit(item.openPrice,sCostP,openFee);oRates.push(o.rate);}
-    var sn=findStock(item.code);if(sn==null)sn=item.stock||0;if(sn<=2)warn++;
-  });
-  var avgN=nRates.length?(nRates.reduce(function(a,b){return a+b},0)/nRates.length):0;
-  var avgO=oRates.length?(oRates.reduce(function(a,b){return a+b},0)/oRates.length):0;
-  c.innerHTML='<div class="os-sum-card"><div class="os-sum-label">총 제품수</div><div class="os-sum-val">'+data.length+'건</div></div>'+
-    '<div class="os-sum-card"><div class="os-sum-label">프로모션</div><div class="os-sum-val">'+promos.length+'개</div></div>'+
-    '<div class="os-sum-card"><div class="os-sum-label">스토어팜 평균</div><div class="os-sum-val" style="color:'+(avgN>=0?'#1D9E75':'#CC2222')+'">'+avgN.toFixed(1)+'%</div></div>'+
-    '<div class="os-sum-card"><div class="os-sum-label">오픈마켓 평균</div><div class="os-sum-val" style="color:'+(avgO>=0?'#1D9E75':'#CC2222')+'">'+avgO.toFixed(1)+'%</div></div>'+
-    '<div class="os-sum-card"><div class="os-sum-label">재고 경고</div><div class="os-sum-val" style="color:#CC2222">'+warn+'건</div></div>';
 }
 
 function onOsProductSelect(idx, code) {

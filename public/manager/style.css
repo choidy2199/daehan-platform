@@ -826,9 +826,6 @@ body.gen-edit-active #gen-table tbody tr td:first-child {
 .os-filter-pill { padding:3px 10px; font-size:10px; font-weight:500; border-radius:12px; cursor:pointer; border:1px solid #DDE1EB; background:#FFF; color:#5A6070; }
 .os-filter-pill.active { background:#185FA5; color:#FFF; border-color:#185FA5; }
 .os-filter-pill.pill-amber { background:#FAEEDA; color:#633806; border-color:#FAC775; }
-.os-sum-card { flex:1; background:#F4F6FA; border-radius:4px; padding:6px 10px; text-align:center; }
-.os-sum-label { font-size:10px; color:#5A6070; }
-.os-sum-val { font-size:13px; font-weight:600; color:#1A1D23; }
 .os-date { color:#9BA3B2; font-size:13px; }
 
 /* Toast */
