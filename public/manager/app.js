@@ -8715,7 +8715,9 @@ var _osColumns = {
     { id: 'promo',         label: '프로모션',   minWidth: 140, align: 'left', locked: true },
     { id: 'delete',        label: '',           width: 50,  align: 'center', locked: true }
   ],
-  COLUMNS_OPTIONAL: [],
+  COLUMNS_OPTIONAL: [
+    { id: 'manageCode', label: '관리코드', width: 130, align: 'left' }
+  ],
   CONFIG_KEY: 'mw_os_columns',
   _config: null,
   _defaultConfig: function() {
@@ -8755,6 +8757,48 @@ var _osColumns = {
     });
     html += '</tr>';
     thead.innerHTML = html;
+  },
+  _renderBodyCells: function(item, ri, ctx) {
+    var cols = this.getVisibleColumns();
+    var html = '';
+    for (var i = 0; i < cols.length; i++) {
+      html += this._renderCell(cols[i].id, item, ri, ctx);
+    }
+    return html;
+  },
+  _renderCell: function(colId, item, ri, ctx) {
+    switch (colId) {
+      case 'date':
+        return '<td><span class="os-date">' + (item.date || '-') + '</span></td>';
+      case 'code':
+        return '<td>' + (item.code || '-') + '</td>';
+      case 'model':
+        return '<td style="text-align:left;font-weight:500;padding-left:8px">' + (item.model || '-') + '</td>';
+      case 'stock':
+        return '<td class="center">' + osStockHtml(ctx.stockNum) + '</td>';
+      case 'costP':
+        return '<td class="num" style="font-weight:600;color:#185FA5">' + (ctx.costP ? ctx.costP.toLocaleString() : '-') + '</td>';
+      case 'expectedPrice':
+        return ctx.expPrice > 0
+          ? '<td class="num" style="color:#534AB7;font-weight:500">' + Math.round(ctx.expPrice).toLocaleString() + '</td>'
+          : '<td class="num" style="color:#9BA3B2">-</td>';
+      case 'naver':
+        return '<td style="padding:4px 4px;text-align:center">' + ctx.naverCardHtml + ctx._naverChip + '</td>';
+      case 'gmarket':
+        return '<td style="padding:4px 4px;text-align:center">' + ctx.openCardHtml + ctx._openChip + '</td>';
+      case 'ssg':
+        return '<td style="padding:4px 4px;text-align:center">' + ctx.ssgCardHtml + ctx._ssgChip + '</td>';
+      case 'promo':
+        return '<td style="text-align:left"><span class="os-promo-badge">' + (ctx.promoTxt || '-') + '</span>' + ctx.monthBadge + '</td>';
+      case 'delete':
+        return ctx.editable
+          ? '<td class="center"><button onclick="removeOsRow(' + ri + ')" style="background:#CC2222;color:#fff;border:none;padding:3px 7px;border-radius:3px;font-size:11px;cursor:pointer;line-height:1;font-weight:500;">×</button></td>'
+          : '<td></td>';
+      case 'manageCode':
+        return '<td>' + (ctx.osProd ? (ctx.osProd.manageCode || '') : '') + '</td>';
+      default:
+        return '<td></td>';
+    }
   }
 };
 
@@ -8783,26 +8827,7 @@ function renderOnlineSales() {
     var naver = calcOsProfit(item.naverPrice||0, costP||0, naverFee);
     var open = calcOsProfit(item.openPrice||0, costP||0, openFee);
     var ssg = calcOsProfit(item.ssgPrice||0, costP||0, ssgFee);
-    var pCls = function(v){return v>=0?'fc-positive':'fc-negative';};
-
-    var pSign = function(v){return v>=0?'+':'';};
-    html += '<tr'+(naver.profit<0||open.profit<0?' style="background:#FFF5F5"':'')+'>';
-    html += '<td><span class="os-date">'+(item.date||'-')+'</span></td>';
-    html += '<td>'+(item.code||'-')+'</td>';
-    // 모델 셀은 항상 텍스트로 표시 (편집 input 제거)
-    // 신규 행 추가/검색은 상단 [+ 행 추가] 버튼과 검색창에서 처리
-    html += '<td style="text-align:left;font-weight:500;padding-left:8px">'+(item.model||'-')+'</td>';
-    html += '<td class="center">'+osStockHtml(stockNum)+'</td>';
-    if (editable) {
-    } else {
-    }
-    html += '<td class="num" style="font-weight:600;color:#185FA5">'+(costP?costP.toLocaleString():'-')+'</td>';
     var expPrice = item.expectedPrice || 0;
-    if (expPrice > 0) {
-      html += '<td class="num" style="color:#534AB7;font-weight:500">'+Math.round(expPrice).toLocaleString()+'</td>';
-    } else {
-      html += '<td class="num" style="color:#9BA3B2">-</td>';
-    }
     var osProdForBadge = osProd;
     if (!osProdForBadge && item.code) {
       var genArr = (typeof genProducts !== 'undefined' && genProducts) ? genProducts : [];
@@ -8812,23 +8837,33 @@ function renderOnlineSales() {
     var naverCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'naver') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var openCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'gmarket') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
     var ssgCardHtml = osProdForBadge ? marketBadge(osProdForBadge, 'ssg') : '<div style="text-align:center;color:#DDE1EB;font-size:11px">-</div>';
-    var _chipStyle = 'display:block;margin-top:3px;font-size:11px;color:#534AB7;font-weight:500;text-align:center;';
     var _curNaver = (typeof _priceCollectMap !== 'undefined' && _priceCollectMap && _priceCollectMap.naver && _priceCollectMap.naver[item.code]) ? _priceCollectMap.naver[item.code].price : 0;
     var _curSsg   = (typeof _priceCollectMap !== 'undefined' && _priceCollectMap && _priceCollectMap.ssg   && _priceCollectMap.ssg[item.code])   ? _priceCollectMap.ssg[item.code].price   : 0;
     var _naverChip = _renderOsAppliedBadge(item.appliedNaverPrice, _osExpected.naver, _curNaver);
     var _openChip  = _renderOsAppliedBadge(item.appliedOpenPrice, _osExpected.open, 0);
     var _ssgChip   = _renderOsAppliedBadge(item.appliedSsgPrice, _osExpected.ssg, _curSsg);
-    html += '<td style="padding:4px 4px;text-align:center">' + naverCardHtml + _naverChip + '</td>';
-    html += '<td style="padding:4px 4px;text-align:center">' + openCardHtml + _openChip + '</td>';
-    html += '<td style="padding:4px 4px;text-align:center">' + ssgCardHtml + _ssgChip + '</td>';
     var promoTxt = item.promoName || '';
     var monthBadge = item.promoMonth ? '<span style="display:inline-block;padding:1px 6px;background:#1A1D23;color:#fff;border-radius:3px;font-size:10px;font-weight:500;margin-left:4px;">' + item.promoMonth + '</span>' : '';
-    html += '<td style="text-align:left"><span class="os-promo-badge">'+ (promoTxt || '-') +'</span>' + monthBadge + '</td>';
-    if (editable) { html += '<td class="center"><button onclick="removeOsRow('+ri+')" style="background:#CC2222;color:#fff;border:none;padding:3px 7px;border-radius:3px;font-size:11px;cursor:pointer;line-height:1;font-weight:500;">×</button></td>'; }
-    else { html += '<td></td>'; }
+    var ctx = {
+      stockNum: stockNum,
+      osProd: osProd,
+      costP: costP,
+      expPrice: expPrice,
+      naverCardHtml: naverCardHtml,
+      openCardHtml: openCardHtml,
+      ssgCardHtml: ssgCardHtml,
+      _naverChip: _naverChip,
+      _openChip: _openChip,
+      _ssgChip: _ssgChip,
+      promoTxt: promoTxt,
+      monthBadge: monthBadge,
+      editable: editable
+    };
+    html += '<tr'+(naver.profit<0||open.profit<0?' style="background:#FFF5F5"':'')+'>';
+    html += _osColumns._renderBodyCells(item, ri, ctx);
     html += '</tr>';
   });
-  if (!filtered.length) html = '<tr><td colspan="11"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
+  if (!filtered.length) html = '<tr><td colspan="' + _osColumns.getVisibleColumns().length + '"><div class="empty-state"><p>제품을 추가하세요</p></div></td></tr>';
   body.innerHTML = html;
   renderOsSummary(filtered, naverFee, openFee);
   initColumnResize('os-table');
