@@ -1468,6 +1468,18 @@ function LogTab() {
 //  탭 5 — 설정
 // ═════════════════════════════════════════════════════════════
 function SettingTab() {
+  const [adStatus, setAdStatus] = useState<'loading' | 'connected' | 'not_configured'>('loading');
+
+  useEffect(() => {
+    fetch('/api/settings/api-status')
+      .then(r => r.json())
+      .then(data => {
+        const naverAd = (data.platforms ?? []).find((p: any) => p.id === 'naverAd');
+        setAdStatus(naverAd?.status === 'connected' ? 'connected' : 'not_configured');
+      })
+      .catch(() => setAdStatus('not_configured'));
+  }, []);
+
   const guards = [
     { label: '한 번에 입찰가 최대 변경', desc: '한 키워드 입찰가 1회 조정 한도', value: '±30%' },
     {
@@ -1550,19 +1562,27 @@ function SettingTab() {
           API 키는 <strong>설정 &gt; API 관리</strong>에서 등록합니다.
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: C.danger,
-              display: 'inline-block',
-            }}
-          />
-          <span style={{ fontSize: 14, fontWeight: 600, color: C.danger }}>미연결</span>
-          <span style={{ fontSize: 12, color: C.textHint, marginLeft: 6 }}>
-            (연결되면 초록 dot + &quot;연결됨&quot;으로 변경됩니다)
-          </span>
+          {adStatus === 'loading' && (
+            <>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#9BA3B2', display: 'inline-block' }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#9BA3B2' }}>확인 중...</span>
+            </>
+          )}
+          {adStatus === 'connected' && (
+            <>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: C.success, display: 'inline-block' }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: C.success }}>연결됨</span>
+            </>
+          )}
+          {adStatus === 'not_configured' && (
+            <>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: C.danger, display: 'inline-block' }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: C.danger }}>미연결</span>
+              <span style={{ fontSize: 12, color: C.textHint, marginLeft: 6 }}>
+                (설정 &gt; API 관리에서 키 등록 후 연결됩니다)
+              </span>
+            </>
+          )}
         </div>
       </Section>
 
