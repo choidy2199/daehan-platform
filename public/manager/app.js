@@ -14002,6 +14002,7 @@ function renderGenProducts() {
   const search = (document.getElementById('gen-search').value || '').toLowerCase();
   let filtered = genProducts;
   if (search) filtered = filtered.filter(p => `${p.code} ${p.manageCode || ''} ${p.model} ${p.description}`.toLowerCase().includes(search));
+  filtered = filtered.slice().sort((a, b) => (a.description || '').localeCompare(b.description || '', 'ko'));
 
   const body = document.getElementById('gen-body');
   body.innerHTML = filtered.map((p, i) => {
