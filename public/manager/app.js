@@ -14349,10 +14349,10 @@ function getGenBrand(product) {
 
 function downloadGenTemplate() {
   if (!window.XLSX) { toast('SheetJS 로딩 중...'); return; }
-  const data = [['코드', '관리코드', '대분류', '모델 및 규격', '제품설명 및 품명', '원가', '도매(A)', '스토어팜', '오픈마켓', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '비고', '입고날짜', '수입가(USD)']];
-  data.push(['SAMPLE-001', '8801234567890', '전동공구', '샘플 제품', '샘플 설명', 90000, 95000, 97000, 105000, 10, 800, 120, 750, 1200, 700, '', '', '']);
+  const data = [['코드', '관리코드', '대분류', '품명', '규격', '원가', '도매(A)', '스토어팜', '오픈마켓', 'SSG', 'IN수량', 'IN단가', 'OUT수량', 'OUT단가', '파레트수량', '파레트단가', '수입가(USD)', '비고', '입고날짜']];
+  data.push(['SAMPLE-001', '8801234567890', '전동공구', '샘플 제품', '샘플 설명', 90000, 95000, 97000, 105000, 0, 10, 800, 120, 750, 1200, 700, '', '', '']);
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{wch:12},{wch:16},{wch:12},{wch:25},{wch:40},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10},{wch:10},{wch:10},{wch:20},{wch:15},{wch:12}];
+  ws['!cols'] = [{wch:12},{wch:16},{wch:12},{wch:25},{wch:40},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:8},{wch:10},{wch:8},{wch:10},{wch:10},{wch:10},{wch:12},{wch:20},{wch:15}];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '일반제품');
   XLSX.writeFile(wb, '일반제품_양식.xlsx');
@@ -14372,7 +14372,7 @@ function uploadGenProducts(input) {
       for (let i = 1; i < rows.length; i++) {
         const r = rows[i];
         if (!r || !r[0]) continue;
-        var ipRaw = r[17];
+        var ipRaw = r[16];
         var ip = null;
         if (ipRaw != null && String(ipRaw).trim() !== '') {
           var ipNum = parseFloat(String(ipRaw).replace(/[$,\s]/g, ''));
@@ -14389,15 +14389,16 @@ function uploadGenProducts(input) {
           priceA: parseInt(r[6]) || 0,
           priceNaver: parseInt(r[7]) || 0,
           priceOpen: parseInt(r[8]) || 0,
-          inQty: parseInt(r[9]) || 0,
-          inPrice: parseInt(r[10]) || 0,
-          outQty: parseInt(r[11]) || 0,
-          outPrice: parseInt(r[12]) || 0,
-          palletQty: parseInt(r[13]) || 0,
-          palletPrice: parseInt(r[14]) || 0,
-          memo: String(r[15] || ''),
-          inDate: String(r[16] || ''),
+          priceSsg: parseInt(r[9]) || 0,
+          inQty: parseInt(r[10]) || 0,
+          inPrice: parseInt(r[11]) || 0,
+          outQty: parseInt(r[12]) || 0,
+          outPrice: parseInt(r[13]) || 0,
+          palletQty: parseInt(r[14]) || 0,
+          palletPrice: parseInt(r[15]) || 0,
           importPrice: ip,
+          memo: String(r[17] || ''),
+          inDate: String(r[18] || ''),
           source: 'general'
         });
         count++;
@@ -14730,7 +14731,7 @@ function importGenExcel() {
       for (var i = 1; i < rows.length; i++) {
         var r = rows[i];
         if (!r || !r[0]) continue;
-        var ipRaw2 = r[17];
+        var ipRaw2 = r[16];
         var ip2 = null;
         if (ipRaw2 != null && String(ipRaw2).trim() !== '') {
           var ipNum2 = parseFloat(String(ipRaw2).replace(/[$,\s]/g, ''));
@@ -14747,15 +14748,16 @@ function importGenExcel() {
           priceA: parseInt(r[6]) || 0,
           priceNaver: parseInt(r[7]) || 0,
           priceOpen: parseInt(r[8]) || 0,
-          inQty: parseInt(r[9]) || 0,
-          inPrice: parseInt(r[10]) || 0,
-          outQty: parseInt(r[11]) || 0,
-          outPrice: parseInt(r[12]) || 0,
-          palletQty: parseInt(r[13]) || 0,
-          palletPrice: parseInt(r[14]) || 0,
-          memo: String(r[15] || ''),
-          inDate: String(r[16] || ''),
+          priceSsg: parseInt(r[9]) || 0,
+          inQty: parseInt(r[10]) || 0,
+          inPrice: parseInt(r[11]) || 0,
+          outQty: parseInt(r[12]) || 0,
+          outPrice: parseInt(r[13]) || 0,
+          palletQty: parseInt(r[14]) || 0,
+          palletPrice: parseInt(r[15]) || 0,
           importPrice: ip2,
+          memo: String(r[17] || ''),
+          inDate: String(r[18] || ''),
           source: 'general'
         });
       }
