@@ -58,10 +58,10 @@ export interface ChannelCellProps {
 }
 
 const CHANNEL_THEMES: Record<Channel, { bg: string; dot: string; label: string; name: string }> = {
-  naver:      { bg: 'rgba(0, 191, 64, 0.08)',  dot: '#009632', label: '#009632', name: '스토어팜' },
-  coupang_mp: { bg: 'rgba(255, 66, 66, 0.07)', dot: '#E52222', label: '#E52222', name: '쿠팡' },
-  gmarket:    { bg: '#EAF2FE',                  dot: '#0054D1', label: '#0054D1', name: '오픈마켓' },
-  ssg:        { bg: 'rgba(255, 146, 0, 0.08)', dot: '#D17600', label: '#D17600', name: 'SSG' },
+  naver:      { bg: 'rgba(0, 191, 64, 0.12)',  dot: '#009632', label: '#009632', name: '스토어팜' },
+  coupang_mp: { bg: 'rgba(255, 66, 66, 0.11)', dot: '#E52222', label: '#E52222', name: '쿠팡' },
+  gmarket:    { bg: '#D5E6FD',                  dot: '#0054D1', label: '#0054D1', name: '오픈마켓' },
+  ssg:        { bg: 'rgba(255, 146, 0, 0.12)', dot: '#D17600', label: '#D17600', name: 'SSG' },
 };
 
 export function ChannelCell({ price, channel, category, rates, prices }: ChannelCellProps) {
@@ -127,10 +127,10 @@ function ChannelHeader({ dot, label, name }: { dot: string; label: string; name:
 function Badge({ type, text }: { type: 'pos' | 'neg' | 'neutral'; text: string }) {
   const styles =
     type === 'pos'
-      ? { background: 'rgba(0, 150, 50, 0.10)', color: '#009632' }
+      ? { background: 'rgba(0, 150, 50, 0.20)', color: '#009632' }
       : type === 'neg'
-      ? { background: 'rgba(255, 66, 66, 0.10)', color: '#E52222' }
-      : { background: 'rgba(112, 115, 124, 0.05)', color: 'rgba(55, 56, 60, 0.28)' };
+      ? { background: 'rgba(255, 66, 66, 0.20)', color: '#E52222' }
+      : { background: 'rgba(112, 115, 124, 0.10)', color: 'rgba(55, 56, 60, 0.28)' };
 
   return (
     <span style={{

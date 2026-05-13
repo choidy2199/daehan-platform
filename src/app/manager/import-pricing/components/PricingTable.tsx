@@ -144,8 +144,8 @@ function Th({ children, width, sticky, left, sep, lastSticky }: ThProps) {
     <th style={{
       fontWeight: 600,
       fontSize: 12,
-      color: 'rgba(55, 56, 60, 0.61)',
-      background: '#F7F7F8',
+      color: 'rgba(55, 56, 60, 0.80)',
+      background: '#EAEBEC',
       padding: '8px 6px',
       textAlign: 'center',
       borderBottom: '1px solid #EAEBEC',
@@ -194,8 +194,8 @@ function Td({ children, sticky, left, sep, center, noPadding, lastSticky, style 
 
 function CategoryBadge({ category, text }: { category: 'powertool' | 'handtool'; text: string }) {
   const styles = category === 'powertool'
-    ? { background: '#EAF2FE', color: '#0054D1' }
-    : { background: 'rgba(0, 191, 64, 0.10)', color: '#009632' };
+    ? { background: '#D5E6FD', color: '#0054D1' }
+    : { background: 'rgba(0, 191, 64, 0.20)', color: '#009632' };
 
   return (
     <span style={{
