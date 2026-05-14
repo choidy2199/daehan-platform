@@ -1243,10 +1243,6 @@ body.gen-edit-active #gen-table tbody tr td:first-child {
 #tab-import-invoice-v2.tab-content.active { display:block !important; overflow-y:auto; }
 #tab-import-invoice-v2.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
 
-/* 설정 — tab-content flex 무효화 (API 관리 카드 7개 이상 스크롤) */
-#tab-manage.tab-content.active { display:block !important; overflow-y:auto; }
-#tab-manage.tab-content.active > div { display:block !important; flex:none !important; overflow:visible !important; }
-
 /* 공지 NEW 깜빡임 */
 /* 공지 확인 뱃지 */
 .notice-confirm-badge { background:#D1FAE5; color:#065F46; padding:2px 8px; border-radius:10px; font-size:11px; display:inline-block; margin-right:4px; font-family:'Pretendard',sans-serif; }

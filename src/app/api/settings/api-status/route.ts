@@ -66,18 +66,6 @@ export async function GET(request: NextRequest) {
         { label: 'KAKAO_REST_API_KEY', value: raw ? keys.kakao.apiKey : maskKey(keys.kakao.apiKey) },
       ],
     },
-    {
-      id: 'naverAd',
-      name: '네이버 검색광고',
-      status: (keys.naverAd?.customerId && keys.naverAd?.apiKey && keys.naverAd?.secretKey)
-        ? 'connected' as const
-        : 'not_configured' as const,
-      keys: [
-        { label: 'NAVER_AD_CUSTOMER_ID', value: raw ? keys.naverAd?.customerId || '' : maskKey(keys.naverAd?.customerId || '') },
-        { label: 'NAVER_AD_API_KEY',     value: raw ? keys.naverAd?.apiKey     || '' : maskKey(keys.naverAd?.apiKey     || '') },
-        { label: 'NAVER_AD_SECRET_KEY',  value: raw ? keys.naverAd?.secretKey  || '' : maskKey(keys.naverAd?.secretKey  || '') },
-      ],
-    },
   ];
 
   return NextResponse.json({ platforms });
