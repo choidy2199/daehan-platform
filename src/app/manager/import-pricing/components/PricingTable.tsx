@@ -53,6 +53,8 @@ export function PricingTable({
   return (
     <div style={{
       overflowX: 'auto',
+      overflowY: 'auto',
+      maxHeight: 'calc(100vh - 200px)',
       border: '1px solid #E1E2E4',
       borderRadius: 12,
       background: '#ffffff',
@@ -230,9 +232,10 @@ function Th({ children, width, sticky, left, sep, lastSticky }: ThProps) {
       whiteSpace: 'nowrap',
       width: width ?? undefined,
       minWidth: width ?? undefined,
-      position: sticky ? 'sticky' : undefined,
+      position: 'sticky',
+      top: 0,
       left: sticky ? left : undefined,
-      zIndex: sticky ? 11 : undefined,
+      zIndex: sticky ? 22 : 12,
       borderLeft: sep ? '1px solid #EAEBEC' : undefined,
       boxShadow: lastSticky ? '2px 0 4px -1px rgba(23, 23, 23, 0.06)' : undefined,
     }}>{children}</th>
