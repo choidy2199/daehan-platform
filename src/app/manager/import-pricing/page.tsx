@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import { Package } from 'lucide-react';
 import { PricingTable, type PricingRow } from './components/PricingTable';
@@ -8,6 +8,7 @@ import type { ChannelFeeRates } from './lib/feeCalc';
 import { COLUMNS } from './lib/columnConfig';
 import { useColumnConfig } from './lib/useColumnConfig';
 import { ColumnSettingsModal } from './components/ColumnSettingsModal';
+import { ImportModal } from './components/ImportModal';
 import { supabase } from '@/lib/supabase';
 
 // ============================================================
@@ -92,49 +93,59 @@ export default function ImportPricingPage() {
   const [rows, setRows]           = useState<PricingRow[]>([]);
   const [rates, setRates]         = useState<ChannelFeeRates | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [items, setItems] = useState<ImportPricingItem[]>([]);
   const { config, save, reset } = useColumnConfig();
   const resolvedCols = config.order
     .map(id => COLUMNS.find(c => c.id === id))
     .filter((c): c is NonNullable<typeof c> => c != null);
 
-  useEffect(() => {
+  const existingGenProductIds = useMemo(
+    () => new Set(items.map(it => String(it.gen_product_id)).filter(Boolean)),
+    [items]
+  );
+
+  const fetchItems = useCallback(async () => {
     let cancelled = false;
-    (async () => {
-      try {
-        const [feesRes, productsRes, itemsRes] = await Promise.all([
-          supabase.from('app_data').select('value').eq('key', 'mw_channel_fees').single(),
-          supabase.from('app_data').select('value').eq('key', 'mw_gen_products').single(),
-          supabase.from('import_pricing_items').select('*').order('id', { ascending: false }),
-        ]);
+    try {
+      const [feesRes, productsRes, itemsRes] = await Promise.all([
+        supabase.from('app_data').select('value').eq('key', 'mw_channel_fees').single(),
+        supabase.from('app_data').select('value').eq('key', 'mw_gen_products').single(),
+        supabase.from('import_pricing_items').select('*').order('id', { ascending: false }),
+      ]);
 
-        if (cancelled) return;
+      if (cancelled) return;
 
-        if (feesRes.error)    throw new Error('수수료 정보 로드 실패');
-        if (productsRes.error) throw new Error('제품 마스터 로드 실패');
-        if (itemsRes.error)   throw new Error('책정 데이터 로드 실패');
+      if (feesRes.error)    throw new Error('수수료 정보 로드 실패');
+      if (productsRes.error) throw new Error('제품 마스터 로드 실패');
+      if (itemsRes.error)   throw new Error('책정 데이터 로드 실패');
 
-        const mappedRates = mapChannelFees(feesRes.data?.value);
-        if (!mappedRates) throw new Error('수수료 구조 파싱 실패');
+      const mappedRates = mapChannelFees(feesRes.data?.value);
+      if (!mappedRates) throw new Error('수수료 구조 파싱 실패');
 
-        const genProductsArray = (productsRes.data?.value ?? []) as any[];
-        const genMap = new Map<number, any>();
-        for (const p of genProductsArray) {
-          if (p.code != null) genMap.set(parseInt(p.code, 10), p);
-        }
-
-        const builtRows = buildRows((itemsRes.data ?? []) as ImportPricingItem[], genMap);
-
-        setRates(mappedRates);
-        setRows(builtRows);
-        setLoadState('ready');
-      } catch (e: any) {
-        if (cancelled) return;
-        setErrorMsg(e?.message ?? '알 수 없는 에러');
-        setLoadState('error');
+      const genProductsArray = (productsRes.data?.value ?? []) as any[];
+      const genMap = new Map<number, any>();
+      for (const p of genProductsArray) {
+        if (p.code != null) genMap.set(parseInt(p.code, 10), p);
       }
-    })();
-    return () => { cancelled = true; };
+
+      const fetchedItems = (itemsRes.data ?? []) as ImportPricingItem[];
+      const builtRows = buildRows(fetchedItems, genMap);
+
+      setItems(fetchedItems);
+      setRates(mappedRates);
+      setRows(builtRows);
+      setLoadState('ready');
+    } catch (e: any) {
+      if (cancelled) return;
+      setErrorMsg(e?.message ?? '알 수 없는 에러');
+      setLoadState('error');
+    }
   }, []);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
 
   return (
     <div style={{
@@ -164,7 +175,7 @@ export default function ImportPricingPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <SecondaryButton>가져오기</SecondaryButton>
+          <SecondaryButton onClick={() => setShowImportModal(true)}>가져오기</SecondaryButton>
           <SecondaryButton>행 추가</SecondaryButton>
           <SecondaryButton>템플릿</SecondaryButton>
           <PrimaryButton onClick={() => setIsModalOpen(true)}>설정</PrimaryButton>
@@ -188,6 +199,13 @@ export default function ImportPricingPage() {
         config={config}
         onApply={next => save(next)}
         onReset={reset}
+      />
+
+      <ImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImported={fetchItems}
+        existingGenProductIds={existingGenProductIds}
       />
     </div>
   );
