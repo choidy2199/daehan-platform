@@ -5,6 +5,8 @@ import { WholesaleCell, ChannelCell } from './PriceCell';
 import { detectCategory, type ChannelFeeRates } from '../lib/feeCalc';
 import type { ColumnDef } from '../lib/columnConfig';
 import type { DraftRow } from '../page';
+import { useColumnWidths, type ColumnWidths } from '../lib/useColumnWidths';
+import { ColumnResizer } from './ColumnResizer';
 
 export interface PricingRow {
   id: number;
@@ -41,13 +43,24 @@ export interface PricingTableProps {
   onDraftCancel?: () => void;
 }
 
-// sticky 컬럼 left 오프셋 (photo→code→manageCode 순 고정값)
-const STICKY_LEFT: Record<string, number> = { photo: 0, code: 44, manageCode: 104 };
+// sticky 컬럼 left 오프셋 — 앞 컬럼 width 누적 합산으로 동적 계산
+const STICKY_COLS = ['photo', 'code', 'manageCode'] as const;
+
+function getStickyLeft(colId: string, widths: ColumnWidths): number {
+  const idx = STICKY_COLS.indexOf(colId as any);
+  if (idx <= 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < idx; i++) {
+    sum += widths[STICKY_COLS[i]] ?? 0;
+  }
+  return sum;
+}
 
 export function PricingTable({
   rows, rates, visibleCols,
   draftRow, draftErrors, onDraftChange, onDraftSave, onDraftCancel,
 }: PricingTableProps) {
+  const { widths, updateWidth, persistWidth } = useColumnWidths();
   const lastStickyId = [...visibleCols].reverse().find(c => c.sticky)?.id;
 
   return (
@@ -65,17 +78,27 @@ export function PricingTable({
         fontSize: 14,
         fontFamily: "'Pretendard', -apple-system, sans-serif",
         width: '100%',
+        tableLayout: 'fixed',
       }}>
+        <colgroup>
+          {visibleCols.map(col => {
+            const w = widths[col.id] ?? col.width;
+            return <col key={col.id} style={{ width: `${w}px` }} />;
+          })}
+        </colgroup>
         <thead>
           <tr>
             {visibleCols.map(col => (
               <Th
                 key={col.id}
-                width={col.width}
+                colId={col.id}
+                width={widths[col.id] ?? col.width}
                 sep={col.sep}
                 sticky={!!col.sticky}
-                left={col.sticky ? STICKY_LEFT[col.sticky] : undefined}
+                left={col.sticky ? getStickyLeft(col.id, widths) : undefined}
                 lastSticky={col.id === lastStickyId}
+                onResize={updateWidth}
+                onResizeCommit={persistWidth}
               >
                 {col.header}
               </Th>
@@ -99,7 +122,7 @@ export function PricingTable({
             return (
               <tr key={row.id}>
                 {visibleCols.map(col =>
-                  renderCell(col, row, category, prices, rates, col.id === lastStickyId)
+                  renderCell(col, row, category, prices, rates, col.id === lastStickyId, widths)
                 )}
               </tr>
             );
@@ -117,8 +140,9 @@ function renderCell(
   prices: { cost: number; priceA: number; priceB: number; priceC: number },
   rates: ChannelFeeRates | null,
   isLastSticky: boolean,
+  widths: ColumnWidths,
 ) {
-  const stickyLeft = col.sticky ? STICKY_LEFT[col.sticky] : undefined;
+  const stickyLeft = col.sticky ? getStickyLeft(col.id, widths) : undefined;
   const base = { sep: col.sep, sticky: !!col.sticky, left: stickyLeft, lastSticky: isLastSticky };
 
   switch (col.id) {
@@ -212,14 +236,17 @@ function renderCell(
 // ============================================================
 interface ThProps {
   children: React.ReactNode;
+  colId: string;
   width?: number;
   sticky?: boolean;
   left?: number;
   sep?: boolean;
   lastSticky?: boolean;
+  onResize: (colId: string, width: number) => void;
+  onResizeCommit: (colId: string, width: number) => void;
 }
 
-function Th({ children, width, sticky, left, sep, lastSticky }: ThProps) {
+function Th({ children, colId, width, sticky, left, sep, lastSticky, onResize, onResizeCommit }: ThProps) {
   return (
     <th style={{
       fontWeight: 600,
@@ -238,7 +265,15 @@ function Th({ children, width, sticky, left, sep, lastSticky }: ThProps) {
       zIndex: sticky ? 22 : 12,
       borderLeft: sep ? '1px solid #EAEBEC' : undefined,
       boxShadow: lastSticky ? '2px 0 4px -1px rgba(23, 23, 23, 0.06)' : undefined,
-    }}>{children}</th>
+    }}>
+      {children}
+      <ColumnResizer
+        colId={colId}
+        currentWidth={width ?? 100}
+        onDrag={onResize}
+        onCommit={onResizeCommit}
+      />
+    </th>
   );
 }
 
