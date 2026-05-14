@@ -9,6 +9,7 @@ import { COLUMNS } from './lib/columnConfig';
 import { useColumnConfig } from './lib/useColumnConfig';
 import { ColumnSettingsModal } from './components/ColumnSettingsModal';
 import { ImportModal } from './components/ImportModal';
+import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { supabase } from '@/lib/supabase';
 
 // ============================================================
@@ -115,6 +116,10 @@ export default function ImportPricingPage() {
   const [items, setItems] = useState<ImportPricingItem[]>([]);
   const [draftRow, setDraftRow] = useState<DraftRow | null>(null);
   const [draftErrors, setDraftErrors] = useState<Set<string>>(new Set());
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { config, save, reset } = useColumnConfig();
   const resolvedCols = config.order
     .map(id => COLUMNS.find(c => c.id === id))
@@ -266,6 +271,57 @@ export default function ImportPricingPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [draftRow, handleDraftCancel, handleDraftSave]);
 
+  const enterDeleteMode = () => {
+    setDeleteMode(true);
+    setSelectedIds(new Set());
+  };
+
+  const exitDeleteMode = () => {
+    setDeleteMode(false);
+    setSelectedIds(new Set());
+    setShowConfirmDialog(false);
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map(it => it.id)));
+    }
+  };
+
+  const openConfirm = () => {
+    if (selectedIds.size === 0) return;
+    setShowConfirmDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsDeleting(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase
+      .from('import_pricing_items')
+      .delete()
+      .in('id', ids);
+    setIsDeleting(false);
+    if (error) {
+      console.error('Delete failed:', error);
+      alert(`삭제 실패: ${error.message}`);
+      return;
+    }
+    await fetchItems();
+    exitDeleteMode();
+  };
+
   return (
     <div style={{
       padding: 24,
@@ -294,10 +350,32 @@ export default function ImportPricingPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <SecondaryButton onClick={() => setShowImportModal(true)}>가져오기</SecondaryButton>
-          <SecondaryButton onClick={handleAddRow}>행 추가</SecondaryButton>
-          <SecondaryButton>템플릿</SecondaryButton>
-          <PrimaryButton onClick={() => setIsModalOpen(true)}>설정</PrimaryButton>
+          {deleteMode ? (
+            <>
+              <span style={{
+                fontSize: 12, fontWeight: 600, color: '#A32D2D',
+                background: '#FCEBEB', borderRadius: 6, padding: '4px 10px',
+              }}>삭제 모드</span>
+              <span style={{ fontSize: 13, color: 'rgba(55,56,60,0.61)' }}>
+                선택 {selectedIds.size}개
+              </span>
+              <PrimaryButton
+                onClick={openConfirm}
+                style={{ background: '#A32D2D' }}
+              >
+                선택 {selectedIds.size}개 삭제
+              </PrimaryButton>
+              <SecondaryButton onClick={exitDeleteMode}>취소</SecondaryButton>
+            </>
+          ) : (
+            <>
+              <SecondaryButton onClick={() => setShowImportModal(true)}>가져오기</SecondaryButton>
+              <SecondaryButton onClick={handleAddRow}>행 추가</SecondaryButton>
+              <SecondaryButton>템플릿</SecondaryButton>
+              <SecondaryButton onClick={enterDeleteMode}>삭제</SecondaryButton>
+              <PrimaryButton onClick={() => setIsModalOpen(true)}>설정</PrimaryButton>
+            </>
+          )}
         </div>
       </div>
 
@@ -317,6 +395,10 @@ export default function ImportPricingPage() {
             onDraftChange={handleDraftChange}
             onDraftSave={handleDraftSave}
             onDraftCancel={handleDraftCancel}
+            deleteMode={deleteMode}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={toggleSelectAll}
           />
         )
       )}
@@ -334,6 +416,13 @@ export default function ImportPricingPage() {
         onClose={() => setShowImportModal(false)}
         onImported={fetchItems}
         existingGenProductIds={existingGenProductIds}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={showConfirmDialog}
+        count={selectedIds.size}
+        onConfirm={confirmDelete}
+        onCancel={() => setShowConfirmDialog(false)}
       />
     </div>
   );

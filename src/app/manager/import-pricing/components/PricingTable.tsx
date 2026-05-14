@@ -41,6 +41,10 @@ export interface PricingTableProps {
   onDraftChange?: (field: keyof DraftRow, value: any) => void;
   onDraftSave?: () => void;
   onDraftCancel?: () => void;
+  deleteMode?: boolean;
+  selectedIds?: Set<number>;
+  onToggleSelect?: (id: number) => void;
+  onToggleSelectAll?: () => void;
 }
 
 // sticky 컬럼 left 오프셋 — 앞 컬럼 width 누적 합산으로 동적 계산
@@ -59,6 +63,7 @@ function getStickyLeft(colId: string, widths: ColumnWidths): number {
 export function PricingTable({
   rows, rates, visibleCols,
   draftRow, draftErrors, onDraftChange, onDraftSave, onDraftCancel,
+  deleteMode, selectedIds, onToggleSelect, onToggleSelectAll,
 }: PricingTableProps) {
   const { widths, updateWidth, persistWidth } = useColumnWidths();
   const lastStickyId = [...visibleCols].reverse().find(c => c.sticky)?.id;
@@ -81,6 +86,7 @@ export function PricingTable({
         tableLayout: 'fixed',
       }}>
         <colgroup>
+          {deleteMode && <col style={{ width: '40px' }} />}
           {visibleCols.map(col => {
             const w = widths[col.id] ?? col.width;
             return <col key={col.id} style={{ width: `${w}px` }} />;
@@ -88,6 +94,24 @@ export function PricingTable({
         </colgroup>
         <thead>
           <tr>
+            {deleteMode && (
+              <th style={{
+                background: '#FCEBEB',
+                padding: '8px 6px',
+                textAlign: 'center',
+                position: 'sticky',
+                top: 0,
+                zIndex: 12,
+                borderRight: '1px solid white',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={!!selectedIds && selectedIds.size > 0 && selectedIds.size === rows.length}
+                  onChange={onToggleSelectAll}
+                  style={{ margin: 0 }}
+                />
+              </th>
+            )}
             {visibleCols.map(col => (
               <Th
                 key={col.id}
@@ -119,8 +143,19 @@ export function PricingTable({
           {rows.map(row => {
             const category = detectCategory(row.category, row.overrideCategory);
             const prices = { cost: row.cost, priceA: row.priceA, priceB: row.priceB, priceC: row.priceC };
+            const isSelected = deleteMode && selectedIds?.has(row.id);
             return (
-              <tr key={row.id}>
+              <tr key={row.id} style={{ background: isSelected ? '#FCEBEB' : undefined }}>
+                {deleteMode && (
+                  <td style={{ padding: '6px', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected ?? false}
+                      onChange={() => onToggleSelect?.(row.id)}
+                      style={{ margin: 0 }}
+                    />
+                  </td>
+                )}
                 {visibleCols.map(col =>
                   renderCell(col, row, category, prices, rates, col.id === lastStickyId, widths)
                 )}
