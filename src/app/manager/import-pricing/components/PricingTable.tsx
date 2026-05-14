@@ -158,7 +158,7 @@ function renderCell(
       );
     case 'code':
       return (
-        <Td key={col.id} {...base}>
+        <Td key={col.id} {...base} title={row.code}>
           {row.code}
           {row.genProductId === null && (
             <span style={{
@@ -170,17 +170,17 @@ function renderCell(
         </Td>
       );
     case 'manageCode':
-      return <Td key={col.id} {...base}>{row.manageCode}</Td>;
+      return <Td key={col.id} {...base} title={row.manageCode}>{row.manageCode}</Td>;
     case 'category':
       return (
-        <Td key={col.id} {...base}>
+        <Td key={col.id} {...base} title={row.category}>
           <CategoryBadge category={category} text={row.category} />
         </Td>
       );
     case 'name':
-      return <Td key={col.id} {...base}>{row.model}</Td>;
+      return <Td key={col.id} {...base} title={row.model}>{row.model}</Td>;
     case 'spec':
-      return <Td key={col.id} {...base} style={{ color: 'rgba(55, 56, 60, 0.61)' }}>{row.spec}</Td>;
+      return <Td key={col.id} {...base} title={row.spec} style={{ color: 'rgba(55, 56, 60, 0.61)' }}>{row.spec}</Td>;
     case 'stock':
       return <Td key={col.id} {...base} center>{row.stock}</Td>;
     case 'cost':
@@ -264,6 +264,7 @@ function Th({ children, colId, width, sticky, left, sep, lastSticky, onResize, o
       left: sticky ? left : undefined,
       zIndex: sticky ? 22 : 12,
       borderLeft: sep ? '1px solid #EAEBEC' : undefined,
+      borderRight: '1px solid white',
       boxShadow: lastSticky ? '2px 0 4px -1px rgba(23, 23, 23, 0.06)' : undefined,
     }}>
       {children}
@@ -285,17 +286,21 @@ interface TdProps {
   center?: boolean;
   noPadding?: boolean;
   lastSticky?: boolean;
+  title?: string;
   style?: CSSProperties;
 }
 
-function Td({ children, sticky, left, sep, center, noPadding, lastSticky, style }: TdProps) {
+function Td({ children, sticky, left, sep, center, noPadding, lastSticky, title, style }: TdProps) {
   return (
-    <td style={{
+    <td title={title} style={{
       padding: noPadding ? 0 : '8px 6px',
       verticalAlign: 'middle',
       borderBottom: '1px solid #EAEBEC',
       fontSize: 14,
       color: '#171719',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
       background: sticky ? '#ffffff' : undefined,
       position: sticky ? 'sticky' : undefined,
       left: sticky ? left : undefined,
