@@ -1,6 +1,11 @@
 'use client';
-import { useState, useCallback } from 'react';
-import { type ColumnId, DEFAULT_VISIBLE, COLUMNS } from './columnConfig';
+import { useEffect, useState } from 'react';
+import { type ColumnId, DEFAULT_VISIBLE } from './columnConfig';
+import {
+  getUserPreference,
+  setUserPreference,
+  deleteUserPreference,
+} from '@/lib/userPreferences';
 
 export interface StoredConfig {
   order: ColumnId[];
@@ -8,6 +13,8 @@ export interface StoredConfig {
 }
 
 const STORAGE_KEY = 'ip_visible_cols_';
+const PREF_KEY = 'import_pricing:visible_cols';
+const DEFAULT: StoredConfig = { order: DEFAULT_VISIBLE, hidden: [] };
 
 function getStorageKey(): string {
   if (typeof window === 'undefined') return STORAGE_KEY + 'anon';
@@ -21,41 +28,84 @@ function getStorageKey(): string {
   return STORAGE_KEY + 'anon';
 }
 
-function loadConfig(): StoredConfig {
-  if (typeof window === 'undefined') {
-    return { order: DEFAULT_VISIBLE, hidden: [] };
-  }
+function getLoginId(): string {
+  if (typeof window === 'undefined') return 'anon';
   try {
-    const raw = localStorage.getItem(getStorageKey());
-    if (!raw) return { order: DEFAULT_VISIBLE, hidden: [] };
-    const parsed = JSON.parse(raw) as StoredConfig;
-    const validIds = new Set(COLUMNS.map(c => c.id));
-    const order = parsed.order.filter((id): id is ColumnId => validIds.has(id as ColumnId));
-    const hidden = (parsed.hidden || []).filter((id): id is ColumnId => validIds.has(id as ColumnId));
-    // 필수 컬럼은 무조건 order에 포함
-    const requiredIds = COLUMNS.filter(c => c.required).map(c => c.id);
-    for (const rid of requiredIds) {
-      if (!order.includes(rid)) order.unshift(rid);
-    }
-    return { order, hidden };
+    const raw = localStorage.getItem('current_user');
+    if (!raw) return 'anon';
+    const user = JSON.parse(raw);
+    return user?.loginId ?? 'anon';
   } catch {
-    return { order: DEFAULT_VISIBLE, hidden: [] };
+    return 'anon';
   }
 }
 
-export function useColumnConfig() {
-  const [config, setConfig] = useState<StoredConfig>(() => loadConfig());
+function isValidConfig(c: any): c is StoredConfig {
+  return !!c && Array.isArray(c.order) && Array.isArray(c.hidden);
+}
 
-  const save = useCallback((next: StoredConfig) => {
-    setConfig(next);
-    try {
-      localStorage.setItem(getStorageKey(), JSON.stringify(next));
-    } catch {}
+export function useColumnConfig() {
+  const [config, setConfig] = useState<StoredConfig>(DEFAULT);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loginId = getLoginId();
+
+    (async () => {
+      // 1. Supabase에서 먼저 조회
+      const fromServer = await getUserPreference<StoredConfig>(loginId, PREF_KEY);
+      if (cancelled) return;
+
+      if (fromServer && isValidConfig(fromServer)) {
+        setConfig(fromServer);
+        return;
+      }
+
+      // 2. localStorage 마이그 시도
+      if (typeof window === 'undefined') return;
+      const localKey = getStorageKey();
+      const localRaw = localStorage.getItem(localKey);
+      if (!localRaw) return; // 마이그할 게 없음
+
+      try {
+        const parsed = JSON.parse(localRaw) as StoredConfig;
+        if (!isValidConfig(parsed)) {
+          localStorage.removeItem(localKey);
+          return;
+        }
+        // Supabase에 옮기기
+        const ok = await setUserPreference(loginId, PREF_KEY, parsed);
+        if (cancelled) return;
+        if (ok) {
+          localStorage.removeItem(localKey);
+          setConfig(parsed);
+        }
+      } catch {
+        // 파싱 실패 시 그냥 제거
+        localStorage.removeItem(localKey);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const reset = useCallback(() => {
-    save({ order: DEFAULT_VISIBLE, hidden: [] });
-  }, [save]);
+  const save = (next: StoredConfig): void => {
+    setConfig(next); // 낙관적 갱신
+    const loginId = getLoginId();
+    void setUserPreference(loginId, PREF_KEY, next).catch(err => {
+      console.error('save column config failed:', err);
+    });
+  };
+
+  const reset = (): void => {
+    setConfig(DEFAULT);
+    const loginId = getLoginId();
+    void deleteUserPreference(loginId, PREF_KEY).catch(err => {
+      console.error('reset column config failed:', err);
+    });
+  };
 
   return { config, save, reset };
 }

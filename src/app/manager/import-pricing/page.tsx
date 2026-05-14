@@ -9,6 +9,7 @@ import { COLUMNS } from './lib/columnConfig';
 import { useColumnConfig } from './lib/useColumnConfig';
 import { ColumnSettingsModal } from './components/ColumnSettingsModal';
 import { ImportModal } from './components/ImportModal';
+import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { supabase } from '@/lib/supabase';
 
 // ============================================================
@@ -32,6 +33,23 @@ interface ImportPricingItem {
   price_gmarket: number | null;
   price_ssg: number | null;
   override_category: string | null;
+}
+
+export interface DraftRow {
+  custom_code: string;
+  custom_manage_code: string;
+  custom_category: string;
+  custom_model: string;
+  custom_spec: string;
+  cost: number | null;
+  override_category: 'powertool' | 'handtool' | null;
+  price_a: number | null;
+  price_b: number | null;
+  price_c: number | null;
+  price_naver: number | null;
+  price_coupang: number | null;
+  price_gmarket: number | null;
+  price_ssg: number | null;
 }
 
 // ============================================================
@@ -58,6 +76,7 @@ function buildRows(items: ImportPricingItem[], genMap: Map<number, any>): Pricin
     const gen = item.gen_product_id != null ? genMap.get(item.gen_product_id) : null;
     return {
       id:               item.id,
+      genProductId:     item.gen_product_id,
       imgUrl:           null,
       code:             gen?.code              ?? item.custom_code          ?? '',
       manageCode:       gen?.manageCode        ?? item.custom_manage_code   ?? '',
@@ -95,6 +114,12 @@ export default function ImportPricingPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [items, setItems] = useState<ImportPricingItem[]>([]);
+  const [draftRow, setDraftRow] = useState<DraftRow | null>(null);
+  const [draftErrors, setDraftErrors] = useState<Set<string>>(new Set());
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { config, save, reset } = useColumnConfig();
   const resolvedCols = config.order
     .map(id => COLUMNS.find(c => c.id === id))
@@ -147,6 +172,156 @@ export default function ImportPricingPage() {
     fetchItems();
   }, [fetchItems]);
 
+  const handleAddRow = useCallback(() => {
+    if (draftRow) return;
+    setDraftRow({
+      custom_code: '',
+      custom_manage_code: '',
+      custom_category: '',
+      custom_model: '',
+      custom_spec: '',
+      cost: null,
+      override_category: null,
+      price_a: null,
+      price_b: null,
+      price_c: null,
+      price_naver: null,
+      price_coupang: null,
+      price_gmarket: null,
+      price_ssg: null,
+    });
+    setDraftErrors(new Set());
+  }, [draftRow]);
+
+  const handleDraftChange = useCallback((field: keyof DraftRow, value: any) => {
+    setDraftRow(prev => prev ? { ...prev, [field]: value } : prev);
+    setDraftErrors(prev => {
+      const next = new Set(prev);
+      next.delete(field);
+      return next;
+    });
+  }, []);
+
+  const handleDraftCancel = useCallback(() => {
+    setDraftRow(null);
+    setDraftErrors(new Set());
+  }, []);
+
+  const handleDraftSave = useCallback(async () => {
+    if (!draftRow) return;
+
+    const errors = new Set<string>();
+    if (!draftRow.custom_model.trim()) errors.add('custom_model');
+    if (!draftRow.custom_spec.trim()) errors.add('custom_spec');
+    if (draftRow.cost === null || draftRow.cost <= 0) errors.add('cost');
+    if (!draftRow.override_category) errors.add('override_category');
+
+    if (errors.size > 0) {
+      setDraftErrors(errors);
+      return;
+    }
+
+    const payload = {
+      gen_product_id: null,
+      custom_code: draftRow.custom_code.trim() || null,
+      custom_manage_code: draftRow.custom_manage_code.trim() || null,
+      custom_category: draftRow.custom_category.trim() || null,
+      custom_model: draftRow.custom_model.trim(),
+      custom_spec: draftRow.custom_spec.trim(),
+      cost: draftRow.cost,
+      override_category: draftRow.override_category,
+      price_a: draftRow.price_a,
+      price_b: draftRow.price_b,
+      price_c: draftRow.price_c,
+      price_naver: draftRow.price_naver,
+      price_coupang: draftRow.price_coupang,
+      price_gmarket: draftRow.price_gmarket,
+      price_ssg: draftRow.price_ssg,
+    };
+
+    const { error } = await supabase
+      .from('import_pricing_items')
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Save failed:', error);
+      alert(`저장 실패: ${error.message}`);
+      return;
+    }
+
+    await fetchItems();
+    setDraftRow(null);
+    setDraftErrors(new Set());
+  }, [draftRow, fetchItems]);
+
+  useEffect(() => {
+    if (!draftRow) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleDraftCancel();
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleDraftSave();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [draftRow, handleDraftCancel, handleDraftSave]);
+
+  const enterDeleteMode = () => {
+    setDeleteMode(true);
+    setSelectedIds(new Set());
+  };
+
+  const exitDeleteMode = () => {
+    setDeleteMode(false);
+    setSelectedIds(new Set());
+    setShowConfirmDialog(false);
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map(it => it.id)));
+    }
+  };
+
+  const openConfirm = () => {
+    if (selectedIds.size === 0) return;
+    setShowConfirmDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsDeleting(true);
+    const ids = Array.from(selectedIds);
+    const { error } = await supabase
+      .from('import_pricing_items')
+      .delete()
+      .in('id', ids);
+    setIsDeleting(false);
+    if (error) {
+      console.error('Delete failed:', error);
+      alert(`삭제 실패: ${error.message}`);
+      return;
+    }
+    await fetchItems();
+    exitDeleteMode();
+  };
+
   return (
     <div style={{
       padding: 24,
@@ -175,10 +350,32 @@ export default function ImportPricingPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <SecondaryButton onClick={() => setShowImportModal(true)}>가져오기</SecondaryButton>
-          <SecondaryButton>행 추가</SecondaryButton>
-          <SecondaryButton>템플릿</SecondaryButton>
-          <PrimaryButton onClick={() => setIsModalOpen(true)}>설정</PrimaryButton>
+          {deleteMode ? (
+            <>
+              <span style={{
+                fontSize: 12, fontWeight: 600, color: '#A32D2D',
+                background: '#FCEBEB', borderRadius: 6, padding: '4px 10px',
+              }}>삭제 모드</span>
+              <span style={{ fontSize: 13, color: 'rgba(55,56,60,0.61)' }}>
+                선택 {selectedIds.size}개
+              </span>
+              <PrimaryButton
+                onClick={openConfirm}
+                style={{ background: '#A32D2D' }}
+              >
+                선택 {selectedIds.size}개 삭제
+              </PrimaryButton>
+              <SecondaryButton onClick={exitDeleteMode}>취소</SecondaryButton>
+            </>
+          ) : (
+            <>
+              <SecondaryButton onClick={() => setShowImportModal(true)}>가져오기</SecondaryButton>
+              <SecondaryButton onClick={handleAddRow}>행 추가</SecondaryButton>
+              <SecondaryButton>템플릿</SecondaryButton>
+              <SecondaryButton onClick={enterDeleteMode}>삭제</SecondaryButton>
+              <PrimaryButton onClick={() => setIsModalOpen(true)}>설정</PrimaryButton>
+            </>
+          )}
         </div>
       </div>
 
@@ -186,10 +383,23 @@ export default function ImportPricingPage() {
       {loadState === 'loading' && <LoadingView />}
       {loadState === 'error'   && <ErrorView message={errorMsg} />}
       {loadState === 'ready'   && rates && (
-        rows.length === 0 ? (
+        rows.length === 0 && !draftRow ? (
           <EmptyState />
         ) : (
-          <PricingTable rows={rows} rates={rates} visibleCols={resolvedCols} />
+          <PricingTable
+            rows={rows}
+            rates={rates}
+            visibleCols={resolvedCols}
+            draftRow={draftRow}
+            draftErrors={draftErrors}
+            onDraftChange={handleDraftChange}
+            onDraftSave={handleDraftSave}
+            onDraftCancel={handleDraftCancel}
+            deleteMode={deleteMode}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={toggleSelectAll}
+          />
         )
       )}
 
@@ -206,6 +416,13 @@ export default function ImportPricingPage() {
         onClose={() => setShowImportModal(false)}
         onImported={fetchItems}
         existingGenProductIds={existingGenProductIds}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={showConfirmDialog}
+        count={selectedIds.size}
+        onConfirm={confirmDelete}
+        onCancel={() => setShowConfirmDialog(false)}
       />
     </div>
   );
