@@ -17047,7 +17047,10 @@ async function init() {
     var flag = localStorage.getItem('_migration_remove_bad_pdf_v1');
     if (flag) return;
     var products = load('mw_products');
-    if (!products || !products.length) return;
+    if (!products || !products.length) {
+      localStorage.setItem('_migration_remove_bad_pdf_v1', '1');
+      return;
+    }
     var badPattern = /\d{1,2}V\s*(FUEL|브러쉬|브러쉬리스|기타)/;
     var before = products.length;
     var cleaned = products.filter(function(p) {
