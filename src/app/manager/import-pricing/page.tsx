@@ -5,6 +5,9 @@ import type { CSSProperties } from 'react';
 import { Package } from 'lucide-react';
 import { PricingTable, type PricingRow } from './components/PricingTable';
 import type { ChannelFeeRates } from './lib/feeCalc';
+import { COLUMNS } from './lib/columnConfig';
+import { useColumnConfig } from './lib/useColumnConfig';
+import { ColumnSettingsModal } from './components/ColumnSettingsModal';
 import { supabase } from '@/lib/supabase';
 
 // ============================================================
@@ -88,6 +91,11 @@ export default function ImportPricingPage() {
   const [errorMsg, setErrorMsg]   = useState<string>('');
   const [rows, setRows]           = useState<PricingRow[]>([]);
   const [rates, setRates]         = useState<ChannelFeeRates | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { config, save, reset } = useColumnConfig();
+  const resolvedCols = config.order
+    .map(id => COLUMNS.find(c => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => c != null);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,7 +167,7 @@ export default function ImportPricingPage() {
           <SecondaryButton>가져오기</SecondaryButton>
           <SecondaryButton>행 추가</SecondaryButton>
           <SecondaryButton>템플릿</SecondaryButton>
-          <PrimaryButton>설정</PrimaryButton>
+          <PrimaryButton onClick={() => setIsModalOpen(true)}>설정</PrimaryButton>
         </div>
       </div>
 
@@ -170,9 +178,17 @@ export default function ImportPricingPage() {
         rows.length === 0 ? (
           <EmptyState />
         ) : (
-          <PricingTable rows={rows} rates={rates} />
+          <PricingTable rows={rows} rates={rates} visibleCols={resolvedCols} />
         )
       )}
+
+      <ColumnSettingsModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        config={config}
+        onApply={next => save(next)}
+        onReset={reset}
+      />
     </div>
   );
 }
