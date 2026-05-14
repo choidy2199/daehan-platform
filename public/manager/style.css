@@ -1074,7 +1074,7 @@ body.gen-edit-active #gen-table tbody tr td:first-child {
 .po-autocomplete-item .ac-code { font-size:10px; color:#9BA3B2; margin-right:8px; min-width:60px; }
 
 /* === API 관리 === */
-.api-management-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:16px; }
+.api-management-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:16px; max-height:calc(100vh - 220px); overflow-y:auto; }
 .api-card { background:#fff; border:1px solid #DDE1EB; border-radius:8px; overflow:hidden; }
 .api-card-header { display:flex; align-items:center; gap:8px; padding:14px 16px; border-bottom:1px solid #F0F2F7; }
 .api-card-logo { width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; flex-shrink:0; }
