@@ -14,6 +14,7 @@ export interface ApiKeys {
   ssg: { apiKey: string };
   gmarket: { apiKey: string };
   kakao: { apiKey: string };
+  naverAd: { customerId: string; apiKey: string; secretKey: string };
 }
 
 // Supabase에서 읽기 → .env fallback
@@ -44,6 +45,11 @@ export async function getApiKeys(): Promise<ApiKeys> {
         ssg: { apiKey: s.ssg?.apiKey || process.env.SSG_API_KEY || '' },
         gmarket: { apiKey: s.gmarket?.apiKey || process.env.GMARKET_API_KEY || '' },
         kakao: { apiKey: s.kakao?.apiKey || process.env.KAKAO_REST_API_KEY || '' },
+        naverAd: {
+          customerId: (s as any).naverAd?.customerId || process.env.NAVER_AD_CUSTOMER_ID || '',
+          apiKey:     (s as any).naverAd?.apiKey     || process.env.NAVER_AD_API_KEY     || '',
+          secretKey:  (s as any).naverAd?.secretKey  || process.env.NAVER_AD_SECRET_KEY  || '',
+        },
       };
     }
   } catch (e) { /* fallback to env */ }
@@ -55,6 +61,11 @@ export async function getApiKeys(): Promise<ApiKeys> {
     ssg: { apiKey: process.env.SSG_API_KEY || '' },
     gmarket: { apiKey: process.env.GMARKET_API_KEY || '' },
     kakao: { apiKey: process.env.KAKAO_REST_API_KEY || '' },
+    naverAd: {
+      customerId: process.env.NAVER_AD_CUSTOMER_ID || '',
+      apiKey:     process.env.NAVER_AD_API_KEY     || '',
+      secretKey:  process.env.NAVER_AD_SECRET_KEY  || '',
+    },
   };
 }
 

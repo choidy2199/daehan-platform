@@ -17735,7 +17735,8 @@ var _apiPlatformMeta = {
   coupang: { logo: 'C',  logoBg: '#E3002B', keys: ['COUPANG_ACCESS_KEY', 'COUPANG_SECRET_KEY'], note: '' },
   ssg:     { logo: 'S',  logoBg: '#FF5A2E', keys: ['SSG_API_KEY'], note: '※ 운영서버 IP 등록 필요' },
   gmarket: { logo: 'G',  logoBg: '#43B02A', keys: ['GMARKET_API_KEY'], note: '고객센터 문의 완료 · 답변 대기 중' },
-  kakao:   { logo: 'AI', logoBg: '#D97706', keys: ['KAKAO_REST_API_KEY'], note: '카카오톡 자동응답 (NAS Docker) 연동용' }
+  kakao:   { logo: 'AI', logoBg: '#D97706', keys: ['KAKAO_REST_API_KEY'], note: '카카오톡 자동응답 (NAS Docker) 연동용' },
+  naverAd: { logo: '광고', logoBg: '#03A551', keys: ['NAVER_AD_CUSTOMER_ID', 'NAVER_AD_API_KEY', 'NAVER_AD_SECRET_KEY'], note: '네이버 검색광고 API (AD-LAB 전용)' }
 };
 
 // API 키 → Supabase 필드 매핑 (label → keys 객체 경로)
@@ -17748,7 +17749,10 @@ var _apiKeyFieldMap = {
   'COUPANG_SECRET_KEY': { platform: 'coupang', field: 'secretKey' },
   'SSG_API_KEY': { platform: 'ssg', field: 'apiKey' },
   'GMARKET_API_KEY': { platform: 'gmarket', field: 'apiKey' },
-  'KAKAO_REST_API_KEY': { platform: 'kakao', field: 'apiKey' }
+  'KAKAO_REST_API_KEY': { platform: 'kakao', field: 'apiKey' },
+  'NAVER_AD_CUSTOMER_ID': { platform: 'naverAd', field: 'customerId' },
+  'NAVER_AD_API_KEY':     { platform: 'naverAd', field: 'apiKey' },
+  'NAVER_AD_SECRET_KEY':  { platform: 'naverAd', field: 'secretKey' }
 };
 
 // 편집 모드 raw 데이터 캐시
