@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 import { WholesaleCell, ChannelCell } from './PriceCell';
 import { detectCategory, type ChannelFeeRates } from '../lib/feeCalc';
+import type { ColumnDef } from '../lib/columnConfig';
 
 export interface PricingRow {
   id: number;
@@ -29,10 +30,16 @@ export interface PricingRow {
 
 export interface PricingTableProps {
   rows: PricingRow[];
-  rates: ChannelFeeRates;
+  rates: ChannelFeeRates | null;
+  visibleCols: ColumnDef[];
 }
 
-export function PricingTable({ rows, rates }: PricingTableProps) {
+// sticky 컬럼 left 오프셋 (photo→code→manageCode 순 고정값)
+const STICKY_LEFT: Record<string, number> = { photo: 0, code: 44, manageCode: 104 };
+
+export function PricingTable({ rows, rates, visibleCols }: PricingTableProps) {
+  const lastStickyId = [...visibleCols].reverse().find(c => c.sticky)?.id;
+
   return (
     <div style={{
       overflowX: 'auto',
@@ -49,75 +56,29 @@ export function PricingTable({ rows, rates }: PricingTableProps) {
       }}>
         <thead>
           <tr>
-            <Th sticky left={0}   width={44}>사진</Th>
-            <Th sticky left={44}  width={60}>코드</Th>
-            <Th sticky left={104} width={70} lastSticky>관리코드</Th>
-            <Th width={64}>대분류</Th>
-            <Th width={80}>품명</Th>
-            <Th width={120}>규격</Th>
-            <Th width={44}>재고</Th>
-            <Th width={80} sep>원가</Th>
-            <Th width={90}>A</Th>
-            <Th width={90}>B</Th>
-            <Th width={90}>C</Th>
-            <Th width={200} sep>스토어팜</Th>
-            <Th width={200}>쿠팡</Th>
-            <Th width={200}>오픈마켓</Th>
-            <Th width={200}>SSG</Th>
-            <Th width={42} sep>IN</Th>
-            <Th width={42}>OUT</Th>
-            <Th width={50}>파레트</Th>
+            {visibleCols.map(col => (
+              <Th
+                key={col.id}
+                width={col.width}
+                sep={col.sep}
+                sticky={!!col.sticky}
+                left={col.sticky ? STICKY_LEFT[col.sticky] : undefined}
+                lastSticky={col.id === lastStickyId}
+              >
+                {col.header}
+              </Th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {rows.map(row => {
             const category = detectCategory(row.category, row.overrideCategory);
             const prices = { cost: row.cost, priceA: row.priceA, priceB: row.priceB, priceC: row.priceC };
-
             return (
               <tr key={row.id}>
-                <Td sticky left={0}>
-                  <div style={{
-                    width: 32, height: 32, background: '#EAF2FE', borderRadius: 4,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#0054D1', fontSize: 9.5,
-                  }}>IMG</div>
-                </Td>
-                <Td sticky left={44}>{row.code}</Td>
-                <Td sticky left={104} lastSticky>{row.manageCode}</Td>
-
-                <Td>
-                  <CategoryBadge category={category} text={row.category} />
-                </Td>
-                <Td>{row.model}</Td>
-                <Td style={{ color: 'rgba(55, 56, 60, 0.61)' }}>{row.spec}</Td>
-                <Td center>{row.stock}</Td>
-
-                <Td sep style={{ textAlign: 'center', background: 'rgba(112, 115, 124, 0.05)' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{row.cost.toLocaleString()}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(55, 56, 60, 0.28)', marginTop: 3 }}>기준</div>
-                </Td>
-
-                <Td><WholesaleCell price={row.priceA} cost={row.cost} /></Td>
-                <Td><WholesaleCell price={row.priceB} cost={row.cost} /></Td>
-                <Td><WholesaleCell price={row.priceC} cost={row.cost} /></Td>
-
-                <Td sep noPadding>
-                  <ChannelCell price={row.priceNaver}   channel="naver"      category={category} rates={rates} prices={prices} />
-                </Td>
-                <Td noPadding>
-                  <ChannelCell price={row.priceCoupang} channel="coupang_mp" category={category} rates={rates} prices={prices} />
-                </Td>
-                <Td noPadding>
-                  <ChannelCell price={row.priceGmarket} channel="gmarket"    category={category} rates={rates} prices={prices} />
-                </Td>
-                <Td noPadding>
-                  <ChannelCell price={row.priceSsg}     channel="ssg"        category={category} rates={rates} prices={prices} />
-                </Td>
-
-                <Td sep center>{row.inQty}</Td>
-                <Td center>{row.outQty}</Td>
-                <Td center>{row.pallet}</Td>
+                {visibleCols.map(col =>
+                  renderCell(col, row, category, prices, rates, col.id === lastStickyId)
+                )}
               </tr>
             );
           })}
@@ -127,8 +88,94 @@ export function PricingTable({ rows, rates }: PricingTableProps) {
   );
 }
 
+function renderCell(
+  col: ColumnDef,
+  row: PricingRow,
+  category: 'powertool' | 'handtool',
+  prices: { cost: number; priceA: number; priceB: number; priceC: number },
+  rates: ChannelFeeRates | null,
+  isLastSticky: boolean,
+) {
+  const stickyLeft = col.sticky ? STICKY_LEFT[col.sticky] : undefined;
+  const base = { sep: col.sep, sticky: !!col.sticky, left: stickyLeft, lastSticky: isLastSticky };
+
+  switch (col.id) {
+    case 'photo':
+      return (
+        <Td key={col.id} {...base}>
+          <div style={{
+            width: 32, height: 32, background: '#EAF2FE', borderRadius: 4,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#0054D1', fontSize: 9.5,
+          }}>IMG</div>
+        </Td>
+      );
+    case 'code':
+      return <Td key={col.id} {...base}>{row.code}</Td>;
+    case 'manageCode':
+      return <Td key={col.id} {...base}>{row.manageCode}</Td>;
+    case 'category':
+      return (
+        <Td key={col.id} {...base}>
+          <CategoryBadge category={category} text={row.category} />
+        </Td>
+      );
+    case 'name':
+      return <Td key={col.id} {...base}>{row.model}</Td>;
+    case 'spec':
+      return <Td key={col.id} {...base} style={{ color: 'rgba(55, 56, 60, 0.61)' }}>{row.spec}</Td>;
+    case 'stock':
+      return <Td key={col.id} {...base} center>{row.stock}</Td>;
+    case 'cost':
+      return (
+        <Td key={col.id} {...base} style={{ textAlign: 'center', background: 'rgba(112, 115, 124, 0.05)' }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{row.cost.toLocaleString()}</div>
+          <div style={{ fontSize: 11, color: 'rgba(55, 56, 60, 0.28)', marginTop: 3 }}>기준</div>
+        </Td>
+      );
+    case 'priceA':
+      return <Td key={col.id} {...base}><WholesaleCell price={row.priceA} cost={row.cost} /></Td>;
+    case 'priceB':
+      return <Td key={col.id} {...base}><WholesaleCell price={row.priceB} cost={row.cost} /></Td>;
+    case 'priceC':
+      return <Td key={col.id} {...base}><WholesaleCell price={row.priceC} cost={row.cost} /></Td>;
+    case 'storefarm':
+      return (
+        <Td key={col.id} {...base} noPadding>
+          {rates && <ChannelCell price={row.priceNaver} channel="naver" category={category} rates={rates} prices={prices} />}
+        </Td>
+      );
+    case 'coupang':
+      return (
+        <Td key={col.id} {...base} noPadding>
+          {rates && <ChannelCell price={row.priceCoupang} channel="coupang_mp" category={category} rates={rates} prices={prices} />}
+        </Td>
+      );
+    case 'openmarket':
+      return (
+        <Td key={col.id} {...base} noPadding>
+          {rates && <ChannelCell price={row.priceGmarket} channel="gmarket" category={category} rates={rates} prices={prices} />}
+        </Td>
+      );
+    case 'ssg':
+      return (
+        <Td key={col.id} {...base} noPadding>
+          {rates && <ChannelCell price={row.priceSsg} channel="ssg" category={category} rates={rates} prices={prices} />}
+        </Td>
+      );
+    case 'inStock':
+      return <Td key={col.id} {...base} center>{row.inQty}</Td>;
+    case 'outStock':
+      return <Td key={col.id} {...base} center>{row.outQty}</Td>;
+    case 'pallet':
+      return <Td key={col.id} {...base} center>{row.pallet}</Td>;
+    default:
+      return null;
+  }
+}
+
 // ============================================================
-// 헬퍼 컴포넌트 (any 금지 — 명시적 인터페이스)
+// 헬퍼 컴포넌트
 // ============================================================
 interface ThProps {
   children: React.ReactNode;
