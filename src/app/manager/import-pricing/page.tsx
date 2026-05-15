@@ -11,6 +11,7 @@ import { ColumnSettingsModal } from './components/ColumnSettingsModal';
 import { ImportModal } from './components/ImportModal';
 import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
 import { SaveTemplateDialog } from './components/SaveTemplateDialog';
+import TemplateModal from './components/TemplateModal';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/common/Toast';
 import { type Template, type TemplateItem, loadTemplates, saveTemplates } from './lib/useTemplates';
@@ -137,6 +138,8 @@ export default function ImportPricingPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateToDeleteId, setTemplateToDeleteId] = useState<string | null>(null);
   const { config, save, reset } = useColumnConfig();
   const { toast } = useToast();
   const resolvedCols = config.order
@@ -245,6 +248,63 @@ export default function ImportPricingPage() {
     setDeleteMode(false);
   }, [items, selectedIds, templates, toast]);
 
+  const handleApplyTemplate = useCallback(async (template: Template) => {
+    const existingGenIds = new Set(items.map(it => it.gen_product_id).filter((id): id is number => id !== null));
+    const toInsert: Array<Record<string, unknown>> = [];
+    let skipped = 0;
+    for (const tItem of template.items) {
+      if (tItem.gen_product_id !== null && existingGenIds.has(tItem.gen_product_id)) {
+        skipped++;
+        continue;
+      }
+      if (tItem.gen_product_id !== null) {
+        toInsert.push({ gen_product_id: tItem.gen_product_id });
+      } else {
+        toInsert.push({
+          gen_product_id: null,
+          custom_model: tItem.custom_model,
+          custom_spec: tItem.custom_description,
+          cost: tItem.cost,
+          override_category: tItem.override_category,
+          price_naver: tItem.price_storefarm,
+          price_coupang: tItem.price_coupang,
+          price_gmarket: tItem.price_openmarket,
+          price_ssg: tItem.price_ssg,
+        });
+      }
+    }
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('import_pricing_items').insert(toInsert);
+      if (error) {
+        toast(`적용 실패: ${error.message}`);
+        return;
+      }
+      await fetchItems();
+    }
+    setShowTemplateModal(false);
+    const msg = skipped > 0
+      ? `템플릿 적용: ${toInsert.length}개 추가됨, ${skipped}개 중복 skip`
+      : `템플릿 적용: ${toInsert.length}개 추가됨`;
+    toast(msg);
+  }, [items, fetchItems, toast]);
+
+  const handleRenameTemplate = useCallback(async (id: string, newName: string) => {
+    const next = templates.map(t => t.id === id ? { ...t, name: newName } : t);
+    setTemplates(next);
+    const loginId = getLoginId();
+    await saveTemplates(loginId, next);
+    toast('이름 변경됨');
+  }, [templates, toast]);
+
+  const handleDeleteTemplate = useCallback(async (id: string) => {
+    const next = templates.filter(t => t.id !== id);
+    setTemplates(next);
+    const loginId = getLoginId();
+    await saveTemplates(loginId, next);
+    toast('템플릿 삭제됨');
+    setTemplateToDeleteId(null);
+  }, [templates, toast]);
+
   const handleDraftChange = useCallback((field: keyof DraftRow, value: any) => {
     setDraftRow(prev => prev ? { ...prev, [field]: value } : prev);
     setDraftErrors(prev => {
@@ -299,7 +359,7 @@ export default function ImportPricingPage() {
 
     if (error) {
       console.error('Save failed:', error);
-      alert(`저장 실패: ${error.message}`);
+      toast(`저장 실패: ${error.message}`);
       return;
     }
 
@@ -367,7 +427,7 @@ export default function ImportPricingPage() {
     setIsDeleting(false);
     if (error) {
       console.error('Delete failed:', error);
-      alert(`삭제 실패: ${error.message}`);
+      toast(`삭제 실패: ${error.message}`);
       return;
     }
     await fetchItems();
@@ -443,7 +503,7 @@ export default function ImportPricingPage() {
             <>
               <SecondaryButton onClick={() => setShowImportModal(true)}>가져오기</SecondaryButton>
               <SecondaryButton onClick={handleAddRow}>행 추가</SecondaryButton>
-              <SecondaryButton>템플릿</SecondaryButton>
+              <SecondaryButton onClick={() => setShowTemplateModal(true)}>템플릿</SecondaryButton>
               <SecondaryButton onClick={enterDeleteMode}>삭제</SecondaryButton>
               <PrimaryButton onClick={() => setIsModalOpen(true)}>설정</PrimaryButton>
             </>
@@ -505,6 +565,24 @@ export default function ImportPricingPage() {
           .map(row => row.model || '미등록')}
         onConfirm={handleSaveTemplate}
         onCancel={() => setShowSaveDialog(false)}
+      />
+
+      <TemplateModal
+        isOpen={showTemplateModal}
+        templates={templates}
+        onClose={() => setShowTemplateModal(false)}
+        onApply={handleApplyTemplate}
+        onRename={handleRenameTemplate}
+        onDelete={(id) => setTemplateToDeleteId(id)}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={templateToDeleteId !== null}
+        count={1}
+        onConfirm={() => {
+          if (templateToDeleteId) handleDeleteTemplate(templateToDeleteId);
+        }}
+        onCancel={() => setTemplateToDeleteId(null)}
       />
     </div>
   );
