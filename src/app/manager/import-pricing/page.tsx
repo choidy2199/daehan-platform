@@ -10,7 +10,10 @@ import { useColumnConfig } from './lib/useColumnConfig';
 import { ColumnSettingsModal } from './components/ColumnSettingsModal';
 import { ImportModal } from './components/ImportModal';
 import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
+import { SaveTemplateDialog } from './components/SaveTemplateDialog';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/common/Toast';
+import { type Template, type TemplateItem, loadTemplates, saveTemplates } from './lib/useTemplates';
 
 // ============================================================
 // 내부 타입
@@ -100,6 +103,18 @@ function buildRows(items: ImportPricingItem[], genMap: Map<number, any>): Pricin
   });
 }
 
+function getLoginId(): string {
+  if (typeof window === 'undefined') return 'anon';
+  try {
+    const raw = localStorage.getItem('current_user');
+    if (!raw) return 'anon';
+    const user = JSON.parse(raw);
+    return user?.loginId ?? 'anon';
+  } catch {
+    return 'anon';
+  }
+}
+
 // ============================================================
 // 메인 페이지
 // ============================================================
@@ -120,7 +135,10 @@ export default function ImportPricingPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
   const { config, save, reset } = useColumnConfig();
+  const { toast } = useToast();
   const resolvedCols = config.order
     .map(id => COLUMNS.find(c => c.id === id))
     .filter((c): c is NonNullable<typeof c> => c != null);
@@ -172,6 +190,11 @@ export default function ImportPricingPage() {
     fetchItems();
   }, [fetchItems]);
 
+  useEffect(() => {
+    const loginId = getLoginId();
+    loadTemplates(loginId).then(setTemplates);
+  }, []);
+
   const handleAddRow = useCallback(() => {
     if (draftRow) return;
     setDraftRow({
@@ -192,6 +215,35 @@ export default function ImportPricingPage() {
     });
     setDraftErrors(new Set());
   }, [draftRow]);
+
+  const handleSaveTemplate = useCallback(async (name: string) => {
+    const selectedItems = items.filter(it => selectedIds.has(it.id));
+    const templateItems: TemplateItem[] = selectedItems.map(it => ({
+      gen_product_id: it.gen_product_id,
+      custom_model: it.custom_model,
+      custom_description: it.custom_spec,
+      cost: it.cost,
+      price_storefarm: it.price_naver,
+      price_coupang: it.price_coupang,
+      price_openmarket: it.price_gmarket,
+      price_ssg: it.price_ssg,
+      override_category: it.override_category,
+    }));
+    const newTemplate: Template = {
+      id: `tpl_${Date.now()}`,
+      name,
+      created_at: new Date().toISOString(),
+      items: templateItems,
+    };
+    const next = [newTemplate, ...templates];
+    setTemplates(next);
+    const loginId = getLoginId();
+    await saveTemplates(loginId, next);
+    setShowSaveDialog(false);
+    toast(`템플릿 저장됨: ${name}`);
+    setSelectedIds(new Set());
+    setDeleteMode(false);
+  }, [items, selectedIds, templates, toast]);
 
   const handleDraftChange = useCallback((field: keyof DraftRow, value: any) => {
     setDraftRow(prev => prev ? { ...prev, [field]: value } : prev);
@@ -365,6 +417,26 @@ export default function ImportPricingPage() {
               >
                 선택 {selectedIds.size}개 삭제
               </PrimaryButton>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowSaveDialog(true)}
+                  style={{
+                    background: '#E6F1FB',
+                    color: '#0C447C',
+                    border: '0.5px solid #185FA5',
+                    borderRadius: 6,
+                    padding: '5px 10px',
+                    fontSize: 12,
+                    height: 28,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  💾 {selectedIds.size}개 템플릿 저장
+                </button>
+              )}
               <SecondaryButton onClick={exitDeleteMode}>취소</SecondaryButton>
             </>
           ) : (
@@ -423,6 +495,16 @@ export default function ImportPricingPage() {
         count={selectedIds.size}
         onConfirm={confirmDelete}
         onCancel={() => setShowConfirmDialog(false)}
+      />
+
+      <SaveTemplateDialog
+        isOpen={showSaveDialog}
+        count={selectedIds.size}
+        selectedItemsPreview={rows
+          .filter(row => selectedIds.has(row.id))
+          .map(row => row.model || '미등록')}
+        onConfirm={handleSaveTemplate}
+        onCancel={() => setShowSaveDialog(false)}
       />
     </div>
   );
