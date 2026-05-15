@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, CSSProperties, ReactNode } from 'react';
+import { Fragment, useEffect, useState, CSSProperties, ReactNode } from 'react';
 
 // ─── 디자인 토큰 ─────────────────────────────────────────
 const C = {
@@ -1101,245 +1101,370 @@ function KwBlocked() {
 //  탭 3 — 대시보드
 // ═════════════════════════════════════════════════════════════
 function DashboardTab() {
+  const [hideHelp, setHideHelp] = useState(false);
+  useEffect(() => {
+    setHideHelp(localStorage.getItem('ad_lab_hide_help') === '1');
+  }, []);
+  const dismissHelp = () => {
+    localStorage.setItem('ad_lab_hide_help', '1');
+    setHideHelp(true);
+  };
+
+  const [openCampaignId, setOpenCampaignId] = useState<string | null>(null);
+
+  // ⚠️ Step 3-C-1 더미 데이터 (Step 3-C-2에서 API 연결)
+  type Campaign = {
+    ncc_campaign_id: string;
+    name: string;
+    status: string;
+    daily_budget: number;
+    reg_tm: string;
+    campaign_tp: string;
+    synced_at: string;
+  };
+
+  const dummyCampaigns: Campaign[] = [
+    { ncc_campaign_id: 'cmp-a001-02-001', name: 'HPT_그라인더_owls',      status: 'ELIGIBLE', daily_budget:     0, reg_tm: '2026-04-22', campaign_tp: 'SHOPPING', synced_at: '2026-05-14T07:37:22Z' },
+    { ncc_campaign_id: 'cmp-a001-02-002', name: '콜라보_금속절단기_owls',  status: 'ELIGIBLE', daily_budget: 50000, reg_tm: '2026-04-22', campaign_tp: 'SHOPPING', synced_at: '2026-05-14T07:37:22Z' },
+    { ncc_campaign_id: 'cmp-a001-02-003', name: '콜라보_콤프레샤_owls',    status: 'ELIGIBLE', daily_budget: 50000, reg_tm: '2026-04-22', campaign_tp: 'SHOPPING', synced_at: '2026-05-14T07:37:22Z' },
+    { ncc_campaign_id: 'cmp-a001-02-004', name: '프레레_집진기_owls',      status: 'ELIGIBLE', daily_budget: 50000, reg_tm: '2026-04-22', campaign_tp: 'SHOPPING', synced_at: '2026-05-14T07:37:22Z' },
+    { ncc_campaign_id: 'cmp-a001-02-005', name: '프레레_청소기_owls',      status: 'ELIGIBLE', daily_budget: 50000, reg_tm: '2026-04-22', campaign_tp: 'SHOPPING', synced_at: '2026-05-14T07:37:22Z' },
+    { ncc_campaign_id: 'cmp-a001-02-006', name: '대한종합상사_owls',       status: 'PAUSED',   daily_budget: 50000, reg_tm: '2026-04-22', campaign_tp: 'SHOPPING', synced_at: '2026-05-14T07:37:22Z' },
+    { ncc_campaign_id: 'cmp-a001-02-007', name: '미라클 동력분무기',       status: 'PAUSED',   daily_budget: 50000, reg_tm: '2026-04-22', campaign_tp: 'SHOPPING', synced_at: '2026-05-14T07:37:22Z' },
+    { ncc_campaign_id: 'cmp-a001-02-008', name: '스틸포스 금속절단기',     status: 'PAUSED',   daily_budget: 50000, reg_tm: '2026-04-22', campaign_tp: 'SHOPPING', synced_at: '2026-05-14T07:37:22Z' },
+  ];
+  const lastSyncedAt = '2026-05-14T07:37:22Z';
+
+  const runningCount  = dummyCampaigns.filter(c => c.status === 'ELIGIBLE').length;
+  const pausedCount   = dummyCampaigns.filter(c => c.status === 'PAUSED').length;
+  const totalCount    = dummyCampaigns.length;
+  const dailyBudgetSum = dummyCampaigns
+    .filter(c => c.status === 'ELIGIBLE')
+    .reduce((s, c) => s + c.daily_budget, 0);
+
+  type CheckIssue = { campaign: Campaign; rule: 'A' | 'B'; message: string };
+  const issues: CheckIssue[] = [];
+  dummyCampaigns.forEach(c => {
+    if (c.status === 'ELIGIBLE' && c.daily_budget === 0)
+      issues.push({ campaign: c, rule: 'A', message: '일예산 0원 → 광고가 노출되지 않습니다' });
+    if (c.status === 'PAUSED' && c.daily_budget > 0)
+      issues.push({ campaign: c, rule: 'B', message: '예산이 설정돼 있지만 일시정지 상태입니다' });
+  });
+
+  const relTime = (iso: string) => {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)    return '방금 전';
+    if (diff < 3600)  return `${Math.floor(diff / 60)}분 전`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
+    return `${Math.floor(diff / 86400)}일 전`;
+  };
+  const absTime = (iso: string) => {
+    const d = new Date(iso);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${mm}-${dd} ${hh}:${mi}`;
+  };
+  const fmtKRW = (n: number) => '₩' + n.toLocaleString('ko-KR');
+
   return (
     <div style={{ width: '100%' }}>
-      <PageTitle right={<Btn variant="danger">전체 자동화 중지</Btn>}>
-        자동화 대시보드
-      </PageTitle>
-      <HelpBox>
-        이 화면은 AD-LAB이 자동으로 관리하고 있는 현황을 보여줍니다. 사람이 손대지 않아도 24시간
-        키워드 입찰을 조절하고, 새 키워드를 찾고, 낭비를 막고 있어요.
-      </HelpBox>
 
+      {/* 상단 헤더 */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 12,
-          marginBottom: 20,
-          width: '100%',
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          marginBottom: 16,
         }}
       >
-        <KpiCard
-          variant="main"
-          label="오늘 쓴 광고비"
-          value="₩45,200"
-          sub="일 예산 ₩60,000 중 75%"
-        />
-        <KpiCard
-          label="광고 수익률"
-          value="387%"
-          sub="1만원 써서 3.87만원 수익"
-          tooltip="ROAS"
-        />
-        <KpiCard label="운영 중인 키워드" value="23개" sub="자동으로 관리 중" />
-        <KpiCard
-          label="AD-LAB이 절약한 돈"
-          value="₩12,400"
-          sub="자동 차단으로 줄인 낭비"
-        />
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: C.text }}>
+            자동화 대시보드
+          </h1>
+          <div style={{ fontSize: 12, color: C.textHint, marginTop: 4 }}>
+            마지막 동기화: {relTime(lastSyncedAt)} · {absTime(lastSyncedAt)}
+          </div>
+        </div>
+        <Btn variant="secondary">↻ 동기화</Btn>
       </div>
 
-      <Section title="시간대별 클릭비용 지도">
-        <Heatmap />
-        <HeatmapLegend />
-      </Section>
-
-      <Section title="경쟁사 광고비 소진 시간">
-        <CompetitorBars />
-      </Section>
-    </div>
-  );
-}
-
-function Heatmap() {
-  const days = ['월', '화', '수', '목', '금', '토', '일'];
-  const colorOf = (d: number, h: number) => {
-    const v = (d * 31 + h * 17 + h * d * 3) % 100;
-    if (v < 40) return C.successBg;
-    if (v < 70) return C.primaryLight;
-    if (v < 90) return C.warning;
-    return C.danger;
-  };
-  return (
-    <div style={{ width: '100%' }}>
-      <table
-        style={{
-          width: '100%',
-          tableLayout: 'fixed',
-          borderCollapse: 'separate',
-          borderSpacing: 3,
-        }}
-      >
-        <colgroup>
-          <col style={{ width: 28 }} />
-          {Array.from({ length: 24 }).map((_, h) => (
-            <col key={h} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr>
-            <th />
-            {Array.from({ length: 24 }).map((_, h) => (
-              <th
-                key={h}
-                style={{
-                  fontSize: 10,
-                  color: C.textHint,
-                  fontWeight: 500,
-                  paddingBottom: 4,
-                  textAlign: 'center',
-                }}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {days.map((d, di) => (
-            <tr key={d}>
-              <td
-                style={{
-                  fontSize: 11,
-                  color: C.textSec,
-                  fontWeight: 500,
-                  paddingRight: 6,
-                  textAlign: 'right',
-                }}
-              >
-                {d}
-              </td>
-              {Array.from({ length: 24 }).map((_, h) => (
-                <td
-                  key={h}
-                  style={{
-                    height: 24,
-                    background: colorOf(di, h),
-                    borderRadius: 2,
-                  }}
-                />
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function HeatmapLegend() {
-  const items = [
-    { c: C.successBg, label: '싸다' },
-    { c: C.primaryLight, label: '보통' },
-    { c: C.warning, label: '비싸다' },
-    { c: C.danger, label: '매우 비싸다' },
-  ];
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 16,
-        marginTop: 14,
-        justifyContent: 'center',
-        fontSize: 12,
-        color: C.textSec,
-      }}
-    >
-      {items.map((it) => (
-        <div key={it.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
+      {/* 블록 1: 학습 카드 */}
+      {!hideHelp && (
+        <div
+          style={{
+            background: C.primaryLight,
+            border: `1px solid ${C.primary}`,
+            borderRadius: 8,
+            padding: '14px 16px',
+            marginBottom: 20,
+            position: 'relative',
+          }}
+        >
+          <button
+            onClick={dismissHelp}
             style={{
-              width: 14,
-              height: 14,
-              background: it.c,
-              borderRadius: 2,
-              display: 'inline-block',
-            }}
-          />
-          <span>{it.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function CompetitorBars() {
-  const items = [
-    {
-      kw: '임팩트렌치 추천',
-      rival: '경쟁사 A',
-      info: '오늘 09:00~14:30 광고 운영 → 14:30 예산 소진. 14:30 이후 우리만 노출 (9시간 30분 독점)',
-      activeRatio: 60,
-    },
-    {
-      kw: '밀워키 충전드릴',
-      rival: '경쟁사 B',
-      info: '오늘 10:30~16:00 광고 운영 → 16:00 예산 소진. 16:00 이후 우리만 노출 (8시간 독점)',
-      activeRatio: 65,
-    },
-    {
-      kw: 'M18 배터리',
-      rival: '경쟁사 C',
-      info: '오늘 08:00~11:45 광고 운영 → 11:45 예산 소진. 11:45 이후 우리만 노출 (12시간 15분 독점)',
-      activeRatio: 40,
-    },
-  ];
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {items.map((it) => (
-        <div key={it.kw}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>
-              {it.kw}{' '}
-              <span style={{ color: C.textSec, fontWeight: 400, fontSize: 12 }}>
-                · {it.rival}
-              </span>
-            </span>
-          </div>
-          <div style={{ fontSize: 12, color: C.textSec, marginBottom: 8 }}>{it.info}</div>
-          <div
-            style={{
-              display: 'flex',
-              height: 32,
-              borderRadius: 4,
-              overflow: 'hidden',
-              border: `1px solid ${C.border}`,
-              width: '100%',
+              position: 'absolute',
+              top: 10,
+              right: 12,
+              background: 'transparent',
+              border: 'none',
+              fontSize: 12,
+              color: C.textSec,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
             }}
           >
-            <div
-              style={{
-                width: `${it.activeRatio}%`,
-                background: C.dangerBg,
-                color: '#791F1F',
-                fontSize: 11,
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              경쟁사 광고 켜져있음
+            숨기기
+          </button>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10, color: C.primaryDark }}>
+            📚 광고가 어떻게 작동하나요?
+          </div>
+          <p style={{ fontSize: 13, lineHeight: 1.6, color: C.primaryDark, margin: '0 0 10px' }}>
+            네이버 쇼핑광고는 누가 광고를 클릭할 때마다 광고비가 빠집니다.
+            클릭당 비용(CPC)이 낮고, 클릭한 사람이 많이 구매할수록 이익이 납니다.
+          </p>
+          <div
+            style={{
+              background: '#fff',
+              borderRadius: 6,
+              padding: '10px 12px',
+              fontSize: 12,
+              color: C.text,
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 6, color: C.primaryDark }}>
+              예시 (마진율 22% 가정)
             </div>
-            <div
-              style={{
-                width: `${100 - it.activeRatio}%`,
-                background: C.successBg,
-                color: '#085041',
-                fontSize: 11,
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              우리만 노출 (독점!)
+            <div style={{ color: C.success }}>
+              광고비 10,000원 → 매출 50,000원 → 마진 11,000원 → 이익 +1,000원
+            </div>
+            <div style={{ color: C.danger, marginTop: 4 }}>
+              광고비 10,000원 → 매출 30,000원 → 마진 6,600원 → 손해 -3,400원
             </div>
           </div>
         </div>
-      ))}
+      )}
+
+      {/* 블록 2: 광고 상태 + 일예산 합계 */}
+      <Section title="📊 지금 우리 광고 상태">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+          <div style={{ padding: '12px 16px', background: C.successBg, borderRadius: 8 }}>
+            <div style={{ fontSize: 12, color: C.textSec, marginBottom: 6 }}>운영 중인 캠페인</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: C.success }}>
+              {runningCount}
+              <span style={{ fontSize: 14, fontWeight: 500, marginLeft: 4 }}>
+                개 / 총 {totalCount}개
+              </span>
+            </div>
+            <div style={{ fontSize: 16, letterSpacing: 3, marginTop: 6, color: C.success }}>
+              {'●'.repeat(runningCount)}
+            </div>
+          </div>
+          <div style={{ padding: '12px 16px', background: C.warningBg, borderRadius: 8 }}>
+            <div style={{ fontSize: 12, color: C.textSec, marginBottom: 6 }}>일시정지</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: C.warning }}>
+              {pausedCount}
+              <span style={{ fontSize: 14, fontWeight: 500, marginLeft: 4 }}>개</span>
+            </div>
+            <div style={{ fontSize: 16, letterSpacing: 3, marginTop: 6, color: C.warning }}>
+              {'○'.repeat(pausedCount)}
+            </div>
+          </div>
+          <div style={{ padding: '12px 16px', background: C.primaryLight, borderRadius: 8 }}>
+            <div style={{ fontSize: 12, color: C.textSec, marginBottom: 6 }}>
+              운영 중 캠페인의 일예산 합계
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: C.primary }}>
+              {fmtKRW(dailyBudgetSum)}
+            </div>
+            <div style={{ fontSize: 11, color: C.textSec, marginTop: 4 }}>
+              하루에 최대로 쓸 수 있는 금액
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* 블록 3: 캠페인 목록 */}
+      <Section title="📋 캠페인 목록" sub={`${totalCount}개 · 행 클릭 시 상세 펼침`}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <thead>
+            <tr>
+              <th style={{ ...TH, textAlign: 'left' }}>캠페인명</th>
+              <th style={{ ...TH, width: 100 }}>상태</th>
+              <th style={{ ...TH, width: 120 }}>일예산</th>
+              <th style={{ ...TH, width: 90 }}>등록일</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dummyCampaigns.map((c) => {
+              const isOpen = openCampaignId === c.ncc_campaign_id;
+              return (
+                <Fragment key={c.ncc_campaign_id}>
+                  <tr
+                    style={{
+                      borderTop: `1px solid ${C.borderRow}`,
+                      cursor: 'pointer',
+                      background: isOpen ? C.primaryLight : 'transparent',
+                    }}
+                    onClick={() => setOpenCampaignId(isOpen ? null : c.ncc_campaign_id)}
+                  >
+                    <td style={{ ...TD, textAlign: 'left', fontWeight: 500 }}>{c.name}</td>
+                    <td style={TD}>
+                      {c.status === 'ELIGIBLE'
+                        ? <Badge tone="green">운영 중</Badge>
+                        : <Badge tone="amber">일시정지</Badge>
+                      }
+                    </td>
+                    <td
+                      style={{
+                        ...TD,
+                        textAlign: 'right',
+                        color: c.daily_budget === 0 ? C.danger : C.text,
+                        fontWeight: c.daily_budget === 0 ? 600 : 400,
+                      }}
+                    >
+                      {fmtKRW(c.daily_budget)}
+                    </td>
+                    <td style={{ ...TD, color: C.textSec }}>{c.reg_tm.slice(5)}</td>
+                  </tr>
+                  {isOpen && (
+                    <tr style={{ background: '#F8FAFD' }}>
+                      <td
+                        colSpan={4}
+                        style={{
+                          padding: '12px 16px',
+                          fontSize: 12,
+                          color: C.textSec,
+                          lineHeight: 1.9,
+                          borderTop: `1px solid ${C.border}`,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div>캠페인 종류: {c.campaign_tp === 'SHOPPING' ? '쇼핑검색 (SHOPPING)' : c.campaign_tp}</div>
+                        <div>마지막 동기화: {absTime(c.synced_at)}</div>
+                        <div>네이버 캠페인 ID: {c.ncc_campaign_id}</div>
+                        <a
+                          href="https://manage.searchad.naver.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: C.primary,
+                            fontSize: 12,
+                            marginTop: 6,
+                            display: 'inline-block',
+                          }}
+                        >
+                          🔗 네이버 광고 관리자에서 열기
+                        </a>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </Section>
+
+      {/* 블록 4: 점검 필요 */}
+      <Section title="⚠️ 점검 필요" sub={`${issues.length}건`}>
+        {issues.length === 0 ? (
+          <div style={{ fontSize: 13, color: C.success, padding: '8px 0' }}>
+            ✅ 점검 필요한 항목이 없습니다.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {issues.map((iss, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 14px',
+                  background: iss.rule === 'A' ? C.dangerBg : C.warningBg,
+                  borderRadius: 6,
+                  fontSize: 13,
+                }}
+              >
+                <Badge tone={iss.rule === 'A' ? 'red' : 'amber'}>
+                  {iss.rule === 'A' ? '규칙 A' : '규칙 B'}
+                </Badge>
+                <span style={{ fontWeight: 600 }}>{iss.campaign.name}</span>
+                <span style={{ color: C.textSec }}>— {iss.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* 블록 5: 다음 단계 */}
+      <Section title="🛣️ 다음 단계">
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.8 }}>
+          <div>키워드별 매출·클릭 데이터는 14일치 데이터가 쌓이면 표시됩니다.</div>
+          <div>자동 수집을 켜려면 [설정] 탭 → 자동화 엔진 ON으로 이동하세요.</div>
+          <div
+            style={{
+              marginTop: 10,
+              padding: '8px 12px',
+              background: C.thBg,
+              borderRadius: 6,
+              fontSize: 12,
+              color: C.textSec,
+            }}
+          >
+            현재 단계: Phase 0 (API 연결 완료) → 다음: Phase 1 (데이터 수집 14일)
+          </div>
+        </div>
+      </Section>
+
+      {/* 하단: 광고 용어 사전 */}
+      <div
+        style={{
+          marginTop: 8,
+          marginBottom: 24,
+          padding: 16,
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: C.text }}>
+          📖 광고 용어 사전
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '6px 24px',
+            fontSize: 12,
+          }}
+        >
+          {(
+            [
+              ['CPC',          '클릭당 비용. 광고를 한 번 클릭할 때 빠지는 광고비.'],
+              ['ROAS',         '광고 수익률. (광고 매출 ÷ 광고비) × 100%.'],
+              ['일예산',        '하루에 최대로 쓸 수 있는 광고비 한도.'],
+              ['노출수',        '광고가 사용자 화면에 나타난 횟수.'],
+              ['클릭률(CTR)',   '노출 중 클릭된 비율. (클릭 ÷ 노출) × 100%.'],
+              ['전환',          '광고 클릭 → 실제 구매로 이어진 경우.'],
+              ['손익분기 ROAS', '이익이 0이 되는 ROAS. 마진율 22%면 455%.'],
+              ['품질지수',      '키워드 품질 점수 1~10. 높을수록 같은 입찰가로 위 노출.'],
+            ] as [string, string][]
+          ).map(([term, def]) => (
+            <div key={term} style={{ display: 'flex', gap: 8 }}>
+              <span style={{ fontWeight: 700, color: C.primary, minWidth: 90, flexShrink: 0 }}>
+                {term}
+              </span>
+              <span style={{ color: C.textSec }}>{def}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 }
