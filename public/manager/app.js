@@ -17042,27 +17042,6 @@ async function init() {
     localStorage.setItem('_migration_drillbit_v1', '1');
   })();
 
-  // 1회성 마이그레이션: PDF 파싱 오류로 잘못 추가된 항목 삭제
-  (function migrateRemoveBadPdfImports() {
-    var flag = localStorage.getItem('_migration_remove_bad_pdf_v1');
-    if (flag) return;
-    var products = load('mw_products');
-    if (!products || !products.length) return;
-    var badPattern = /\d{1,2}V\s*(FUEL|브러쉬|브러쉬리스|기타)/;
-    var before = products.length;
-    var cleaned = products.filter(function(p) {
-      if (!p.model) return true;
-      return !badPattern.test(p.model);
-    });
-    var removed = before - cleaned.length;
-    if (removed > 0) {
-      save('mw_products', cleaned);
-      DB.products = cleaned;
-      console.log('[마이그레이션] PDF 파싱 오류 항목 삭제: ' + removed + '건 (남은: ' + cleaned.length + '건)');
-    }
-    localStorage.setItem('_migration_remove_bad_pdf_v1', '1');
-  })();
-
   // 1회성 마이그레이션: model + description 통합
   (function migrateMergeModelDesc() {
     if (localStorage.getItem('_migration_merge_model_desc_v1')) return;

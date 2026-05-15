@@ -789,3 +789,50 @@ Next.js 이전의 첫 사례로 채택됨 — 이는 **예외적 마이그레이
 - URL: https://daehantool.dev
 - 로그인: admin / 219921
 - 검증 방법: 메인 CLAUDE.md의 "검증 단계" 참조
+
+---
+
+## ⚠️ 1회성 마이그레이션 함수 작성 금지 (2026-05-15 사고 후)
+
+### 배경
+
+2026-04-03 추가된 `migrateRemoveBadPdfImports` 함수가 5월 14일과 15일에 mw_products의 정상 제품 125건을 삭제하는 사고를 일으켰다 (12V/18V FUEL/브러쉬리스 카테고리 전수 삭제). 다음 두 가지가 결합된 결과:
+
+1. **잘못된 정규식 패턴** — "PDF 파싱 오류 정리"를 목적으로 했으나 정상 제품 모델명까지 매칭
+2. **Early return 시 플래그 setItem 누락** — `products.length === 0`일 때 플래그 안 박혀서 Supabase 동기화 후 재발동
+
+### 절대 금지 패턴
+
+다음과 같은 코드는 **새로 작성하지 말 것:**
+
+```javascript
+// ❌ 금지: localStorage 데이터를 정규식/필터로 일괄 삭제하는 마이그레이션
+(function migrateXxx() {
+  if (localStorage.getItem('_migration_xxx')) return;
+  var data = load('some_key');
+  var cleaned = data.filter(/* 정규식 또는 조건 */);
+  save('some_key', cleaned);
+  localStorage.setItem('_migration_xxx', '1');
+})();
+```
+
+**이유:**
+- 데이터 패턴이 시간이 지나면서 변하면 매칭 범위가 의도와 달라짐
+- 한 번 발동되면 되돌릴 수 없음 (Supabase 자동 동기화로 서버까지 전파)
+- early return 경로가 늘면 플래그 누락 위험 증가
+- 빈 localStorage 상태 + Supabase 동기화 타이밍에 따라 재발동 가능
+
+### 데이터 정리가 꼭 필요하면
+
+1. **마이그레이션 함수로 자동 실행 금지**
+2. 관리자(admin) 사용자가 명시적으로 클릭해야 발동되는 **버튼 + 확인 다이얼로그**로 구현
+3. 실행 전 **삭제 대상 미리보기** 필수 (몇 건이 어떤 기준으로 삭제되는지 사용자가 확인)
+4. 실행 후 **백업 데이터를 별도 키에 저장** (`mw_products_backup_YYYY-MM-DD` 등)
+
+### 기존 마이그레이션 함수 정책
+
+현재 app.js에 남아있는 마이그레이션 함수:
+- `migrateDrillbitCategory` (SDS 드릴비트 대분류 수정) — **건드리지 말 것**, 검증됨
+- `migrateMergeModelDesc` (model + description 통합) — **건드리지 말 것**, 검증됨
+
+새 마이그레이션 추가 금지. 데이터 구조 변경이 필요하면 사용자(admin)에게 확인 후 수동 실행 도구로 구현할 것.
