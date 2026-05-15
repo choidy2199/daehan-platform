@@ -10,7 +10,11 @@ import { useColumnConfig } from './lib/useColumnConfig';
 import { ColumnSettingsModal } from './components/ColumnSettingsModal';
 import { ImportModal } from './components/ImportModal';
 import { DeleteConfirmDialog } from './components/DeleteConfirmDialog';
+import { SaveTemplateDialog } from './components/SaveTemplateDialog';
+import TemplateModal from './components/TemplateModal';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/common/Toast';
+import { type Template, type TemplateItem, loadTemplates, saveTemplates } from './lib/useTemplates';
 
 // ============================================================
 // 내부 타입
@@ -100,6 +104,18 @@ function buildRows(items: ImportPricingItem[], genMap: Map<number, any>): Pricin
   });
 }
 
+function getLoginId(): string {
+  if (typeof window === 'undefined') return 'anon';
+  try {
+    const raw = localStorage.getItem('current_user');
+    if (!raw) return 'anon';
+    const user = JSON.parse(raw);
+    return user?.loginId ?? 'anon';
+  } catch {
+    return 'anon';
+  }
+}
+
 // ============================================================
 // 메인 페이지
 // ============================================================
@@ -120,7 +136,12 @@ export default function ImportPricingPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateToDeleteId, setTemplateToDeleteId] = useState<string | null>(null);
   const { config, save, reset } = useColumnConfig();
+  const { toast } = useToast();
   const resolvedCols = config.order
     .map(id => COLUMNS.find(c => c.id === id))
     .filter((c): c is NonNullable<typeof c> => c != null);
@@ -172,6 +193,11 @@ export default function ImportPricingPage() {
     fetchItems();
   }, [fetchItems]);
 
+  useEffect(() => {
+    const loginId = getLoginId();
+    loadTemplates(loginId).then(setTemplates);
+  }, []);
+
   const handleAddRow = useCallback(() => {
     if (draftRow) return;
     setDraftRow({
@@ -192,6 +218,92 @@ export default function ImportPricingPage() {
     });
     setDraftErrors(new Set());
   }, [draftRow]);
+
+  const handleSaveTemplate = useCallback(async (name: string) => {
+    const selectedItems = items.filter(it => selectedIds.has(it.id));
+    const templateItems: TemplateItem[] = selectedItems.map(it => ({
+      gen_product_id: it.gen_product_id,
+      custom_model: it.custom_model,
+      custom_description: it.custom_spec,
+      cost: it.cost,
+      price_storefarm: it.price_naver,
+      price_coupang: it.price_coupang,
+      price_openmarket: it.price_gmarket,
+      price_ssg: it.price_ssg,
+      override_category: it.override_category,
+    }));
+    const newTemplate: Template = {
+      id: `tpl_${Date.now()}`,
+      name,
+      created_at: new Date().toISOString(),
+      items: templateItems,
+    };
+    const next = [newTemplate, ...templates];
+    setTemplates(next);
+    const loginId = getLoginId();
+    await saveTemplates(loginId, next);
+    setShowSaveDialog(false);
+    toast(`템플릿 저장됨: ${name}`);
+    setSelectedIds(new Set());
+    setDeleteMode(false);
+  }, [items, selectedIds, templates, toast]);
+
+  const handleApplyTemplate = useCallback(async (template: Template) => {
+    const existingGenIds = new Set(items.map(it => it.gen_product_id).filter((id): id is number => id !== null));
+    const toInsert: Array<Record<string, unknown>> = [];
+    let skipped = 0;
+    for (const tItem of template.items) {
+      if (tItem.gen_product_id !== null && existingGenIds.has(tItem.gen_product_id)) {
+        skipped++;
+        continue;
+      }
+      if (tItem.gen_product_id !== null) {
+        toInsert.push({ gen_product_id: tItem.gen_product_id });
+      } else {
+        toInsert.push({
+          gen_product_id: null,
+          custom_model: tItem.custom_model,
+          custom_spec: tItem.custom_description,
+          cost: tItem.cost,
+          override_category: tItem.override_category,
+          price_naver: tItem.price_storefarm,
+          price_coupang: tItem.price_coupang,
+          price_gmarket: tItem.price_openmarket,
+          price_ssg: tItem.price_ssg,
+        });
+      }
+    }
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('import_pricing_items').insert(toInsert);
+      if (error) {
+        toast(`적용 실패: ${error.message}`);
+        return;
+      }
+      await fetchItems();
+    }
+    setShowTemplateModal(false);
+    const msg = skipped > 0
+      ? `템플릿 적용: ${toInsert.length}개 추가됨, ${skipped}개 중복 skip`
+      : `템플릿 적용: ${toInsert.length}개 추가됨`;
+    toast(msg);
+  }, [items, fetchItems, toast]);
+
+  const handleRenameTemplate = useCallback(async (id: string, newName: string) => {
+    const next = templates.map(t => t.id === id ? { ...t, name: newName } : t);
+    setTemplates(next);
+    const loginId = getLoginId();
+    await saveTemplates(loginId, next);
+    toast('이름 변경됨');
+  }, [templates, toast]);
+
+  const handleDeleteTemplate = useCallback(async (id: string) => {
+    const next = templates.filter(t => t.id !== id);
+    setTemplates(next);
+    const loginId = getLoginId();
+    await saveTemplates(loginId, next);
+    toast('템플릿 삭제됨');
+    setTemplateToDeleteId(null);
+  }, [templates, toast]);
 
   const handleDraftChange = useCallback((field: keyof DraftRow, value: any) => {
     setDraftRow(prev => prev ? { ...prev, [field]: value } : prev);
@@ -247,7 +359,7 @@ export default function ImportPricingPage() {
 
     if (error) {
       console.error('Save failed:', error);
-      alert(`저장 실패: ${error.message}`);
+      toast(`저장 실패: ${error.message}`);
       return;
     }
 
@@ -315,7 +427,7 @@ export default function ImportPricingPage() {
     setIsDeleting(false);
     if (error) {
       console.error('Delete failed:', error);
-      alert(`삭제 실패: ${error.message}`);
+      toast(`삭제 실패: ${error.message}`);
       return;
     }
     await fetchItems();
@@ -365,13 +477,33 @@ export default function ImportPricingPage() {
               >
                 선택 {selectedIds.size}개 삭제
               </PrimaryButton>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowSaveDialog(true)}
+                  style={{
+                    background: '#E6F1FB',
+                    color: '#0C447C',
+                    border: '0.5px solid #185FA5',
+                    borderRadius: 6,
+                    padding: '5px 10px',
+                    fontSize: 12,
+                    height: 28,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  💾 {selectedIds.size}개 템플릿 저장
+                </button>
+              )}
               <SecondaryButton onClick={exitDeleteMode}>취소</SecondaryButton>
             </>
           ) : (
             <>
               <SecondaryButton onClick={() => setShowImportModal(true)}>가져오기</SecondaryButton>
               <SecondaryButton onClick={handleAddRow}>행 추가</SecondaryButton>
-              <SecondaryButton>템플릿</SecondaryButton>
+              <SecondaryButton onClick={() => setShowTemplateModal(true)}>템플릿</SecondaryButton>
               <SecondaryButton onClick={enterDeleteMode}>삭제</SecondaryButton>
               <PrimaryButton onClick={() => setIsModalOpen(true)}>설정</PrimaryButton>
             </>
@@ -423,6 +555,34 @@ export default function ImportPricingPage() {
         count={selectedIds.size}
         onConfirm={confirmDelete}
         onCancel={() => setShowConfirmDialog(false)}
+      />
+
+      <SaveTemplateDialog
+        isOpen={showSaveDialog}
+        count={selectedIds.size}
+        selectedItemsPreview={rows
+          .filter(row => selectedIds.has(row.id))
+          .map(row => row.model || '미등록')}
+        onConfirm={handleSaveTemplate}
+        onCancel={() => setShowSaveDialog(false)}
+      />
+
+      <TemplateModal
+        isOpen={showTemplateModal}
+        templates={templates}
+        onClose={() => setShowTemplateModal(false)}
+        onApply={handleApplyTemplate}
+        onRename={handleRenameTemplate}
+        onDelete={(id) => setTemplateToDeleteId(id)}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={templateToDeleteId !== null}
+        count={1}
+        onConfirm={() => {
+          if (templateToDeleteId) handleDeleteTemplate(templateToDeleteId);
+        }}
+        onCancel={() => setTemplateToDeleteId(null)}
       />
     </div>
   );
