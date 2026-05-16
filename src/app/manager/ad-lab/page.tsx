@@ -1249,30 +1249,32 @@ function DashboardTab() {
               ? `${relTime(lastSyncedAt)} · ${absTime(lastSyncedAt)}`
               : isLoading ? '불러오는 중...' : '—'}
           </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <button
+            onClick={handleSync}
+            disabled={isLoading || isSyncing}
+            style={{
+              background: 'transparent',
+              color: C.primary,
+              border: `1px solid ${C.primary}`,
+              borderRadius: 6,
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              cursor: isLoading || isSyncing ? 'not-allowed' : 'pointer',
+              opacity: isLoading || isSyncing ? 0.5 : 1,
+            }}
+          >
+            {isSyncing ? '동기화 중...' : '↻ 동기화'}
+          </button>
           {syncMsg && (
             <div style={{ fontSize: 12, color: C.success, marginTop: 4 }}>
               ✓ {syncMsg}
             </div>
           )}
         </div>
-        <button
-          onClick={handleSync}
-          disabled={isLoading || isSyncing}
-          style={{
-            background: 'transparent',
-            color: C.primary,
-            border: `1px solid ${C.primary}`,
-            borderRadius: 6,
-            padding: '8px 16px',
-            fontSize: 13,
-            fontWeight: 600,
-            fontFamily: 'inherit',
-            cursor: isLoading || isSyncing ? 'not-allowed' : 'pointer',
-            opacity: isLoading || isSyncing ? 0.5 : 1,
-          }}
-        >
-          {isSyncing ? '동기화 중...' : '↻ 동기화'}
-        </button>
       </div>
 
       {/* 블록 1: 학습 카드 */}
