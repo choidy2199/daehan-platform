@@ -1416,7 +1416,7 @@ async function _pdGoProductPage(code, channel) {
     return;
   }
   if (channel === 'ssg') {
-    window.open('https://swing.ssg.com', '_blank');
+    window.open('https://po.ssgadm.com/main.ssg', '_blank');
     return;
   }
   if (channel !== 'naver') return;
