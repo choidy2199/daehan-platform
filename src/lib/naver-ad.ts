@@ -41,3 +41,58 @@ export async function adGet<T = unknown>(
   }
   return response.json() as Promise<T>;
 }
+
+// === Step 3-D 추가 ===
+
+export interface NaverAdgroup {
+  nccAdgroupId: string;
+  nccCampaignId: string;
+  name: string;
+  status?: string;
+}
+
+export interface NaverKeyword {
+  nccKeywordId: string;
+  nccAdgroupId: string;
+  keyword: string;
+  bidAmt?: number;
+  useGroupBidAmt?: boolean;
+  status?: string;
+  qualityIndex?: number;
+  regTm?: string;
+  editTm?: string;
+}
+
+export async function fetchAdgroupsByCampaign(
+  nccCampaignId: string,
+  keys: ApiKeys['naverAd'],
+): Promise<NaverAdgroup[]> {
+  const result = await adGet<NaverAdgroup[]>(
+    `/ncc/adgroups?nccCampaignId=${nccCampaignId}`,
+    keys,
+  );
+  return result || [];
+}
+
+export async function fetchKeywordsByAdgroup(
+  nccAdgroupId: string,
+  keys: ApiKeys['naverAd'],
+): Promise<NaverKeyword[]> {
+  try {
+    const result = await adGet<NaverKeyword[]>(
+      `/ncc/adkeywords?nccAdgroupId=${nccAdgroupId}`,
+      keys,
+    );
+    return result || [];
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('404')) {
+      const result = await adGet<NaverKeyword[]>(
+        `/ncc/keywords?nccAdgroupId=${nccAdgroupId}`,
+        keys,
+      );
+      return result || [];
+    }
+    throw err;
+  }
+}

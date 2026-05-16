@@ -735,165 +735,174 @@ function QualityBar({ score }: { score: number }) {
 }
 
 function KwActive() {
-  const rows: {
-    kw: string;
-    product: string;
-    grade: BadgeTone;
-    gradeLabel: string;
-    bid: number;
-    quality: number;
-    cpc: number;
-    ctr: number;
-    roas: number;
-    status: { tone: BadgeTone; label: string };
-  }[] = [
-    {
-      kw: '임팩트렌치 추천',
-      product: '밀워키 2967',
-      grade: 'green',
-      gradeLabel: 'S',
-      bid: 320,
-      quality: 9,
-      cpc: 287,
-      ctr: 4.8,
-      roas: 542,
-      status: { tone: 'green', label: '잘 됨' },
-    },
-    {
-      kw: '밀워키 충전드릴',
-      product: '밀워키 2903',
-      grade: 'green',
-      gradeLabel: 'S',
-      bid: 280,
-      quality: 8,
-      cpc: 245,
-      ctr: 4.2,
-      roas: 510,
-      status: { tone: 'green', label: '잘 됨' },
-    },
-    {
-      kw: '전동공구 세트',
-      product: '밀워키 2967',
-      grade: 'blue',
-      gradeLabel: 'A',
-      bid: 310,
-      quality: 7,
-      cpc: 298,
-      ctr: 3.6,
-      roas: 380,
-      status: { tone: 'blue', label: '안정' },
-    },
-    {
-      kw: 'M18 배터리',
-      product: '배터리 5.0Ah',
-      grade: 'blue',
-      gradeLabel: 'A',
-      bid: 220,
-      quality: 8,
-      cpc: 198,
-      ctr: 3.9,
-      roas: 365,
-      status: { tone: 'blue', label: '안정' },
-    },
-    {
-      kw: '무선 임팩트',
-      product: '밀워키 2967',
-      grade: 'gray',
-      gradeLabel: 'B',
-      bid: 260,
-      quality: 6,
-      cpc: 252,
-      ctr: 2.8,
-      roas: 245,
-      status: { tone: 'gray', label: '본전' },
-    },
-    {
-      kw: '드릴 추천 2026',
-      product: '밀워키 2903',
-      grade: 'amber',
-      gradeLabel: 'C',
-      bid: 180,
-      quality: 5,
-      cpc: 175,
-      ctr: 1.9,
-      roas: 158,
-      status: { tone: 'amber', label: '관찰' },
-    },
-  ];
+  type KeywordRow = {
+    ncc_keyword_id: string;
+    ncc_campaign_id: string;
+    ncc_adgroup_id: string | null;
+    keyword: string;
+    bid_amt: number | null;
+    status: string | null;
+    quality_index: number | null;
+  };
 
-  const roasColor = (v: number) =>
-    v >= 400 ? C.success : v >= 250 ? C.primary : v >= 150 ? C.warning : C.danger;
+  const [keywords, setKeywords] = useState<KeywordRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+  const [syncMsgType, setSyncMsgType] = useState<'success' | 'error'>('success');
+
+  async function loadKeywords() {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/ad/keywords');
+      const data = await res.json();
+      if (data.success) setKeywords(data.keywords || []);
+    } catch (err) {
+      console.error('키워드 조회 실패:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadKeywords();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg('');
+    try {
+      const res = await fetch('/api/ad/sync/keywords', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setSyncMsgType('success');
+        setSyncMsg(`${data.keywordCount}개 키워드 동기화 완료 (광고그룹 ${data.adgroupCount}개)`);
+        await loadKeywords();
+      } else {
+        setSyncMsgType('error');
+        setSyncMsg(`실패: ${data.error}`);
+      }
+    } catch (err) {
+      setSyncMsgType('error');
+      setSyncMsg(`실패: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  const renderStatus = (status: string | null) => {
+    if (status === 'ELIGIBLE') return <Badge tone="green">운영 중</Badge>;
+    if (status === 'PAUSED') return <Badge tone="amber">일시정지</Badge>;
+    if (status) return <Badge tone="gray">{status}</Badge>;
+    return '—';
+  };
+
+  const stepBadge = (
+    <span style={{
+      fontSize: 10,
+      padding: '1px 6px',
+      borderRadius: 3,
+      background: C.thBg,
+      color: C.textHint,
+      marginLeft: 4,
+    }}>
+      Step 3-E
+    </span>
+  );
 
   return (
     <div style={{ width: '100%' }}>
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 12,
-          marginBottom: 20,
-          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: 16,
         }}
       >
-        <KpiCard label="운영 중" value="23개" sub="현재 광고가 돌고 있는 키워드" />
-        <KpiCard
-          label="클릭당 평균 비용"
-          value="₩287"
-          sub="클릭 한 번당 우리가 낸 돈"
-          tooltip="CPC"
-        />
-        <KpiCard
-          label="클릭률"
-          value="3.4%"
-          sub="100명이 보면 3.4명이 누름"
-          tooltip="CTR"
-        />
-        <KpiCard
-          label="광고 수익률"
-          value="387%"
-          sub="1만원 써서 3.87만원 수익"
-          tooltip="ROAS"
-        />
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>
+            운영 중인 키워드
+          </div>
+          <div style={{ fontSize: 12, color: C.textSec, marginTop: 4 }}>
+            입찰가 높은 순 상위 50개 노출
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <button
+            onClick={() => { handleSync(); }}
+            disabled={syncing || loading}
+            style={{
+              background: C.primary,
+              color: '#fff',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              cursor: syncing || loading ? 'not-allowed' : 'pointer',
+              opacity: syncing || loading ? 0.5 : 1,
+            }}
+          >
+            {syncing ? '↻ 동기화 중...' : '↻ 동기화'}
+          </button>
+          {syncMsg && (
+            <div style={{ fontSize: 12, color: syncMsgType === 'success' ? C.success : C.danger }}>
+              {syncMsgType === 'success' ? '✓' : '✕'} {syncMsg}
+            </div>
+          )}
+        </div>
       </div>
 
-      <Section title="키워드별 성과">
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-          <thead>
-            <tr>
-              <th style={{ ...TH, textAlign: 'left' }}>키워드</th>
-              <th style={{ ...TH, width: 130 }}>제품</th>
-              <th style={{ ...TH, width: 70 }}>등급</th>
-              <th style={{ ...TH, width: 80 }}>입찰가</th>
-              <th style={{ ...TH, width: 160 }}>품질점수</th>
-              <th style={{ ...TH, width: 90 }}>클릭비용</th>
-              <th style={{ ...TH, width: 70 }}>클릭률</th>
-              <th style={{ ...TH, width: 80 }}>수익률</th>
-              <th style={{ ...TH, width: 80 }}>상태</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.kw}>
-                <td style={{ ...TD, textAlign: 'left', fontWeight: 500 }}>{r.kw}</td>
-                <td style={{ ...TD, color: C.textSec }}>{r.product}</td>
-                <td style={TD}>
-                  <Badge tone={r.grade}>{r.gradeLabel}</Badge>
-                </td>
-                <td style={TD}>₩{r.bid}</td>
-                <td style={TD}>
-                  <QualityBar score={r.quality} />
-                </td>
-                <td style={TD}>₩{r.cpc}</td>
-                <td style={TD}>{r.ctr}%</td>
-                <td style={{ ...TD, color: roasColor(r.roas), fontWeight: 700 }}>{r.roas}%</td>
-                <td style={TD}>
-                  <Badge tone={r.status.tone}>{r.status.label}</Badge>
-                </td>
+      {loading ? (
+        <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 13, color: C.textHint }}>
+          불러오는 중...
+        </div>
+      ) : keywords.length === 0 ? (
+        <div style={{ padding: '32px 0', textAlign: 'center', fontSize: 13, color: C.textSec }}>
+          아직 키워드가 없습니다.{' '}
+          <strong>[↻ 동기화]</strong> 버튼을 눌러 키워드를 불러오세요.
+        </div>
+      ) : (
+        <Section title="키워드별 성과">
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <thead>
+              <tr>
+                <th style={{ ...TH, textAlign: 'left' }}>키워드</th>
+                <th style={{ ...TH, width: 130 }}>제품</th>
+                <th style={{ ...TH, width: 70 }}>등급</th>
+                <th style={{ ...TH, width: 80 }}>입찰가</th>
+                <th style={{ ...TH, width: 160 }}>품질점수</th>
+                <th style={{ ...TH, width: 90 }}>클릭비용</th>
+                <th style={{ ...TH, width: 70 }}>클릭률</th>
+                <th style={{ ...TH, width: 80 }}>수익률</th>
+                <th style={{ ...TH, width: 80 }}>상태</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Section>
+            </thead>
+            <tbody>
+              {keywords.map((kw) => (
+                <tr key={kw.ncc_keyword_id}>
+                  <td style={{ ...TD, textAlign: 'left', fontWeight: 500 }}>{kw.keyword}</td>
+                  <td style={{ ...TD, color: C.textSec }}>—{stepBadge}</td>
+                  <td style={TD}>—{stepBadge}</td>
+                  <td style={TD}>
+                    {kw.bid_amt != null ? `₩${kw.bid_amt.toLocaleString()}` : '—'}
+                  </td>
+                  <td style={TD}>
+                    {kw.quality_index != null ? <QualityBar score={kw.quality_index} /> : '—'}
+                  </td>
+                  <td style={{ ...TD, color: C.textSec }}>—{stepBadge}</td>
+                  <td style={{ ...TD, color: C.textSec }}>—{stepBadge}</td>
+                  <td style={{ ...TD, color: C.textSec }}>—{stepBadge}</td>
+                  <td style={TD}>{renderStatus(kw.status)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
     </div>
   );
 }
