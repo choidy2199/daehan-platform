@@ -1126,6 +1126,8 @@ function DashboardTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetch('/api/ad/campaigns')
@@ -1151,6 +1153,46 @@ function DashboardTab() {
       });
     return () => { cancelled = true; };
   }, []);
+
+  const handleSync = () => {
+    if (isSyncing || isLoading) return;
+    setIsSyncing(true);
+    setSyncMsg(null);
+    setError(null);
+    fetch('/api/ad/sync/campaigns', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          setSyncMsg(`${d.count}개 캠페인 동기화 완료`);
+          return fetch('/api/ad/campaigns')
+            .then(r => r.json())
+            .then(r => {
+              if (r.success) {
+                setCampaigns(r.campaigns);
+                const max = r.campaigns.reduce(
+                  (a: Campaign | null, c: Campaign) =>
+                    !a || (c.synced_at ?? '') > (a.synced_at ?? '') ? c : a,
+                  null
+                );
+                if (max?.synced_at) setLastSyncedAt(max.synced_at);
+              }
+            });
+        } else {
+          setError(d.error || '동기화에 실패했습니다');
+        }
+      })
+      .catch(e => {
+        setError(e?.message || '동기화 중 오류가 발생했습니다');
+      })
+      .finally(() => setIsSyncing(false));
+  };
+
+  const sortedCampaigns = [...campaigns].sort((a, b) => {
+    if (a.status === b.status) return (a.name ?? '').localeCompare(b.name ?? '', 'ko');
+    if (a.status === 'ELIGIBLE') return -1;
+    if (b.status === 'ELIGIBLE') return 1;
+    return 0;
+  });
 
   const runningCount   = campaigns.filter(c => c.status === 'ELIGIBLE').length;
   const pausedCount    = campaigns.filter(c => c.status === 'PAUSED').length;
@@ -1207,9 +1249,15 @@ function DashboardTab() {
               ? `${relTime(lastSyncedAt)} · ${absTime(lastSyncedAt)}`
               : isLoading ? '불러오는 중...' : '—'}
           </div>
+          {syncMsg && (
+            <div style={{ fontSize: 12, color: C.success, marginTop: 4 }}>
+              ✓ {syncMsg}
+            </div>
+          )}
         </div>
         <button
-          disabled={isLoading}
+          onClick={handleSync}
+          disabled={isLoading || isSyncing}
           style={{
             background: 'transparent',
             color: C.primary,
@@ -1219,11 +1267,11 @@ function DashboardTab() {
             fontSize: 13,
             fontWeight: 600,
             fontFamily: 'inherit',
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-            opacity: isLoading ? 0.5 : 1,
+            cursor: isLoading || isSyncing ? 'not-allowed' : 'pointer',
+            opacity: isLoading || isSyncing ? 0.5 : 1,
           }}
         >
-          ↻ 동기화
+          {isSyncing ? '동기화 중...' : '↻ 동기화'}
         </button>
       </div>
 
@@ -1349,7 +1397,7 @@ function DashboardTab() {
               </tr>
             </thead>
             <tbody>
-              {campaigns.map((c) => {
+              {sortedCampaigns.map((c) => {
                 const isOpen = openCampaignId === c.ncc_campaign_id;
                 return (
                   <Fragment key={c.ncc_campaign_id}>
