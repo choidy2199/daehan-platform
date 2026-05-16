@@ -1119,9 +1119,12 @@ function openPriceDetail(code, channel) {
     // 스크롤 영역
     + '<div style="overflow-y:auto;flex:1">'
     // 제품 정보
-    + '<div style="padding:14px 18px 0">'
-    + '<div style="font-size:12px;color:#5A6070">' + (p.model || p.code || '') + '</div>'
-    + '<div style="font-size:11px;color:#9BA3B2;margin-top:2px">' + (p.description || '') + '</div>'
+    + '<div style="padding:14px 18px 0;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+    + '<div style="flex:1;min-width:0">'
+    + '<div style="font-size:12px;color:#5A6070;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (p.model || p.code || '') + '</div>'
+    + '<div style="font-size:11px;color:#9BA3B2;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (p.description || '') + '</div>'
+    + '</div>'
+    + _pdLinkButton(code, channel)
     + '</div>'
     // 가격수정 입력 영역 (초기 숨김)
     + '<div id="pd-edit-area" style="display:none;margin:10px 18px 0;background:#FFF8EE;border:1px solid #EF9F27;border-radius:8px;padding:12px 16px">'
@@ -1397,6 +1400,54 @@ function _pdGoSales() {
     switchTab('tab-sales');
   } else {
     alert('판매관리 탭 준비 중입니다.');
+  }
+}
+
+// 가격 상세 팝업 — 상품 바로가기 버튼 마크업 생성
+function _pdLinkButton(code, channel) {
+  var bg = channel === 'naver' ? '#1D9E75' : channel === 'gmarket' ? '#185FA5' : channel === 'ssg' ? '#B8860B' : '#5A6070';
+  return '<button id="pd-btn-link" onclick="_pdGoProductPage(\'' + code + '\',\'' + channel + '\')" style="background:' + bg + ';color:#fff;border:none;border-radius:4px;padding:5px 10px;font-size:11px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;font-family:inherit">↗ 상품 바로가기</button>';
+}
+
+// 가격 상세 팝업 — 상품 바로가기 버튼 핸들러
+async function _pdGoProductPage(code, channel) {
+  if (channel === 'gmarket') {
+    window.open('https://www.esmplus.com', '_blank');
+    return;
+  }
+  if (channel === 'ssg') {
+    window.open('https://po.ssgadm.com/main.ssg', '_blank');
+    return;
+  }
+  if (channel !== 'naver') return;
+  var btn = document.getElementById('pd-btn-link');
+  if (!btn) return;
+  var origHtml = btn.innerHTML;
+  var origBg = btn.style.background;
+  btn.disabled = true;
+  btn.style.opacity = '0.7';
+  btn.style.cursor = 'wait';
+  btn.textContent = '로딩 중…';
+  try {
+    var res = await fetch('/api/naver/products?code=' + encodeURIComponent(code));
+    var data = await res.json();
+    if (!data.success || !data.product || !data.product.originProductNo) {
+      throw new Error('네이버 상품을 찾을 수 없습니다');
+    }
+    var url = 'https://sell.smartstore.naver.com/#/products/edit/' + data.product.originProductNo;
+    window.open(url, '_blank');
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+    btn.style.background = origBg || '#1D9E75';
+    btn.innerHTML = origHtml;
+  } catch (e) {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+    btn.style.background = origBg || '#1D9E75';
+    btn.innerHTML = origHtml;
+    alert('스토어팜 상품 페이지를 열 수 없습니다.\n\n' + (e.message || '네이버 API 호출 실패'));
   }
 }
 
