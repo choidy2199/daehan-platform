@@ -160,6 +160,12 @@ document.head.appendChild(s);
   </div>
   <div class="chrome-tab-items" id="chromeTabItems"></div>
   <div class="chrome-tab-bar-right">
+    <button id="ssg-bell-btn" class="ssg-bell-btn" type="button" aria-label="SSG주문 알림">
+      <span class="ssg-bell-icon">📦</span>
+      <span class="ssg-bell-label">SSG주문</span>
+      <span class="ssg-bell-badge" id="ssg-bell-badge" data-count="0" hidden>0</span>
+    </button>
+    <span class="ssg-bell-vsep" id="ssg-bell-vsep"></span>
     <button id="as-bell-btn" class="as-bell-btn" type="button" aria-label="AS택배 알림" hidden>
       <span class="as-bell-icon">📦</span>
       <span class="as-bell-label">AS택배</span>
