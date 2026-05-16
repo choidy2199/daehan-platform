@@ -34694,3 +34694,58 @@ document.addEventListener('DOMContentLoaded', function() {
   _asnBindEvents();
   _asnInit();
 });
+
+/* ============================================
+ * SSG주문 알림 시스템 (Phase 3)
+ * 메인 DB ssg_orders 카운트 폴링 (30초 주기)
+ * 서버 API 경유 (service_role) — RLS 우회 + 개인정보 보호
+ * ============================================ */
+var _ssgPollingTimer = null;
+var _SSG_POLL_INTERVAL = 30000;
+
+async function _ssgInit() {
+  await _ssgRefreshCount();
+  _ssgStartPolling();
+}
+
+async function _ssgRefreshCount() {
+  try {
+    var res = await fetch('/api/ssg/orders/count');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    _ssgUpdateBadge(data.count || 0);
+  } catch (err) {
+    console.error('[ssg] refreshCount 실패:', err);
+  }
+}
+
+function _ssgUpdateBadge(count) {
+  var badge = document.getElementById('ssg-bell-badge');
+  if (!badge) return;
+  badge.textContent = count;
+  badge.setAttribute('data-count', count);
+  if (count === 0) {
+    badge.setAttribute('hidden', '');
+  } else {
+    badge.removeAttribute('hidden');
+  }
+}
+
+function _ssgStartPolling() {
+  if (_ssgPollingTimer) clearInterval(_ssgPollingTimer);
+  _ssgPollingTimer = setInterval(_ssgRefreshCount, _SSG_POLL_INTERVAL);
+}
+
+function _ssgGoToOrderCollect() {
+  location.href = '/manager/order-collect';
+}
+
+function _ssgBindEvents() {
+  var btn = document.getElementById('ssg-bell-btn');
+  if (btn) btn.addEventListener('click', _ssgGoToOrderCollect);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  _ssgBindEvents();
+  _ssgInit();
+});

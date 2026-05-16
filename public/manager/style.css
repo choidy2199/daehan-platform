@@ -4594,6 +4594,56 @@ body.mw-edit-active .sep.mw-btn-normal.mw-btn-normal {
   display: inline-block;
 }
 
+/* SSG주문 알림 (Phase 3 신규) — AS택배 base 복제 + 골드(#B8860B) 차별화 */
+.ssg-bell-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 12px;
+  background: #FFFFFF;
+  border: 1.5px solid #B8860B;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #B8860B;
+  cursor: pointer;
+  font-family: 'Pretendard', sans-serif;
+}
+.ssg-bell-btn:hover { border-color: #7A5C00; color: #7A5C00; }
+.ssg-bell-icon { font-size: 16px; }
+
+.ssg-bell-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: #DC2626;
+  color: #FFFFFF;
+  border: 2px solid #FFFFFF;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  animation: as-bell-pulse 1.2s ease-in-out infinite;
+}
+
+.ssg-bell-badge[hidden] { display: none; }
+
+.ssg-bell-vsep {
+  width: 1px;
+  height: 24px;
+  background: #DDE1EB;
+  margin: 0 4px;
+  display: inline-block;
+}
+
 .asn-banner {
   background: #0C447C;
   color: #FFFFFF;
