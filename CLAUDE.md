@@ -836,3 +836,32 @@ Next.js 이전의 첫 사례로 채택됨 — 이는 **예외적 마이그레이
 - `migrateMergeModelDesc` (model + description 통합) — **건드리지 말 것**, 검증됨
 
 새 마이그레이션 추가 금지. 데이터 구조 변경이 필요하면 사용자(admin)에게 확인 후 수동 실행 도구로 구현할 것.
+
+## PR 자동 머지 룰 (2026-05-16 추가)
+
+PR 생성 후 다음 조건 모두 충족 시 **Claude Code가 자동 머지**. 형한테 머지 허락 묻지 않음.
+
+### 자동 머지 조건
+1. 6개 PASS/FAIL 검증 항목 전부 ✅
+2. Vercel Preview 배포 성공 (gh pr checks → Vercel pass)
+
+### 머지 명령
+```bash
+gh pr merge <PR번호> --squash --delete-branch
+```
+
+- **Squash and merge 고정** (merge commit / rebase 금지)
+- **--delete-branch** 옵션으로 머지 후 브랜치 자동 삭제
+
+### 머지 후 필수 검증 3단계
+1. `gh pr view <PR번호> --json state` → `"state": "MERGED"` 확인
+2. `git fetch origin main && git log origin/main --oneline -1` → 커밋 메시지 반영 확인
+3. Vercel 본 배포(Preview 아님) 완료 확인 → daehantool.dev 실제 반영 확인
+
+### 예외 (자동 머지 금지)
+- 형이 명시적으로 "머지하지 마" / "내가 직접 머지할게" 한 경우
+- 6개 PASS/FAIL 중 1개라도 ❌ 있는 경우
+- Vercel Preview 배포 실패
+
+### 배경
+PR#13 머지 안 됐던 사건 (베어툴 125건 재발동, 2026-05-15) 재발 방지.
