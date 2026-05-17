@@ -195,8 +195,10 @@ export async function POST() {
       warnings: warnings.slice(0, 20),
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[ad/products/sync]', msg);
+    const msg = err instanceof Error
+      ? err.message
+      : (typeof err === 'object' ? JSON.stringify(err) : String(err));
+    console.error('[ad/products/sync]', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
