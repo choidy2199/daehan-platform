@@ -210,7 +210,7 @@ export async function getSsgShppDirectionList(params: {
   perdStrDts: string;  // YYYYMMDD
   perdEndDts: string;  // YYYYMMDD
 }): Promise<any> {
-  return ssgApi('POST', '/pd/1/listShppDirection.ssg', {
+  return ssgApi('POST', '/api/pd/1/listShppDirection.ssg', {
     requestShppDirection: {
       perdType: params.perdType,
       perdStrDts: params.perdStrDts,
@@ -226,7 +226,7 @@ export async function updateSsgOrderConfirm(params: {
   shppNo: string;
   shppSeq: number;
 }): Promise<any> {
-  return ssgApi('POST', '/pd/1/updateOrderSubjectManage.ssg', {
+  return ssgApi('POST', '/api/pd/1/updateOrderSubjectManage.ssg', {
     requestOrderSubjectManage: {
       shppNo: params.shppNo,
       shppSeq: params.shppSeq,
@@ -245,7 +245,7 @@ export async function saveSsgWblNo(params: {
   shppTypeCd: string;     // 배송유형코드 (조회 응답값 사용)
   shppTypeDtlCd: string;  // 배송유형상세코드 (조회 응답값 사용)
 }): Promise<any> {
-  return ssgApi('POST', '/pd/1/saveWblNo.ssg', {
+  return ssgApi('POST', '/api/pd/1/saveWblNo.ssg', {
     requestWhOutCompleteProcess: {
       shppNo: params.shppNo,
       shppSeq: params.shppSeq,
@@ -265,7 +265,7 @@ export async function saveSsgWhOutComplete(params: {
   shppSeq: number;
   procItemQty: number;  // 처리수량
 }): Promise<any> {
-  return ssgApi('POST', '/pd/1/saveWhOutCompleteProcess.ssg', {
+  return ssgApi('POST', '/api/pd/1/saveWhOutCompleteProcess.ssg', {
     requestWhOutCompleteProcess: {
       shppNo: params.shppNo,
       shppSeq: params.shppSeq,
