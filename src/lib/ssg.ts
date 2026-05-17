@@ -194,3 +194,82 @@ export async function findSsgProductByCode(code: string): Promise<SsgProduct | n
   console.log(`[findSsgProduct] 매칭: "${matched.itemNm}", itemId: ${matched.itemId}, splVenItemId: ${matched.splVenItemId}`);
   return matched;
 }
+
+/* ============================================================
+ * SSG 주문/배송 API (Phase 4-B)
+ * 공식 명세: SSG 파트너 오피스 → 배송 API → 업체 주문/배송
+ * 인증: 기존 ssgApi() 재사용 (Authorization + X-API-Key)
+ * ============================================================ */
+
+/**
+ * 배송지시목록조회 — 접수된 주문 조회.
+ * 최대 180일까지 조회 가능. perdType: 01=주문완료일, 02=주문접수일, 03=고객결정.
+ */
+export async function getSsgShppDirectionList(params: {
+  perdType: '01' | '02' | '03';
+  perdStrDts: string;  // YYYYMMDD
+  perdEndDts: string;  // YYYYMMDD
+}): Promise<any> {
+  return ssgApi('POST', '/pd/1/listShppDirection.ssg', {
+    requestShppDirection: {
+      perdType: params.perdType,
+      perdStrDts: params.perdStrDts,
+      perdEndDts: params.perdEndDts,
+    },
+  });
+}
+
+/**
+ * 주문확인처리 — 배송지시 상태에서만 호출 가능. 호출 후 SSG 상태가 피킹완료로 변경.
+ */
+export async function updateSsgOrderConfirm(params: {
+  shppNo: string;
+  shppSeq: number;
+}): Promise<any> {
+  return ssgApi('POST', '/pd/1/updateOrderSubjectManage.ssg', {
+    requestOrderSubjectManage: {
+      shppNo: params.shppNo,
+      shppSeq: params.shppSeq,
+    },
+  });
+}
+
+/**
+ * 운송장등록 — 운송장번호 등록. 호출 직후 출고처리(saveSsgWhOutComplete) 반드시 호출 필요.
+ */
+export async function saveSsgWblNo(params: {
+  shppNo: string;
+  shppSeq: number;
+  wblNo: string;          // 운송장번호 (롯데 송장)
+  delicoVenId: string;    // 택배사 ID
+  shppTypeCd: string;     // 배송유형코드 (조회 응답값 사용)
+  shppTypeDtlCd: string;  // 배송유형상세코드 (조회 응답값 사용)
+}): Promise<any> {
+  return ssgApi('POST', '/pd/1/saveWblNo.ssg', {
+    requestWhOutCompleteProcess: {
+      shppNo: params.shppNo,
+      shppSeq: params.shppSeq,
+      wblNo: params.wblNo,
+      delicoVenId: params.delicoVenId,
+      shppTypeCd: params.shppTypeCd,
+      shppTypeDtlCd: params.shppTypeDtlCd,
+    },
+  });
+}
+
+/**
+ * 출고처리 — 운송장등록 후 반드시 호출. 미호출 시 SSG가 출고지연으로 자동 결품처리 가능.
+ */
+export async function saveSsgWhOutComplete(params: {
+  shppNo: string;
+  shppSeq: number;
+  procItemQty: number;  // 처리수량
+}): Promise<any> {
+  return ssgApi('POST', '/pd/1/saveWhOutCompleteProcess.ssg', {
+    requestWhOutCompleteProcess: {
+      shppNo: params.shppNo,
+      shppSeq: params.shppSeq,
+      procItemQty: params.procItemQty,
+    },
+  });
+}
