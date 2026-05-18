@@ -2,29 +2,44 @@
 
 import { useState } from 'react';
 import { useProducts } from './products/useProducts';
+import { useCampaigns } from './products/useCampaigns';
+import { ProductsFilter } from './products/ProductsFilter';
 import { ProductsTable } from './products/ProductsTable';
+import { DEFAULT_FILTERS, type ProductFilters } from './products/types';
 
 type Tab = 'dashboard' | 'products' | 'settings';
 
 function ProductsTabContent() {
+  const [filters, setFilters] = useState<ProductFilters>(DEFAULT_FILTERS);
   const {
     rows, totalCount, matchedCount, unmatchedCount,
     loading, error, page, setPage, pageSize, totalPages,
-  } = useProducts();
+    totalFiltered, allRows,
+  } = useProducts(filters);
+  const { campaigns } = useCampaigns();
 
   return (
-    <ProductsTable
-      rows={rows}
-      totalCount={totalCount}
-      matchedCount={matchedCount}
-      unmatchedCount={unmatchedCount}
-      loading={loading}
-      error={error}
-      page={page}
-      setPage={setPage}
-      pageSize={pageSize}
-      totalPages={totalPages}
-    />
+    <>
+      <ProductsFilter
+        filters={filters}
+        onChange={setFilters}
+        rows={allRows}
+        campaigns={campaigns}
+        filteredCount={totalFiltered}
+      />
+      <ProductsTable
+        rows={rows}
+        totalCount={totalCount}
+        matchedCount={matchedCount}
+        unmatchedCount={unmatchedCount}
+        loading={loading}
+        error={error}
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        totalPages={totalPages}
+      />
+    </>
   );
 }
 

@@ -72,4 +72,29 @@ export interface UseProductsResult {
   setPage: (page: number) => void;
   pageSize: number;                // 고정 50
   totalPages: number;
+  totalFiltered: number;           // 필터링 통과 개수
+  totalAll: number;                // 필터링 전 전체 개수
+  allRows: ProductRow[];           // 필터링 전 전체 배열 (ProductsFilter 카운트용)
 }
+
+// 필터 타입
+export type SourceTypeFilter = 'all' | 'milwaukee' | 'general' | 'unmatched';
+export type StatusFilter = 'all' | 'on' | 'off';
+export type CampaignFilter = 'all' | string; // 'all' or ncc_campaign_id
+export type EfficiencyFilter = 'margin10' | 'margin20' | 'margin30';
+
+export interface ProductFilters {
+  sourceType: SourceTypeFilter;
+  status: StatusFilter;
+  campaignId: CampaignFilter;
+  efficiency: EfficiencyFilter[];  // 빈 배열 = 전체
+  searchQuery: string;
+}
+
+export const DEFAULT_FILTERS: ProductFilters = {
+  sourceType: 'all',
+  status: 'all',
+  campaignId: 'all',
+  efficiency: [],
+  searchQuery: '',
+};
