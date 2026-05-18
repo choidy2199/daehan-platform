@@ -210,5 +210,6 @@ export function useProducts(filters: ProductFilters = DEFAULT_FILTERS): UseProdu
     totalPages,
     totalFiltered: filteredRows.length,
     totalAll: allRows.length,
+    allRows,
   };
 }

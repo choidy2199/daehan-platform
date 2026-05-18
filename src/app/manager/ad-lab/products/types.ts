@@ -74,6 +74,7 @@ export interface UseProductsResult {
   totalPages: number;
   totalFiltered: number;           // 필터링 통과 개수
   totalAll: number;                // 필터링 전 전체 개수
+  allRows: ProductRow[];           // 필터링 전 전체 배열 (ProductsFilter 카운트용)
 }
 
 // 필터 타입
