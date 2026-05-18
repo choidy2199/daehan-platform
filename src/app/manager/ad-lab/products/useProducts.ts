@@ -83,7 +83,7 @@ export function useProducts(): UseProductsResult {
   // 캠페인 id → name 매핑
   const campaignMap = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const c of campaigns) m[c.id] = c.name;
+    for (const c of campaigns) m[c.ncc_campaign_id] = c.name;
     return m;
   }, [campaigns]);
 
