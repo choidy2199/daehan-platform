@@ -2,15 +2,27 @@
 
 import { useState } from 'react';
 import { useProducts } from './products/useProducts';
+import { useFeeRate } from './products/useFeeRate';
+import { calcMargin } from './products/calcMargin';
+import { breakEvenRoas } from './products/breakEvenRoas';
 
 type Tab = 'dashboard' | 'products' | 'settings';
 
 // useProducts 검증용 임시 컴포넌트
 function ProductsPlaceholder() {
   const { rows, totalCount, matchedCount, unmatchedCount, loading, error, page, totalPages } = useProducts();
+  const feeRateResult = useFeeRate();
 
   if (loading) return <div>로딩중...</div>;
   if (error) return <div>오류: {error}</div>;
+
+  const firstMatched = rows.find(r => r.matched && r.priceNaver && r.cost);
+  const margin = firstMatched && firstMatched.priceNaver != null && firstMatched.cost != null
+    ? calcMargin(firstMatched.priceNaver, firstMatched.cost, feeRateResult.feeRate)
+    : null;
+  const roas = firstMatched && firstMatched.priceNaver != null && firstMatched.cost != null
+    ? breakEvenRoas(firstMatched.priceNaver, firstMatched.cost, feeRateResult.feeRate)
+    : null;
 
   return (
     <div style={{ padding: 16, fontFamily: 'monospace' }}>
@@ -29,6 +41,20 @@ function ProductsPlaceholder() {
           campaign: r.campaign_name,
           matched: r.matched,
         })), null, 2)}
+      </pre>
+      <hr style={{ margin: '16px 0' }} />
+      <div><strong>첫 매칭 행 계산 검증 (Step 4-2)</strong></div>
+      <pre style={{ fontSize: 11, background: '#f5f5f5', padding: 8 }}>
+        {JSON.stringify({
+          model: firstMatched?.model,
+          priceNaver: firstMatched?.priceNaver,
+          cost: firstMatched?.cost,
+          feeRate: feeRateResult.feeRate,
+          feeRateLoading: feeRateResult.loading,
+          feeRateError: feeRateResult.error,
+          margin,
+          breakEvenRoas: roas,
+        }, null, 2)}
       </pre>
     </div>
   );
