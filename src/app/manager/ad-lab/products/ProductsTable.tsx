@@ -15,18 +15,17 @@ function formatPercent(value: number | null | undefined, digits = 1): string {
   return value.toFixed(digits) + '%';
 }
 
+function marginClass(rate: number | null | undefined): string {
+  if (rate == null) return 'al-c-dash';
+  if (rate < 10) return 'al-c-margin-low';
+  if (rate < 25) return 'al-c-margin-mid';
+  return 'al-c-margin-high';
+}
+
 function StatusBadge({ status }: { status: string }) {
   const isActive = status === 'ELIGIBLE';
   return (
-    <span style={{
-      display: 'inline-block',
-      padding: '2px 10px',
-      borderRadius: 12,
-      background: isActive ? '#EAF3DE' : '#F1EFE8',
-      color: isActive ? '#3B6D11' : '#5F5E5A',
-      fontSize: 11,
-      fontWeight: 500,
-    }}>
+    <span className={`al-bd ${isActive ? 'al-bd-on' : 'al-bd-off'}`}>
       {isActive ? 'ON' : 'OFF'}
     </span>
   );
@@ -84,17 +83,16 @@ export function ProductsTable(props: ProductsTableProps) {
             {COLS.map((c, i) => <col key={i} style={{ width: c.width }} />)}
           </colgroup>
           <thead>
-            <tr style={{ background: '#F5F5F5', borderBottom: '0.5px solid #E5E7EB' }}>
+            <tr className="al-thead-row">
               {COLS.map((c, i) => (
                 <th
                   key={i}
+                  className="al-th"
                   style={{
                     padding: '8px 10px',
                     textAlign: c.align,
-                    fontWeight: 600,
+                    fontWeight: 500,
                     fontSize: 12,
-                    color: '#374151',
-                    borderRight: i < COLS.length - 1 ? '0.5px solid #E5E7EB' : 'none',
                   }}
                 >
                   {c.label}
@@ -105,7 +103,7 @@ export function ProductsTable(props: ProductsTableProps) {
           <tbody>
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={COLS.length} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>
+                <td colSpan={COLS.length} className="al-c-dash" style={{ padding: 24 }}>
                   데이터 없음
                 </td>
               </tr>
@@ -120,11 +118,11 @@ export function ProductsTable(props: ProductsTableProps) {
               return (
                 <tr
                   key={row.id}
+                  className={row.matched ? '' : 'row-unmatched'}
                   onClick={() => console.log('Row clicked:', row.id)}
                   style={{
                     borderBottom: '0.5px solid #F3F4F6',
                     borderLeft: '2px solid transparent',
-                    background: row.matched ? 'transparent' : '#FCEBEB',
                     cursor: 'pointer',
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderLeftColor = '#185FA5'; }}
@@ -134,46 +132,40 @@ export function ProductsTable(props: ProductsTableProps) {
                     <input type="checkbox" onClick={e => e.stopPropagation()} />
                   </td>
                   <td style={{ padding: '6px 10px' }}>
-                    <div style={{ fontWeight: 500, color: row.matched ? undefined : '#791F1F' }}>
+                    <div className="al-c-model">
                       {row.matched ? row.model : '매칭 실패'}
                       {!row.matched && (
-                        <span style={{
-                          display: 'inline-block',
-                          marginLeft: 4,
-                          padding: '1px 6px',
-                          borderRadius: 4,
-                          background: '#F09595',
-                          color: '#501313',
-                          fontSize: 10,
-                          fontWeight: 500,
-                        }}>미매칭</span>
+                        <span className="al-bd al-bd-unmatched" style={{ marginLeft: 4 }}>미매칭</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: row.matched ? '#888780' : '#A32D2D', marginTop: 2 }}>
+                    <div
+                      className={row.matched ? 'al-c-code' : 'al-c-code-unmatched'}
+                      style={{ marginTop: 2 }}
+                    >
                       {row.matched
                         ? `${row.product_code ?? '—'} · ${row.campaign_name ?? '캠페인 없음'}`
                         : (row.campaign_name ?? '캠페인 없음')}
                     </div>
                   </td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatWon(row.cost)}</td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatWon(row.priceNaver)}</td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatPercent(margin?.rate ?? null)}</td>
+                  <td className="al-c-price" style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatWon(row.cost)}</td>
+                  <td className="al-c-price" style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatWon(row.priceNaver)}</td>
+                  <td className={marginClass(margin?.rate ?? null)} style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatPercent(margin?.rate ?? null)}</td>
                   <td style={{ padding: '6px 10px', textAlign: 'right' }}>
-                    {roas === null ? '—' : (
+                    {roas === null ? <span className="al-c-dash">—</span> : (
                       <>
-                        <div style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500, color: '#444441' }}>
+                        <div className="al-c-roas-need" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           {roas.toFixed(0)}%
                         </div>
-                        <div style={{ fontSize: 11, color: '#888780', marginTop: 2 }}>
+                        <div className="al-c-roas-hint" style={{ marginTop: 2 }}>
                           1원 → {(roas / 100).toFixed(1)}원 필요
                         </div>
                       </>
                     )}
                   </td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', color: '#888780' }}>—</td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatWon(row.bid_amt)}</td>
-                  <td style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatWon(row.daily_budget_limit)}</td>
-                  <td style={{ padding: '6px 10px', textAlign: 'center', color: '#888780' }}>—</td>
+                  <td className="al-c-roas-empty" style={{ padding: '6px 10px', textAlign: 'right' }}>—</td>
+                  <td className="al-c-bid" style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatWon(row.bid_amt)}</td>
+                  <td className="al-c-budget" style={{ padding: '6px 10px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{formatWon(row.daily_budget_limit)}</td>
+                  <td className="al-c-dash" style={{ padding: '6px 10px' }}>—</td>
                   <td style={{ padding: '6px 10px', textAlign: 'center' }}>
                     <StatusBadge status={row.status} />
                   </td>
@@ -217,6 +209,51 @@ export function ProductsTable(props: ProductsTableProps) {
           ›
         </button>
       </div>
+
+      <style>{`
+        .al-thead-row { background: #2C2C2A; }
+        .al-th { color: #FFFFFF; border-right: 0.5px solid #444441; }
+        .al-th:last-child { border-right: none; }
+
+        .al-c-model { color: #1A1D23; font-weight: 500; }
+        .al-c-code { color: #5F5E5A; font-size: 11px; }
+        .al-c-code-unmatched { color: #791F1F; font-size: 11px; }
+
+        .al-c-price { color: #1A1D23; font-weight: 500; }
+
+        .al-c-margin-low { color: #791F1F; font-weight: 500; }
+        .al-c-margin-mid { color: #854F0B; font-weight: 500; }
+        .al-c-margin-high { color: #27500A; font-weight: 500; }
+
+        .al-c-roas-need { color: #185FA5; font-weight: 500; }
+        .al-c-roas-hint { color: #5F5E5A; font-size: 10px; }
+        .al-c-roas-actual { color: #1A1D23; font-weight: 500; }
+        .al-c-roas-empty { color: #5F5E5A; }
+
+        .al-c-bid { color: #3C3489; }
+        .al-c-budget { color: #5F5E5A; }
+
+        .al-c-source-mw { color: #185FA5; font-size: 11px; }
+        .al-c-source-gn { color: #27500A; font-size: 11px; }
+
+        .al-c-dash { color: #5F5E5A; text-align: center; }
+
+        .al-bd {
+          display: inline-block;
+          padding: 2px 10px;
+          border-radius: 10px;
+          font-size: 11px;
+          font-weight: 500;
+        }
+        .al-bd-on { background: #185FA5; color: #FFFFFF; }
+        .al-bd-off { background: #5F5E5A; color: #FFFFFF; }
+        .al-bd-auto-on { background: #3C3489; color: #FFFFFF; }
+        .al-bd-unmatched { background: #791F1F; color: #FFFFFF; }
+
+        tr:hover td { background: #FAFAF8; }
+        .row-unmatched td { background: #FCEBEB; }
+        .row-unmatched:hover td { background: #F9DDDD; }
+      `}</style>
     </div>
   );
 }
