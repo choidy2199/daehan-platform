@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getApiKeys } from '@/lib/api-keys';
 import { adPost } from '@/lib/naver-ad';
+import type { NccRegisterKeyword } from '@/app/manager/ad-lab/products/useNccRegister';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ interface ReqProduct {
 
 interface ReqBody {
   products: ReqProduct[];
-  keywords: string[];
+  keywords: NccRegisterKeyword[];
   group_id?: string;
   dry_run: boolean;
 }
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
           '/ncc/keywords',
           {
             nccAdgroupId: adgroup.nccAdgroupId,
-            keyword: kw,
+            keyword: kw.keyword,
             bidAmt: product.recommended_bid,
           },
           keys.naverAd,
@@ -94,23 +95,28 @@ export async function POST(req: Request) {
       await supabase
         .from('ad_products')
         .update({
-          ncc_campaign_id: adgroup.nccCampaignId,
-          is_ad_active: true,
-          daily_budget: product.daily_budget,
-          max_cpc: product.recommended_bid,
+          campaign_id: adgroup.nccCampaignId,
+          status: 'ELIGIBLE',
+          daily_budget_limit: product.daily_budget,
+          bid_amt: product.recommended_bid,
         })
         .eq('id', product.id);
 
       if (keywordIds.length > 0) {
         const inserts = body.keywords.map((kw, i) => ({
+          product_id: Number(product.id),
           ncc_keyword_id: keywordIds[i],
           ncc_campaign_id: adgroup.nccCampaignId,
           ncc_adgroup_id: adgroup.nccAdgroupId,
-          keyword: kw,
+          keyword: kw.keyword,
+          monthly_search_volume: kw.monthlySearchVolume,
+          comp_idx: kw.compIdx,
+          click_rate: kw.clickRate,
+          recommend_score: kw.recommendScore,
           bid_amt: product.recommended_bid,
           status: 'ELIGIBLE',
         }));
-        await supabase.from('ad_keywords').upsert(inserts);
+        await supabase.from('ad_keywords').insert(inserts);
       }
 
       registered.push({

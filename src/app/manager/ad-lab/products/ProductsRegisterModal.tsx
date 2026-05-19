@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ProductRow } from './types';
 import { calcMargin } from './calcMargin';
-import { extractKeywords } from '@/lib/extractKeywords';
 import { useNccRegister } from './useNccRegister';
+import type { NccRegisterKeyword } from './useNccRegister';
 
 const DEFAULT_AD_COST_RATIO = 0.05;
 
@@ -15,28 +15,25 @@ interface ProductsRegisterModalProps {
   onClose: () => void;
 }
 
-type KeywordKind = 'brand' | 'product' | 'category';
-interface TaggedKeyword {
-  text: string;
-  kind: KeywordKind;
+type SortColumn = 'keyword' | 'volume' | 'comp' | 'ctr' | 'score';
+type SortDirection = 'asc' | 'desc';
+type CompLevel = '낮음' | '중간' | '높음';
+
+const COMP_ORDER: Record<CompLevel, number> = { '낮음': 0, '중간': 1, '높음': 2 };
+const DEFAULT_SORT_DIR: Record<SortColumn, SortDirection> = {
+  keyword: 'asc', volume: 'desc', comp: 'asc', ctr: 'desc', score: 'desc',
+};
+
+function scoreBadgeTier(score: number): 'excellent' | 'normal' | 'poor' {
+  if (score >= 7) return 'excellent';
+  if (score >= 4) return 'normal';
+  return 'poor';
 }
 
-function autoExtractAll(products: ProductRow[]): TaggedKeyword[] {
-  const seen = new Set<string>();
-  const out: TaggedKeyword[] = [];
-  const push = (text: string, kind: KeywordKind) => {
-    const t = text.trim();
-    if (!t || seen.has(t)) return;
-    seen.add(t);
-    out.push({ text: t, kind });
-  };
-  for (const p of products) {
-    const k = extractKeywords(p.model ?? '', p.category ?? '');
-    k.brand.forEach(b => push(b, 'brand'));
-    k.product.forEach(pr => push(pr, 'product'));
-    k.category.forEach(c => push(c, 'category'));
-  }
-  return out;
+function scoreBadgeLabel(score: number): string {
+  if (score >= 7) return '우수';
+  if (score >= 4) return '보통';
+  return '부족';
 }
 
 function marginColorClass(rate: number | null): string {
@@ -77,8 +74,14 @@ export function ProductsRegisterModal({
   feeRate,
   onClose,
 }: ProductsRegisterModalProps) {
-  const [keywords, setKeywords] = useState<TaggedKeyword[]>([]);
-  const [keywordInput, setKeywordInput] = useState('');
+  const [nccKeywords, setNccKeywords] = useState<NccRegisterKeyword[]>([]);
+  const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
+  const [keywordsLoading, setKeywordsLoading] = useState(false);
+  const [keywordsError, setKeywordsError] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<SortColumn>('score');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [compFilter, setCompFilter] = useState<Set<CompLevel>>(new Set(['낮음', '중간']));
+  const [refetchToken, setRefetchToken] = useState(0);
   const [dryRun, setDryRun] = useState(true);
   const [helpExpanded, setHelpExpanded] = useState<Record<string, boolean>>({});
   const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({
@@ -94,14 +97,68 @@ export function ProductsRegisterModal({
 
   useEffect(() => {
     if (!open) return;
-    const auto = autoExtractAll(products);
-    setKeywords(auto);
     setIncludedIds(new Set(products.map(p => String(p.id))));
     setDryRun(true);
-    setKeywordInput('');
     setConfirmRealRun(false);
     resetResult();
   }, [open, products, resetResult]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (products.length === 0) {
+      setNccKeywords([]);
+      setSelectedKeywords(new Set());
+      return;
+    }
+    let cancelled = false;
+    setKeywordsLoading(true);
+    setKeywordsError(null);
+
+    fetch('/api/ad/extract-keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        products: products.map(p => ({
+          id: p.id,
+          product_name: p.model,
+          category: p.category,
+        })),
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled) return;
+        if (!data.success) {
+          setKeywordsError(data.error || '키워드 가져오기 실패');
+          setNccKeywords([]);
+          setSelectedKeywords(new Set());
+          return;
+        }
+        const fetched: NccRegisterKeyword[] = data.keywords;
+        setNccKeywords(fetched);
+        const top10 = fetched
+          .filter(k => k.compIdx === '낮음' || k.compIdx === '중간')
+          .sort((a, b) =>
+            b.recommendScore - a.recommendScore ||
+            a.keyword.localeCompare(b.keyword, 'ko'),
+          )
+          .slice(0, 10)
+          .map(k => k.keyword);
+        setSelectedKeywords(new Set(top10));
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setKeywordsError(String(err));
+        setNccKeywords([]);
+        setSelectedKeywords(new Set());
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setKeywordsLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [open, products, refetchToken]);
 
   const includedProducts = useMemo(
     () => products.filter(p => includedIds.has(String(p.id))),
@@ -123,13 +180,34 @@ export function ProductsRegisterModal({
     return Math.round(sum / includedProducts.length);
   }, [includedProducts, perMetrics]);
 
-  const totalDailyBudget = useMemo(
-    () =>
-      includedProducts.reduce(
-        (acc, p) => acc + (perMetrics.get(String(p.id))?.dailyBudget ?? 0),
-        0,
-      ),
-    [includedProducts, perMetrics],
+  const totalDailyBudget = useMemo(() => {
+    const bidSum = includedProducts.reduce(
+      (acc, p) => acc + (perMetrics.get(String(p.id))?.recommendedBid ?? 0),
+      0,
+    );
+    return bidSum * selectedKeywords.size;
+  }, [includedProducts, perMetrics, selectedKeywords]);
+
+  const visibleKeywords = useMemo(() => {
+    const filtered = nccKeywords.filter(k => compFilter.has(k.compIdx));
+    const sorted = [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortColumn) {
+        case 'keyword': cmp = a.keyword.localeCompare(b.keyword, 'ko'); break;
+        case 'volume': cmp = a.monthlySearchVolume - b.monthlySearchVolume; break;
+        case 'comp': cmp = COMP_ORDER[a.compIdx] - COMP_ORDER[b.compIdx]; break;
+        case 'ctr': cmp = a.clickRate - b.clickRate; break;
+        case 'score': cmp = a.recommendScore - b.recommendScore; break;
+      }
+      if (cmp === 0) cmp = a.keyword.localeCompare(b.keyword, 'ko');
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [nccKeywords, compFilter, sortColumn, sortDirection]);
+
+  const selectedKwObjects = useMemo(
+    () => nccKeywords.filter(k => selectedKeywords.has(k.keyword)),
+    [nccKeywords, selectedKeywords],
   );
 
   const toggleIncluded = (id: string) => {
@@ -141,24 +219,38 @@ export function ProductsRegisterModal({
     });
   };
 
-  const removeKeyword = (text: string) =>
-    setKeywords(prev => prev.filter(k => k.text !== text));
+  const toggleKeywordSelect = useCallback((keyword: string) => {
+    setSelectedKeywords(prev => {
+      const next = new Set(prev);
+      if (next.has(keyword)) next.delete(keyword);
+      else next.add(keyword);
+      return next;
+    });
+  }, []);
 
-  const addKeyword = () => {
-    const t = keywordInput.trim();
-    if (!t) return;
-    if (keywords.some(k => k.text === t)) {
-      setKeywordInput('');
-      return;
-    }
-    setKeywords(prev => [...prev, { text: t, kind: 'product' }]);
-    setKeywordInput('');
-  };
+  const handleSort = useCallback((col: SortColumn) => {
+    setSortColumn(prev => {
+      if (prev === col) {
+        setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+        return prev;
+      }
+      setSortDirection(DEFAULT_SORT_DIR[col]);
+      return col;
+    });
+  }, []);
 
-  const reExtract = () => {
-    const auto = autoExtractAll(products);
-    setKeywords(auto);
-  };
+  const toggleCompFilter = useCallback((level: CompLevel) => {
+    setCompFilter(prev => {
+      const next = new Set(prev);
+      if (next.has(level)) next.delete(level);
+      else next.add(level);
+      return next;
+    });
+  }, []);
+
+  const reExtractKeywords = useCallback(() => {
+    setRefetchToken(t => t + 1);
+  }, []);
 
   const toggleHelp = (key: string) =>
     setHelpExpanded(prev => ({ ...prev, [key]: !prev[key] }));
@@ -169,22 +261,22 @@ export function ProductsRegisterModal({
   const doDryRun = useCallback(async () => {
     if (loading) return;
     try {
-      await registerProducts(includedProducts, keywords.map(k => k.text), true);
+      await registerProducts(includedProducts, selectedKwObjects, true);
     } catch {
       /* error captured in hook */
     }
-  }, [loading, registerProducts, includedProducts, keywords]);
+  }, [loading, registerProducts, includedProducts, selectedKwObjects]);
 
   const doRealRun = useCallback(async () => {
     if (loading) return;
     try {
-      await registerProducts(includedProducts, keywords.map(k => k.text), false);
+      await registerProducts(includedProducts, selectedKwObjects, false);
     } catch {
       /* error captured in hook */
     } finally {
       setConfirmRealRun(false);
     }
-  }, [loading, registerProducts, includedProducts, keywords]);
+  }, [loading, registerProducts, includedProducts, selectedKwObjects]);
 
   const handleOverlayClick = () => {
     if (loading) return;
@@ -276,7 +368,7 @@ export function ProductsRegisterModal({
               className="al-rm-section-head"
               onClick={() => toggleSection('keywords')}
             >
-              <span>키워드 ({keywords.length})</span>
+              <span>키워드 (선택 {selectedKeywords.size} / 표시 {visibleKeywords.length})</span>
               <span className="al-rm-caret">{sectionExpanded.keywords ? '▾' : '▸'}</span>
             </button>
             <div className="al-rm-help">
@@ -299,48 +391,120 @@ export function ProductsRegisterModal({
               </div>
             )}
             {sectionExpanded.keywords && (
-              <>
-                <div className="al-rm-kw-list">
-                  {keywords.map(k => (
-                    <span key={k.text} className={`al-rm-kw al-rm-kw-${k.kind}`}>
-                      {k.text}
-                      <button
-                        type="button"
-                        className="al-rm-kw-del"
-                        onClick={() => removeKeyword(k.text)}
-                        disabled={loading}
-                        aria-label="삭제"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <div className="al-rm-kw-row">
-                  <input
-                    type="text"
-                    className="al-rm-kw-input"
-                    value={keywordInput}
-                    onChange={e => setKeywordInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addKeyword();
-                      }
-                    }}
-                    placeholder="새 키워드 입력 후 Enter"
-                    disabled={loading}
-                  />
+              <div className="al-rm-kw-section">
+                <div className="al-rm-kw-controls">
+                  <div className="al-rm-kw-chips">
+                    <button
+                      type="button"
+                      className={`al-rm-kw-chip al-rm-kw-chip-low ${compFilter.has('낮음') ? 'is-active' : ''}`}
+                      onClick={() => toggleCompFilter('낮음')}
+                    >
+                      {compFilter.has('낮음') ? '✓ ' : ''}낮음
+                    </button>
+                    <button
+                      type="button"
+                      className={`al-rm-kw-chip al-rm-kw-chip-mid ${compFilter.has('중간') ? 'is-active' : ''}`}
+                      onClick={() => toggleCompFilter('중간')}
+                    >
+                      {compFilter.has('중간') ? '✓ ' : ''}중간
+                    </button>
+                    <button
+                      type="button"
+                      className={`al-rm-kw-chip al-rm-kw-chip-high ${compFilter.has('높음') ? 'is-active' : ''}`}
+                      onClick={() => toggleCompFilter('높음')}
+                    >
+                      {compFilter.has('높음') ? '✓ ' : ''}높음
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    className="al-rm-kw-btn"
-                    onClick={reExtract}
-                    disabled={loading}
+                    className="al-rm-kw-refetch"
+                    onClick={reExtractKeywords}
+                    disabled={keywordsLoading}
                   >
-                    키워드 다시 추출
+                    {keywordsLoading ? '가져오는 중…' : '키워드 다시 가져오기'}
                   </button>
                 </div>
-              </>
+
+                {keywordsError && (
+                  <div className="al-rm-kw-error">{keywordsError}</div>
+                )}
+
+                {keywordsLoading ? (
+                  <div className="al-rm-kw-loading">키워드 가져오는 중…</div>
+                ) : visibleKeywords.length === 0 ? (
+                  <div className="al-rm-kw-empty">
+                    {nccKeywords.length === 0 ? '키워드 없음' : '필터 조건에 맞는 키워드 없음'}
+                  </div>
+                ) : (
+                  <table className="al-rm-kw-table">
+                    <thead>
+                      <tr>
+                        <th className="al-rm-kw-th al-rm-kw-th-check"></th>
+                        <th
+                          className={`al-rm-kw-th ${sortColumn === 'keyword' ? 'is-sort-active' : ''}`}
+                          onClick={() => handleSort('keyword')}
+                        >
+                          키워드 <span className="al-rm-kw-sort">{sortColumn === 'keyword' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </th>
+                        <th
+                          className={`al-rm-kw-th al-rm-kw-th-num ${sortColumn === 'volume' ? 'is-sort-active' : ''}`}
+                          onClick={() => handleSort('volume')}
+                        >
+                          월 검색량 <span className="al-rm-kw-sort">{sortColumn === 'volume' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </th>
+                        <th
+                          className={`al-rm-kw-th ${sortColumn === 'comp' ? 'is-sort-active' : ''}`}
+                          onClick={() => handleSort('comp')}
+                        >
+                          경쟁도 <span className="al-rm-kw-sort">{sortColumn === 'comp' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </th>
+                        <th
+                          className={`al-rm-kw-th al-rm-kw-th-num ${sortColumn === 'ctr' ? 'is-sort-active' : ''}`}
+                          onClick={() => handleSort('ctr')}
+                        >
+                          클릭률 <span className="al-rm-kw-sort">{sortColumn === 'ctr' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </th>
+                        <th
+                          className={`al-rm-kw-th ${sortColumn === 'score' ? 'is-sort-active' : ''}`}
+                          onClick={() => handleSort('score')}
+                        >
+                          추천 점수 <span className="al-rm-kw-sort">{sortColumn === 'score' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleKeywords.map(k => {
+                        const isSelected = selectedKeywords.has(k.keyword);
+                        const tier = scoreBadgeTier(k.recommendScore);
+                        const compClass = k.compIdx === '낮음' ? 'low' : k.compIdx === '중간' ? 'mid' : 'high';
+                        return (
+                          <tr
+                            key={k.keyword}
+                            className={`al-rm-kw-tr ${isSelected ? 'is-selected' : ''}`}
+                            onClick={() => toggleKeywordSelect(k.keyword)}
+                          >
+                            <td className="al-rm-kw-td al-rm-kw-td-check">
+                              <input type="checkbox" checked={isSelected} onChange={() => {}} readOnly />
+                            </td>
+                            <td className="al-rm-kw-td">{k.keyword}</td>
+                            <td className="al-rm-kw-td al-rm-kw-td-num">{k.monthlySearchVolume.toLocaleString()}</td>
+                            <td className="al-rm-kw-td">
+                              <span className={`al-rm-kw-badge al-rm-kw-badge-comp-${compClass}`}>{k.compIdx}</span>
+                            </td>
+                            <td className="al-rm-kw-td al-rm-kw-td-num">{k.clickRate.toFixed(2)}%</td>
+                            <td className="al-rm-kw-td">
+                              <span className={`al-rm-kw-badge al-rm-kw-badge-score-${tier}`}>
+                                {scoreBadgeLabel(k.recommendScore)} ({k.recommendScore})
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             )}
           </section>
 
@@ -514,8 +678,11 @@ export function ProductsRegisterModal({
             <div className="al-rm-confirm-box">
               <div className="al-rm-confirm-title">실제 등록 확인</div>
               <div className="al-rm-confirm-msg">
-                {includedProducts.length}개 상품을 NCC에 실제 등록합니다.
-                되돌릴 수 없습니다. 계속하시겠습니까?
+                선택된 {includedProducts.length}개 상품 × {selectedKeywords.size}개 키워드를 실제 등록합니다.<br/>
+                일 한도 합계: <strong>{formatWon(totalDailyBudget)}</strong>
+                {totalDailyBudget > 50000 && (
+                  <div className="al-rm-confirm-warn">⚠️ 50,000원을 초과합니다. 진행하시겠습니까?</div>
+                )}
               </div>
               <div className="al-rm-confirm-btns">
                 <button
@@ -624,33 +791,108 @@ export function ProductsRegisterModal({
           color: #3C3489; font-weight: 500;
         }
 
-        .al-rm-kw-list {
-          display: flex; flex-wrap: wrap; gap: 6px;
-          padding: 10px 20px 4px;
+        .al-rm-kw-section { padding: 12px 20px 14px; }
+        .al-rm-kw-controls {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
         }
-        .al-rm-kw {
-          display: inline-flex; align-items: center; gap: 4px;
-          padding: 3px 8px; border-radius: 12px; font-size: 12px;
+        .al-rm-kw-chips { display: flex; gap: 8px; }
+        .al-rm-kw-chip {
+          height: 28px;
+          padding: 0 14px;
+          border-radius: 14px;
+          font-size: 12.5px;
+          font-weight: 500;
+          border: 1px solid;
+          background: #F8F7F2;
+          cursor: pointer;
+          transition: all .12s;
         }
-        .al-rm-kw-brand { background: #E5F0D8; color: #27500A; }
-        .al-rm-kw-product { background: #DCE9F5; color: #185FA5; }
-        .al-rm-kw-category { background: #FDF6E3; color: #854F0B; }
-        .al-rm-kw-del {
-          background: transparent; border: none; color: inherit;
-          cursor: pointer; padding: 0; font-size: 14px; line-height: 1;
+        .al-rm-kw-chip-low { border-color: #27500A; color: #27500A; }
+        .al-rm-kw-chip-mid { border-color: #854F0B; color: #854F0B; }
+        .al-rm-kw-chip-high { border-color: #791F1F; color: #791F1F; }
+        .al-rm-kw-chip.is-active.al-rm-kw-chip-low { background: #27500A; color: #FFFFFF; }
+        .al-rm-kw-chip.is-active.al-rm-kw-chip-mid { background: #854F0B; color: #FFFFFF; }
+        .al-rm-kw-chip.is-active.al-rm-kw-chip-high { background: #791F1F; color: #FFFFFF; }
+        .al-rm-kw-refetch {
+          height: 28px;
+          padding: 0 14px;
+          border-radius: 4px;
+          border: 1px solid #C9C6BB;
+          background: #FFFFFF;
+          color: #2C2C2A;
+          font-size: 12.5px;
+          cursor: pointer;
         }
-        .al-rm-kw-row {
-          display: flex; gap: 8px; padding: 6px 20px 12px;
+        .al-rm-kw-refetch:disabled { opacity: 0.5; cursor: not-allowed; }
+        .al-rm-kw-error {
+          padding: 8px 12px;
+          background: #FCE8E8;
+          color: #791F1F;
+          border-radius: 4px;
+          font-size: 12.5px;
+          margin-bottom: 8px;
         }
-        .al-rm-kw-input {
-          flex: 1; padding: 6px 10px; border: 0.5px solid #D1D5DB;
-          border-radius: 4px; font-size: 13px; background: #FFFFFF;
+        .al-rm-kw-loading, .al-rm-kw-empty {
+          padding: 24px;
+          text-align: center;
+          color: #5F5E5A;
+          font-size: 13px;
+          background: #F8F7F2;
+          border-radius: 4px;
         }
-        .al-rm-kw-btn {
-          padding: 6px 12px; border: 0.5px solid #D1D5DB; border-radius: 4px;
-          background: #FFFFFF; color: #1A1D23; font-size: 12px; cursor: pointer;
-          white-space: nowrap;
+        .al-rm-kw-table {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          font-size: 13px;
         }
+        .al-rm-kw-th {
+          height: 32px;
+          padding: 0 12px;
+          text-align: left;
+          background: #F1EFE8;
+          color: #5F5E5A;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          user-select: none;
+          border-bottom: 1px solid #DEE1E4;
+        }
+        .al-rm-kw-th-num { text-align: right; }
+        .al-rm-kw-th-check { width: 36px; cursor: default; }
+        .al-rm-kw-th.is-sort-active { background: #2C2C2A; color: #FFFFFF; }
+        .al-rm-kw-sort { margin-left: 4px; font-size: 11px; opacity: 0.7; }
+        .al-rm-kw-tr { cursor: pointer; transition: background .08s; }
+        .al-rm-kw-tr:nth-child(even):not(.is-selected) { background: #F8F7F2; }
+        .al-rm-kw-tr.is-selected { background: #E6F1FB; }
+        .al-rm-kw-tr:hover:not(.is-selected) { background: #EFEDE5; }
+        .al-rm-kw-td {
+          height: 36px;
+          padding: 0 12px;
+          border-bottom: 1px solid #EDEAE0;
+          vertical-align: middle;
+        }
+        .al-rm-kw-td-num { text-align: right; font-variant-numeric: tabular-nums; }
+        .al-rm-kw-td-check { text-align: center; }
+        .al-rm-kw-badge {
+          display: inline-block;
+          height: 22px;
+          line-height: 22px;
+          padding: 0 10px;
+          border-radius: 11px;
+          font-size: 11.5px;
+          font-weight: 500;
+        }
+        .al-rm-kw-badge-comp-low { background: #DDEBC5; color: #27500A; }
+        .al-rm-kw-badge-comp-mid { background: #F5E3C5; color: #854F0B; }
+        .al-rm-kw-badge-comp-high { background: #F4D2D2; color: #791F1F; }
+        .al-rm-kw-badge-score-excellent { background: #185FA5; color: #FFFFFF; }
+        .al-rm-kw-badge-score-normal { background: #5F5E5A; color: #FFFFFF; }
+        .al-rm-kw-badge-score-poor { background: #B4B2A9; color: #FFFFFF; }
+        .al-rm-confirm-warn { margin-top: 8px; color: #791F1F; font-weight: 500; font-size: 13px; }
 
         .al-rm-group-info {
           display: grid; grid-template-columns: 1fr auto; gap: 16px;

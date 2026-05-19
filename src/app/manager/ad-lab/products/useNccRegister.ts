@@ -6,6 +6,14 @@ import { calcMargin } from './calcMargin';
 
 const DEFAULT_AD_COST_RATIO = 0.05;
 
+export interface NccRegisterKeyword {
+  keyword: string;
+  monthlySearchVolume: number;
+  compIdx: '낮음' | '중간' | '높음';
+  clickRate: number;
+  recommendScore: number;
+}
+
 export interface RegisteredItem {
   product_id: string;
   ncc_campaign_id: string | null;
@@ -26,7 +34,7 @@ interface UseNccRegisterResult {
   result: RegisterResult | null;
   registerProducts: (
     products: ProductRow[],
-    keywords: string[],
+    keywords: NccRegisterKeyword[],
     dryRun: boolean,
   ) => Promise<RegisterResult>;
   resetResult: () => void;
@@ -40,7 +48,7 @@ export function useNccRegister(feeRate: number): UseNccRegisterResult {
   const registerProducts = useCallback(
     async (
       products: ProductRow[],
-      keywords: string[],
+      keywords: NccRegisterKeyword[],
       dryRun: boolean,
     ): Promise<RegisterResult> => {
       setLoading(true);

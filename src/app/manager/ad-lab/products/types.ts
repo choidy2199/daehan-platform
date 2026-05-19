@@ -1,17 +1,17 @@
 // ad_products 테이블 행 (DB 스키마 그대로)
 export interface AdProduct {
-  id: string;
-  product_code: string;
-  product_source: 'milwaukee' | 'general';
-  product_name: string;
-  margin_rate: number | null;
-  sale_price: number | null;
-  is_ad_active: boolean;
-  tier: string | null;
-  ncc_campaign_id: string | null;
-  daily_budget: number | null;
-  max_cpc: number | null;
-  min_roas: number | null;
+  id: number;
+  product_code: string | null;
+  product_source: string;
+  ncc_product_id: string | null;
+  origin_product_no: string | null;
+  channel_product_no: string | null;
+  campaign_id: string | null;
+  bid_amt: number | null;
+  auto_bid_enabled: boolean;
+  target_roas_multiplier: number;
+  daily_budget_limit: number | null;
+  status: string;
   created_at: string;
   updated_at: string;
 }

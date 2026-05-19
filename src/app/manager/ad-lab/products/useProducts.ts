@@ -92,15 +92,15 @@ export function useProducts(filters: ProductFilters = DEFAULT_FILTERS): UseProdu
       }
 
       return {
-        id: Number(ap.id),
+        id: ap.id,
         product_code: ap.product_code,
-        product_source: ap.product_source,
-        campaign_id: ap.ncc_campaign_id,
-        campaign_name: ap.ncc_campaign_id ? (campaignMap[ap.ncc_campaign_id] || null) : null,
-        bid_amt: ap.max_cpc,
-        daily_budget_limit: ap.daily_budget,
-        auto_bid_enabled: false,
-        status: ap.is_ad_active ? 'ELIGIBLE' : 'PAUSED',
+        product_source: ap.product_source as 'milwaukee' | 'general' | null,
+        campaign_id: ap.campaign_id,
+        campaign_name: ap.campaign_id ? (campaignMap[ap.campaign_id] || null) : null,
+        bid_amt: ap.bid_amt,
+        daily_budget_limit: ap.daily_budget_limit,
+        auto_bid_enabled: ap.auto_bid_enabled,
+        status: ap.status,
         model: catalog?.model ?? null,
         category: catalog?.category ?? null,
         cost: catalog?.cost ?? null,
