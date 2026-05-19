@@ -1,9 +1,43 @@
 'use client';
 
+import { useRef } from 'react';
 import type { ProductRow } from './types';
 import { calcMargin } from './calcMargin';
 import { breakEvenRoas } from './breakEvenRoas';
 import { useFeeRate } from './useFeeRate';
+import { useColumnWidths, type ColumnKey } from './useColumnWidths';
+import { ResizableHeader } from './ResizableHeader';
+
+const CHECKBOX_WIDTH = 36;
+
+const COLUMNS: { key: ColumnKey; label: string; align: 'left' | 'right' | 'center' }[] = [
+  { key: 'model', label: '모델·코드', align: 'left' },
+  { key: 'cost', label: '원가', align: 'right' },
+  { key: 'priceNaver', label: '판매가', align: 'right' },
+  { key: 'marginRate', label: '마진율', align: 'right' },
+  { key: 'breakEvenRoas', label: '손익분기 ROAS', align: 'right' },
+  { key: 'actualRoas', label: '실제 ROAS', align: 'right' },
+  { key: 'bid', label: '입찰가', align: 'right' },
+  { key: 'budget', label: '일 한도', align: 'right' },
+  { key: 'automation', label: '자동화', align: 'center' },
+  { key: 'status', label: '상태', align: 'center' },
+];
+
+function measureColumnAutoWidth(
+  colIndex: number,
+  tableEl: HTMLTableElement | null
+): number {
+  if (!tableEl) return 100;
+  const rows = tableEl.querySelectorAll('tbody tr');
+  let maxWidth = 0;
+  rows.forEach(row => {
+    const cell = row.children[colIndex] as HTMLElement | undefined;
+    if (!cell) return;
+    const w = cell.scrollWidth;
+    if (w > maxWidth) maxWidth = w;
+  });
+  return Math.max(40, Math.ceil(maxWidth + 24));
+}
 
 function formatWon(value: number | null | undefined): string {
   if (value === null || value === undefined) return '—';
@@ -44,23 +78,13 @@ interface ProductsTableProps {
   totalPages: number;
 }
 
-const COLS: { label: string; width: number; align: 'left' | 'right' | 'center' }[] = [
-  { label: '☐', width: 36, align: 'center' },
-  { label: '모델·코드', width: 180, align: 'left' },
-  { label: '원가', width: 90, align: 'right' },
-  { label: '판매가', width: 90, align: 'right' },
-  { label: '마진율', width: 80, align: 'right' },
-  { label: '손익분기 ROAS', width: 110, align: 'right' },
-  { label: '실제 ROAS', width: 100, align: 'right' },
-  { label: '입찰가', width: 90, align: 'right' },
-  { label: '일 한도', width: 100, align: 'right' },
-  { label: '자동화', width: 80, align: 'center' },
-  { label: '상태', width: 80, align: 'center' },
-];
+const TOTAL_COL_COUNT = COLUMNS.length + 1; // checkbox + 10
 
 export function ProductsTable(props: ProductsTableProps) {
   const { rows, totalCount, matchedCount, unmatchedCount, loading, error, page, setPage, pageSize, totalPages } = props;
   const { feeRate } = useFeeRate();
+  const { widths, ratios, setColumnWidth, minWidth } = useColumnWidths();
+  const tableRef = useRef<HTMLTableElement>(null);
 
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, totalCount);
@@ -78,32 +102,54 @@ export function ProductsTable(props: ProductsTableProps) {
       {error && <div style={{ padding: 12, color: '#DC2626' }}>에러: {error}</div>}
 
       <div style={{ overflowX: 'auto', border: '0.5px solid #E5E7EB', borderRadius: 4 }}>
-        <table style={{ width: 1036, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+        <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <colgroup>
-            {COLS.map((c, i) => <col key={i} style={{ width: c.width }} />)}
+            <col style={{ width: CHECKBOX_WIDTH }} />
+            {COLUMNS.map(c => {
+              const px = widths[c.key];
+              const style = px != null
+                ? { width: `${px}px` }
+                : { width: `${ratios[c.key]}%` };
+              return <col key={c.key} style={style} />;
+            })}
           </colgroup>
           <thead>
             <tr className="al-thead-row">
-              {COLS.map((c, i) => (
-                <th
-                  key={i}
-                  className="al-th"
-                  style={{
-                    padding: '8px 10px',
-                    textAlign: c.align,
-                    fontWeight: 500,
-                    fontSize: 12,
+              <th
+                className="al-th"
+                style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 500, fontSize: 12 }}
+              >
+                ☐
+              </th>
+              {COLUMNS.map((c, i) => (
+                <ResizableHeader
+                  key={c.key}
+                  columnKey={c.key}
+                  onResize={(px) => setColumnWidth(c.key, px)}
+                  onAutoFit={() => {
+                    const measured = measureColumnAutoWidth(i + 1, tableRef.current);
+                    setColumnWidth(c.key, measured);
+                  }}
+                  minWidth={minWidth}
+                  thProps={{
+                    className: 'al-th',
+                    style: {
+                      padding: '8px 10px',
+                      textAlign: c.align,
+                      fontWeight: 500,
+                      fontSize: 12,
+                    },
                   }}
                 >
                   {c.label}
-                </th>
+                </ResizableHeader>
               ))}
             </tr>
           </thead>
           <tbody>
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={COLS.length} className="al-c-dash" style={{ padding: 24 }}>
+                <td colSpan={TOTAL_COL_COUNT} className="al-c-dash" style={{ padding: 24 }}>
                   데이터 없음
                 </td>
               </tr>
@@ -212,8 +258,26 @@ export function ProductsTable(props: ProductsTableProps) {
 
       <style>{`
         .al-thead-row { background: #2C2C2A; }
-        .al-th { color: #FFFFFF; border-right: 0.5px solid #444441; }
+        .al-th {
+          color: #FFFFFF;
+          border-right: 0.5px solid #444441;
+          position: relative;
+        }
         .al-th:last-child { border-right: none; }
+
+        .al-resize-handle {
+          position: absolute;
+          right: -2px;
+          top: 0;
+          width: 6px;
+          height: 100%;
+          cursor: col-resize;
+          z-index: 2;
+          background: transparent;
+          transition: background 0.1s ease;
+          user-select: none;
+        }
+        .al-resize-handle:hover { background: #185FA5; }
 
         .al-c-model { color: #1A1D23; font-weight: 500; }
         .al-c-code { color: #5F5E5A; font-size: 11px; }
