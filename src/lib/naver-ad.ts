@@ -41,3 +41,21 @@ export async function adGet<T = unknown>(
   }
   return response.json() as Promise<T>;
 }
+
+export async function adPost<T = unknown>(
+  uri: string,
+  body: object,
+  keys: ApiKeys['naverAd'],
+): Promise<T> {
+  const signUri = uri.includes('?') ? uri.slice(0, uri.indexOf('?')) : uri;
+  const headers = buildAdHeaders('POST', signUri, keys);
+  const response = await fetch(NAVER_AD_BASE_URL + uri, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`Naver Ad API ${response.status}: ${await response.text()}`);
+  }
+  return response.json() as Promise<T>;
+}

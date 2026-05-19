@@ -1,17 +1,17 @@
 // ad_products 테이블 행 (DB 스키마 그대로)
 export interface AdProduct {
-  id: number;
-  product_code: string | null;          // mw_*.code와 매칭
-  product_source: 'milwaukee' | 'general' | null;
-  ncc_product_id: string | null;
-  origin_product_no: string | null;
-  channel_product_no: string | null;
-  campaign_id: string | null;
-  bid_amt: number | null;
-  auto_bid_enabled: boolean;
-  target_roas_multiplier: number;
-  daily_budget_limit: number | null;
-  status: string;
+  id: string;
+  product_code: string;
+  product_source: 'milwaukee' | 'general';
+  product_name: string;
+  margin_rate: number | null;
+  sale_price: number | null;
+  is_ad_active: boolean;
+  tier: string | null;
+  ncc_campaign_id: string | null;
+  daily_budget: number | null;
+  max_cpc: number | null;
+  min_roas: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -75,6 +75,7 @@ export interface UseProductsResult {
   totalFiltered: number;           // 필터링 통과 개수
   totalAll: number;                // 필터링 전 전체 개수
   allRows: ProductRow[];           // 필터링 전 전체 배열 (ProductsFilter 카운트용)
+  refetchProducts: () => Promise<void>;
 }
 
 // 필터 타입

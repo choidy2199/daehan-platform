@@ -8,6 +8,7 @@ import { useFeeRate } from './useFeeRate';
 import { useColumnWidths, type ColumnKey } from './useColumnWidths';
 import { ResizableHeader } from './ResizableHeader';
 import { ProductsDrawer } from './ProductsDrawer';
+import { ProductsRegisterModal } from './ProductsRegisterModal';
 
 const CHECKBOX_WIDTH = 36;
 
@@ -77,26 +78,66 @@ interface ProductsTableProps {
   setPage: (page: number) => void;
   pageSize: number;
   totalPages: number;
+  refetchProducts: () => void;
 }
 
 const TOTAL_COL_COUNT = COLUMNS.length + 1; // checkbox + 10
 
 export function ProductsTable(props: ProductsTableProps) {
-  const { rows, totalCount, matchedCount, unmatchedCount, loading, error, page, setPage, pageSize, totalPages } = props;
+  const { rows, totalCount, matchedCount, unmatchedCount, loading, error, page, setPage, pageSize, totalPages, refetchProducts } = props;
   const { feeRate } = useFeeRate();
   const { widths, ratios, setColumnWidth, minWidth } = useColumnWidths();
   const tableRef = useRef<HTMLTableElement>(null);
   const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [registerModalProducts, setRegisterModalProducts] = useState<ProductRow[] | null>(null);
+
+  const toggleRowSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allPageSelected = rows.length > 0 && rows.every(r => selectedIds.has(String(r.id)));
+  const toggleAllOnPage = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        for (const r of rows) next.delete(String(r.id));
+      } else {
+        for (const r of rows) next.add(String(r.id));
+      }
+      return next;
+    });
+  };
+
+  const selectedProducts = rows.filter(r => selectedIds.has(String(r.id)));
 
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, totalCount);
 
   return (
     <div className="al-products-table" style={{ fontSize: 13 }}>
-      <div className="al-summary" style={{ display: 'flex', gap: 16, padding: '8px 12px', color: '#374151' }}>
+      <div className="al-summary" style={{ display: 'flex', gap: 16, alignItems: 'center', padding: '8px 12px', color: '#374151' }}>
         <span>전체 {totalCount}</span>
         <span>매칭 {matchedCount}</span>
         <span>미매칭 {unmatchedCount}</span>
+        {selectedProducts.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setRegisterModalProducts(selectedProducts)}
+            style={{
+              padding: '6px 12px', border: '0.5px solid #185FA5', borderRadius: 4,
+              background: '#185FA5', color: '#FFFFFF', fontSize: 12, fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            선택 {selectedProducts.length}건 NCC 일괄 등록
+          </button>
+        )}
         <span style={{ marginLeft: 'auto' }}>페이지 {page} / {totalPages} · {pageSize}건</span>
       </div>
 
@@ -121,7 +162,13 @@ export function ProductsTable(props: ProductsTableProps) {
                 className="al-th"
                 style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 500, fontSize: 12 }}
               >
-                ☐
+                <input
+                  type="checkbox"
+                  checked={allPageSelected}
+                  onChange={toggleAllOnPage}
+                  onClick={e => e.stopPropagation()}
+                  aria-label="전체 선택"
+                />
               </th>
               {COLUMNS.map((c, i) => (
                 <ResizableHeader
@@ -177,7 +224,12 @@ export function ProductsTable(props: ProductsTableProps) {
                   onMouseLeave={e => { e.currentTarget.style.borderLeftColor = 'transparent'; }}
                 >
                   <td style={{ padding: '6px 10px', textAlign: 'center' }}>
-                    <input type="checkbox" onClick={e => e.stopPropagation()} />
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(String(row.id))}
+                      onChange={() => toggleRowSelected(String(row.id))}
+                      onClick={e => e.stopPropagation()}
+                    />
                   </td>
                   <td style={{ padding: '6px 10px' }}>
                     <div className="al-c-model">
@@ -325,6 +377,17 @@ export function ProductsTable(props: ProductsTableProps) {
         product={selectedProduct}
         onClose={() => setSelectedProduct(null)}
         feeRate={feeRate}
+        onNccRegisterClick={(p) => setRegisterModalProducts([p])}
+      />
+
+      <ProductsRegisterModal
+        open={registerModalProducts !== null}
+        products={registerModalProducts ?? []}
+        feeRate={feeRate}
+        onClose={() => {
+          setRegisterModalProducts(null);
+          refetchProducts();
+        }}
       />
     </div>
   );
