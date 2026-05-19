@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ProductRow } from './types';
 import { calcMargin } from './calcMargin';
 import { breakEvenRoas } from './breakEvenRoas';
 import { useFeeRate } from './useFeeRate';
 import { useColumnWidths, type ColumnKey } from './useColumnWidths';
 import { ResizableHeader } from './ResizableHeader';
+import { ProductsDrawer } from './ProductsDrawer';
 
 const CHECKBOX_WIDTH = 36;
 
@@ -85,6 +86,7 @@ export function ProductsTable(props: ProductsTableProps) {
   const { feeRate } = useFeeRate();
   const { widths, ratios, setColumnWidth, minWidth } = useColumnWidths();
   const tableRef = useRef<HTMLTableElement>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductRow | null>(null);
 
   const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, totalCount);
@@ -165,7 +167,7 @@ export function ProductsTable(props: ProductsTableProps) {
                 <tr
                   key={row.id}
                   className={row.matched ? '' : 'row-unmatched'}
-                  onClick={() => console.log('Row clicked:', row.id)}
+                  onClick={() => setSelectedProduct(row)}
                   style={{
                     borderBottom: '0.5px solid #F3F4F6',
                     borderLeft: '2px solid transparent',
@@ -318,6 +320,12 @@ export function ProductsTable(props: ProductsTableProps) {
         .row-unmatched td { background: #FCEBEB; }
         .row-unmatched:hover td { background: #F9DDDD; }
       `}</style>
+
+      <ProductsDrawer
+        product={selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+        feeRate={feeRate}
+      />
     </div>
   );
 }
