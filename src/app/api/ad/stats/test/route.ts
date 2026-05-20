@@ -33,16 +33,15 @@ export async function GET(req: Request) {
   const y = yesterdayKST();
   const since = searchParams.get('since') || y;
   const until = searchParams.get('until') || y;
-  const timeIncrement = (searchParams.get('timeIncrement') as '1' | 'allDays') || 'allDays';
   const fields = ['impCnt', 'clkCnt', 'salesAmt', 'ccnt', 'convAmt', 'ror'];
 
   try {
-    const raw = await getStats({ ids, fields, timeRange: { since, until }, timeIncrement });
+    const raw = await getStats({ ids, fields, timeRange: { since, until } });
     console.log('[ad/stats/test] raw:', JSON.stringify(raw, null, 2));
     return NextResponse.json({
       ok: true,
       raw,
-      requestEcho: { ids, fields, timeRange: { since, until }, timeIncrement },
+      requestEcho: { ids, fields, timeRange: { since, until } },
     });
   } catch (e) {
     return NextResponse.json(
