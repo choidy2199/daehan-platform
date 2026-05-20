@@ -18,7 +18,6 @@ export interface AdProduct {
 
 // ad_campaigns 테이블 행
 export interface AdCampaign {
-  id: string;
   ncc_campaign_id: string;
   name: string;
   status: string;
