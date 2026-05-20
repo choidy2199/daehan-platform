@@ -1,8 +1,8 @@
 // ad_products 테이블 행 (DB 스키마 그대로)
 export interface AdProduct {
   id: number;
-  product_code: string | null;          // mw_*.code와 매칭
-  product_source: 'milwaukee' | 'general' | null;
+  product_code: string | null;
+  product_source: string;
   ncc_product_id: string | null;
   origin_product_no: string | null;
   channel_product_no: string | null;
@@ -75,6 +75,7 @@ export interface UseProductsResult {
   totalFiltered: number;           // 필터링 통과 개수
   totalAll: number;                // 필터링 전 전체 개수
   allRows: ProductRow[];           // 필터링 전 전체 배열 (ProductsFilter 카운트용)
+  refetchProducts: () => Promise<void>;
 }
 
 // 필터 타입

@@ -14,7 +14,7 @@ function ProductsTabContent() {
   const {
     rows, totalCount, matchedCount, unmatchedCount,
     loading, error, page, setPage, pageSize, totalPages,
-    totalFiltered, allRows,
+    totalFiltered, allRows, refetchProducts,
   } = useProducts(filters);
   const { campaigns } = useCampaigns();
 
@@ -38,6 +38,7 @@ function ProductsTabContent() {
         setPage={setPage}
         pageSize={pageSize}
         totalPages={totalPages}
+        refetchProducts={refetchProducts}
       />
     </>
   );

@@ -39,9 +39,10 @@ interface ProductsDrawerProps {
   product: ProductRow | null;
   onClose: () => void;
   feeRate: number;
+  onNccRegisterClick: (product: ProductRow) => void;
 }
 
-export function ProductsDrawer({ product, onClose, feeRate }: ProductsDrawerProps) {
+export function ProductsDrawer({ product, onClose, feeRate, onNccRegisterClick }: ProductsDrawerProps) {
   const [adCostRatio, setAdCostRatio] = useState<number>(DEFAULT_AD_COST_RATIO);
   const [targetRoas, setTargetRoas] = useState<number>(DEFAULT_TARGET_ROAS);
 
@@ -210,10 +211,11 @@ export function ProductsDrawer({ product, onClose, feeRate }: ProductsDrawerProp
         <div className="al-drawer-footer">
           <button
             type="button"
-            className="al-drawer-btn al-drawer-btn-disabled"
-            disabled
+            className="al-drawer-btn al-drawer-btn-primary"
+            onClick={() => product && onNccRegisterClick(product)}
+            disabled={!product}
           >
-            NCC 광고 등록 (Step 5+)
+            NCC 광고 등록
           </button>
           <button
             type="button"

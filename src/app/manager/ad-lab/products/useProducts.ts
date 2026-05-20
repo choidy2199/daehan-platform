@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   AdProduct,
   AdCampaign,
@@ -27,63 +27,52 @@ export function useProducts(filters: ProductFilters = DEFAULT_FILTERS): UseProdu
 
   // ① ad_products + ad_campaigns API에서 가져오기
   // ② localStorage에서 mw_products / mw_gen_products 읽기 (dictionary로 변환)
-  useEffect(() => {
-    let cancelled = false;
+  const refetchProducts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [productsRes, campaignsRes] = await Promise.all([
+        fetch('/api/ad/products').then(r => r.json()),
+        fetch('/api/ad/campaigns').then(r => r.json()),
+      ]);
 
-    async function load() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        // API 병렬 호출
-        const [productsRes, campaignsRes] = await Promise.all([
-          fetch('/api/ad/products').then(r => r.json()),
-          fetch('/api/ad/campaigns').then(r => r.json()),
-        ]);
-
-        if (cancelled) return;
-
-        if (!productsRes.success) {
-          throw new Error('광고 상품 조회 실패');
-        }
-        if (!campaignsRes.success) {
-          throw new Error('캠페인 조회 실패');
-        }
-
-        setAdProducts(productsRes.products || []);
-        setCampaigns(campaignsRes.campaigns || []);
-
-        // localStorage 단가표 읽기
-        const mwRaw = localStorage.getItem('mw_products');
-        const genRaw = localStorage.getItem('mw_gen_products');
-
-        const mwArr: CatalogItem[] = mwRaw ? JSON.parse(mwRaw) : [];
-        const genArr: CatalogItem[] = genRaw ? JSON.parse(genRaw) : [];
-
-        // dictionary 변환 (code → CatalogItem)
-        const mwDict: Record<string, CatalogItem> = {};
-        for (const item of mwArr) {
-          if (item.code) mwDict[String(item.code)] = item;
-        }
-        const genDict: Record<string, CatalogItem> = {};
-        for (const item of genArr) {
-          if (item.code) genDict[String(item.code)] = item;
-        }
-
-        setMwProducts(mwDict);
-        setMwGenProducts(genDict);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : '알 수 없는 오류');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+      if (!productsRes.success) {
+        throw new Error('광고 상품 조회 실패');
       }
-    }
+      if (!campaignsRes.success) {
+        throw new Error('캠페인 조회 실패');
+      }
 
-    load();
-    return () => { cancelled = true; };
+      setAdProducts(productsRes.products || []);
+      setCampaigns(campaignsRes.campaigns || []);
+
+      const mwRaw = localStorage.getItem('mw_products');
+      const genRaw = localStorage.getItem('mw_gen_products');
+
+      const mwArr: CatalogItem[] = mwRaw ? JSON.parse(mwRaw) : [];
+      const genArr: CatalogItem[] = genRaw ? JSON.parse(genRaw) : [];
+
+      const mwDict: Record<string, CatalogItem> = {};
+      for (const item of mwArr) {
+        if (item.code) mwDict[String(item.code)] = item;
+      }
+      const genDict: Record<string, CatalogItem> = {};
+      for (const item of genArr) {
+        if (item.code) genDict[String(item.code)] = item;
+      }
+
+      setMwProducts(mwDict);
+      setMwGenProducts(genDict);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '알 수 없는 오류');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refetchProducts();
+  }, [refetchProducts]);
 
   // 캠페인 id → name 매핑
   const campaignMap = useMemo(() => {
@@ -105,7 +94,7 @@ export function useProducts(filters: ProductFilters = DEFAULT_FILTERS): UseProdu
       return {
         id: ap.id,
         product_code: ap.product_code,
-        product_source: ap.product_source,
+        product_source: ap.product_source as 'milwaukee' | 'general' | null,
         campaign_id: ap.campaign_id,
         campaign_name: ap.campaign_id ? (campaignMap[ap.campaign_id] || null) : null,
         bid_amt: ap.bid_amt,
@@ -211,5 +200,6 @@ export function useProducts(filters: ProductFilters = DEFAULT_FILTERS): UseProdu
     totalFiltered: filteredRows.length,
     totalAll: allRows.length,
     allRows,
+    refetchProducts,
   };
 }
