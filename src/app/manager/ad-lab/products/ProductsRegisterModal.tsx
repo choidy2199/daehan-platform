@@ -82,15 +82,14 @@ export function ProductsRegisterModal({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [compFilter, setCompFilter] = useState<Set<CompLevel>>(new Set(['낮음', '중간']));
   const [refetchToken, setRefetchToken] = useState(0);
-  const [dryRun, setDryRun] = useState(true);
   const [helpExpanded, setHelpExpanded] = useState<Record<string, boolean>>({});
   const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({
     target: true,
     keywords: true,
     group: true,
-    mode: true,
   });
   const [confirmRealRun, setConfirmRealRun] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [includedIds, setIncludedIds] = useState<Set<string>>(new Set());
 
   const { loading, error, result, registerProducts, resetResult } = useNccRegister(feeRate);
@@ -98,72 +97,87 @@ export function ProductsRegisterModal({
   useEffect(() => {
     if (!open) return;
     setIncludedIds(new Set(products.map(p => String(p.id))));
-    setDryRun(true);
     setConfirmRealRun(false);
     resetResult();
   }, [open, products, resetResult]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (products.length === 0) {
-      setNccKeywords([]);
-      setSelectedKeywords(new Set());
-      return;
-    }
-    let cancelled = false;
-    setKeywordsLoading(true);
-    setKeywordsError(null);
-
-    fetch('/api/ad/extract-keywords', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        products: products.map(p => ({
-          id: p.id,
-          product_name: p.model,
-          category: p.category,
-        })),
-      }),
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (cancelled) return;
-        if (!data.success) {
-          setKeywordsError(data.error || '키워드 가져오기 실패');
-          setNccKeywords([]);
-          setSelectedKeywords(new Set());
-          return;
-        }
-        const fetched: NccRegisterKeyword[] = data.keywords;
-        setNccKeywords(fetched);
-        const top10 = fetched
-          .filter(k => k.compIdx === '낮음' || k.compIdx === '중간')
-          .sort((a, b) =>
-            b.recommendScore - a.recommendScore ||
-            a.keyword.localeCompare(b.keyword, 'ko'),
-          )
-          .slice(0, 10)
-          .map(k => k.keyword);
-        setSelectedKeywords(new Set(top10));
-      })
-      .catch(err => {
-        if (cancelled) return;
-        setKeywordsError(String(err));
-        setNccKeywords([]);
-        setSelectedKeywords(new Set());
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setKeywordsLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [open, products, refetchToken]);
 
   const includedProducts = useMemo(
     () => products.filter(p => includedIds.has(String(p.id))),
     [products, includedIds],
   );
+
+  const includedIdsKey = useMemo(
+    () => Array.from(includedIds).sort().join(','),
+    [includedIds],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    if (includedProducts.length === 0) {
+      setNccKeywords([]);
+      setSelectedKeywords(new Set());
+      setKeywordsError(null);
+      setKeywordsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setKeywordsLoading(true);
+    setKeywordsError(null);
+
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+
+      fetch('/api/ad/extract-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          products: includedProducts.map(p => ({
+            id: p.id,
+            product_name: p.model,
+            category: p.category,
+          })),
+        }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (cancelled) return;
+          if (!data.success) {
+            setKeywordsError(data.error || '키워드 가져오기 실패');
+            setNccKeywords([]);
+            setSelectedKeywords(new Set());
+            return;
+          }
+          const fetched: NccRegisterKeyword[] = data.keywords;
+          setNccKeywords(fetched);
+          const top10 = fetched
+            .filter(k => k.compIdx === '낮음' || k.compIdx === '중간')
+            .sort((a, b) =>
+              b.recommendScore - a.recommendScore ||
+              a.keyword.localeCompare(b.keyword, 'ko'),
+            )
+            .slice(0, 10)
+            .map(k => k.keyword);
+          setSelectedKeywords(new Set(top10));
+        })
+        .catch(err => {
+          if (cancelled) return;
+          setKeywordsError(String(err));
+          setNccKeywords([]);
+          setSelectedKeywords(new Set());
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setKeywordsLoading(false);
+        });
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, includedIdsKey, refetchToken]);
 
   const perMetrics = useMemo(() => {
     const map = new Map<string, PerProductMetrics>();
@@ -258,16 +272,20 @@ export function ProductsRegisterModal({
   const toggleSection = (key: string) =>
     setSectionExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const doDryRun = useCallback(async () => {
-    if (loading) return;
+  const doRealRun = useCallback(async () => {
+    if (loading || previewing) return;
+    setPreviewing(true);
     try {
       await registerProducts(includedProducts, selectedKwObjects, true);
+      setConfirmRealRun(true);
     } catch {
-      /* error captured in hook */
+      /* error captured in hook (useNccRegister.error) */
+    } finally {
+      setPreviewing(false);
     }
-  }, [loading, registerProducts, includedProducts, selectedKwObjects]);
+  }, [loading, previewing, registerProducts, includedProducts, selectedKwObjects]);
 
-  const doRealRun = useCallback(async () => {
+  const doFinalRun = useCallback(async () => {
     if (loading) return;
     try {
       await registerProducts(includedProducts, selectedKwObjects, false);
@@ -558,50 +576,6 @@ export function ProductsRegisterModal({
             )}
           </section>
 
-          {/* Section 4: 등록 모드 */}
-          <section className="al-rm-section">
-            <button
-              type="button"
-              className="al-rm-section-head"
-              onClick={() => toggleSection('mode')}
-            >
-              <span>등록 모드</span>
-              <span className="al-rm-caret">{sectionExpanded.mode ? '▾' : '▸'}</span>
-            </button>
-            <div className="al-rm-help">
-              <span className="al-rm-help-icon">?</span>
-              <span className="al-rm-help-short">
-                dry-run 모드는 NCC API를 호출하지 않고 시뮬레이션만 수행합니다.
-              </span>
-              <button
-                type="button"
-                className="al-rm-help-toggle"
-                onClick={() => toggleHelp('mode')}
-              >
-                {helpExpanded.mode ? '접기' : '더 알아보기'}
-              </button>
-            </div>
-            {helpExpanded.mode && (
-              <div className="al-rm-help-detail">
-                dry-run ON: 데이터베이스에 쓰지 않고 등록될 결과만 미리 확인합니다.
-                dry-run OFF: 실제 NCC API를 호출하여 광고가 등록되며 되돌릴 수 없습니다.
-              </div>
-            )}
-            {sectionExpanded.mode && (
-              <div className="al-rm-mode-row">
-                <label className="al-rm-toggle">
-                  <input
-                    type="checkbox"
-                    checked={dryRun}
-                    onChange={e => setDryRun(e.target.checked)}
-                    disabled={loading}
-                  />
-                  <span>dry-run 모드 {dryRun ? 'ON' : 'OFF'}</span>
-                </label>
-              </div>
-            )}
-          </section>
-
           {/* 결과 패널 */}
           {error && (
             <div className="al-rm-error">에러: {error}</div>
@@ -657,26 +631,18 @@ export function ProductsRegisterModal({
           </button>
           <button
             type="button"
-            className="al-rm-btn al-rm-btn-primary"
-            onClick={doDryRun}
-            disabled={loading || !dryRun || includedProducts.length === 0}
-          >
-            {loading && dryRun ? '실행 중...' : 'dry-run 실행'}
-          </button>
-          <button
-            type="button"
             className="al-rm-btn al-rm-btn-danger"
-            onClick={() => setConfirmRealRun(true)}
-            disabled={loading || dryRun || includedProducts.length === 0}
+            onClick={doRealRun}
+            disabled={loading || previewing || includedProducts.length === 0 || selectedKeywords.size === 0}
           >
-            실제 등록
+            {previewing ? '검증 중...' : '실제 등록'}
           </button>
         </div>
 
         {confirmRealRun && (
           <div className="al-rm-confirm">
             <div className="al-rm-confirm-box">
-              <div className="al-rm-confirm-title">실제 등록 확인</div>
+              <div className="al-rm-confirm-title">사전 검증 완료 — 등록 확인</div>
               <div className="al-rm-confirm-msg">
                 선택된 {includedProducts.length}개 상품 × {selectedKeywords.size}개 키워드를 실제 등록합니다.<br/>
                 일 한도 합계: <strong>{formatWon(totalDailyBudget)}</strong>
@@ -684,6 +650,38 @@ export function ProductsRegisterModal({
                   <div className="al-rm-confirm-warn">⚠️ 50,000원을 초과합니다. 진행하시겠습니까?</div>
                 )}
               </div>
+              {result && result.dry_run && (
+                <div className="al-rm-confirm-preview">
+                  <div className="al-rm-confirm-preview-head">사전 검증 결과</div>
+                  <div className="al-rm-confirm-preview-summary">
+                    {(() => {
+                      const total = result.registered.length;
+                      const success = result.registered.filter(r => r.status === 'dry_run').length;
+                      const failed = result.registered.filter(r => r.status === 'failed').length;
+                      return (
+                        <>
+                          검증 {total}건 · 통과 <strong>{success}</strong>건
+                          {failed > 0 && (
+                            <> · 실패 <strong className="al-rm-confirm-preview-fail">{failed}</strong>건</>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                  {result.registered.some(r => r.status === 'failed') && (
+                    <div className="al-rm-confirm-preview-fails">
+                      {result.registered
+                        .filter(r => r.status === 'failed')
+                        .map(r => (
+                          <div key={r.product_id} className="al-rm-confirm-preview-fail-row">
+                            <span className="al-rm-confirm-preview-pid">{r.product_id}</span>
+                            <span className="al-rm-confirm-preview-msg">{r.error_message || '오류'}</span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="al-rm-confirm-btns">
                 <button
                   type="button"
@@ -696,10 +694,10 @@ export function ProductsRegisterModal({
                 <button
                   type="button"
                   className="al-rm-btn al-rm-btn-danger"
-                  onClick={doRealRun}
-                  disabled={loading}
+                  onClick={doFinalRun}
+                  disabled={loading || (result !== null && result.registered.every(r => r.status === 'failed'))}
                 >
-                  {loading ? '등록 중...' : '확인'}
+                  {loading ? '등록 중...' : '확인 후 등록'}
                 </button>
               </div>
             </div>
@@ -965,7 +963,7 @@ export function ProductsRegisterModal({
         }
         .al-rm-confirm-box {
           background: #FFFFFF; border-radius: 6px;
-          padding: 20px 24px; width: 400px; max-width: 90vw;
+          padding: 20px 24px; width: 560px; max-width: calc(100vw - 48px);
           box-shadow: 0 8px 24px rgba(0,0,0,0.3);
         }
         .al-rm-confirm-title { font-size: 15px; font-weight: 600; color: #1A1D23; }
@@ -974,6 +972,54 @@ export function ProductsRegisterModal({
         }
         .al-rm-confirm-btns {
           margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;
+        }
+        .al-rm-confirm-preview {
+          margin-top: 16px;
+          padding: 12px 14px;
+          background: #F8F7F2;
+          border: 1px solid #DEE1E4;
+          border-radius: 4px;
+        }
+        .al-rm-confirm-preview-head {
+          font-size: 13px;
+          font-weight: 600;
+          color: #2C2C2A;
+          margin-bottom: 8px;
+        }
+        .al-rm-confirm-preview-summary {
+          font-size: 12.5px;
+          color: #5F5E5A;
+        }
+        .al-rm-confirm-preview-fail {
+          color: #791F1F;
+        }
+        .al-rm-confirm-preview-fails {
+          margin-top: 8px;
+          max-height: 120px;
+          overflow-y: auto;
+          border-top: 1px solid #EDEAE0;
+          padding-top: 8px;
+        }
+        .al-rm-confirm-preview-fail-row {
+          display: flex;
+          gap: 8px;
+          font-size: 12px;
+          padding: 4px 0;
+          border-bottom: 1px dashed #EDEAE0;
+        }
+        .al-rm-confirm-preview-fail-row:last-child {
+          border-bottom: none;
+        }
+        .al-rm-confirm-preview-pid {
+          flex-shrink: 0;
+          width: 80px;
+          color: #5F5E5A;
+          font-variant-numeric: tabular-nums;
+        }
+        .al-rm-confirm-preview-msg {
+          flex: 1;
+          color: #791F1F;
+          word-break: break-word;
         }
       `}</style>
     </>
