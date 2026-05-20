@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { ApiKeys } from './api-keys';
+import { getApiKeys } from './api-keys';
 
 export const NAVER_AD_BASE_URL = 'https://api.naver.com';
 
@@ -58,4 +59,22 @@ export async function adPost<T = unknown>(
     throw new Error(`Naver Ad API ${response.status}: ${await response.text()}`);
   }
   return response.json() as Promise<T>;
+}
+
+// NCC /stats 실시간 통계 (5-D-1) — 응답 shape 미확정이라 unknown 반환
+// timeIncrement는 'allDays'만 지원 (timeIncrement=1은 Naver 400 미지원, 5-D-1 실측 확인) → 고정.
+// 일별 적재가 필요하면 호출자가 since=until=특정일로 날짜별 반복 호출할 것.
+export async function getStats(params: {
+  ids: string[];           // ncc_product_id 배열
+  fields: string[];        // ['impCnt', 'clkCnt', 'salesAmt', 'ccnt', 'convAmt', 'ror']
+  timeRange: { since: string; until: string };  // 'YYYY-MM-DD'
+}): Promise<unknown> {
+  const { ids, fields, timeRange } = params;
+  const keys = await getApiKeys();
+  const query =
+    'ids=' + ids.map((id) => encodeURIComponent(id)).join(',') +
+    '&fields=' + encodeURIComponent(JSON.stringify(fields)) +
+    '&timeRange=' + encodeURIComponent(JSON.stringify(timeRange)) +
+    '&timeIncrement=allDays';
+  return adGet<unknown>('/stats?' + query, keys.naverAd);
 }
