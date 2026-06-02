@@ -1894,6 +1894,21 @@ function calcCost(supplyPrice, category, ttiNum) {
   return sp - arTotal - volTotal;
 }
 
+// 원가 컬럼 전용: AR(분기+년간) + 카테고리DC만. 누적/커머셜/arPromos/volPromos 미포함
+function calcBaseCost(supplyPrice, category) {
+  if (!supplyPrice) return 0;
+  const s = DB.settings;
+  const sp = supplyPrice;
+  let arTotal = sp * s.quarterDC + sp * s.yearDC;
+  let volTotal = 0;
+  (s.productDCRules || []).forEach(function(rule) {
+    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
+      volTotal += sp - (sp / (1 + rule.rate / 100));
+    }
+  });
+  return sp - arTotal - volTotal;
+}
+
 // ======================== AUTOCOMPLETE ========================
 let acActive = null; // { input, callback }
 const acEl = document.createElement('div');
@@ -11765,7 +11780,7 @@ function saveProduct() {
   // Calculate cost and prices using current settings (same as recalcAll)
   const s = DB.settings;
   var _prodTtiNum = document.getElementById('prod-ttiNum').value.trim();
-  const cost = calcCost(supplyPrice, prodCategory, _prodTtiNum);
+  const cost = calcBaseCost(supplyPrice, prodCategory);
 
   const item = {
     code: code,
@@ -12501,7 +12516,7 @@ function recalcAll() {
 
   DB.products.forEach(function(p) {
     if (!p.supplyPrice) return;
-    var cost = calcCost(p.supplyPrice, p.category || '', p.ttiNum || '');
+    var cost = calcBaseCost(p.supplyPrice, p.category || '');
     p.cost = Math.round(cost);
 
     // 도매: 단순 마크업, 백원 반올림
