@@ -5672,6 +5672,40 @@ function registerErpFromList() {
 }
 
 // Phase 3 예정: mw_orders 반영, 원가계산, 프로모션 탭 분류, 버튼 → '경박 매입등록'으로 변환
+// 제품별(ttiNum 기준) 매입 가중평균 원가P 재계산 → DB.products에 반영 (저장은 호출처에서). prodUpdated 반환
+function recalcCostPriceP(history) {
+  // Step 2: 제품별(ttiNum 기준) 가중평균 계산
+  var groups = {}; // { normTtiNum: { totalCost, totalQty, items:[] } }
+  history.forEach(function(item) {
+    if (item.dryRun) return;
+    var ttiNum = item.ttiNum || '';
+    if (!ttiNum) return;
+    var norm = normalizeTtiCode(ttiNum);
+    if (!norm) return;
+    if (!groups[norm]) groups[norm] = { totalCost: 0, totalQty: 0 };
+    var qty = item.qty || 0;
+    var cost = item.costPrice || 0;
+    groups[norm].totalCost += cost * qty;
+    groups[norm].totalQty += qty;
+  });
+
+  // Step 3: mw_products에 costPriceP 저장 (매입기록 없는 제품은 0으로 초기화)
+  var prodUpdated = 0;
+  var nowStr = new Date().toISOString().slice(0, 10);
+  (DB.products || []).forEach(function(p) {
+    if (!p.ttiNum) return;
+    var norm = normalizeTtiCode(p.ttiNum);
+    var g = groups[norm];
+    if (!g || g.totalQty === 0) { p.costPriceP = 0; return; }
+    p.costPriceP = Math.round(g.totalCost / g.totalQty);
+    p.costPricePQty = g.totalQty;
+    p.costPricePTotal = Math.round(g.totalCost);
+    p.costPricePDate = nowStr;
+    prodUpdated++;
+  });
+  return prodUpdated;
+}
+
 function savePoConfirmed() {
   _invalidateCumulDCCache();
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
@@ -5692,35 +5726,8 @@ function savePoConfirmed() {
     }
   });
 
-  // Step 2: 제품별(ttiNum 기준) 가중평균 계산
-  var groups = {}; // { normTtiNum: { totalCost, totalQty, items:[] } }
-  history.forEach(function(item) {
-    if (item.dryRun) return;
-    var ttiNum = item.ttiNum || '';
-    if (!ttiNum) return;
-    var norm = normalizeTtiCode(ttiNum);
-    if (!norm) return;
-    if (!groups[norm]) groups[norm] = { totalCost: 0, totalQty: 0 };
-    var qty = item.qty || 0;
-    var cost = item.costPrice || 0;
-    groups[norm].totalCost += cost * qty;
-    groups[norm].totalQty += qty;
-  });
-
-  // Step 3: mw_products에 costPriceP 저장
-  var prodUpdated = 0;
-  var nowStr = new Date().toISOString().slice(0, 10);
-  (DB.products || []).forEach(function(p) {
-    if (!p.ttiNum) return;
-    var norm = normalizeTtiCode(p.ttiNum);
-    var g = groups[norm];
-    if (!g || g.totalQty === 0) return;
-    p.costPriceP = Math.round(g.totalCost / g.totalQty);
-    p.costPricePQty = g.totalQty;
-    p.costPricePTotal = Math.round(g.totalCost);
-    p.costPricePDate = nowStr;
-    prodUpdated++;
-  });
+  // Step 2+3: 제품별(ttiNum 기준) 가중평균 원가P 재계산 (recalcCostPriceP로 추출)
+  var prodUpdated = recalcCostPriceP(history);
 
   // Step 3.5: poBatchId 부여 (B안: 프로모션 그룹별 별도 batch + 월별 리셋)
   var nowDate = new Date();
@@ -6071,6 +6078,8 @@ function deleteSelectedPOHistory() {
   var history = JSON.parse(localStorage.getItem('mw_po_history') || '[]');
   history = history.filter(function(entry) { return !idsToDelete[entry.id]; });
   save('mw_po_history', history);
+  recalcCostPriceP(history);
+  save(KEYS.products, DB.products);
   renderPOTab();
   toast(checkboxes.length + '건 삭제 완료');
 }
