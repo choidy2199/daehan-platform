@@ -15522,6 +15522,10 @@ function syncOrderItems(items, dateFrom, dateTo) {
     //   TTI 단가(unitPrice) = 제품 1개 가격 → 대한데브 supplyPrice
     //   TTI 공급가(supplyPrice) = 수량×단가 = 총 금액 → 대한데브 amount
     var _unitPrice = item.unitPrice || 0;
+    // FOC(물량지원): 매칭된 우리 제품이면 매입원가 0원 대신 제품 원가(p.cost)로 보정 (사은품 등 미매칭은 0원 유지)
+    if (promo === 'FOC' && matchedProd && matchedProd.cost > 0) {
+      _unitPrice = matchedProd.cost;
+    }
     var _qty = item.qty || 0;
     var _totalAmount = item.supplyPrice || (_unitPrice * _qty) || 0;
 
