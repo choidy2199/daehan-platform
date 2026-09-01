@@ -17816,11 +17816,23 @@ var _apiKeyFieldMap = {
 // 편집 모드 raw 데이터 캐시
 var _apiRawKeys = null;
 
+// API 키 관리 경로는 관리자 JWT가 필수다. 토큰이 없거나 만료되면
+// 서버가 401/403으로 거부하며, 원본 키와 저장 경로는 공개되지 않는다.
+function _apiAdminHeaders(extra) {
+  var token = localStorage.getItem('session_token') || sessionStorage.getItem('session_token') || '';
+  var headers = Object.assign({}, extra || {});
+  if (token) headers.Authorization = 'Bearer ' + token;
+  return headers;
+}
+
 function renderApiManagement() {
   var container = document.getElementById('api-management-container');
   container.innerHTML = '<div style="text-align:center;padding:40px;color:#9BA3B2;font-size:13px">API 상태 조회 중...</div>';
-  fetch('/api/settings/api-status')
-    .then(function(r) { return r.json(); })
+  fetch('/api/settings/api-status', { headers: _apiAdminHeaders() })
+    .then(function(r) {
+      if (!r.ok) throw new Error('API 상태 조회 권한이 없습니다.');
+      return r.json();
+    })
     .then(function(data) {
       var html = '';
       (data.platforms || []).forEach(function(p) {
@@ -17865,8 +17877,13 @@ function editApiKeys(platformId) {
   if (!body) return;
 
   // raw 키 로드 (최초 1회만)
-  var loadRaw = _apiRawKeys ? Promise.resolve(_apiRawKeys) : fetch('/api/settings/api-status?raw=true')
-    .then(function(r) { return r.json(); })
+  var loadRaw = _apiRawKeys ? Promise.resolve(_apiRawKeys) : fetch('/api/settings/api-status?raw=true', {
+    headers: _apiAdminHeaders()
+  })
+    .then(function(r) {
+      if (!r.ok) throw new Error('API 키 조회 권한이 없습니다.');
+      return r.json();
+    })
     .then(function(data) {
       // 플랫폼별 raw 값 캐시
       var raw = {};
@@ -17942,7 +17959,7 @@ function saveApiKeysFromUI(platformId) {
 
   fetch('/api/settings/api-status', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: _apiAdminHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ keys: keysObj })
   })
     .then(function(r) { return r.json(); })
@@ -17977,7 +17994,7 @@ function testApiConnection(platformId) {
   btn.classList.remove('success', 'fail');
   fetch('/api/settings/api-status', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: _apiAdminHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ platformId: platformId })
   })
     .then(function(r) { return r.json(); })

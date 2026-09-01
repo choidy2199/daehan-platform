@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccessToken } from '@/lib/naver';
 import { getApiKeys, saveApiKeys, ApiKeys } from '@/lib/api-keys';
+import { requireAdmin } from '@/lib/auth-guard';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function maskKey(key: string): string {
   if (!key) return '';
@@ -10,6 +14,9 @@ function maskKey(key: string): string {
 
 // GET — 전체 플랫폼 상태 + 키 조회
 export async function GET(request: NextRequest) {
+  const guard = await requireAdmin(request);
+  if (guard instanceof NextResponse) return guard;
+
   const { searchParams } = new URL(request.url);
   const raw = searchParams.get('raw') === 'true';
   const keys = await getApiKeys();
@@ -80,11 +87,17 @@ export async function GET(request: NextRequest) {
     },
   ];
 
-  return NextResponse.json({ platforms });
+  return NextResponse.json(
+    { platforms },
+    { headers: { 'Cache-Control': 'private, no-store, max-age=0' } },
+  );
 }
 
 // POST — 개별 플랫폼 연결 테스트
 export async function POST(req: NextRequest) {
+  const guard = await requireAdmin(req);
+  if (guard instanceof NextResponse) return guard;
+
   const { platformId } = await req.json();
 
   if (!platformId) {
@@ -196,6 +209,9 @@ export async function POST(req: NextRequest) {
 // PUT — API 키 저장
 export async function PUT(request: NextRequest) {
   try {
+    const guard = await requireAdmin(request);
+    if (guard instanceof NextResponse) return guard;
+
     const body = await request.json();
     const keys = body.keys as ApiKeys;
 
