@@ -1848,6 +1848,10 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// 제품 추가 DC 행별 할인율 (1행: 수공구·액세서리, 2행: 팩아웃) — 저장된 rule.rate 대신 이 값을 사용
+var PRODUCT_DC_RATES = [5, 5];
+function _productDCRate(idx) { return PRODUCT_DC_RATES[idx] || 0; }
+
 // Calculate cost from supply price (엑셀 원가 공식)
 function calcCost(supplyPrice, category, ttiNum) {
   if (!supplyPrice) return 0;
@@ -1862,9 +1866,10 @@ function calcCost(supplyPrice, category, ttiNum) {
     if (vp.rate > 0) { volTotal += sp - (sp / (1 + vp.rate / 100)); }
   });
   // 제품 추가 DC (카테고리 기반) — 개별 계산
-  (s.productDCRules || []).forEach(function(rule) {
-    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
-      volTotal += sp - (sp / (1 + rule.rate / 100));
+  (s.productDCRules || []).forEach(function(rule, idx) {
+    var rate = _productDCRate(idx);
+    if (rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
+      volTotal += sp - (sp / (1 + rate / 100));
     }
   });
   // 누적프로모션 DC역산 (대상 제품만)
@@ -1901,9 +1906,10 @@ function calcBaseCost(supplyPrice, category) {
   const sp = supplyPrice;
   let arTotal = sp * s.quarterDC + sp * s.yearDC;
   let volTotal = 0;
-  (s.productDCRules || []).forEach(function(rule) {
-    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
-      volTotal += sp - (sp / (1 + rule.rate / 100));
+  (s.productDCRules || []).forEach(function(rule, idx) {
+    var rate = _productDCRate(idx);
+    if (rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
+      volTotal += sp - (sp / (1 + rate / 100));
     }
   });
   return sp - arTotal - volTotal;
@@ -12208,8 +12214,8 @@ function showSettingsModal() {
   }
   // 저장된 productDCRules 값 로드
   var rules = s.productDCRules || [];
-  rules.forEach(function(rule) {
-    var prefix = rule.rate === 12 ? 'dc12cat' : rule.rate === 13 ? 'dc13cat' : '';
+  rules.forEach(function(rule, idx) {
+    var prefix = idx === 0 ? 'dc12cat' : idx === 1 ? 'dc13cat' : '';
     if (!prefix) return;
     (rule.categories || []).forEach(function(cat, idx) {
       var el = document.getElementById(prefix + (idx + 1));
@@ -12435,9 +12441,10 @@ function calcOrderCost(price, category, ttiNum, remark) {
     if (vp.rate > 0) { volTotal += price - (price / (1 + vp.rate / 100)); }
   });
   // 제품 추가 DC (카테고리 기반) — 개별 계산
-  (s.productDCRules || []).forEach(function(rule) {
-    if (rule.rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
-      volTotal += price - (price / (1 + rule.rate / 100));
+  (s.productDCRules || []).forEach(function(rule, idx) {
+    var rate = _productDCRate(idx);
+    if (rate > 0 && rule.categories && rule.categories.indexOf(category) !== -1) {
+      volTotal += price - (price / (1 + rate / 100));
     }
   });
   // 누적프로모션 DC역산 (대상 제품만, remark가 normal이거나 미지정일 때만)
@@ -12488,8 +12495,8 @@ function applySettings() {
     var v13 = document.getElementById('dc13cat' + i); if (v13 && v13.value) dc13cats.push(v13.value);
   }
   DB.settings.productDCRules = [
-    { rate: 12, categories: dc12cats },
-    { rate: 13, categories: dc13cats }
+    { rate: PRODUCT_DC_RATES[0], categories: dc12cats },
+    { rate: PRODUCT_DC_RATES[1], categories: dc13cats }
   ];
 
   // 커머셜 프로모션 저장 (mw_settings에 통합)
