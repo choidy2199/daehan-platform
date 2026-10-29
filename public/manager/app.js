@@ -4009,16 +4009,18 @@ function fmtCommaInput(el) {
 
 // 티어 상수
 var HANDTOOL_TIERS = [
-  { amount: 1000000, rate: 8 },
-  { amount: 4000000, rate: 10 },
-  { amount: 12000000, rate: 12 }
+  { amount: 10000000, rate: 5 }
+];
+// 악세사리 = 액세서리 + 드릴비트 (분기)
+var ACCESSORY_TIERS = [
+  { amount: 10000000, rate: 5 }
 ];
 var PACKOUT_TIERS = [
-  { amount: 1000000, rate: 5 },
-  { amount: 3000000, rate: 8 },
-  { amount: 6000000, rate: 10 },
-  { amount: 12000000, rate: 13 }
+  { amount: 10000000, rate: 5 }
 ];
+function _isAccessoryCat(cat) {
+  return cat === '악세사리' || cat === '악세서리' || cat === '액세서리' || cat === '드릴비트';
+}
 
 function getCurrentTier(amount, tiers) {
   var current = { amount: 0, rate: 0 };
@@ -4172,7 +4174,7 @@ function calcPOSalesData() {
     if (p.code) catMap[p.code] = p.category || '';
   });
 
-  var powerTool = 0, handTool = 0, packout = 0, totalMonth = 0, first15 = 0, last15 = 0;
+  var powerTool = 0, handTool = 0, accessory = 0, packout = 0, totalMonth = 0, first15 = 0, last15 = 0;
 
   history.forEach(function(item) {
     if (item.dryRun) return;
@@ -4186,8 +4188,10 @@ function calcPOSalesData() {
 
     // 파워툴: 이번 달 (일반주문만)
     if (isNormal && cat === '파워툴' && d >= monthRange.start && d <= monthRange.end) powerTool += amt;
-    // 수공구+액세서리: 분기 (일반주문만)
-    if (isNormal && (cat === '수공구' || cat === '악세사리' || cat === '액세서리') && d >= quarterRange.start && d <= quarterRange.end) handTool += amt;
+    // 수공구: 분기 (일반주문만)
+    if (isNormal && cat === '수공구' && d >= quarterRange.start && d <= quarterRange.end) handTool += amt;
+    // 악세사리(액세서리+드릴비트): 분기 (일반주문만)
+    if (isNormal && _isAccessoryCat(cat) && d >= quarterRange.start && d <= quarterRange.end) accessory += amt;
     // 팩아웃: 이번 달 (일반주문만)
     if (isNormal && cat === '팩아웃' && d >= monthRange.start && d <= monthRange.end) packout += amt;
 
@@ -4230,6 +4234,7 @@ function calcPOSalesData() {
   return {
     powerTool: powerTool,
     handTool: handTool,
+    accessory: accessory,
     packout: packout,
     totalMonth: totalMonth,
     first15: first15,
@@ -4303,7 +4308,7 @@ function _invalidateCumulDCCache() { _cumulDCCache = null; }
 // ========================================
 function openPoSalesDetailPopup(category) {
   var now = new Date();
-  var isQuarter = (category === '수공구');
+  var isQuarter = (category === '수공구' || category === '악세사리');
   var quarterRange = getQuarterRange(now);
   var monthRange = getMonthRange(now);
 
@@ -4311,6 +4316,7 @@ function openPoSalesDetailPopup(category) {
   var _styles = {
     '파워툴': { color:'#185FA5', bg:'#E6F1FB', badge:'월', badgeBg:'#E6F1FB', badgeColor:'#0C447C' },
     '수공구': { color:'#1D9E75', bg:'#E1F5EE', badge:'분기', badgeBg:'#E1F5EE', badgeColor:'#085041' },
+    '악세사리': { color:'#92400E', bg:'#FEF3C7', badge:'분기', badgeBg:'#FEF3C7', badgeColor:'#92400E' },
     '팩아웃': { color:'#D4537E', bg:'#FCE7F3', badge:'월', badgeBg:'#FCE7F3', badgeColor:'#9D174D' }
   };
   var sty = _styles[category] || _styles['파워툴'];
@@ -4326,7 +4332,7 @@ function openPoSalesDetailPopup(category) {
     return item.category || catMap[_normTti] || catMap[item.ttiNum] || catMap[item.manageCode] || '';
   }
   function _matchCat(cat) {
-    if (category === '수공구') return cat === '수공구' || cat === '악세사리' || cat === '악세서리' || cat === '액세서리';
+    if (category === '악세사리') return _isAccessoryCat(cat);
     return cat === category;
   }
 
@@ -4406,7 +4412,7 @@ function openPoSalesDetailPopup(category) {
 
   var h = '';
   // 헤더
-  var _title = category === '수공구' ? '수공구&액세서리 매입내역' : category + ' 매입내역';
+  var _title = category === '악세사리' ? '악세사리(액세서리·드릴비트) 매입내역' : category + ' 매입내역';
   h += '<div id="po-sdp-header" style="background:#1A1D23;color:#fff;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">';
   h += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:700">' + _title + '</span>';
   h += '<span style="background:' + sty.badgeBg + ';color:' + sty.badgeColor + ';padding:3px 10px;border-radius:4px;font-size:11px;font-weight:600">' + sty.badge + '</span></div>';
@@ -4855,6 +4861,19 @@ function renderPOTab() {
   html += '<div class="po-card-row3">목표 ' + _htMax.rate + '% (' + fmtPO(_htMax.amount) + '원)</div>';
   html += '<div class="po-card-row4" style="color:' + (_htDone ? '#1D9E75' : '#CC2222') + '">' + (_htDone ? '최고 달성' : '부족 ' + fmtPO(_htShortage) + '원') + '</div>';
   html += '<div class="po-card-row5"><div class="po-card-row5-fill" style="width:' + _htPct + '%;background:#1D9E75"></div></div>';
+  html += '</div>';
+
+  // 악세사리 (액세서리 + 드릴비트)
+  var _acMax = ACCESSORY_TIERS[ACCESSORY_TIERS.length - 1];
+  var _acPct = _acMax.amount > 0 ? Math.min(100, Math.round(salesData.accessory / _acMax.amount * 100)) : 0;
+  var _acShortage = Math.max(0, _acMax.amount - salesData.accessory);
+  var _acDone = salesData.accessory >= _acMax.amount;
+  html += '<div class="po-card-cell" style="cursor:pointer" onclick="openPoSalesDetailPopup(\'악세사리\')">';
+  html += '<div class="po-card-row1"><span style="color:#92400E">악세사리</span> <span class="po-card-tag" style="background:#FEF3C7;color:#92400E">분기</span></div>';
+  html += '<div class="po-card-row2">' + fmtPO(salesData.accessory) + '</div>';
+  html += '<div class="po-card-row3">목표 ' + _acMax.rate + '% (' + fmtPO(_acMax.amount) + '원)</div>';
+  html += '<div class="po-card-row4" style="color:' + (_acDone ? '#1D9E75' : '#CC2222') + '">' + (_acDone ? '최고 달성' : '부족 ' + fmtPO(_acShortage) + '원') + '</div>';
+  html += '<div class="po-card-row5"><div class="po-card-row5-fill" style="width:' + _acPct + '%;background:#92400E"></div></div>';
   html += '</div>';
 
   // 팩아웃
