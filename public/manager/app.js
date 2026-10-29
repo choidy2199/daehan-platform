@@ -5357,6 +5357,7 @@ function buildPOListPanel() {
   h += '<button class="po-hdr-btn po-hdr-sync" onclick="startTtiOrderItemsSync()">↻ 밀워키 주문내역 동기화</button>';
   h += '<button id="po-save-btn" class="po-save-btn" onclick="savePoConfirmed()" style="background:#185FA5;color:#fff;border:none;padding:7px 14px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">💾 저장</button>';
   h += '<button id="po-saved-list-btn" onclick="openPoSavedListModal()" style="background:#2A4A8C;color:#fff;border:none;padding:7px 12px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><span style="font-size:13px">📋</span>발주리스트</button>';
+  h += '<button id="po-excel-btn" onclick="downloadPoConfirmedExcel()" title="현재 표시된 발주확정 품목 엑셀 다운로드" style="background:#1D9E75;color:#fff;border:none;padding:7px 12px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:4px"><span style="font-size:13px">📥</span>엑셀 다운로드</button>';
 
   // ⚙ 컬럼 표시 설정 (드롭다운 컨테이너 — position:relative)
   var _poCols = [
@@ -5430,11 +5431,12 @@ function buildPOListPanel() {
   h += '<th data-col="erpStatus" class="center">경영박사</th>';
   h += '</tr></thead><tbody id="po-list-body">';
 
+  // 엑셀 다운로드 대상 = 현재 표시 목록 (빈 목록일 때도 이전 목록이 남지 않도록 항상 초기화)
+  window._poListItems = [];
   if (filtered.length === 0) {
     h += '<tr><td colspan="15" style="text-align:center;padding:40px;color:#9BA3B2;font-size:12px">발주 내역이 없습니다</td></tr>';
   } else {
     filtered.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
-    window._poListItems = [];
     filtered.forEach(function(item) {
       window._poListItems.push(item);
       var _poIdx = window._poListItems.length - 1;
@@ -5846,14 +5848,16 @@ function downloadPoConfirmedExcel() {
   }
 
   var rows = [];
-  var skipped = 0;
+  var unmatched = [];
   items.forEach(function(item) {
     var pCode = item.ttiNum || item.manageCode || '';
     var normCode = normalizeTtiCode(pCode);
     var matched = (DB.products || []).find(function(pr) {
       return (pr.ttiNum && normalizeTtiCode(pr.ttiNum) === normCode) || (pr.code && pr.code === pCode);
     });
-    if (!matched || !matched.code) { skipped++; return; }
+    // 제품 매칭 실패도 누락하지 않고 코드 빈칸으로 포함
+    var erpCode = (matched && matched.code) ? matched.code : '';
+    if (!erpCode) unmatched.push(item.model || pCode || '(모델명 없음)');
 
     var qty = item.qty || 0;
     var costPrice = item.costPrice || 0;
@@ -5861,11 +5865,10 @@ function downloadPoConfirmedExcel() {
     var vat = Math.round(amount * 0.1);
     var jeokyo = _getJeokyoLabel(item.ttiPromotion, item.type);
 
-    rows.push([dealerCode, matched.code, qty, costPrice, amount, vat, jeokyo]);
+    rows.push([dealerCode, erpCode, qty, costPrice, amount, vat, jeokyo]);
   });
 
   if (rows.length === 0) { alert('다운로드할 데이터가 없습니다'); return; }
-  if (skipped > 0) toast('매칭 안 된 ' + skipped + '건 제외됨');
 
   var header = ['거래처코드', '코드', '수량', '매입원가', '금액', '부가세', '적요'];
   var data = [header].concat(rows);
@@ -5876,7 +5879,7 @@ function downloadPoConfirmedExcel() {
   var dd = String(now.getDate()).padStart(2, '0');
   var hh = String(now.getHours()).padStart(2, '0');
   var mi = String(now.getMinutes()).padStart(2, '0');
-  var filename = '밀워키매입_' + yyyy + mm + dd + '_' + hh + mi + '.xlsx';
+  var filename = '밀워키매입_' + (window._poViewBatchId ? window._poViewBatchId + '_' : '') + yyyy + mm + dd + '_' + hh + mi + '.xlsx';
 
   var ws = XLSX.utils.aoa_to_sheet(data);
   var wb = XLSX.utils.book_new();
@@ -5884,6 +5887,9 @@ function downloadPoConfirmedExcel() {
   XLSX.writeFile(wb, filename);
 
   toast('엑셀 다운로드 완료 (' + rows.length + '건)');
+  if (unmatched.length > 0) {
+    alert('제품 코드를 찾지 못한 ' + unmatched.length + '건은 코드 칸이 비어 있습니다. 경영박사 입력 전 확인하세요.\n\n' + unmatched.slice(0, 20).join('\n') + (unmatched.length > 20 ? '\n외 ' + (unmatched.length - 20) + '건' : ''));
+  }
 }
 
 function openPoSavedListModal() {
