@@ -839,7 +839,7 @@ body.gen-edit-active #gen-table tbody tr td:first-child {
 /* 매출카드 — 1행 섹션박스 + 합계 바 */
 .po-cards-area { display:flex; gap:10px; padding:10px 12px 6px; }
 .po-section-box { background:#fff; border:1px solid #DDE1EB; border-radius:8px; overflow:hidden; min-width:0; }
-.po-section-normal { flex:3; }
+.po-section-normal { flex:4; }
 .po-section-promo { flex:4; }
 .po-section-title { background:#1A1D23; padding:7px 14px; font-size:12px; font-weight:600; color:#fff; display:flex; align-items:center; gap:8px; }
 .po-section-sub { font-size:10px; font-weight:400; opacity:0.6; }
